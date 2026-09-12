@@ -1,0 +1,47 @@
+{
+  "attempt": {
+    "attempt_id": "perf3-demo-2026-07-30-01",
+    "client_id": "demo",
+    "requested_model": "qwen3.7-plus",
+    "configured_model": "qwen3.7-plus",
+    "composer_fingerprint": "aeb519f43eb9b4eb9cb4f2dfdf2c48cd34ead754b2edd0225857b5aa084980d4",
+    "verifier_fingerprint": "44999fefb2810dcf4dfb6ae6d7cbc1a69159cda1c9cd99a21b9853bfeb99d41a",
+    "planned_roles": [
+      "composer",
+      "verifier"
+    ],
+    "budget": 2,
+    "retry": 0,
+    "status": "completed",
+    "started_at": "2026-07-30T09:38:33.573765+00:00",
+    "completed_at": "2026-07-30T09:38:41.489094+00:00",
+    "calls_started": 2,
+    "calls_completed": 2
+  },
+  "calls": [
+    {
+      "role": "composer",
+      "requested_model": "qwen3.7-plus",
+      "configured_model": "qwen3.7-plus",
+      "observed_model": "qwen3.7-plus",
+      "status": "completed",
+      "duration_ms": 5194.666,
+      "prompt_tokens": 32256,
+      "completion_tokens": 16,
+      "total_tokens": 32272,
+      "cached_tokens": 0
+    },
+    {
+      "role": "verifier",
+      "requested_model": "qwen3.7-plus",
+      "configured_model": "qwen3.7-plus",
+      "observed_model": "qwen3.7-plus",
+      "status": "completed",
+      "duration_ms": 2550.791,
+      "prompt_tokens": 32035,
+      "completion_tokens": 4,
+      "total_tokens": 32039,
+      "cached_tokens": 0
+    }
+  ]
+}

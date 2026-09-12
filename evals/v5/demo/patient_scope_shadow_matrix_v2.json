@@ -1,0 +1,493 @@
+{
+  "schema_version": "a9.patient_scope_shadow_matrix.v2",
+  "client_id": "demo",
+  "purpose": "Frozen A9 v2 patient-scope shadow expectations with live-only scoring and harness-owned manual-contact applicability.",
+  "authority_decision_allowed": false,
+  "expected_scope_schema": {
+    "extent": ["unknown", "one_tooth", "few_teeth", "full_arch"],
+    "jaw": ["unknown", "upper", "lower", "both"],
+    "stage": ["unknown", "extraction_context", "implant_placed"],
+    "modifiers": ["reported_bone_deficit"]
+  },
+  "scoring_contract": {
+    "scope_match": "per_field_exact_normalized",
+    "metadata_match": "per_field_status_and_stable_error",
+    "observation_priority": [
+      "transport_error",
+      "scoreable_shadow",
+      "runtime_not_available_or_degraded",
+      "pre_planner_manual_contact",
+      "extraction_error"
+    ],
+    "planner_availability_live_only": true,
+    "manual_contact_not_applicable": {
+      "service_route": "ingress_manual_contact",
+      "status": "not_applicable",
+      "reason": "pre_planner_manual_contact"
+    },
+    "not_applicable_retained_in_frozen_total": true,
+    "not_applicable_excluded_from_scoreable_denominators": [
+      "scope",
+      "exact",
+      "positive",
+      "composite"
+    ],
+    "live_quality_separate_from_deterministic_fixtures": true,
+    "current_frame_is_current_turn_only": true,
+    "legacy_session_carry_scored_separately": true,
+    "one_live_call_per_live_turn": true,
+    "retry_failed_case": false,
+    "confidence_is_descriptive_only": true,
+    "confidence_pass_threshold": null,
+    "authority_decision_allowed": false,
+    "product_parity_source": "existing_regression_suites"
+  },
+  "bridge_cases": [
+    {
+      "id": "patient_scope_a9_bridge_01_one_tooth",
+      "raw_patient_situation": "one_tooth_missing",
+      "expected_scope": {"extent": "one_tooth", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "valid", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "rationale": "The scalar kind losslessly provides only the one-tooth extent."
+    },
+    {
+      "id": "patient_scope_a9_bridge_02_few_teeth",
+      "raw_patient_situation": "few_teeth_missing",
+      "expected_scope": {"extent": "few_teeth", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "valid", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "rationale": "The scalar kind losslessly provides only the few-teeth extent."
+    },
+    {
+      "id": "patient_scope_a9_bridge_03_full_arch",
+      "raw_patient_situation": "full_arch_missing",
+      "expected_scope": {"extent": "full_arch", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "valid", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "rationale": "Full-arch extent is known, while upper, lower, or both cannot be inferred."
+    },
+    {
+      "id": "patient_scope_a9_bridge_04_upper",
+      "raw_patient_situation": "upper_jaw_missing_or_complex",
+      "expected_scope": {"extent": "unknown", "jaw": "upper", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "valid", "stage": "defaulted", "modifiers": "defaulted"},
+      "rationale": "The combined legacy kind safely provides upper jaw but not extent or a medical conclusion."
+    },
+    {
+      "id": "patient_scope_a9_bridge_05_implant_placed",
+      "raw_patient_situation": "existing_implant_prosthetic_stage",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "implant_placed", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "valid", "modifiers": "defaulted"},
+      "rationale": "The legacy kind safely provides only the implant-placed care stage."
+    },
+    {
+      "id": "patient_scope_a9_bridge_06_extraction_context",
+      "raw_patient_situation": "extraction_then_implant",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "extraction_context", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "valid", "modifiers": "defaulted"},
+      "rationale": "The scalar kind safely provides an extraction context but not tooth count or jaw."
+    },
+    {
+      "id": "patient_scope_a9_bridge_07_bone_context",
+      "raw_patient_situation": "bone_deficit_or_grafting",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": ["reported_bone_deficit"]},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "valid"},
+      "rationale": "Reported bone context is preserved as a modifier and never promoted to a medical conclusion."
+    },
+    {
+      "id": "patient_scope_a9_bridge_08_urgent_boundary",
+      "raw_patient_situation": "urgent_problem",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "rationale": "Urgency is a medical boundary axis, not patient scope."
+    },
+    {
+      "id": "patient_scope_a9_bridge_09_generic_interest",
+      "raw_patient_situation": "generic_implant_interest",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "rationale": "Generic implant interest is topic or intent context, not patient scope."
+    },
+    {
+      "id": "patient_scope_a9_bridge_10_unknown",
+      "raw_patient_situation": "unknown",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "rationale": "Unknown stays unknown and is never replaced by a nearest scope value."
+    }
+  ],
+  "field_isolation_cases": [
+    {
+      "id": "patient_scope_a9_field_01_invalid_jaw_keeps_extent",
+      "raw_payload": {
+        "route": "content",
+        "aspects": ["overview"],
+        "service_id": null,
+        "followup_of": null,
+        "needs_clarify": false,
+        "patient_situation": null,
+        "brand_filter": null,
+        "topic": null,
+        "topic_confidence": 0.0,
+        "patient_scope": {"extent": "one_tooth", "jaw": "right", "stage": "unknown", "modifiers": []}
+      },
+      "expected_scope": {"extent": "one_tooth", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "valid", "jaw": "invalid", "stage": "valid", "modifiers": "valid"},
+      "expected_field_errors": {"extent": null, "jaw": "patient_jaw_not_allowed", "stage": null, "modifiers": null},
+      "expected_attempt_status": "partial",
+      "rationale": "Future nested target: an invalid jaw must not erase a valid extent."
+    },
+    {
+      "id": "patient_scope_a9_field_02_invalid_extent_keeps_modifier",
+      "raw_payload": {
+        "route": "content",
+        "aspects": ["overview"],
+        "service_id": null,
+        "followup_of": null,
+        "needs_clarify": false,
+        "patient_situation": null,
+        "brand_filter": null,
+        "topic": null,
+        "topic_confidence": 0.0,
+        "patient_scope": {"extent": "several", "jaw": "upper", "stage": "unknown", "modifiers": ["reported_bone_deficit"]}
+      },
+      "expected_scope": {"extent": "unknown", "jaw": "upper", "stage": "unknown", "modifiers": ["reported_bone_deficit"]},
+      "expected_field_status": {"extent": "invalid", "jaw": "valid", "stage": "valid", "modifiers": "valid"},
+      "expected_field_errors": {"extent": "patient_extent_not_allowed", "jaw": null, "stage": null, "modifiers": null},
+      "expected_attempt_status": "partial",
+      "rationale": "Future nested target: invalid extent is isolated while jaw and reported context survive."
+    },
+    {
+      "id": "patient_scope_a9_field_03_invalid_modifier_keeps_stage",
+      "raw_payload": {
+        "route": "content",
+        "aspects": ["overview"],
+        "service_id": null,
+        "followup_of": null,
+        "needs_clarify": false,
+        "patient_situation": null,
+        "brand_filter": null,
+        "topic": null,
+        "topic_confidence": 0.0,
+        "patient_scope": {"extent": "unknown", "jaw": "unknown", "stage": "implant_placed", "modifiers": ["sinus_lift"]}
+      },
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "implant_placed", "modifiers": []},
+      "expected_field_status": {"extent": "valid", "jaw": "valid", "stage": "valid", "modifiers": "invalid"},
+      "expected_field_errors": {"extent": null, "jaw": null, "stage": null, "modifiers": "patient_modifier_not_allowed"},
+      "expected_attempt_status": "partial",
+      "rationale": "Future nested target: an unsupported procedure-like modifier cannot erase a valid stage."
+    },
+    {
+      "id": "patient_scope_a9_field_04_missing_stage_keeps_composite",
+      "raw_payload": {
+        "route": "content",
+        "aspects": ["overview"],
+        "service_id": null,
+        "followup_of": null,
+        "needs_clarify": false,
+        "patient_situation": null,
+        "brand_filter": null,
+        "topic": null,
+        "topic_confidence": 0.0,
+        "patient_scope": {"extent": "full_arch", "jaw": "both", "modifiers": ["reported_bone_deficit"]}
+      },
+      "expected_scope": {"extent": "full_arch", "jaw": "both", "stage": "unknown", "modifiers": ["reported_bone_deficit"]},
+      "expected_field_status": {"extent": "valid", "jaw": "valid", "stage": "missing", "modifiers": "valid"},
+      "expected_field_errors": {"extent": null, "jaw": null, "stage": null, "modifiers": null},
+      "expected_attempt_status": "partial",
+      "rationale": "Future nested target: one missing field does not destroy valid composite neighbors."
+    }
+  ],
+  "single_turn_cases": [
+    {
+      "id": "patient_scope_a9_live_01_one_tooth",
+      "category": "extent",
+      "question": "У меня нет одного зуба, чем его восстановить?",
+      "expected_scope": {"extent": "one_tooth", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "valid", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#5-repository-evidence-inventory", "tests/test_patient_situation.py"],
+      "rationale": "The patient explicitly reports one missing tooth."
+    },
+    {
+      "id": "patient_scope_a9_live_02_few_teeth",
+      "category": "extent",
+      "question": "Не хватает трёх зубов подряд, что можно сделать?",
+      "expected_scope": {"extent": "few_teeth", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "valid", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#5-repository-evidence-inventory", "tests/test_patient_playbook.py"],
+      "rationale": "Three missing teeth explicitly establish the few-teeth extent."
+    },
+    {
+      "id": "patient_scope_a9_live_03_full_arch",
+      "category": "extent",
+      "question": "Нужно восстановить всю челюсть, зубов на ней нет.",
+      "expected_scope": {"extent": "full_arch", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "valid", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#5-repository-evidence-inventory", "tests/test_patient_situation.py"],
+      "rationale": "A whole toothless arch is explicit, but anatomical jaw is not."
+    },
+    {
+      "id": "patient_scope_a9_live_04_upper_full_arch",
+      "category": "composite",
+      "question": "Нет зубов на верхней челюсти.",
+      "expected_scope": {"extent": "full_arch", "jaw": "upper", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "valid", "jaw": "valid", "stage": "defaulted", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#5-repository-evidence-inventory", "tests/test_patient_situation.py"],
+      "rationale": "Both the full-arch extent and upper jaw are explicit."
+    },
+    {
+      "id": "patient_scope_a9_live_05_lower_jaw",
+      "category": "jaw",
+      "question": "Восстановление нужно на нижней челюсти, какие варианты?",
+      "expected_scope": {"extent": "unknown", "jaw": "lower", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "valid", "stage": "defaulted", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#5-repository-evidence-inventory", "evals/v5/archive/implant_golden.v4.json"],
+      "rationale": "Lower jaw is explicit; extent and treatment remain unknown."
+    },
+    {
+      "id": "patient_scope_a9_live_06_both_jaws",
+      "category": "jaw",
+      "question": "Нужно восстановить обе челюсти.",
+      "expected_scope": {"extent": "unknown", "jaw": "both", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "valid", "stage": "defaulted", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#5-repository-evidence-inventory", "docs/PATIENT_SCOPE_DESIGN_A9.md#14-quality-matrix-до-authority"],
+      "rationale": "Both jaws are explicit without a safe extent inference."
+    },
+    {
+      "id": "patient_scope_a9_live_07_implant_placed",
+      "category": "stage",
+      "question": "Имплант уже установлен, что делать дальше?",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "implant_placed", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "valid", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#10-worked-examples", "tests/test_patient_situation.py"],
+      "rationale": "The placed implant establishes a care stage without tooth count or jaw."
+    },
+    {
+      "id": "patient_scope_a9_live_08_planned_extraction",
+      "category": "stage",
+      "question": "Нужно удалить зуб и потом поставить имплант.",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "extraction_context", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "valid", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#5-repository-evidence-inventory", "tests/test_patient_situation.py"],
+      "rationale": "Planned extraction establishes the current coarse extraction context only."
+    },
+    {
+      "id": "patient_scope_a9_live_09_already_removed",
+      "category": "stage",
+      "question": "Зуб уже удалили, хочу поставить имплант.",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "extraction_context", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "valid", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#5-repository-evidence-inventory", "tests/test_patient_situation.py"],
+      "rationale": "Already removed and planned removal share the current coarse stage enum."
+    },
+    {
+      "id": "patient_scope_a9_live_10_bone_context",
+      "category": "modifier",
+      "question": "Врач сказал, что у меня мало кости.",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": ["reported_bone_deficit"]},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "valid"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#5-repository-evidence-inventory", "tests/test_patient_situation.py"],
+      "rationale": "The patient reports a clinician statement; it remains contextual and non-diagnostic."
+    },
+    {
+      "id": "patient_scope_a9_live_11_full_composite",
+      "category": "composite",
+      "question": "Нет зубов на верхней челюсти, врач сказал, что мало кости.",
+      "expected_scope": {"extent": "full_arch", "jaw": "upper", "stage": "unknown", "modifiers": ["reported_bone_deficit"]},
+      "expected_field_status": {"extent": "valid", "jaw": "valid", "stage": "defaulted", "modifiers": "valid"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#10-worked-examples", "tests/test_patient_situation.py"],
+      "rationale": "Three independent facts are explicit without selecting a protocol."
+    },
+    {
+      "id": "patient_scope_a9_live_12_scoped_price",
+      "category": "composite",
+      "question": "Сколько стоит восстановление всей верхней челюсти?",
+      "expected_scope": {"extent": "full_arch", "jaw": "upper", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "valid", "jaw": "valid", "stage": "defaulted", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#5-repository-evidence-inventory", "tests/price_query_cases.py"],
+      "rationale": "Price intent does not erase the explicit full-arch and upper-jaw facts."
+    },
+    {
+      "id": "patient_scope_a9_live_13_one_tooth_extraction",
+      "category": "composite",
+      "question": "Один зуб нужно удалить и затем восстановить имплантом.",
+      "expected_scope": {"extent": "one_tooth", "jaw": "unknown", "stage": "extraction_context", "modifiers": []},
+      "expected_field_status": {"extent": "valid", "jaw": "defaulted", "stage": "valid", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#5-repository-evidence-inventory", "docs/PATIENT_SCOPE_DESIGN_A9.md#14-quality-matrix-до-authority"],
+      "rationale": "One-tooth extent and extraction context are independently explicit."
+    },
+    {
+      "id": "patient_scope_a9_live_14_upper_bone",
+      "category": "composite",
+      "question": "Сверху мало кости, врач обсуждает восстановление.",
+      "expected_scope": {"extent": "unknown", "jaw": "upper", "stage": "unknown", "modifiers": ["reported_bone_deficit"]},
+      "expected_field_status": {"extent": "defaulted", "jaw": "valid", "stage": "defaulted", "modifiers": "valid"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#3-current-state", "docs/PATIENT_SCOPE_DESIGN_A9.md#14-quality-matrix-до-authority"],
+      "rationale": "Upper location and reported bone context are explicit; extent is not."
+    },
+    {
+      "id": "patient_scope_a9_live_15_information",
+      "category": "negative",
+      "question": "Что такое имплантация?",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#5-repository-evidence-inventory", "tests/test_patient_situation.py"],
+      "rationale": "An informational request provides no facts about this patient's scope."
+    },
+    {
+      "id": "patient_scope_a9_live_16_generic_price",
+      "category": "negative",
+      "question": "Сколько стоит имплантация?",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#5-repository-evidence-inventory", "tests/price_query_cases.py"],
+      "rationale": "Generic price intent supplies no patient extent, jaw, stage, or modifier."
+    },
+    {
+      "id": "patient_scope_a9_live_17_urgent_only",
+      "category": "negative",
+      "question": "Очень болит зуб, что делать?",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#5-repository-evidence-inventory", "tests/test_patient_situation.py"],
+      "rationale": "Pain and urgency belong to medical boundary handling, not patient scope."
+    },
+    {
+      "id": "patient_scope_a9_live_18_named_service",
+      "category": "negative",
+      "question": "Сколько стоит All-on-4?",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#6-orthogonal-dimensions-что-входит-в-target", "docs/PATIENT_SCOPE_DESIGN_A9.md#12-medical-и-product-firewall"],
+      "rationale": "A named service is not evidence of the patient's anatomical scope."
+    },
+    {
+      "id": "patient_scope_a9_live_19_other_dental",
+      "category": "negative",
+      "question": "Безопасно ли отбеливание зубов?",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#5-repository-evidence-inventory", "docs/PATIENT_SCOPE_DESIGN_A9.md#14-quality-matrix-до-authority"],
+      "rationale": "The scope contract is not an implant-only topic classifier and must stay unknown."
+    },
+    {
+      "id": "patient_scope_a9_live_20_booking_complaint",
+      "category": "negative",
+      "question": "Очень болит зуб, срочно запишите меня.",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "evidence_refs": ["docs/PATIENT_SCOPE_DESIGN_A9.md#5-repository-evidence-inventory", "tests/test_explicit_booking_lead_gate.py"],
+      "rationale": "Booking and a complaint are handled outside the patient-scope axes."
+    }
+  ],
+  "multi_turn_cases": [
+    {
+      "id": "patient_scope_a9_multi_01_safe_vague_price",
+      "category": "safe_carry_boundary",
+      "turns": [
+        {
+          "turn": 1,
+          "question": "У меня нет одного зуба, хочу его восстановить.",
+          "score_current_scope": true,
+          "expected_current_scope": {"extent": "one_tooth", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+          "expected_current_field_status": {"extent": "valid", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"}
+        },
+        {
+          "turn": 2,
+          "question": "А сколько это стоит?",
+          "score_current_scope": true,
+          "expected_current_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+          "expected_current_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"}
+        }
+      ],
+      "session_boundary": "legacy_carry_not_materialized_into_current_shadow",
+      "rationale": "The old product may use a separate carry source, while the vague current observation remains unknown."
+    },
+    {
+      "id": "patient_scope_a9_multi_02_stale_carry",
+      "category": "stale_carry_boundary",
+      "turns": [
+        {
+          "turn": 1,
+          "question": "У меня нет одного зуба, хочу его восстановить.",
+          "score_current_scope": true,
+          "expected_current_scope": {"extent": "one_tooth", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+          "expected_current_field_status": {"extent": "valid", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"}
+        },
+        {
+          "turn": 2,
+          "question": "А сколько это стоит?",
+          "score_current_scope": true,
+          "expected_current_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+          "expected_current_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"}
+        }
+      ],
+      "session_boundary": "expired_legacy_snapshot_not_materialized",
+      "rationale": "Before turn two the future harness expires the legacy snapshot through public age semantics; the current frame remains independent."
+    },
+    {
+      "id": "patient_scope_a9_multi_03_topic_replacement",
+      "category": "topic_replacement",
+      "turns": [
+        {
+          "turn": 1,
+          "question": "У меня нет одного зуба, хочу его восстановить.",
+          "score_current_scope": true,
+          "expected_current_scope": {"extent": "one_tooth", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+          "expected_current_field_status": {"extent": "valid", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"}
+        },
+        {
+          "turn": 2,
+          "question": "А теперь расскажите про отбеливание.",
+          "score_current_scope": true,
+          "expected_current_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+          "expected_current_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"}
+        }
+      ],
+      "session_boundary": "explicit_topic_replacement_clears_legacy_scope",
+      "rationale": "A new dental topic must not inherit the previous patient scope."
+    },
+    {
+      "id": "patient_scope_a9_multi_04_conflicting_current_value",
+      "category": "current_over_carried_conflict",
+      "turns": [
+        {
+          "turn": 1,
+          "question": "Нет зубов на верхней челюсти.",
+          "score_current_scope": true,
+          "expected_current_scope": {"extent": "full_arch", "jaw": "upper", "stage": "unknown", "modifiers": []},
+          "expected_current_field_status": {"extent": "valid", "jaw": "valid", "stage": "defaulted", "modifiers": "defaulted"}
+        },
+        {
+          "turn": 2,
+          "question": "Нет, я ошибся: проблема на нижней челюсти, не хватает нескольких зубов.",
+          "score_current_scope": true,
+          "expected_current_scope": {"extent": "few_teeth", "jaw": "lower", "stage": "unknown", "modifiers": []},
+          "expected_current_field_status": {"extent": "valid", "jaw": "valid", "stage": "defaulted", "modifiers": "defaulted"}
+        }
+      ],
+      "session_boundary": "explicit_current_values_win_without_frame_merge",
+      "rationale": "Explicit correction on the current turn wins; upper/full-arch values are not merged into it."
+    },
+    {
+      "id": "patient_scope_a9_multi_05_jaw_arrives_second",
+      "category": "composite_across_turns_boundary",
+      "turns": [
+        {
+          "turn": 1,
+          "question": "Не хватает нескольких зубов.",
+          "score_current_scope": true,
+          "expected_current_scope": {"extent": "few_teeth", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+          "expected_current_field_status": {"extent": "valid", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"}
+        },
+        {
+          "turn": 2,
+          "question": "Они снизу.",
+          "score_current_scope": true,
+          "expected_current_scope": {"extent": "unknown", "jaw": "lower", "stage": "unknown", "modifiers": []},
+          "expected_current_field_status": {"extent": "defaulted", "jaw": "valid", "stage": "defaulted", "modifiers": "defaulted"}
+        }
+      ],
+      "session_boundary": "prior_extent_remains_separate_from_current_observation",
+      "rationale": "The second turn adds a jaw observation but does not create an unreviewed effective merged frame."
+    }
+  ]
+}

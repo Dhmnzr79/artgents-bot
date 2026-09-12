@@ -90,7 +90,7 @@ lead_turn:
 
 # Follow-up compatibility (PRODUCT_WORK_PLAN stage 4a)
 follow_up:
-  max_subject_turn_age: 4
+  max_service_focus_turn_age: 4
   min_compat_score: 0.15
   doc_type_boost: 0.04
 
@@ -106,11 +106,4 @@ facet_arbitration:
     - duration
     - comparison
   min_facet_score: 0.72
-
-# Patient situation router — soft routing gates (Slice 2+)
-patient_situation:
-  min_confidence_for_routing: 0.8
-  unit_match_boost: 0.04
-  unit_mismatch_penalty: 0.06
-  max_turn_age: 4
 

@@ -1,0 +1,38 @@
+{"timestamp_utc": "2026-07-23T11:46:07.814065+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_info_01", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 1, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:14.116018+00:00", "case_id": "fc_info_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 1}
+{"timestamp_utc": "2026-07-23T11:46:14.163011+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_info_02", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 2, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:16.465325+00:00", "case_id": "fc_info_02", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 2}
+{"timestamp_utc": "2026-07-23T11:46:16.514998+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_pain_01", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 3, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:18.060150+00:00", "case_id": "fc_pain_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 3}
+{"timestamp_utc": "2026-07-23T11:46:18.108740+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_price_01", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 4, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:19.530517+00:00", "case_id": "fc_price_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 4}
+{"timestamp_utc": "2026-07-23T11:46:19.585325+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_payment_01", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 5, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:21.494863+00:00", "case_id": "fc_payment_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 5}
+{"timestamp_utc": "2026-07-23T11:46:21.564702+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_doctor_01", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 6, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:23.056809+00:00", "case_id": "fc_doctor_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 6}
+{"timestamp_utc": "2026-07-23T11:46:23.113084+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_marketing_01", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 7, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:24.268862+00:00", "case_id": "fc_marketing_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 7}
+{"timestamp_utc": "2026-07-23T11:46:24.332777+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_medical_01", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 8, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:25.956302+00:00", "case_id": "fc_medical_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 8}
+{"timestamp_utc": "2026-07-23T11:46:25.998614+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_medical_02", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 9, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:27.618662+00:00", "case_id": "fc_medical_02", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 9}
+{"timestamp_utc": "2026-07-23T11:46:27.659981+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_medical_03", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 10, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:29.558155+00:00", "case_id": "fc_medical_03", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 10}
+{"timestamp_utc": "2026-07-23T11:46:29.604250+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_missing_01", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 11, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:31.125459+00:00", "case_id": "fc_missing_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 11}
+{"timestamp_utc": "2026-07-23T11:46:31.169574+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_missing_02", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 12, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:33.408247+00:00", "case_id": "fc_missing_02", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 12}
+{"timestamp_utc": "2026-07-23T11:46:33.436108+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_boundary_01", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 13, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:35.908994+00:00", "case_id": "fc_boundary_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 13}
+{"timestamp_utc": "2026-07-23T11:46:35.977647+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_boundary_02", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 14, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:37.769214+00:00", "case_id": "fc_boundary_02", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 14}
+{"timestamp_utc": "2026-07-23T11:46:37.820654+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_boundary_03", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 15, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:39.547175+00:00", "case_id": "fc_boundary_03", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 15}
+{"timestamp_utc": "2026-07-23T11:46:39.593208+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_price_02", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 16, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:41.569851+00:00", "case_id": "fc_price_02", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 16}
+{"timestamp_utc": "2026-07-23T11:46:41.612214+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_info_03", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 17, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:43.103425+00:00", "case_id": "fc_info_03", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 17}
+{"timestamp_utc": "2026-07-23T11:46:43.151546+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_commercial_02", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 18, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:44.691908+00:00", "case_id": "fc_commercial_02", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 18}
+{"timestamp_utc": "2026-07-23T11:46:44.740310+00:00", "measurement_id": "s53_fullcontext_verifier_replay_live", "case_id": "fc_boundary_04", "provider": "semantic_verifier", "model": "qwen3.7-plus", "call_index": 19, "phase": "call_start"}
+{"timestamp_utc": "2026-07-23T11:46:46.318852+00:00", "case_id": "fc_boundary_04", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 19}

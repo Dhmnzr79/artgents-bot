@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "records": [
+    {
+      "family_price_id": "implantology_from",
+      "topic": "implantation",
+      "price": {
+        "mode": "from",
+        "min_amount": 35000,
+        "currency": "RUB",
+        "billing_unit": "implant"
+      },
+      "applies_to_service_ids": [
+        "classic",
+        "one_stage",
+        "all_on_4",
+        "all_on_6"
+      ],
+      "approved_context": "Цены на имплантацию начинаются от 35 000 ₽. Подробности и точную стоимость врач определит на консультации."
+    },
+    {
+      "family_price_id": "crowns_from",
+      "topic": "prosthetics",
+      "price": {
+        "mode": "from",
+        "min_amount": 22000,
+        "currency": "RUB",
+        "billing_unit": "tooth"
+      },
+      "applies_to_service_ids": [
+        "zirconia_crowns",
+        "metal_ceramic_crowns"
+      ],
+      "approved_context": "Цены на коронки начинаются от 22 000 ₽. Точную стоимость врач определит на консультации."
+    },
+    {
+      "family_price_id": "dentures_from",
+      "topic": "prosthetics",
+      "price": {
+        "mode": "from",
+        "min_amount": 35000,
+        "currency": "RUB",
+        "billing_unit": "jaw"
+      },
+      "applies_to_service_ids": [
+        "removable_dentures",
+        "clasp_dentures",
+        "implant_supported_prosthetics"
+      ],
+      "approved_context": "Цены на зубные протезы начинаются от 35 000 ₽. Точную стоимость врач определит на консультации."
+    },
+    {
+      "family_price_id": "teeth_treatment_from",
+      "topic": "therapy",
+      "price": {
+        "mode": "from",
+        "min_amount": 5000,
+        "currency": "RUB",
+        "billing_unit": "tooth"
+      },
+      "applies_to_service_ids": [
+        "teeth_treatment",
+        "caries"
+      ],
+      "approved_context": "Стоимость лечения зубов зависит от объёма работы. Ориентир — от 5 000 ₽; точную сумму врач назовёт после осмотра."
+    }
+  ]
+}

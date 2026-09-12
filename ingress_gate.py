@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from collections.abc import Callable
 from typing import Any
 
 from config import INGRESS_CLASSIFY_MODEL
@@ -21,6 +22,7 @@ from core.clinic_policies_loader import (
     policy_answer,
     service_alternative_quick_replies,
 )
+from core.target_contact_authority import format_manual_contact_phone_suffix_for_client
 from core.routing_loader import THRESHOLDS
 from doctors_lookup import doctor_ground_truth_mention
 from llm import chat_completions_create
@@ -132,19 +134,13 @@ _INGRESS_COMPARISON_HINT_RE = re.compile(
 )
 
 
-def _client_catalog_path(client_id: str) -> str:
-    root = os.path.dirname(os.path.abspath(__file__))
-    cid = (client_id or "").strip() or "default"
-    return os.path.join(root, "clients", cid, "service_catalog.json")
+from core.target_client_data import service_catalog_dict
 
 
 def _read_service_catalog(client_id: str) -> dict[str, Any]:
-    path = _client_catalog_path(client_id)
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            obj = json.load(f)
-        return obj if isinstance(obj, dict) else {}
-    except (OSError, json.JSONDecodeError):
+        return service_catalog_dict(client_id)
+    except Exception:
         return {}
 
 
@@ -203,15 +199,42 @@ def _offered_phrases(catalog: dict[str, Any]) -> list[str]:
             continue
         if svc.get("active") is False:
             continue
-        title = str(svc.get("title") or "").strip()
-        if len(title) >= 3:
-            phrases.append(_norm_text(title))
+        name = str(svc.get("name") or "").strip()
+        if len(name) >= 3:
+            phrases.append(_norm_text(name))
         for raw in svc.get("aliases") or []:
             a = _norm_text(str(raw))
             if len(a) >= 3:
                 phrases.append(a)
     phrases.sort(key=len, reverse=True)
     return phrases
+
+
+def _inactive_catalog_phrases(catalog: dict[str, Any]) -> list[str]:
+    phrases: list[str] = []
+    for _sid, svc in catalog.items():
+        if not isinstance(svc, dict) or svc.get("active") is not False:
+            continue
+        name = str(svc.get("name") or "").strip()
+        if len(name) >= 3:
+            phrases.append(_norm_text(name))
+        for raw in svc.get("aliases") or []:
+            alias = _norm_text(str(raw))
+            if len(alias) >= 3:
+                phrases.append(alias)
+    phrases.sort(key=len, reverse=True)
+    return phrases
+
+
+def catalog_inactive_mention(text: str, client_id: str) -> bool:
+    """True when text matches an authored inactive catalog record (exact inactive handling)."""
+    low = _norm_text(text)
+    if not low:
+        return False
+    for phrase in _inactive_catalog_phrases(_read_service_catalog(client_id)):
+        if phrase in low:
+            return True
+    return False
 
 
 def catalog_offers_mention(text: str, client_id: str) -> bool:
@@ -238,10 +261,10 @@ def _offered_services_summary(client_id: str, *, max_items: int = 40) -> str:
     for sid, svc in catalog.items():
         if not isinstance(svc, dict) or svc.get("active") is False:
             continue
-        title = str(svc.get("title") or sid).strip()
+        name = str(svc.get("name") or sid).strip()
         aliases = svc.get("aliases") or []
         al = ", ".join(str(a) for a in aliases[:6] if str(a).strip())
-        lines.append(f"- {title}" + (f" ({al})" if al else ""))
+        lines.append(f"- {name}" + (f" ({al})" if al else ""))
         if len(lines) >= max_items:
             break
     return "\n".join(lines) if lines else "(список пуст)"
@@ -315,6 +338,27 @@ def _apply_offered_ground_truth(
         policy_key=None,
         requested_service=None,
         source=source,
+        is_urgent=False,
+    )
+
+
+def _apply_catalog_miss_availability_policy(
+    result: IngressRouteResult, question: str, client_id: str
+) -> IngressRouteResult:
+    """Catalog miss is not proof of non-offering — route to normal Generic path."""
+    if result.route != "service_not_offered":
+        return result
+    if ingress_entity_offered(question, client_id):
+        return result
+    if catalog_inactive_mention(question, client_id):
+        return result
+    return IngressRouteResult(
+        route="normal",
+        confidence=float(result.confidence),
+        reason="catalog_miss_availability_routing",
+        policy_key=None,
+        requested_service=None,
+        source="fallback",
         is_urgent=False,
     )
 
@@ -398,6 +442,7 @@ def _call_ingress_llm(question: str, client_id: str, sid: str) -> IngressRouteRe
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
+                provider_call_source="ingress",
             )
         log_llm_usage(
             logger,
@@ -460,9 +505,19 @@ def classify_ingress(
     client_id: str,
     sid: str,
     skip: bool = False,
+    on_llm_path: "Callable[[], None] | None" = None,
 ) -> IngressRouteResult:
     """
     Classify ingress route. skip=True for ref-click / empty q (forced normal).
+
+    `on_llm_path`, if given, is called exactly once, immediately before this function
+    invokes its own real LLM call -- i.e. only after `skip`, the length check, the
+    policy match, and the deterministic-normal check have all already found nothing
+    (PERF-4: the seam a caller can use to start other independent work concurrently
+    with Ingress's LLM call, without duplicating any of the checks above). Never
+    called on a deterministic-rule hit. Default `None` is a pure no-op -- every
+    existing caller, and any test that replaces this function wholesale, is
+    unaffected.
     """
     if skip:
         return _normal_skipped("ingress_skipped_ref_or_empty")
@@ -478,6 +533,9 @@ def classify_ingress(
     det = _ingress_deterministic_normal(msg)
     if det is not None:
         return det
+
+    if on_llm_path is not None:
+        on_llm_path()
 
     try:
         result = _call_ingress_llm(msg, client_id, sid)
@@ -503,6 +561,7 @@ def classify_ingress(
         )
 
     result = _apply_offered_ground_truth(result, msg, client_id)
+    result = _apply_catalog_miss_availability_policy(result, msg, client_id)
     return _apply_confidence_threshold(result)
 
 
@@ -514,8 +573,10 @@ def build_ingress_payload(
     question: str = "",
 ) -> dict[str, Any]:
     bundle = load_clinic_policies(client_id)
-    phone = (bundle.contact_phone_display if bundle else "") or ""
-    phone_suffix = f" по номеру {phone}" if phone else ""
+    phone_suffix = format_manual_contact_phone_suffix_for_client(
+        client_id,
+        branch_hint=question,
+    )
     quick_replies: list[dict[str, str]] = []
 
     if result.route == "hard_stop_non_target":

@@ -1,0 +1,43 @@
+{
+  "offer_id": "zygomatic_implants.default",
+  "service_id": "zygomatic_implants",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 420000,
+    "currency": "RUB",
+    "billing_unit": "jaw"
+  },
+  "package": {
+    "label": "за хирургический этап на верхнюю челюсть",
+    "includes": [
+      "установка скуловых имплантов по плану лечения",
+      "местная анестезия",
+      "временное протезирование по клиническим показаниям"
+    ],
+    "excludes": [
+      "постоянный протез",
+      "КТ",
+      "седация/наркоз"
+    ]
+  },
+  "fact_refs": [
+    "free_implant_consult",
+    "implant_warranty",
+    "installment_12",
+    "implant_same_day_discount"
+  ],
+  "followups": [],
+  "applies_to_extents": [
+    "full_arch"
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Постоянный протез, КТ и седация/наркоз — отдельно."
+      }
+    ]
+  }
+}

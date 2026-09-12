@@ -1,0 +1,829 @@
+"""Offline harness for S47 FullContext response live eval preparation."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from collections.abc import Callable, Sequence
+from dataclasses import asdict, is_dataclass
+from datetime import date
+from pathlib import Path
+from typing import Any
+
+_EVAL_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _EVAL_DIR.parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from contracts.doctor_schema_refs import (
+    DoctorCatalogExternalIndex,
+    build_doctor_source_refs,
+    validate_doctor_catalog_external_refs,
+)
+from contracts.response_schema import TargetStrategyMatch
+from contracts.response_schema_refs import (
+    ResponseSchemaExternalIndex,
+    validate_response_schema_external_refs,
+)
+from contracts.service_consultation import validate_service_consultation_refs
+from contracts.target_medical_boundary import (
+    TargetMedicalBoundaryResult,
+    TargetMedicalBoundaryTerminalEnforcement,
+)
+from contracts.target_turn_frame_dispatch import (
+    TargetTurnFrameBoundMaterializeResponse,
+    TargetTurnFrameBoundTerminalResponse,
+)
+from core.doctor_schema_loader import load_doctor_catalog
+from core.response_schema_kb_index import build_response_schema_kb_refs
+from core.response_schema_loader import load_response_schema_bundle
+from core.service_consultation_source import build_service_consultation_values
+from core.target_boundary_enforced_fullcontext_response import (
+    run_target_offline_boundary_enforced_fullcontext_response,
+)
+from core.target_cached_full_context import build_target_cached_full_context
+from core.target_composer_executor import TargetComposerTone
+from core.target_response_verifier import TargetResponseVerificationError
+from core.turn_frame_from_raw import build_turn_frame_from_raw
+from evals.v5.fullcontext_response_eval_backend import (
+    FullContextResponseEvalComposerAdapter,
+    FullContextResponseEvalLiveNotConfiguredError,
+    FullContextResponseEvalRecordingComposerBackend,
+    FullContextResponseEvalRecordingSemanticBackend,
+    FullContextResponseEvalSemanticAdapter,
+    FullContextResponseEvalTransportError,
+)
+from evals.v5.fullcontext_response_eval_contract import (
+    ATTEMPT_MARKER_EXISTS_CODE,
+    AUTOMATED_ACCEPTANCE_THRESHOLDS,
+    AUTOMATED_THRESHOLDS_STATUS,
+    AttemptMarkerExistsError,
+    CASE_RESULT_KEYS,
+    DEFAULT_LIVE_ARTIFACT_PATHS,
+    DEFAULT_V2_LIVE_ARTIFACT_PATHS,
+    FINAL_ACCEPTANCE_GATES,
+    FINAL_GATES_STATUS,
+    FROZEN_MATRIX_HASH,
+    LIVE_RAW_ARTIFACT_PATH,
+    LIVE_RESULT_ARTIFACT_PATH,
+    MALFORMED_ERROR_CODES,
+    MEASUREMENT_ID,
+    MEASUREMENT_ID_V2,
+    MATRIX_PATH,
+    MODEL_RECOMMENDATION,
+    TRANSPORT_ERROR_CODES,
+    V2_EXPECTED_LLM_CALLS,
+    V2_LIVE_ATTEMPT_MARKER_PATH,
+    V2_LIVE_RAW_ARTIFACT_PATH,
+    V2_LIVE_RESULT_ARTIFACT_PATH,
+    V2_LIVE_MANUAL_REVIEW_ARTIFACT_PATH,
+    V2_MATRIX_HASH,
+    V2_MATRIX_PATH,
+    V2_RUN_MANIFEST_ARTIFACT_PATH,
+    HarnessConfigError,
+    LiveArtifactWriteError,
+    aggregate_automated_metrics,
+    assert_live_artifacts_absent,
+    assert_v2_attempt_marker_absent,
+    build_literal_and_semantic_extensions,
+    build_v2_attempt_marker_payload,
+    create_v2_attempt_marker_exclusive,
+    derive_case_automated_flags,
+    evaluate_automated_verdict,
+    evaluate_final_verdict,
+    extract_candidate_text_from_composer_payload,
+    load_frozen_matrix,
+    load_matrix_by_path,
+    load_v2_matrix,
+    prepare_json_artifact_payload,
+    raw_literal_forbidden_hits,
+    record_v2_provider_call_started,
+)
+
+
+def _serialize_raw_payload(payload: object) -> object:
+    if type(payload) is str:
+        return payload
+    if is_dataclass(payload):
+        return asdict(payload)
+    if isinstance(payload, dict):
+        return dict(payload)
+    if hasattr(payload, "__dict__") and isinstance(payload.__dict__, dict):
+        return {
+            key: value
+            for key, value in payload.__dict__.items()
+            if not key.startswith("_")
+        }
+    return repr(payload)
+
+
+def _load_pipeline_context(spec: dict[str, Any]) -> dict[str, object]:
+    defaults = spec["pipeline_defaults"]
+    demo_root = _REPO_ROOT / "clients" / "demo"
+    md_root = _REPO_ROOT / str(defaults["md_root"])
+    target_root = _REPO_ROOT / str(defaults["target_root"])
+    bundle = load_response_schema_bundle(target_root)
+    doctors = load_doctor_catalog(demo_root / "doctor_catalog.json")
+    kb_refs = build_response_schema_kb_refs(md_root)
+    doctor_index = DoctorCatalogExternalIndex(
+        service_ids=tuple(bundle.services),
+        kb_refs=kb_refs,
+    )
+    validate_doctor_catalog_external_refs(doctors, doctor_index)
+    external_index = ResponseSchemaExternalIndex(
+        kb_refs=kb_refs,
+        doctor_refs=build_doctor_source_refs(doctors),
+    )
+    validate_response_schema_external_refs(bundle, external_index)
+    consultations = build_service_consultation_values(md_root)
+    validate_service_consultation_refs(consultations, bundle.services)
+    return {
+        "bundle": bundle,
+        "doctor_catalog": doctors,
+        "external_index": external_index,
+        "consultation_values": consultations,
+        "md_root": md_root,
+        "cached_full_context": build_target_cached_full_context(md_root),
+        "brand_term": None,
+        "strategy_context": TargetStrategyMatch(
+            family="implantology",
+            extent="full_arch",
+        ),
+        "semantic_context": str(defaults["semantic_context"]),
+        "today": date(2026, 7, 22),
+        "include_initial_block": bool(defaults["include_initial_block"]),
+        "include_consultation_close": bool(defaults["include_consultation_close"]),
+        "include_cta": bool(defaults["include_cta"]),
+        "tone": TargetComposerTone(
+            key="commercial_warm",
+            instruction="Отвечай доброжелательно и без давления.",
+        ),
+    }
+
+
+def classify_observed_outcome(result: object) -> tuple[str, str | None, str | None]:
+    if type(result) is TargetMedicalBoundaryTerminalEnforcement:
+        return "terminal_boundary_uncertain", None, None
+    if isinstance(result, TargetTurnFrameBoundMaterializeResponse):
+        return (
+            "materialize_verified",
+            result.dispatch.policy_request.response_mode,
+            result.verified.verification_status,
+        )
+    if isinstance(result, TargetTurnFrameBoundTerminalResponse):
+        return f"terminal_s41_{result.dispatch.terminal_mode}", None, None
+    return "unknown", None, None
+
+
+def provider_call_violation(
+    *,
+    expected_outcome: str,
+    composer_calls: int,
+    semantic_calls: int,
+) -> bool:
+    if expected_outcome == "terminal_boundary_uncertain":
+        return composer_calls != 0 or semantic_calls != 0
+    if expected_outcome == "materialize_verified":
+        return composer_calls != 1 or semantic_calls != 1
+    return True
+
+
+def forbidden_claim_violations(text: str, forbidden_claims: Sequence[str]) -> list[str]:
+    return raw_literal_forbidden_hits(text, list(forbidden_claims))
+
+
+def is_target_response_verification_error(error: BaseException) -> bool:
+    return type(error) is TargetResponseVerificationError
+
+
+def run_case(
+    *,
+    case: dict[str, Any],
+    index: int,
+    spec: dict[str, Any],
+    context: dict[str, object],
+    composer_backend: FullContextResponseEvalRecordingComposerBackend,
+    semantic_backend: FullContextResponseEvalRecordingSemanticBackend,
+) -> dict[str, Any]:
+    allowlist = spec["turn_frame_allowlist"]
+    turn_frame = build_turn_frame_from_raw(
+        case["turn_frame_raw"],
+        allowed_topics=frozenset(allowlist["allowed_topics"]),
+        allowed_service_ids=frozenset(allowlist["allowed_service_ids"]),
+    )
+    boundary = TargetMedicalBoundaryResult.model_validate(case["boundary_result"])
+    policy = case["policy_envelope"]
+    try:
+        result = run_target_offline_boundary_enforced_fullcontext_response(
+            turn_frame,
+            boundary,
+            context["bundle"],  # type: ignore[arg-type]
+            context["doctor_catalog"],  # type: ignore[arg-type]
+            context["external_index"],  # type: ignore[arg-type]
+            context["consultation_values"],  # type: ignore[arg-type]
+            tone_key=policy["tone_key"],
+            allowed_topics=tuple(policy["allowed_topics"]),
+            forbidden_topics=tuple(policy["forbidden_topics"]),
+            required_fact_ids=tuple(policy["required_fact_ids"]),
+            allow_marketing_facts=bool(policy["allow_marketing_facts"]),
+            allow_consultation_close=bool(policy["allow_consultation_close"]),
+            allow_cta=bool(policy["allow_cta"]),
+            min_topic_confidence=float(policy["min_topic_confidence"]),
+            min_service_confidence=float(policy["min_service_confidence"]),
+            min_intent_confidence=float(policy["min_intent_confidence"]),
+            brand_term=context["brand_term"],  # type: ignore[arg-type]
+            strategy_context=context["strategy_context"],  # type: ignore[arg-type]
+            semantic_context=str(context["semantic_context"]),
+            today=context["today"],  # type: ignore[arg-type]
+            md_root=context["md_root"],  # type: ignore[arg-type]
+            cached_full_context=context["cached_full_context"],  # type: ignore[arg-type]
+            include_initial_block=bool(context["include_initial_block"]),
+            include_consultation_close=bool(context["include_consultation_close"]),
+            include_cta=bool(context["include_cta"]),
+            user_message=str(case["user_message"]).strip(),
+            tone=context["tone"],  # type: ignore[arg-type]
+            composer_backend=composer_backend,
+            semantic_backend=semantic_backend,
+        )
+    except Exception as error:
+        composer_payload = _serialize_raw_payload(
+            composer_backend.captures[-1].raw_backend_payload
+            if composer_backend.captures
+            else None
+        )
+        semantic_payload = _serialize_raw_payload(
+            semantic_backend.captures[-1].raw_backend_payload
+            if semantic_backend.captures
+            else None
+        )
+        verification_error = is_target_response_verification_error(error)
+        candidate_text = extract_candidate_text_from_composer_payload(composer_payload)
+        metric_extensions = build_literal_and_semantic_extensions(
+            candidate_text=candidate_text,
+            forbidden_claims=list(case["forbidden_claims"]),
+            semantic_raw_payload=semantic_payload,
+            apply_semantic_assessment=verification_error,
+        )
+        row = {
+            "index": index,
+            "case_id": case["case_id"],
+            "case_kind": case["case_kind"],
+            "expected_outcome": case["expected_outcome"],
+            "observed_outcome": "pipeline_error",
+            "expected_response_mode": case["expected_response_mode"],
+            "observed_response_mode": None,
+            "response_text": candidate_text if verification_error else None,
+            "composer_call_count": composer_backend.call_count,
+            "semantic_call_count": semantic_backend.call_count,
+            "provider_call_violation": provider_call_violation(
+                expected_outcome=case["expected_outcome"],
+                composer_calls=composer_backend.call_count,
+                semantic_calls=semantic_backend.call_count,
+            ),
+            "pipeline_error_code": type(error).__name__,
+            "verification_status": None,
+            "composer_raw_payload": composer_payload,
+            "semantic_raw_payload": semantic_payload,
+            "status": "ERROR",
+            "reason": getattr(error, "code", type(error).__name__),
+            **metric_extensions,
+        }
+        row.update(derive_case_automated_flags(case, row))
+        return row
+
+    observed_outcome, observed_mode, verification_status = classify_observed_outcome(result)
+    response_text: str | None
+    if isinstance(result, TargetTurnFrameBoundMaterializeResponse):
+        response_text = result.verified.text
+    else:
+        response_text = None
+
+    composer_payload = _serialize_raw_payload(
+        composer_backend.captures[-1].raw_backend_payload
+        if composer_backend.captures
+        else None
+    )
+    semantic_payload = _serialize_raw_payload(
+        semantic_backend.captures[-1].raw_backend_payload
+        if semantic_backend.captures
+        else None
+    )
+    metric_extensions = build_literal_and_semantic_extensions(
+        candidate_text=response_text,
+        forbidden_claims=list(case["forbidden_claims"]),
+        semantic_raw_payload=semantic_payload,
+        apply_semantic_assessment=True,
+    )
+    call_violation = provider_call_violation(
+        expected_outcome=case["expected_outcome"],
+        composer_calls=composer_backend.call_count,
+        semantic_calls=semantic_backend.call_count,
+    )
+    outcome_match = observed_outcome == case["expected_outcome"]
+    mode_match = (
+        case["expected_response_mode"] is None
+        or observed_mode == case["expected_response_mode"]
+    )
+    status = "OK" if outcome_match and mode_match and not call_violation else "REVIEW"
+
+    row = {
+        "index": index,
+        "case_id": case["case_id"],
+        "case_kind": case["case_kind"],
+        "expected_outcome": case["expected_outcome"],
+        "observed_outcome": observed_outcome,
+        "expected_response_mode": case["expected_response_mode"],
+        "observed_response_mode": observed_mode,
+        "response_text": response_text,
+        "composer_call_count": composer_backend.call_count,
+        "semantic_call_count": semantic_backend.call_count,
+        "provider_call_violation": call_violation,
+        "pipeline_error_code": None,
+        "verification_status": verification_status,
+        "composer_raw_payload": composer_payload,
+        "semantic_raw_payload": semantic_payload,
+        "status": status,
+        "reason": "outcome_match" if status == "OK" else "manual_or_metric_review",
+        **metric_extensions,
+    }
+    row.update(derive_case_automated_flags(case, row))
+    return row
+
+
+def summarize_results(
+    case_results: Sequence[dict[str, Any]],
+    *,
+    matrix_spec: dict[str, Any] | None = None,
+    manual_review_record: dict[str, Any] | None = None,
+    result_sha256: str | None = None,
+    measurement_id: str = MEASUREMENT_ID,
+    matrix_hash: str = FROZEN_MATRIX_HASH,
+) -> dict[str, Any]:
+    summary = {
+        "measurement_id": measurement_id,
+        **aggregate_automated_metrics(list(case_results)),
+        "proposed_automated_acceptance_thresholds": dict(AUTOMATED_ACCEPTANCE_THRESHOLDS),
+        "automated_thresholds_status": AUTOMATED_THRESHOLDS_STATUS,
+        "proposed_final_acceptance_gates": dict(FINAL_ACCEPTANCE_GATES),
+        "final_gates_status": FINAL_GATES_STATUS,
+        "model_recommendation": dict(MODEL_RECOMMENDATION),
+    }
+    automated = evaluate_automated_verdict(summary)
+    summary["automated_verdict"] = automated
+    spec = matrix_spec or load_frozen_matrix()
+    summary["final_verdict"] = evaluate_final_verdict(
+        summary,
+        manual_review_record,
+        matrix_spec=spec,
+        matrix_hash=matrix_hash,
+        result_sha256=result_sha256,
+    )
+    return summary
+
+
+def write_json_exclusive(path: Path, payload: dict[str, Any]) -> None:
+    serialized = prepare_json_artifact_payload(payload)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with path.open("x", encoding="utf-8") as handle:
+            json.dump(serialized, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+    except FileExistsError as error:
+        raise LiveArtifactWriteError(
+            f"live artifact already exists; silent overwrite forbidden: {path}"
+        ) from error
+
+
+def _wrap_backend_factory_with_attempt_audit(
+    backend_factory: Callable[[dict[str, Any]], tuple[object, object]],
+    *,
+    attempt_marker_path: Path,
+) -> Callable[[dict[str, Any]], tuple[object, object]]:
+    def factory(case: dict[str, Any]) -> tuple[object, object]:
+        composer, semantic = backend_factory(case)
+
+        class _ComposerAuditProxy:
+            def __init__(self, backend: object) -> None:
+                self._backend = backend
+                self.call_count = getattr(backend, "call_count", 0)
+
+            @property
+            def captures(self) -> object:
+                return self._backend.captures
+
+            def generate(self, invocation: object, /) -> object:
+                record_v2_provider_call_started(attempt_marker_path)
+                generate = getattr(self._backend, "generate")
+                result = generate(invocation)
+                self.call_count = getattr(self._backend, "call_count", self.call_count)
+                return result
+
+        class _SemanticAuditProxy:
+            def __init__(self, backend: object) -> None:
+                self._backend = backend
+                self.call_count = getattr(backend, "call_count", 0)
+
+            @property
+            def captures(self) -> object:
+                return self._backend.captures
+
+            def assess(self, invocation: object, /) -> object:
+                record_v2_provider_call_started(attempt_marker_path)
+                assess = getattr(self._backend, "assess")
+                result = assess(invocation)
+                self.call_count = getattr(self._backend, "call_count", self.call_count)
+                return result
+
+        return _ComposerAuditProxy(composer), _SemanticAuditProxy(semantic)
+
+    return factory
+
+
+def prepare_v2_live_run(
+    *,
+    attempt_marker_path: Path,
+    artifact_paths: Sequence[Path],
+    owner_override_attempt_marker: bool = False,
+    matrix_hash: str = V2_MATRIX_HASH,
+) -> None:
+    assert_v2_attempt_marker_absent(
+        attempt_marker_path,
+        owner_override=owner_override_attempt_marker,
+    )
+    assert_live_artifacts_absent(tuple(artifact_paths))
+    create_v2_attempt_marker_exclusive(
+        attempt_marker_path,
+        build_v2_attempt_marker_payload(matrix_hash=matrix_hash),
+    )
+
+
+def run_harness_with_backend_factory(
+    *,
+    backend_factory: Callable[
+        [dict[str, Any]],
+        tuple[
+            FullContextResponseEvalRecordingComposerBackend,
+            FullContextResponseEvalRecordingSemanticBackend,
+        ],
+    ],
+    matrix_path: Path = MATRIX_PATH,
+    artifact_paths: Sequence[Path] | None = None,
+    preflight_exclude_paths: Sequence[Path] | None = None,
+    measurement_id: str = MEASUREMENT_ID,
+    matrix_hash: str = FROZEN_MATRIX_HASH,
+) -> dict[str, Any]:
+    spec = load_matrix_by_path(path=matrix_path)
+    context = _load_pipeline_context(spec)
+    if artifact_paths is not None:
+        excluded = {path.resolve() for path in (preflight_exclude_paths or ())}
+        preflight_paths = tuple(
+            path for path in artifact_paths if path.resolve() not in excluded
+        )
+        assert_live_artifacts_absent(preflight_paths)
+
+    case_results: list[dict[str, Any]] = []
+    for index, case in enumerate(spec["cases"]):
+        composer, semantic = backend_factory(case)
+        case_results.append(
+            run_case(
+                case=case,
+                index=index,
+                spec=spec,
+                context=context,
+                composer_backend=composer,
+                semantic_backend=semantic,
+            )
+        )
+
+    keys = frozenset(case_results[0].keys()) if case_results else CASE_RESULT_KEYS
+    for row in case_results:
+        if frozenset(row.keys()) != keys:
+            raise HarnessConfigError("case result shape mismatch")
+
+    spec = load_matrix_by_path(path=matrix_path)
+    return {
+        "summary": summarize_results(
+            case_results,
+            matrix_spec=spec,
+            measurement_id=measurement_id,
+            matrix_hash=matrix_hash,
+        ),
+        "case_results": case_results,
+    }
+
+
+def _offline_backend_factory(
+    case: dict[str, Any],
+) -> tuple[
+    FullContextResponseEvalRecordingComposerBackend,
+    FullContextResponseEvalRecordingSemanticBackend,
+]:
+    return (
+        FullContextResponseEvalRecordingComposerBackend(
+            str(case["offline_composer_stub"])
+        ),
+        FullContextResponseEvalRecordingSemanticBackend(),
+    )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=MEASUREMENT_ID)
+    parser.add_argument("--matrix", default=str(MATRIX_PATH))
+    parser.add_argument("--output", default=None)
+    parser.add_argument("--raw-output", default=None)
+    parser.add_argument(
+        "--v2",
+        action="store_true",
+        help="Use S49 v2 matrix and isolated v2 artifact paths",
+    )
+    parser.add_argument(
+        "--owner-override-attempt-marker",
+        action="store_true",
+        help="Allow v2 live prep when attempt marker exists (owner approval only)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate matrix only; do not execute cases",
+    )
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help="Reserved for future permitted live eval (blocked in S47)",
+    )
+    args = parser.parse_args(list(argv) if argv is not None else None)
+
+    use_v2 = bool(args.v2) or Path(args.matrix).resolve() == V2_MATRIX_PATH.resolve()
+    matrix_path = V2_MATRIX_PATH if use_v2 else Path(args.matrix)
+    measurement_id = MEASUREMENT_ID_V2 if use_v2 else MEASUREMENT_ID
+    matrix_hash = V2_MATRIX_HASH if use_v2 else FROZEN_MATRIX_HASH
+    raw_path = Path(args.raw_output or (V2_LIVE_RAW_ARTIFACT_PATH if use_v2 else LIVE_RAW_ARTIFACT_PATH))
+    result_path = Path(
+        args.output or (V2_LIVE_RESULT_ARTIFACT_PATH if use_v2 else LIVE_RESULT_ARTIFACT_PATH)
+    )
+    attempt_marker_path = V2_LIVE_ATTEMPT_MARKER_PATH if use_v2 else None
+    max_llm_calls = (
+        V2_EXPECTED_LLM_CALLS
+        if use_v2
+        else MODEL_RECOMMENDATION["expected_llm_calls_materializable"]
+    )
+
+    try:
+        spec = load_matrix_by_path(path=matrix_path)
+    except HarnessConfigError as error:
+        print(f"CONFIG_ERROR: {error}", file=sys.stderr)
+        return 2
+
+    if args.dry_run:
+        payload = {
+            "measurement_id": measurement_id,
+            "matrix_git_blob_hash": matrix_hash,
+            "total_cases": len(spec["cases"]),
+            "max_llm_calls": max_llm_calls,
+            "dry_run": True,
+            "proposed_automated_acceptance_thresholds": dict(AUTOMATED_ACCEPTANCE_THRESHOLDS),
+            "automated_thresholds_status": AUTOMATED_THRESHOLDS_STATUS,
+            "proposed_final_acceptance_gates": dict(FINAL_ACCEPTANCE_GATES),
+            "final_gates_status": FINAL_GATES_STATUS,
+            "model_recommendation": dict(MODEL_RECOMMENDATION),
+            "manual_review_required": spec["scoring_contract"]["manual_review_required"],
+        }
+        if use_v2:
+            payload["artifact_paths"] = {
+                "raw": str(V2_LIVE_RAW_ARTIFACT_PATH),
+                "result": str(V2_LIVE_RESULT_ARTIFACT_PATH),
+                "manual_review": str(V2_LIVE_MANUAL_REVIEW_ARTIFACT_PATH),
+                "manifest": str(V2_RUN_MANIFEST_ARTIFACT_PATH),
+                "attempt_marker": str(V2_LIVE_ATTEMPT_MARKER_PATH),
+            }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.live:
+        if use_v2:
+            artifact_paths = tuple(
+                dict.fromkeys(
+                    (
+                        *DEFAULT_V2_LIVE_ARTIFACT_PATHS,
+                        raw_path,
+                        result_path,
+                    )
+                )
+            )
+
+            def _v2_live_backend_factory(
+                case: dict[str, Any],
+            ) -> tuple[object, object]:
+                from evals.v5.fullcontext_response_eval_live_backend import (
+                    FullContextResponseEvalLiveComposerBackend,
+                    FullContextResponseEvalLiveSemanticBackend,
+                    fullcontext_response_eval_live_model,
+                )
+
+                if case["expected_outcome"] == "terminal_boundary_uncertain":
+                    return (
+                        FullContextResponseEvalRecordingComposerBackend("unused"),
+                        FullContextResponseEvalRecordingSemanticBackend(),
+                    )
+                model = fullcontext_response_eval_live_model()
+                return (
+                    FullContextResponseEvalLiveComposerBackend(model=model),
+                    FullContextResponseEvalLiveSemanticBackend(model=model),
+                )
+
+            try:
+                prepare_v2_live_run(
+                    attempt_marker_path=attempt_marker_path,
+                    artifact_paths=artifact_paths,
+                    owner_override_attempt_marker=args.owner_override_attempt_marker,
+                    matrix_hash=matrix_hash,
+                )
+                payload = run_harness_with_backend_factory(
+                    backend_factory=_wrap_backend_factory_with_attempt_audit(
+                        _v2_live_backend_factory,
+                        attempt_marker_path=attempt_marker_path,
+                    ),
+                    matrix_path=matrix_path,
+                    artifact_paths=artifact_paths,
+                    preflight_exclude_paths=(attempt_marker_path,),
+                    measurement_id=measurement_id,
+                    matrix_hash=matrix_hash,
+                )
+            except AttemptMarkerExistsError as error:
+                print(str(error), file=sys.stderr)
+                return 5
+            except (HarnessConfigError, LiveArtifactWriteError) as error:
+                print(f"CONFIG_ERROR: {error}", file=sys.stderr)
+                return 2
+
+            case_results = payload["case_results"]
+            total_llm_calls = sum(
+                row["composer_call_count"] + row["semantic_call_count"] for row in case_results
+            )
+            if total_llm_calls > max_llm_calls:
+                print(
+                    f"CONFIG_ERROR: live LLM call budget exceeded "
+                    f"count={total_llm_calls} max={max_llm_calls}",
+                    file=sys.stderr,
+                )
+                return 2
+
+            summary = payload["summary"]
+            summary["live_run"] = True
+            summary["total_llm_calls"] = total_llm_calls
+            summary["owner_approval"] = {
+                "technical_outcome_match_min": 1.0,
+                "manual_answer_quality_pass_rate_min": 0.85,
+                "critical_violation_max": 0,
+                "composer_model": MODEL_RECOMMENDATION["composer_model"],
+                "semantic_verifier_model": MODEL_RECOMMENDATION["semantic_verifier_model"],
+                "max_llm_calls": max_llm_calls,
+            }
+            payload["summary"] = summary
+
+            raw_artifact = prepare_json_artifact_payload(
+                {
+                    "measurement_id": measurement_id,
+                    "matrix_git_blob_hash": matrix_hash,
+                    "total_llm_calls": total_llm_calls,
+                    "cases": [
+                        {
+                            "index": row["index"],
+                            "case_id": row["case_id"],
+                            "composer_call_count": row["composer_call_count"],
+                            "semantic_call_count": row["semantic_call_count"],
+                            "composer_raw_payload": row["composer_raw_payload"],
+                            "semantic_raw_payload": row["semantic_raw_payload"],
+                        }
+                        for row in case_results
+                    ],
+                }
+            )
+            result_artifact = prepare_json_artifact_payload(payload)
+            manifest_artifact = prepare_json_artifact_payload(
+                {
+                    "measurement_id": measurement_id,
+                    "matrix_git_blob_hash": matrix_hash,
+                    "parent_matrix_git_blob_hash": FROZEN_MATRIX_HASH,
+                    "total_llm_calls": total_llm_calls,
+                    "attempt_marker_path": str(attempt_marker_path),
+                    "raw_artifact_path": str(raw_path),
+                    "result_artifact_path": str(result_path),
+                }
+            )
+            try:
+                write_json_exclusive(raw_path, raw_artifact)
+                write_json_exclusive(result_path, result_artifact)
+                write_json_exclusive(V2_RUN_MANIFEST_ARTIFACT_PATH, manifest_artifact)
+            except LiveArtifactWriteError as error:
+                print(f"CONFIG_ERROR: {error}", file=sys.stderr)
+                return 2
+
+            print(json.dumps(summary, ensure_ascii=False, indent=2))
+            automated = summary["automated_verdict"]["verdict"]
+            final = summary["final_verdict"]["verdict"]
+            print(f"AUTOMATED_VERDICT: {automated}", file=sys.stderr)
+            print(f"FINAL_VERDICT: {final}", file=sys.stderr)
+            return 0 if automated == "AUTOMATED_PASS" else 4
+
+        artifact_paths = tuple(dict.fromkeys((*DEFAULT_LIVE_ARTIFACT_PATHS, raw_path, result_path)))
+
+        def _live_backend_factory(
+            case: dict[str, Any],
+        ) -> tuple[object, object]:
+            from evals.v5.fullcontext_response_eval_live_backend import (
+                FullContextResponseEvalLiveComposerBackend,
+                FullContextResponseEvalLiveSemanticBackend,
+                fullcontext_response_eval_live_model,
+            )
+
+            if case["expected_outcome"] == "terminal_boundary_uncertain":
+                return (
+                    FullContextResponseEvalRecordingComposerBackend("unused"),
+                    FullContextResponseEvalRecordingSemanticBackend(),
+                )
+            model = fullcontext_response_eval_live_model()
+            return (
+                FullContextResponseEvalLiveComposerBackend(model=model),
+                FullContextResponseEvalLiveSemanticBackend(model=model),
+            )
+
+        try:
+            assert_live_artifacts_absent(DEFAULT_LIVE_ARTIFACT_PATHS)
+            payload = run_harness_with_backend_factory(
+                backend_factory=_live_backend_factory,
+                matrix_path=matrix_path,
+                artifact_paths=artifact_paths,
+            )
+        except (HarnessConfigError, LiveArtifactWriteError) as error:
+            print(f"CONFIG_ERROR: {error}", file=sys.stderr)
+            return 2
+
+        case_results = payload["case_results"]
+        total_llm_calls = sum(
+            row["composer_call_count"] + row["semantic_call_count"] for row in case_results
+        )
+        if total_llm_calls > MODEL_RECOMMENDATION["expected_llm_calls_materializable"]:
+            print(
+                f"CONFIG_ERROR: live LLM call budget exceeded "
+                f"count={total_llm_calls} max={MODEL_RECOMMENDATION['expected_llm_calls_materializable']}",
+                file=sys.stderr,
+            )
+            return 2
+
+        summary = payload["summary"]
+        summary["live_run"] = True
+        summary["total_llm_calls"] = total_llm_calls
+        summary["owner_approval"] = {
+            "technical_outcome_match_min": 1.0,
+            "manual_answer_quality_pass_rate_min": 0.85,
+            "critical_violation_max": 0,
+            "composer_model": MODEL_RECOMMENDATION["composer_model"],
+            "semantic_verifier_model": MODEL_RECOMMENDATION["semantic_verifier_model"],
+            "max_llm_calls": MODEL_RECOMMENDATION["expected_llm_calls_materializable"],
+        }
+        payload["summary"] = summary
+
+        raw_artifact = prepare_json_artifact_payload(
+            {
+                "measurement_id": MEASUREMENT_ID,
+                "matrix_git_blob_hash": FROZEN_MATRIX_HASH,
+                "total_llm_calls": total_llm_calls,
+                "cases": [
+                    {
+                        "index": row["index"],
+                        "case_id": row["case_id"],
+                        "composer_call_count": row["composer_call_count"],
+                        "semantic_call_count": row["semantic_call_count"],
+                        "composer_raw_payload": row["composer_raw_payload"],
+                        "semantic_raw_payload": row["semantic_raw_payload"],
+                    }
+                    for row in case_results
+                ],
+            }
+        )
+        result_artifact = prepare_json_artifact_payload(payload)
+        try:
+            write_json_exclusive(raw_path, raw_artifact)
+            write_json_exclusive(result_path, result_artifact)
+        except LiveArtifactWriteError as error:
+            print(f"CONFIG_ERROR: {error}", file=sys.stderr)
+            return 2
+
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        automated = summary["automated_verdict"]["verdict"]
+        final = summary["final_verdict"]["verdict"]
+        print(f"AUTOMATED_VERDICT: {automated}", file=sys.stderr)
+        print(f"FINAL_VERDICT: {final}", file=sys.stderr)
+        return 0 if automated == "AUTOMATED_PASS" else 4
+
+    print(
+        "LIVE_NOT_CONFIGURED: permitted live run requires explicit delegate backend injection",
+        file=sys.stderr,
+    )
+    return 3
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

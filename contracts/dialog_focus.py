@@ -19,7 +19,7 @@ DialogFocusAttribute = Literal[
 ]
 
 DialogFocusSource = Literal[
-    "last_subject",
+    "target_runtime_state",
     "legacy_session",
     "explicit_service",
     "llm_gray",

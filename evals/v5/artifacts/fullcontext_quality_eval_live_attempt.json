@@ -1,0 +1,17 @@
+{
+  "measurement_id": "s57_fullcontext_quality_eval",
+  "matrix_git_blob_hash": "89616cbde59229e222d4c87f4e2abc06361aa05d",
+  "status": "attempt_completed",
+  "baseline_commit": "cac54a5cfb30841fc2e6b4669083a8b8dc9ee790",
+  "composer_model": "qwen3.7-plus",
+  "verifier_model": "qwen3.7-plus",
+  "started_provider_calls": 18,
+  "started_composer_calls": 9,
+  "started_verifier_calls": 9,
+  "max_llm_calls": 18,
+  "max_composer_calls": 9,
+  "max_verifier_calls": 9,
+  "retry_count_max": 0,
+  "rerun_blocked_without_owner_approval": true,
+  "completed_provider_calls": 18
+}

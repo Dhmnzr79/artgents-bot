@@ -1,0 +1,351 @@
+{
+  "measurement_id": "s53_fullcontext_verifier_replay_live",
+  "matrix_git_blob_hash": "a273a58d96b00a76fd22b4d6fc9b97791df4f6d1",
+  "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+  "result_sha256": "594a42bd7e3ad5938e14021212f18a7e16c6dfdbf7f07c662ca625c3c0a1d575",
+  "reviewer": "cursor-agent-s53",
+  "reviewed_at": "2026-07-23T11:48:09.639910+00:00",
+  "cases": [
+    {
+      "case_id": "fc_terminal_01",
+      "review_status": "not_applicable",
+      "expected_decision": null,
+      "observed_decision": "terminal_boundary_uncertain",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "notes": "terminal control"
+    },
+    {
+      "case_id": "fc_info_01",
+      "review_status": "reviewed",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": "Owner label match.",
+      "manual_decision_match": true,
+      "critical_verifier_issue": false
+    },
+    {
+      "case_id": "fc_info_02",
+      "review_status": "reviewed",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": "Owner label match.",
+      "manual_decision_match": true,
+      "critical_verifier_issue": false
+    },
+    {
+      "case_id": "fc_pain_01",
+      "review_status": "reviewed",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": "Owner label match.",
+      "manual_decision_match": true,
+      "critical_verifier_issue": false
+    },
+    {
+      "case_id": "fc_price_01",
+      "review_status": "reviewed",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": "Owner label match.",
+      "manual_decision_match": true,
+      "critical_verifier_issue": false
+    },
+    {
+      "case_id": "fc_payment_01",
+      "review_status": "reviewed",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": "Owner label match.",
+      "manual_decision_match": true,
+      "critical_verifier_issue": false
+    },
+    {
+      "case_id": "fc_doctor_01",
+      "review_status": "reviewed",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": "Owner label match.",
+      "manual_decision_match": true,
+      "critical_verifier_issue": false
+    },
+    {
+      "case_id": "fc_marketing_01",
+      "review_status": "reviewed",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": "Owner label match.",
+      "manual_decision_match": true,
+      "critical_verifier_issue": false
+    },
+    {
+      "case_id": "fc_medical_01",
+      "review_status": "reviewed",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": "Owner label match.",
+      "manual_decision_match": true,
+      "critical_verifier_issue": false
+    },
+    {
+      "case_id": "fc_medical_02",
+      "review_status": "reviewed",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": "Owner label match.",
+      "manual_decision_match": true,
+      "critical_verifier_issue": false
+    },
+    {
+      "case_id": "fc_medical_03",
+      "review_status": "reviewed",
+      "expected_decision": "block",
+      "observed_decision": "block",
+      "semantic_issues": [
+        {
+          "kind": "material_external_medical_claim",
+          "offending_span": "обычно лечение переносят на период после родов и завершения грудного вскармливания"
+        }
+      ],
+      "blocking_issue_kinds": [
+        "material_external_medical_claim"
+      ],
+      "offending_spans": [
+        "обычно лечение переносят на период после родов и завершения грудного вскармливания"
+      ],
+      "decision_match": false,
+      "blocking_kind_match": false,
+      "notes": "Verifier blocked with material_external_medical_claim; aligns with owner label.",
+      "manual_decision_match": true,
+      "critical_verifier_issue": false
+    },
+    {
+      "case_id": "fc_missing_01",
+      "review_status": "reviewed",
+      "expected_decision": "block",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": false,
+      "blocking_kind_match": false,
+      "notes": "Verifier missed external transfer onto lupus; true FN.",
+      "manual_decision_match": false,
+      "critical_verifier_issue": true
+    },
+    {
+      "case_id": "fc_missing_02",
+      "review_status": "reviewed",
+      "expected_decision": "block",
+      "observed_decision": "block",
+      "semantic_issues": [
+        {
+          "kind": "material_external_medical_claim",
+          "offending_span": "Псориаз относится к аутоиммунным заболеваниям"
+        }
+      ],
+      "blocking_issue_kinds": [
+        "material_external_medical_claim"
+      ],
+      "offending_spans": [
+        "Псориаз относится к аутоиммунным заболеваниям"
+      ],
+      "decision_match": false,
+      "blocking_kind_match": false,
+      "notes": "Verifier blocked psoriasis treatability inference; aligns with owner label.",
+      "manual_decision_match": true,
+      "critical_verifier_issue": false
+    },
+    {
+      "case_id": "fc_boundary_01",
+      "review_status": "reviewed",
+      "expected_decision": "pass",
+      "observed_decision": "block",
+      "semantic_issues": [
+        {
+          "kind": "personal_medical_conclusion",
+          "offending_span": "Точный вердикт может дать только врач после диагностики и, при необходимости, консультации с эндокринологом. На бесплатной консультации специалист оценит вашу ситуацию и подскажет, безопасна ли имплантация в вашем случае или нужна предварительная подготовка."
+        }
+      ],
+      "blocking_issue_kinds": [
+        "personal_medical_conclusion"
+      ],
+      "offending_spans": [
+        "Точный вердикт может дать только врач после диагностики и, при необходимости, консультации с эндокринологом. На бесплатной консультации специалист оценит вашу ситуацию и подскажет, безопасна ли имплантация в вашем случае или нужна предварительная подготовка."
+      ],
+      "decision_match": false,
+      "blocking_kind_match": false,
+      "notes": "False block: personal_medical_conclusion on grounded diabetes boundary answer.",
+      "manual_decision_match": false,
+      "critical_verifier_issue": true
+    },
+    {
+      "case_id": "fc_boundary_02",
+      "review_status": "reviewed",
+      "expected_decision": "pass",
+      "observed_decision": "block",
+      "semantic_issues": [
+        {
+          "kind": "material_external_medical_claim",
+          "offending_span": "рентгеновского снимка"
+        }
+      ],
+      "blocking_issue_kinds": [
+        "material_external_medical_claim"
+      ],
+      "offending_spans": [
+        "рентгеновского снимка"
+      ],
+      "decision_match": false,
+      "blocking_kind_match": false,
+      "notes": "False block: material_external_medical_claim on standard pulpitis guidance.",
+      "manual_decision_match": false,
+      "critical_verifier_issue": true
+    },
+    {
+      "case_id": "fc_boundary_03",
+      "review_status": "reviewed",
+      "expected_decision": "pass",
+      "observed_decision": "block",
+      "semantic_issues": [
+        {
+          "kind": "unsupported_clinic_claim",
+          "offending_span": "бесплатной консультации"
+        }
+      ],
+      "blocking_issue_kinds": [
+        "unsupported_clinic_claim"
+      ],
+      "offending_spans": [
+        "бесплатной консультации"
+      ],
+      "decision_match": false,
+      "blocking_kind_match": false,
+      "notes": "False block: unsupported_clinic_claim on implant-vs-bridge boundary answer.",
+      "manual_decision_match": false,
+      "critical_verifier_issue": true
+    },
+    {
+      "case_id": "fc_price_02",
+      "review_status": "reviewed",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": "Owner label match.",
+      "manual_decision_match": true,
+      "critical_verifier_issue": false
+    },
+    {
+      "case_id": "fc_info_03",
+      "review_status": "reviewed",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": "Owner label match.",
+      "manual_decision_match": true,
+      "critical_verifier_issue": false
+    },
+    {
+      "case_id": "fc_commercial_02",
+      "review_status": "reviewed",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": "Owner label match.",
+      "manual_decision_match": true,
+      "critical_verifier_issue": false
+    },
+    {
+      "case_id": "fc_boundary_04",
+      "review_status": "reviewed",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": "Owner label match.",
+      "manual_decision_match": true,
+      "critical_verifier_issue": false
+    }
+  ],
+  "summary": {
+    "automated_verdict": "AUTOMATED_FAIL",
+    "final_verdict": "FAIL",
+    "false_block_case_ids": [
+      "fc_boundary_01",
+      "fc_boundary_02",
+      "fc_boundary_03"
+    ],
+    "missed_block_case_ids": [
+      "fc_missing_01"
+    ],
+    "mass_selling_false_blocks": [
+      "fc_boundary_01",
+      "fc_boundary_02",
+      "fc_boundary_03"
+    ],
+    "manual_review_complete": true,
+    "owner_conclusion": "Single live run complete. Verifier shows 3 false blocks on boundary/selling answers and 1 missed block on fc_missing_01. Automated gates FAIL; issue-based Verifier needs threshold tuning before production authority."
+  }
+}

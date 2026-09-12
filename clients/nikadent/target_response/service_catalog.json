@@ -1,0 +1,565 @@
+{
+  "caries": {
+    "name": "Лечение кариеса",
+    "aliases": [
+      "лечение кариеса",
+      "кариес",
+      "пломба",
+      "поставить пломбу"
+    ],
+    "family": "therapy",
+    "roles": [],
+    "active": true,
+    "content_ref": "treatment__service__caries.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "teeth_treatment": {
+    "name": "Лечение зубов",
+    "aliases": [
+      "лечение зубов",
+      "лечить зубы",
+      "терапевтическая стоматология"
+    ],
+    "family": "therapy",
+    "roles": [],
+    "active": true,
+    "content_ref": "treatment__service__teeth_treatment.md",
+    "selection": {
+      "mode": "context"
+    },
+    "options": []
+  },
+  "pulpitis": {
+    "name": "Лечение каналов",
+    "aliases": [
+      "лечение каналов",
+      "лечение пульпита",
+      "пульпит",
+      "удалить нерв"
+    ],
+    "family": "endodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "treatment__service__pulpitis.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "tooth_restoration": {
+    "name": "Реставрация зубов",
+    "aliases": [
+      "реставрация зубов",
+      "реставрация",
+      "восстановление зуба"
+    ],
+    "family": "therapy",
+    "roles": [],
+    "active": true,
+    "content_ref": "treatment__service__tooth_restoration.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "teeth_cleaning": {
+    "name": "Чистка зубов",
+    "aliases": [
+      "чистка зубов",
+      "профессиональная гигиена",
+      "гигиена полости рта"
+    ],
+        "family": "therapy",
+    "roles": [],
+    "active": true,
+    "content_ref": "hygiene__service__teeth_cleaning.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "periodontitis": {
+    "name": "Лечение дёсен",
+    "aliases": [
+      "лечение дёсен",
+      "лечение десен",
+      "пародонтит",
+      "пародонтоз",
+      "пародонтолог"
+    ],
+    "family": "periodontology",
+    "roles": [],
+    "active": true,
+    "content_ref": "periodontology__service__periodontitis.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "tooth_extraction": {
+    "name": "Удаление зуба",
+    "aliases": [
+      "удаление зуба",
+      "удалить зуб",
+      "вырвать зуб"
+    ],
+    "family": "surgery",
+    "roles": [],
+    "active": true,
+    "content_ref": "extraction__service__tooth_extraction.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "classic": {
+    "name": "Классическая имплантация",
+    "aliases": [
+      "классическая имплантация",
+      "имплант на один зуб",
+      "двухэтапная имплантация"
+    ],
+    "family": "implantology",
+    "roles": [
+      "protocol"
+    ],
+    "active": true,
+    "content_ref": "implantation__service__classic.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
+    },
+    "options": []
+  },
+  "one_stage": {
+    "name": "Одномоментная имплантация",
+    "aliases": [
+      "одномоментная имплантация",
+      "имплант в день удаления"
+    ],
+    "family": "implantology",
+    "roles": [
+      "protocol"
+    ],
+    "active": true,
+    "content_ref": "implantation__service__one_stage.md",
+    "selection": {
+      "mode": "context",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ],
+      "stage": [
+        "extraction_context"
+      ]
+    },
+    "options": []
+  },
+  "all_on_4": {
+    "name": "Имплантация All-on-4",
+    "aliases": [
+      "all-on-4",
+      "имплантация all-on-4",
+      "все на четырёх",
+      "протез на 4 имплантах"
+    ],
+    "family": "implantology",
+    "roles": [
+      "protocol"
+    ],
+    "active": true,
+    "content_ref": "implantation__service__all_on_4.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "full_arch"
+      ]
+    },
+    "options": []
+  },
+  "all_on_6": {
+    "name": "Имплантация All-on-6",
+    "aliases": [
+      "all-on-6",
+      "имплантация all-on-6",
+      "все на шести",
+      "протез на 6 имплантах"
+    ],
+    "family": "implantology",
+    "roles": [
+      "protocol"
+    ],
+    "active": true,
+    "content_ref": "implantation__service__all_on_6.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "full_arch"
+      ]
+    },
+    "options": []
+  },
+  "sinus_lift": {
+    "name": "Синус-лифтинг",
+    "aliases": [
+      "синус-лифтинг",
+      "синус лифтинг",
+      "сколько стоит синус-лифтинг"
+    ],
+    "family": "implantology",
+    "roles": [],
+    "active": true,
+    "content_ref": "implantation__service__sinus_lift.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "bone_graft": {
+    "name": "Костная пластика",
+    "aliases": [
+      "костная пластика",
+      "наращивание костной ткани",
+      "сколько стоит костная пластика"
+    ],
+    "family": "implantology",
+    "roles": [],
+    "active": true,
+    "content_ref": "implantation__service__bone_graft.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "metal_ceramic_crowns": {
+    "name": "Металлокерамические коронки",
+    "aliases": [
+      "металлокерамическая коронка",
+      "металлокерамика",
+      "коронка металлокерамика"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__metal_ceramic_crowns.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
+    },
+    "options": []
+  },
+  "zirconia_crowns": {
+    "name": "Циркониевые коронки",
+    "aliases": [
+      "циркониевая коронка",
+      "коронки",
+      "коронка на зуб",
+      "коронка из диоксида циркония"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__zirconia_crowns.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
+    },
+    "options": []
+  },
+  "veneers": {
+    "name": "Виниры",
+    "aliases": [
+      "виниры",
+      "виниры на зубы",
+      "керамические виниры"
+    ],
+    "family": "aesthetics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__veneers.md",
+    "selection": {
+      "mode": "context"
+    },
+    "options": []
+  },
+  "core_inlay": {
+    "name": "Культевая вкладка",
+    "aliases": [
+      "культевая вкладка",
+      "культёвая вкладка",
+      "вкладка под коронку",
+      "восстановление культи зуба"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__core_inlay.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "ceramic_inlays": {
+    "name": "Керамические накладки",
+    "aliases": [
+      "керамические накладки",
+      "накладки на зубы",
+      "вкладки на зуб"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__ceramic_inlays.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "prosthetics_consultation": {
+    "name": "Консультация по протезированию",
+    "aliases": [
+      "консультация ортопеда",
+      "консультация по протезированию",
+      "консультация протезиста"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__consultation.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "removable_dentures": {
+    "name": "Съёмные зубные протезы",
+    "aliases": [
+      "съёмные протезы",
+      "съемные протезы",
+      "зубной протез",
+      "съёмное протезирование"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__removable_dentures.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "few_teeth",
+        "full_arch"
+      ]
+    },
+    "options": []
+  },
+  "clasp_dentures": {
+    "name": "Бюгельные протезы",
+    "aliases": [
+      "бюгельные протезы",
+      "бюгельный протез",
+      "протез с дугой"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__clasp_dentures.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "few_teeth"
+      ]
+    },
+    "options": []
+  },
+  "implant_supported_prosthetics": {
+    "name": "Протезы на имплантах",
+    "aliases": [
+      "протезы на имплантах",
+      "протезирование на имплантах",
+      "зубы на имплантах"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__implant_supported_prosthetics.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "one_tooth",
+        "few_teeth",
+        "full_arch"
+      ],
+      "stage": [
+        "implant_placed"
+      ]
+    },
+    "options": []
+  },
+  "denture_repair": {
+    "name": "Ремонт протезов",
+    "aliases": [
+      "ремонт протезов",
+      "починить протез",
+      "ремонт зубного протеза"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__denture_repair.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "braces": {
+    "name": "Брекеты",
+    "aliases": [
+      "брекеты",
+      "брекет-система",
+      "установка брекетов",
+      "ставите брекеты"
+    ],
+    "family": "orthodontics",
+    "roles": [],
+    "active": false,
+    "selection": {
+      "mode": "context"
+    },
+    "options": []
+  },
+  "aligners": {
+    "name": "Элайнеры",
+    "aliases": [
+      "элайнеры",
+      "капы для зубов",
+      "прозрачные капы"
+    ],
+    "family": "orthodontics",
+    "roles": [],
+    "active": false,
+    "selection": {
+      "mode": "context"
+    },
+    "options": []
+  },
+  "professional_whitening": {
+    "name": "Отбеливание зубов",
+    "aliases": [
+      "отбеливание",
+      "отбеливание зубов",
+      "профессиональное отбеливание"
+    ],
+    "family": "aesthetics",
+    "roles": [],
+    "active": false,
+    "selection": {
+      "mode": "context"
+    },
+    "options": []
+  },
+  "tomography": {
+    "name": "КТ (компьютерная томография)",
+    "aliases": [
+      "кт зубов",
+      "компьютерная томография",
+      "томография зуба",
+      "сколько стоит кт"
+    ],
+    "family": "diagnostics",
+    "roles": [
+      "supporting"
+    ],
+    "active": false,
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "zygomatic_implants": {
+    "name": "Скуловая имплантация",
+    "aliases": [
+      "скуловая имплантация",
+      "скуловые импланты",
+      "зигоматические импланты"
+    ],
+    "family": "implantology",
+    "roles": [
+      "advanced_protocol"
+    ],
+    "active": false,
+    "selection": {
+      "mode": "context"
+    },
+    "options": []
+  },
+  "pterygoid_implants": {
+    "name": "Птеригоидные импланты",
+    "aliases": [
+      "птеригоидные импланты",
+      "птеригоидная имплантация"
+    ],
+    "family": "implantology",
+    "roles": [
+      "advanced_protocol"
+    ],
+    "active": false,
+    "selection": {
+      "mode": "context"
+    },
+    "options": []
+  },
+  "sedation": {
+    "name": "Лечение под седацией",
+    "aliases": [
+      "лечение под седацией",
+      "седация",
+      "имплантация под седацией",
+      "лечение во сне",
+      "имплантация во сне",
+      "лечение под наркозом",
+      "общий наркоз"
+    ],
+    "family": "surgery",
+    "roles": [],
+    "active": false,
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "fixed_bridge": {
+    "name": "Мостовидные протезы",
+    "aliases": [
+      "мостовидный протез",
+      "мост на зубах",
+      "зубной мост",
+      "мостовидное протезирование",
+      "несъемный мост",
+      "мост при отсутствии зуба"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__fixed_bridge.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
+    },
+    "options": []
+  }
+}

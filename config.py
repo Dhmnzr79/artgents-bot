@@ -6,12 +6,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- LLM provider ---
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-CHAT_API_KEY = (
-    (os.getenv("CHAT_API_KEY") or os.getenv("DASHSCOPE_API_KEY") or "").strip()
-    or OPENAI_API_KEY
-)
+APP_ENV = (os.getenv("APP_ENV") or "local").strip().lower()
+
+# --- LLM provider (Qwen/DashScope chat runtime; no OpenAI import-time requirement) ---
+CHAT_API_KEY = (os.getenv("CHAT_API_KEY") or os.getenv("DASHSCOPE_API_KEY") or "").strip() or None
 CHAT_BASE_URL = (
     (os.getenv("CHAT_BASE_URL") or os.getenv("DASHSCOPE_BASE_URL") or "").strip()
     or None
@@ -24,8 +22,11 @@ QWEN_ENABLE_THINKING = os.getenv("QWEN_ENABLE_THINKING", "0").lower() in (
 
 
 # --- Models (Qwen pilot defaults; override via .env to revert to OpenAI) ---
-QWEN_PLUS_MODEL = "qwen3.7-plus"
-QWEN_FLASH_MODEL = "qwen3.6-flash"
+# Local speed experiment: use one Qwen Flash model across the complete bot
+# contour (Planner, Ingress, Boundary, Composer, Verifier and auxiliary
+# classifiers).  Keep environment-variable overrides intact for rollback.
+QWEN_PLUS_MODEL = "qwen3.7-flash"
+QWEN_FLASH_MODEL = "qwen3.7-flash"
 
 CHAT_MODEL = os.getenv("MODEL_CHAT", QWEN_PLUS_MODEL)
 
@@ -42,7 +43,6 @@ def chat_provider_is_qwen() -> bool:
     )
 
 RESOLVER_MODEL = (os.getenv("MODEL_RESOLVER") or "").strip() or QWEN_PLUS_MODEL
-QUERY_REWRITE_MODEL = (os.getenv("MODEL_QUERY_REWRITE") or "").strip() or QWEN_FLASH_MODEL
 LEAD_NAME_CLASSIFY_MODEL = (os.getenv("MODEL_LEAD_NAME") or "").strip() or QWEN_FLASH_MODEL
 DIALOG_FOCUS_LLM_CLASSIFY_ON = os.getenv("DIALOG_FOCUS_LLM_CLASSIFY", "1").lower() in (
     "1",
@@ -71,47 +71,20 @@ ASPECT_PLANNER_LLM_MODEL = (
     (os.getenv("ASPECT_PLANNER_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
 )
 
-# --- Answer packet assembler (composer roadmap phase 2) ---
-ANSWER_PACKET_ASSEMBLER_ON = os.getenv("ANSWER_PACKET_ASSEMBLER_ON", "0").lower() in (
+# --- Sales-fast one-call widget path (Stage 2: default runtime invariant) ---
+# SALES_ONE_PLUS_ON is deprecated for architecture selection; kept for eval/LIVE harness only.
+SALES_ONE_PLUS_ON = os.getenv("SALES_ONE_PLUS_ON", "0").lower() in (
     "1",
     "true",
     "yes",
 )
-
-# --- Packet composer (composer roadmap phase 3) ---
-COMPOSER_ON = os.getenv("COMPOSER_ON", "1").lower() in (
-    "1",
-    "true",
-    "yes",
+# Active sales-fast / One Call provider snapshot (override via env).
+SALES_ONE_PLUS_MODEL = (
+    (os.getenv("SALES_ONE_PLUS_MODEL") or "").strip() or "qwen3.7-plus-2026-05-26"
 )
-
-# --- Full-context composer content (step 1: whole md base, not chunk refs) ---
-FULLCTX_ON = os.getenv("FULLCTX_ON", "1").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-
-# --- Living copy for deterministic price group overviews (stage 5.5d) ---
-LIVING_OVERVIEW_ON = os.getenv("LIVING_OVERVIEW_ON", "0").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-
-# --- Situation-level price overview through unified map (stage 5.5) ---
-SITUATION_PRICE_ON = os.getenv("SITUATION_PRICE_ON", "0").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-
-# --- Symptom-only price → consult gate (medzone; default on, env "0" = kill-switch) ---
-PRICE_SYMPTOM_CONSULT_ON = os.getenv("PRICE_SYMPTOM_CONSULT_ON", "1").lower() in (
-    "1",
-    "true",
-    "yes",
-)
+SALES_ONE_PLUS_TIMEOUT_SEC = float(os.getenv("SALES_ONE_PLUS_TIMEOUT_SEC", "40"))
+# Legacy Flash snapshot — deprecated; does not control active sales-fast runtime.
+SALES_ONE_PLUS_FLASH_MODEL = "qwen3.7-flash-2026-07-15"
 
 # --- Lead booking date defer (no slot confirmation without schedule; default on, env "0" = kill-switch) ---
 BOOKING_DATE_DEFER_ON = os.getenv("BOOKING_DATE_DEFER_ON", "1").lower() in (
@@ -120,47 +93,9 @@ BOOKING_DATE_DEFER_ON = os.getenv("BOOKING_DATE_DEFER_ON", "1").lower() in (
     "yes",
 )
 
-# --- Brand filter + budget anchor on implant price path (money-path marketing; default ON, env "0" = kill-switch) ---
-BRAND_FILTER_ON = os.getenv("BRAND_FILTER_ON", "1").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-
-# --- Strict service match for price: no explicitly-named service -> honest defer, never a fuzzy price ---
-# Default ON (env "0" = kill-switch). Situation-focus gap fixed: shared price_query_has_session_focus
-# now honors patient-situation focus, so ps03-class follow-ups get the per-unit price, not a defer.
-PRICE_STRICT_SERVICE_ON = os.getenv("PRICE_STRICT_SERVICE_ON", "1").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-
-# --- Composer clarify state (full-context roadmap stage 5) ---
-CLARIFY_STATE_ON = os.getenv("CLARIFY_STATE_ON", "0").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-
-# --- LLM service selection in composer price path (step 2) ---
-SERVICE_SELECT_LLM_ON = os.getenv("SERVICE_SELECT_LLM_ON", "1").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-SERVICE_SELECT_LLM_MODEL = (
-    (os.getenv("SERVICE_SELECT_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
-)
-
-# --- Single turn planner (full-context roadmap stage 4) ---
-TURN_PLANNER_ON = os.getenv("TURN_PLANNER_ON", "1").lower() in (
-    "1",
-    "true",
-    "yes",
-)
+# --- Booking date defer (default ON) ---
 TURN_PLANNER_LLM_MODEL = (
-    (os.getenv("TURN_PLANNER_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
+    (os.getenv("TURN_PLANNER_LLM_MODEL") or "").strip() or QWEN_PLUS_MODEL
 )
 
 # --- Lead active-turn gray-zone classifier ---
@@ -188,21 +123,6 @@ SAFETY_CLASSIFY_MODEL = (os.getenv("MODEL_SAFETY_CLASSIFY") or "").strip() or QW
 SAFETY_RED_CONFIDENCE_THRESHOLD = float(os.getenv("SAFETY_RED_CONFIDENCE_THRESHOLD", "0.8"))
 COMPLAINT_CLASSIFY_MODEL = (os.getenv("MODEL_COMPLAINT_CLASSIFY") or "").strip() or QWEN_FLASH_MODEL
 INGRESS_CLASSIFY_MODEL = (os.getenv("MODEL_INGRESS_CLASSIFY") or "").strip() or QWEN_FLASH_MODEL
-QUERY_REWRITE_ON = os.getenv("QUERY_REWRITE_ON", "1").lower() in ("1", "true", "yes")
-QUERY_REWRITE_MAX_MESSAGES = int(os.getenv("QUERY_REWRITE_MAX_MESSAGES", "10"))
-# Подстроки в ответе rewrite → отбросить (утечка инструкции / мусор). Разделитель |
-_rewrite_reject_raw = os.getenv(
-    "REWRITE_REJECT_SUBSTRINGS",
-    "врач, процедура, симптом, зуб, материал|ключевые сущности",
-)
-REWRITE_REJECT_SUBSTRINGS: tuple[str, ...] = tuple(
-    x.strip().lower() for x in _rewrite_reject_raw.split("|") if x.strip()
-)
-QUERY_REWRITE_VALIDATE_OVERLAP = os.getenv("QUERY_REWRITE_VALIDATE_OVERLAP", "1").lower() in (
-    "1",
-    "true",
-    "yes",
-)
 
 # --- HTTP / app ---
 PORT = int(os.getenv("PORT", "9000"))
@@ -210,9 +130,6 @@ DEBUG_TOKEN = os.getenv("DEBUG_TOKEN", "dev-debug")
 INPUT_MAX_CHARS = int(os.getenv("INPUT_MAX_CHARS", "600"))
 RATE_LIMIT_WINDOW_SEC = int(os.getenv("RATE_LIMIT_WINDOW_SEC", "60"))
 RATE_LIMIT_MAX_PER_IP = int(os.getenv("RATE_LIMIT_MAX_PER_IP", "40"))
-ANTI_SPAM_NO_INTENT_TURNS = int(os.getenv("ANTI_SPAM_NO_INTENT_TURNS", "20"))
-ANTI_SPAM_BURST_WINDOW_SEC = int(os.getenv("ANTI_SPAM_BURST_WINDOW_SEC", "120"))
-ANTI_SPAM_BURST_MESSAGES = int(os.getenv("ANTI_SPAM_BURST_MESSAGES", "6"))
 
 # --- Paths ---
 DATA_DIR = os.getenv("DATA_DIR", "data")
@@ -251,7 +168,7 @@ _ac_raw = os.getenv("ALLOWED_CLIENTS", "").strip()
 if _ac_raw:
     ALLOWED_CLIENTS = frozenset(x.strip() for x in _ac_raw.split(",") if x.strip())
 else:
-    ALLOWED_CLIENTS = frozenset({DEFAULT_CLIENT_ID, "demo", "cesi", "nikadent"})
+    ALLOWED_CLIENTS = frozenset({DEFAULT_CLIENT_ID, "demo"})
 
 # --- Детерминированный роутинг до LLM ---
 CONTACTS_RE = re.compile(
@@ -381,15 +298,10 @@ def estimate_llm_usage_usd(
     )
 
 
-if not OPENAI_API_KEY:
-    # CI lint/unit import config without calling OpenAI; eval job checks the secret explicitly.
-    if os.getenv("GITHUB_ACTIONS") == "true":
-        OPENAI_API_KEY = "github-actions-placeholder"
-        CHAT_API_KEY = CHAT_API_KEY or OPENAI_API_KEY
-    else:
-        raise RuntimeError("OPENAI_API_KEY is not set in .env (required for chat LLM)")
-elif not CHAT_API_KEY:
-    CHAT_API_KEY = OPENAI_API_KEY
+if os.getenv("GITHUB_ACTIONS") == "true":
+    # CI import smoke only; production validation is readiness.
+    if not CHAT_API_KEY:
+        CHAT_API_KEY = "github-actions-placeholder"
 
 
 def resolve_client_id(raw: str | None) -> str | None:

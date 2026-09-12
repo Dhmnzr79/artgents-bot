@@ -1,0 +1,143 @@
+"""TurnFrame-bound offline response orchestration (S41, unwired)."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from datetime import date
+from pathlib import Path
+
+from contracts.effective_scope import EffectiveScope
+from contracts.doctor_schema import TargetDoctorCatalog
+from contracts.response_schema import ResponseSchemaBundle, TargetStrategyMatch
+from contracts.response_schema_refs import ResponseSchemaExternalIndex
+from contracts.service_consultation import ServiceConsultationValue
+from contracts.target_cached_full_context import TargetCachedFullContext
+from contracts.turn_frame import TurnFrame
+from contracts.target_turn_frame_dispatch import (
+    TargetTurnFrameBoundMaterializeResponse,
+    TargetTurnFrameBoundTerminalResponse,
+)
+from contracts.target_turn_frame_policy_envelope import TargetTurnFramePolicyEnvelope
+from core.target_composer_executor import (
+    TargetComposerBackend,
+    TargetComposerTone,
+)
+from core.target_policy_bound_verified_response_pipeline import (
+    run_target_offline_policy_bound_verified_response_pipeline_with_selection,
+)
+from core.target_presentation_turn_projection import (
+    contact_fields_from_turn_frame,
+    marketing_scenarios_from_turn_frame,
+    resolve_bound_marketing_flags,
+    resolve_target_semantic_context,
+)
+from core.target_response_policy import (
+    build_target_response_spec,
+    select_target_response_length_profile,
+)
+from core.target_response_verifier import TargetSemanticVerifierBackend
+from core.target_turn_frame_dispatch import dispatch_target_turn_frame_response
+
+
+def run_target_offline_turn_frame_bound_response(
+    turn_frame: TurnFrame,
+    envelope: TargetTurnFramePolicyEnvelope,
+    bundle: ResponseSchemaBundle,
+    doctor_catalog: TargetDoctorCatalog,
+    external_index: ResponseSchemaExternalIndex,
+    consultation_values: Sequence[ServiceConsultationValue],
+    *,
+    brand_term: str | None,
+    strategy_context: TargetStrategyMatch,
+    semantic_context: str,
+    today: date,
+    md_root: Path,
+    cached_full_context: TargetCachedFullContext,
+    include_initial_block: bool,
+    include_consultation_close: bool,
+    include_cta: bool,
+    user_message: str,
+    tone: TargetComposerTone,
+    composer_backend: TargetComposerBackend,
+    semantic_backend: TargetSemanticVerifierBackend,
+    marketing_scenarios: Sequence[str] = (),
+    shown_fact_ids: Sequence[str] = (),
+    shown_amplifier_refs: Sequence[str] = (),
+    shown_consultation_value_refs: Sequence[str] = (),
+    effective_scope: EffectiveScope | None = None,
+    client_id: str = "demo",
+) -> TargetTurnFrameBoundMaterializeResponse | TargetTurnFrameBoundTerminalResponse:
+    """Dispatch one TurnFrame and return either terminal spec or one exact verified response."""
+
+    dispatch = dispatch_target_turn_frame_response(
+        turn_frame,
+        envelope,
+        effective_scope=effective_scope,
+    )
+    if dispatch.kind == "terminal":
+        return TargetTurnFrameBoundTerminalResponse(kind="terminal", dispatch=dispatch)
+    bound_spec = build_target_response_spec(dispatch.policy_request)
+    resolved_semantic_context = resolve_target_semantic_context(turn_frame, bound_spec)
+    scenario_intent = (
+        tuple(marketing_scenarios)
+        if marketing_scenarios
+        else marketing_scenarios_from_turn_frame(turn_frame)
+    )
+    resolved_include_initial_block, resolved_scenarios, resolved_brand_term = (
+        resolve_bound_marketing_flags(
+            turn_frame,
+            bound_spec,
+            boundary_allows_marketing=True,
+            brand_term=brand_term,
+            marketing_scenarios=scenario_intent,
+        )
+    )
+    contact_fields = contact_fields_from_turn_frame(turn_frame)
+    # PERF-5 (corrected): the one production seam -- final bound_spec, the real
+    # TurnFrame's aspects/needs_clarification, and the resolved (post-marketing-flag)
+    # applied scenarios are all simultaneously available here. select_target_response_
+    # length_profile is called exactly once; the resulting typed profile is threaded
+    # down as a plain parameter -- never a ContextVar/global, never recomputed by any
+    # downstream consumer.
+    response_length_profile = select_target_response_length_profile(
+        bound_spec,
+        aspects=tuple(turn_frame.aspects),
+        aspects_valid=turn_frame.field_meta.aspects.status == "valid",
+        marketing_scenarios=tuple(resolved_scenarios),
+        needs_clarification=turn_frame.needs_clarification,
+    )
+    verified, session_selection = run_target_offline_policy_bound_verified_response_pipeline_with_selection(
+        dispatch.policy_request,
+        bundle,
+        doctor_catalog,
+        external_index,
+        consultation_values,
+        brand_term=resolved_brand_term,
+        strategy_context=strategy_context,
+        semantic_context=resolved_semantic_context,
+        today=today,
+        md_root=md_root,
+        cached_full_context=cached_full_context,
+        include_initial_block=resolved_include_initial_block,
+        include_consultation_close=include_consultation_close,
+        include_cta=include_cta,
+        user_message=user_message,
+        tone=tone,
+        composer_backend=composer_backend,
+        semantic_backend=semantic_backend,
+        marketing_scenarios=resolved_scenarios,
+        shown_fact_ids=shown_fact_ids,
+        shown_amplifier_refs=shown_amplifier_refs,
+        shown_consultation_value_refs=shown_consultation_value_refs,
+        turn_topic=turn_frame.topic,
+        effective_scope=effective_scope,
+        client_id=client_id,
+        contact_fields=contact_fields,
+        response_length_profile=response_length_profile,
+    )
+    return TargetTurnFrameBoundMaterializeResponse(
+        kind="materialize",
+        dispatch=dispatch,
+        verified=verified,
+        session_selection=session_selection,
+    )

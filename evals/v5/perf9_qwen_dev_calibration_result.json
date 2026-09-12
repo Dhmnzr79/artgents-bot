@@ -1,0 +1,1440 @@
+{
+  "candidate_config": {
+    "candidates": {
+      "dense": {
+        "min_margin": 0.06788,
+        "min_score": 0.0
+      },
+      "qwen_dense_lexical_hybrid": {
+        "min_margin": 0.0,
+        "min_score": 0.016393
+      }
+    },
+    "dimension": 1024,
+    "hybrid_dense_weight": 0.75,
+    "model": "text-embedding-v4",
+    "output_type": "dense",
+    "schema_version": 1,
+    "source_gold_sha256": "e2a59ec5cb82229ca590291321011932635269d6ef545ea9543e418ee54ee681",
+    "source_phase": "dev"
+  },
+  "candidates": {
+    "dense": {
+      "critical_false_narrow_count": 0,
+      "fallback_count": 29,
+      "fallback_rate": 0.5918367346938775,
+      "match_correct_count": 37,
+      "min_margin": 0.06788,
+      "min_score": 0.0,
+      "recall_at_1": 0.90625,
+      "recall_at_3": 1.0,
+      "safe_over_fallback_count": 12
+    },
+    "qwen_dense_lexical_hybrid": {
+      "critical_false_narrow_count": 0,
+      "fallback_count": 34,
+      "fallback_rate": 0.6938775510204082,
+      "match_correct_count": 32,
+      "min_margin": 0.0,
+      "min_score": 0.016393,
+      "recall_at_1": 0.71875,
+      "recall_at_3": 0.90625,
+      "safe_over_fallback_count": 17
+    }
+  },
+  "contains_query_or_answer_text": false,
+  "corpus_input_manifest_sha256": "9a1f9b6a8e9ff2af9c365916552954b20c6cb9a434bc51e8dd0c69013ef0ea0d",
+  "corpus_paragraph_count": 348,
+  "dimension": 1024,
+  "duration_ms": 96049.452,
+  "gold_sha256": "e2a59ec5cb82229ca590291321011932635269d6ef545ea9543e418ee54ee681",
+  "hybrid_dense_weight": 0.75,
+  "hybrid_method": "weighted_reciprocal_rank_fusion_qwen_dense_plus_local_lexical",
+  "model": "text-embedding-v4",
+  "output_type": "dense",
+  "phase": "dev",
+  "provider_calls": 40,
+  "provider_input_tokens": 30503,
+  "query_document_role_distinction": "not_available_through_openai_compatible_api",
+  "query_index_sha256": "027dc9ce5692d36ddd634a2df4829947c0afe0a918b94c4371ef9585541767ef",
+  "scenario_count": 49,
+  "schema_version": 1,
+  "top3": {
+    "dense": {
+      "s011_broad_service": [
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.699685
+        },
+        {
+          "document_ref": "prosthetics__service__removable_dentures.md",
+          "score": 0.645466
+        },
+        {
+          "document_ref": "prosthetics__service__clasp_dentures.md",
+          "score": 0.609175
+        }
+      ],
+      "s012_broad_service": [
+        {
+          "document_ref": "periodontology__service__periodontitis.md",
+          "score": 0.568032
+        },
+        {
+          "document_ref": "doctors__doctor__grigoriev.md",
+          "score": 0.555229
+        },
+        {
+          "document_ref": "comparison__classic_vs_one_stage.md",
+          "score": 0.48129
+        }
+      ],
+      "s013_broad_service": [
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.647323
+        },
+        {
+          "document_ref": "prosthetics__service__removable_dentures.md",
+          "score": 0.612454
+        },
+        {
+          "document_ref": "prosthetics__service__clasp_dentures.md",
+          "score": 0.579151
+        }
+      ],
+      "s014_broad_service": [
+        {
+          "document_ref": "whitening__service__teeth_whitening.md",
+          "score": 0.711509
+        },
+        {
+          "document_ref": "treatment__service__teeth_treatment.md",
+          "score": 0.569392
+        },
+        {
+          "document_ref": "extraction__service__tooth_extraction.md",
+          "score": 0.528608
+        }
+      ],
+      "s015_broad_service": [
+        {
+          "document_ref": "treatment__service__teeth_treatment.md",
+          "score": 0.64851
+        },
+        {
+          "document_ref": "implantation__info__methods_overview.md",
+          "score": 0.587968
+        },
+        {
+          "document_ref": "treatment__service__pulpitis.md",
+          "score": 0.54933
+        }
+      ],
+      "s016_broad_service": [
+        {
+          "document_ref": "orthodontics__service__aligners.md",
+          "score": 0.545178
+        },
+        {
+          "document_ref": "comparison__classic_vs_one_stage.md",
+          "score": 0.544264
+        },
+        {
+          "document_ref": "implantation__info__methods_overview.md",
+          "score": 0.523599
+        }
+      ],
+      "s039_sterilization_safety": [
+        {
+          "document_ref": "implantation__faq__safety.md",
+          "score": 0.640796
+        },
+        {
+          "document_ref": "treatment__service__pulpitis.md",
+          "score": 0.337054
+        },
+        {
+          "document_ref": "implantation__faq__what_included.md",
+          "score": 0.324818
+        }
+      ],
+      "s040_sterilization_safety": [
+        {
+          "document_ref": "implantation__faq__safety.md",
+          "score": 0.541882
+        },
+        {
+          "document_ref": "treatment__service__teeth_treatment.md",
+          "score": 0.367855
+        },
+        {
+          "document_ref": "clinic__info__technology.md",
+          "score": 0.360022
+        }
+      ],
+      "s041_sterilization_safety": [
+        {
+          "document_ref": "implantation__faq__safety.md",
+          "score": 0.659017
+        },
+        {
+          "document_ref": "whitening__service__teeth_whitening.md",
+          "score": 0.444005
+        },
+        {
+          "document_ref": "treatment__service__teeth_treatment.md",
+          "score": 0.427883
+        }
+      ],
+      "s042_sterilization_safety": [
+        {
+          "document_ref": "implantation__faq__safety.md",
+          "score": 0.5751
+        },
+        {
+          "document_ref": "diagnostics__service__tomography.md",
+          "score": 0.393227
+        },
+        {
+          "document_ref": "implantation__faq__osseointegration.md",
+          "score": 0.39087
+        }
+      ],
+      "s043_sterilization_safety": [
+        {
+          "document_ref": "implantation__faq__safety.md",
+          "score": 0.544395
+        },
+        {
+          "document_ref": "clinic__info__technology.md",
+          "score": 0.367029
+        },
+        {
+          "document_ref": "implantation__service__all_on_4.md",
+          "score": 0.358717
+        }
+      ],
+      "s044_sterilization_safety": [
+        {
+          "document_ref": "whitening__service__teeth_whitening.md",
+          "score": 0.459768
+        },
+        {
+          "document_ref": "implantation__faq__safety.md",
+          "score": 0.413304
+        },
+        {
+          "document_ref": "treatment__service__teeth_treatment.md",
+          "score": 0.393848
+        }
+      ],
+      "s048_own_fresh_ct": [
+        {
+          "document_ref": "diagnostics__service__tomography.md",
+          "score": 0.644107
+        },
+        {
+          "document_ref": "implantation__service__zygomatic_implants.md",
+          "score": 0.508362
+        },
+        {
+          "document_ref": "implantation__service__pterygoid_implants.md",
+          "score": 0.477718
+        }
+      ],
+      "s049_own_fresh_ct": [
+        {
+          "document_ref": "diagnostics__service__tomography.md",
+          "score": 0.755025
+        },
+        {
+          "document_ref": "implantation__service__zygomatic_implants.md",
+          "score": 0.565713
+        },
+        {
+          "document_ref": "implantation__service__pterygoid_implants.md",
+          "score": 0.544468
+        }
+      ],
+      "s050_own_fresh_ct": [
+        {
+          "document_ref": "diagnostics__service__tomography.md",
+          "score": 0.757
+        },
+        {
+          "document_ref": "implantation__service__pterygoid_implants.md",
+          "score": 0.527353
+        },
+        {
+          "document_ref": "implantation__service__zygomatic_implants.md",
+          "score": 0.513426
+        }
+      ],
+      "s051_treatment_plan_other_clinic": [
+        {
+          "document_ref": "clinic__info__consultation.md",
+          "score": 0.402814
+        },
+        {
+          "document_ref": "implantation__faq__tooth_loss.md",
+          "score": 0.386431
+        },
+        {
+          "document_ref": "implantation__service__bone_graft.md",
+          "score": 0.372258
+        }
+      ],
+      "s052_treatment_plan_other_clinic": [
+        {
+          "document_ref": "clinic__info__consultation.md",
+          "score": 0.554987
+        },
+        {
+          "document_ref": "implantation__faq__tooth_loss.md",
+          "score": 0.458477
+        },
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.44844
+        }
+      ],
+      "s053_treatment_plan_other_clinic": [
+        {
+          "document_ref": "clinic__info__consultation.md",
+          "score": 0.452204
+        },
+        {
+          "document_ref": "implantation__faq__tooth_loss.md",
+          "score": 0.406605
+        },
+        {
+          "document_ref": "implantation__faq__osseointegration.md",
+          "score": 0.391036
+        }
+      ],
+      "s054_treatment_plan_other_clinic": [
+        {
+          "document_ref": "diagnostics__service__tomography.md",
+          "score": 0.569507
+        },
+        {
+          "document_ref": "implantation__service__pterygoid_implants.md",
+          "score": 0.501628
+        },
+        {
+          "document_ref": "implantation__faq__osseointegration.md",
+          "score": 0.484618
+        }
+      ],
+      "s055_treatment_plan_other_clinic": [
+        {
+          "document_ref": "clinic__info__consultation.md",
+          "score": 0.549412
+        },
+        {
+          "document_ref": "implantation__faq__osseointegration.md",
+          "score": 0.521148
+        },
+        {
+          "document_ref": "doctors__doctor__fedorova.md",
+          "score": 0.512892
+        }
+      ],
+      "s056_treatment_plan_other_clinic": [
+        {
+          "document_ref": "clinic__info__consultation.md",
+          "score": 0.545208
+        },
+        {
+          "document_ref": "implantation__info__curator.md",
+          "score": 0.494301
+        },
+        {
+          "document_ref": "implantation__faq__tooth_loss.md",
+          "score": 0.468642
+        }
+      ],
+      "s071_comparison": [
+        {
+          "document_ref": "comparison__all_on_4_vs_all_on_6.md",
+          "score": 0.872364
+        },
+        {
+          "document_ref": "implantation__service__all_on_6.md",
+          "score": 0.744759
+        },
+        {
+          "document_ref": "implantation__service__all_on_4.md",
+          "score": 0.716713
+        }
+      ],
+      "s072_comparison": [
+        {
+          "document_ref": "comparison__implant_vs_bridge.md",
+          "score": 0.82243
+        },
+        {
+          "document_ref": "implantation__info__methods_overview.md",
+          "score": 0.688524
+        },
+        {
+          "document_ref": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+          "score": 0.688339
+        }
+      ],
+      "s073_comparison": [
+        {
+          "document_ref": "comparison__bone_graft_vs_all_on_4.md",
+          "score": 0.790768
+        },
+        {
+          "document_ref": "comparison__all_on_4_vs_all_on_6.md",
+          "score": 0.744566
+        },
+        {
+          "document_ref": "implantation__service__all_on_4.md",
+          "score": 0.668463
+        }
+      ],
+      "s074_comparison": [
+        {
+          "document_ref": "comparison__classic_vs_one_stage.md",
+          "score": 0.776174
+        },
+        {
+          "document_ref": "implantation__service__one_stage.md",
+          "score": 0.73195
+        },
+        {
+          "document_ref": "implantation__info__methods_overview.md",
+          "score": 0.654094
+        }
+      ],
+      "s075_comparison": [
+        {
+          "document_ref": "comparison__all_on_4_vs_all_on_6.md",
+          "score": 0.818907
+        },
+        {
+          "document_ref": "implantation__service__all_on_4.md",
+          "score": 0.697906
+        },
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.692003
+        }
+      ],
+      "s076_comparison": [
+        {
+          "document_ref": "implantation__service__one_stage.md",
+          "score": 0.815342
+        },
+        {
+          "document_ref": "comparison__classic_vs_one_stage.md",
+          "score": 0.779163
+        },
+        {
+          "document_ref": "implantation__info__methods_overview.md",
+          "score": 0.7193
+        }
+      ],
+      "s077_comparison": [
+        {
+          "document_ref": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+          "score": 0.739828
+        },
+        {
+          "document_ref": "prosthetics__service__clasp_dentures.md",
+          "score": 0.609005
+        },
+        {
+          "document_ref": "comparison__implant_vs_bridge.md",
+          "score": 0.562858
+        }
+      ],
+      "s078_comparison": [
+        {
+          "document_ref": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+          "score": 0.770879
+        },
+        {
+          "document_ref": "prosthetics__service__clasp_dentures.md",
+          "score": 0.639781
+        },
+        {
+          "document_ref": "comparison__implant_vs_bridge.md",
+          "score": 0.588864
+        }
+      ],
+      "s079_cross_topic": [
+        {
+          "document_ref": "prosthetics__service__veneers.md",
+          "score": 0.638689
+        },
+        {
+          "document_ref": "comparison__implant_vs_bridge.md",
+          "score": 0.621512
+        },
+        {
+          "document_ref": "implantation__faq__what_included.md",
+          "score": 0.594577
+        }
+      ],
+      "s080_cross_topic": [
+        {
+          "document_ref": "implantation__faq__cost.md",
+          "score": 0.631019
+        },
+        {
+          "document_ref": "comparison__implant_vs_bridge.md",
+          "score": 0.627736
+        },
+        {
+          "document_ref": "implantation__faq__what_included.md",
+          "score": 0.612619
+        }
+      ],
+      "s081_cross_topic": [
+        {
+          "document_ref": "implantation__info__steps.md",
+          "score": 0.604943
+        },
+        {
+          "document_ref": "extraction__service__tooth_extraction.md",
+          "score": 0.604659
+        },
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.596557
+        }
+      ],
+      "s082_cross_topic": [
+        {
+          "document_ref": "whitening__service__teeth_whitening.md",
+          "score": 0.643725
+        },
+        {
+          "document_ref": "treatment__service__caries.md",
+          "score": 0.562455
+        },
+        {
+          "document_ref": "doctors__doctor__fedorova.md",
+          "score": 0.555028
+        }
+      ],
+      "s083_cross_topic": [
+        {
+          "document_ref": "implantation__faq__what_included.md",
+          "score": 0.468929
+        },
+        {
+          "document_ref": "implantation__faq__tooth_loss.md",
+          "score": 0.46116
+        },
+        {
+          "document_ref": "comparison__bone_graft_vs_all_on_4.md",
+          "score": 0.443679
+        }
+      ],
+      "s084_cross_topic": [
+        {
+          "document_ref": "treatment__service__teeth_treatment.md",
+          "score": 0.571362
+        },
+        {
+          "document_ref": "clinic__info__technology.md",
+          "score": 0.537023
+        },
+        {
+          "document_ref": "doctors__doctor__overview.md",
+          "score": 0.533742
+        }
+      ],
+      "s099_unknown_wording": [
+        {
+          "document_ref": "implantation__service__bone_graft.md",
+          "score": 0.496657
+        },
+        {
+          "document_ref": "doctors__doctor__kuznetsov.md",
+          "score": 0.470284
+        },
+        {
+          "document_ref": "implantation__service__zygomatic_implants.md",
+          "score": 0.466928
+        }
+      ],
+      "s100_unknown_wording": [
+        {
+          "document_ref": "treatment__service__teeth_treatment.md",
+          "score": 0.590082
+        },
+        {
+          "document_ref": "clinic__info__technology.md",
+          "score": 0.531829
+        },
+        {
+          "document_ref": "periodontology__service__periodontitis.md",
+          "score": 0.531423
+        }
+      ],
+      "s101_unknown_wording": [
+        {
+          "document_ref": "implantation__faq__osseointegration.md",
+          "score": 0.375487
+        },
+        {
+          "document_ref": "clinic__info__contacts.md",
+          "score": 0.366396
+        },
+        {
+          "document_ref": "implantation__faq__cost.md",
+          "score": 0.364983
+        }
+      ],
+      "s102_unknown_wording": [
+        {
+          "document_ref": "implantation__faq__osseointegration.md",
+          "score": 0.43046
+        },
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.399409
+        },
+        {
+          "document_ref": "treatment__service__caries.md",
+          "score": 0.394575
+        }
+      ],
+      "s103_unknown_wording": [
+        {
+          "document_ref": "treatment__service__caries.md",
+          "score": 0.500108
+        },
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.481282
+        },
+        {
+          "document_ref": "implantation__faq__tooth_loss.md",
+          "score": 0.481153
+        }
+      ],
+      "s104_unknown_wording": [
+        {
+          "document_ref": "implantation__service__bone_graft.md",
+          "score": 0.445153
+        },
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.434263
+        },
+        {
+          "document_ref": "implantation__service__zygomatic_implants.md",
+          "score": 0.428029
+        }
+      ],
+      "s111_medically_risky_personal": [
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.646786
+        },
+        {
+          "document_ref": "implantation__service__one_stage.md",
+          "score": 0.377714
+        },
+        {
+          "document_ref": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+          "score": 0.366559
+        }
+      ],
+      "s112_medically_risky_personal": [
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.676504
+        },
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.61386
+        },
+        {
+          "document_ref": "extraction__service__tooth_extraction.md",
+          "score": 0.604442
+        }
+      ],
+      "s113_medically_risky_personal": [
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.646786
+        },
+        {
+          "document_ref": "implantation__service__one_stage.md",
+          "score": 0.377714
+        },
+        {
+          "document_ref": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+          "score": 0.366559
+        }
+      ],
+      "s114_medically_risky_personal": [
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.676504
+        },
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.61386
+        },
+        {
+          "document_ref": "extraction__service__tooth_extraction.md",
+          "score": 0.604442
+        }
+      ],
+      "s115_medically_risky_personal": [
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.797766
+        },
+        {
+          "document_ref": "extraction__service__tooth_extraction.md",
+          "score": 0.582172
+        },
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.555303
+        }
+      ],
+      "s116_medically_risky_personal": [
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.610858
+        },
+        {
+          "document_ref": "implantation__faq__duration.md",
+          "score": 0.55813
+        },
+        {
+          "document_ref": "extraction__service__tooth_extraction.md",
+          "score": 0.527443
+        }
+      ],
+      "s117_medically_risky_personal": [
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.618294
+        },
+        {
+          "document_ref": "implantation__service__one_stage.md",
+          "score": 0.570772
+        },
+        {
+          "document_ref": "clinic__info__warranty.md",
+          "score": 0.556746
+        }
+      ],
+      "s118_medically_risky_personal": [
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.800731
+        },
+        {
+          "document_ref": "extraction__service__tooth_extraction.md",
+          "score": 0.612897
+        },
+        {
+          "document_ref": "implantation__faq__duration.md",
+          "score": 0.58817
+        }
+      ]
+    },
+    "qwen_dense_lexical_hybrid": {
+      "s011_broad_service": [
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.016141
+        },
+        {
+          "document_ref": "prosthetics__service__clasp_dentures.md",
+          "score": 0.015811
+        },
+        {
+          "document_ref": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+          "score": 0.015462
+        }
+      ],
+      "s012_broad_service": [
+        {
+          "document_ref": "doctors__doctor__grigoriev.md",
+          "score": 0.01572
+        },
+        {
+          "document_ref": "comparison__classic_vs_one_stage.md",
+          "score": 0.015693
+        },
+        {
+          "document_ref": "periodontology__service__periodontitis.md",
+          "score": 0.015307
+        }
+      ],
+      "s013_broad_service": [
+        {
+          "document_ref": "prosthetics__service__clasp_dentures.md",
+          "score": 0.015873
+        },
+        {
+          "document_ref": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+          "score": 0.015817
+        },
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.015382
+        }
+      ],
+      "s014_broad_service": [
+        {
+          "document_ref": "whitening__service__teeth_whitening.md",
+          "score": 0.016201
+        },
+        {
+          "document_ref": "treatment__service__teeth_treatment.md",
+          "score": 0.015073
+        },
+        {
+          "document_ref": "periodontology__service__periodontitis.md",
+          "score": 0.014924
+        }
+      ],
+      "s015_broad_service": [
+        {
+          "document_ref": "implantation__info__methods_overview.md",
+          "score": 0.016065
+        },
+        {
+          "document_ref": "doctors__doctor__morozova.md",
+          "score": 0.015128
+        },
+        {
+          "document_ref": "comparison__classic_vs_one_stage.md",
+          "score": 0.014917
+        }
+      ],
+      "s016_broad_service": [
+        {
+          "document_ref": "comparison__classic_vs_one_stage.md",
+          "score": 0.015885
+        },
+        {
+          "document_ref": "comparison__all_on_4_vs_all_on_6.md",
+          "score": 0.015445
+        },
+        {
+          "document_ref": "orthodontics__service__aligners.md",
+          "score": 0.015202
+        }
+      ],
+      "s039_sterilization_safety": [
+        {
+          "document_ref": "implantation__faq__safety.md",
+          "score": 0.016393
+        },
+        {
+          "document_ref": "doctors__doctor__fedorova.md",
+          "score": 0.015052
+        },
+        {
+          "document_ref": "implantation__faq__what_included.md",
+          "score": 0.014746
+        }
+      ],
+      "s040_sterilization_safety": [
+        {
+          "document_ref": "implantation__faq__safety.md",
+          "score": 0.016393
+        },
+        {
+          "document_ref": "treatment__service__teeth_treatment.md",
+          "score": 0.012097
+        },
+        {
+          "document_ref": "clinic__info__technology.md",
+          "score": 0.011905
+        }
+      ],
+      "s041_sterilization_safety": [
+        {
+          "document_ref": "implantation__faq__safety.md",
+          "score": 0.016327
+        },
+        {
+          "document_ref": "extraction__service__tooth_extraction.md",
+          "score": 0.015342
+        },
+        {
+          "document_ref": "diagnostics__service__tomography.md",
+          "score": 0.015128
+        }
+      ],
+      "s042_sterilization_safety": [
+        {
+          "document_ref": "diagnostics__service__tomography.md",
+          "score": 0.016065
+        },
+        {
+          "document_ref": "implantation__faq__pain.md",
+          "score": 0.015445
+        },
+        {
+          "document_ref": "comparison__all_on_4_vs_all_on_6.md",
+          "score": 0.012961
+        }
+      ],
+      "s043_sterilization_safety": [
+        {
+          "document_ref": "implantation__faq__safety.md",
+          "score": 0.012295
+        },
+        {
+          "document_ref": "clinic__info__technology.md",
+          "score": 0.012097
+        },
+        {
+          "document_ref": "implantation__service__all_on_4.md",
+          "score": 0.011905
+        }
+      ],
+      "s044_sterilization_safety": [
+        {
+          "document_ref": "whitening__service__teeth_whitening.md",
+          "score": 0.012295
+        },
+        {
+          "document_ref": "implantation__faq__safety.md",
+          "score": 0.012097
+        },
+        {
+          "document_ref": "treatment__service__teeth_treatment.md",
+          "score": 0.011905
+        }
+      ],
+      "s048_own_fresh_ct": [
+        {
+          "document_ref": "diagnostics__service__tomography.md",
+          "score": 0.016393
+        },
+        {
+          "document_ref": "implantation__service__zygomatic_implants.md",
+          "score": 0.01543
+        },
+        {
+          "document_ref": "implantation__service__pterygoid_implants.md",
+          "score": 0.015377
+        }
+      ],
+      "s049_own_fresh_ct": [
+        {
+          "document_ref": "diagnostics__service__tomography.md",
+          "score": 0.016393
+        },
+        {
+          "document_ref": "implantation__service__zygomatic_implants.md",
+          "score": 0.015943
+        },
+        {
+          "document_ref": "implantation__service__pterygoid_implants.md",
+          "score": 0.015811
+        }
+      ],
+      "s050_own_fresh_ct": [
+        {
+          "document_ref": "diagnostics__service__tomography.md",
+          "score": 0.016393
+        },
+        {
+          "document_ref": "implantation__service__pterygoid_implants.md",
+          "score": 0.015618
+        },
+        {
+          "document_ref": "extraction__service__tooth_extraction.md",
+          "score": 0.015226
+        }
+      ],
+      "s051_treatment_plan_other_clinic": [
+        {
+          "document_ref": "clinic__info__consultation.md",
+          "score": 0.015918
+        },
+        {
+          "document_ref": "implantation__service__bone_graft.md",
+          "score": 0.015811
+        },
+        {
+          "document_ref": "clinic__info__technology.md",
+          "score": 0.015637
+        }
+      ],
+      "s052_treatment_plan_other_clinic": [
+        {
+          "document_ref": "clinic__info__consultation.md",
+          "score": 0.015816
+        },
+        {
+          "document_ref": "clinic__info__contacts.md",
+          "score": 0.015687
+        },
+        {
+          "document_ref": "diagnostics__service__tomography.md",
+          "score": 0.015385
+        }
+      ],
+      "s053_treatment_plan_other_clinic": [
+        {
+          "document_ref": "clinic__info__consultation.md",
+          "score": 0.016141
+        },
+        {
+          "document_ref": "implantation__info__curator.md",
+          "score": 0.015687
+        },
+        {
+          "document_ref": "implantation__faq__osseointegration.md",
+          "score": 0.015377
+        }
+      ],
+      "s054_treatment_plan_other_clinic": [
+        {
+          "document_ref": "diagnostics__service__tomography.md",
+          "score": 0.016083
+        },
+        {
+          "document_ref": "implantation__service__pterygoid_implants.md",
+          "score": 0.015261
+        },
+        {
+          "document_ref": "clinic__info__technology.md",
+          "score": 0.015128
+        }
+      ],
+      "s055_treatment_plan_other_clinic": [
+        {
+          "document_ref": "clinic__info__consultation.md",
+          "score": 0.016263
+        },
+        {
+          "document_ref": "implantation__faq__osseointegration.md",
+          "score": 0.015943
+        },
+        {
+          "document_ref": "clinic__info__technology.md",
+          "score": 0.015817
+        }
+      ],
+      "s056_treatment_plan_other_clinic": [
+        {
+          "document_ref": "clinic__info__consultation.md",
+          "score": 0.016327
+        },
+        {
+          "document_ref": "implantation__info__curator.md",
+          "score": 0.015773
+        },
+        {
+          "document_ref": "implantation__faq__pain.md",
+          "score": 0.015332
+        }
+      ],
+      "s071_comparison": [
+        {
+          "document_ref": "comparison__all_on_4_vs_all_on_6.md",
+          "score": 0.016393
+        },
+        {
+          "document_ref": "implantation__service__all_on_6.md",
+          "score": 0.016065
+        },
+        {
+          "document_ref": "comparison__bone_graft_vs_all_on_4.md",
+          "score": 0.015625
+        }
+      ],
+      "s072_comparison": [
+        {
+          "document_ref": "comparison__implant_vs_bridge.md",
+          "score": 0.016393
+        },
+        {
+          "document_ref": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+          "score": 0.015937
+        },
+        {
+          "document_ref": "implantation__info__methods_overview.md",
+          "score": 0.015773
+        }
+      ],
+      "s073_comparison": [
+        {
+          "document_ref": "comparison__bone_graft_vs_all_on_4.md",
+          "score": 0.016393
+        },
+        {
+          "document_ref": "comparison__all_on_4_vs_all_on_6.md",
+          "score": 0.016129
+        },
+        {
+          "document_ref": "implantation__service__all_on_4.md",
+          "score": 0.015528
+        }
+      ],
+      "s074_comparison": [
+        {
+          "document_ref": "comparison__classic_vs_one_stage.md",
+          "score": 0.016393
+        },
+        {
+          "document_ref": "implantation__info__methods_overview.md",
+          "score": 0.015811
+        },
+        {
+          "document_ref": "implantation__service__classic.md",
+          "score": 0.015565
+        }
+      ],
+      "s075_comparison": [
+        {
+          "document_ref": "comparison__all_on_4_vs_all_on_6.md",
+          "score": 0.016393
+        },
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.015636
+        },
+        {
+          "document_ref": "comparison__bone_graft_vs_all_on_4.md",
+          "score": 0.015571
+        }
+      ],
+      "s076_comparison": [
+        {
+          "document_ref": "implantation__service__one_stage.md",
+          "score": 0.016141
+        },
+        {
+          "document_ref": "implantation__info__methods_overview.md",
+          "score": 0.015873
+        },
+        {
+          "document_ref": "comparison__classic_vs_one_stage.md",
+          "score": 0.015569
+        }
+      ],
+      "s077_comparison": [
+        {
+          "document_ref": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+          "score": 0.016393
+        },
+        {
+          "document_ref": "prosthetics__service__clasp_dentures.md",
+          "score": 0.016129
+        },
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.015565
+        }
+      ],
+      "s078_comparison": [
+        {
+          "document_ref": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+          "score": 0.016201
+        },
+        {
+          "document_ref": "prosthetics__service__clasp_dentures.md",
+          "score": 0.01572
+        },
+        {
+          "document_ref": "comparison__implant_vs_bridge.md",
+          "score": 0.015693
+        }
+      ],
+      "s079_cross_topic": [
+        {
+          "document_ref": "prosthetics__service__veneers.md",
+          "score": 0.015542
+        },
+        {
+          "document_ref": "prosthetics__service__zirconia_crowns.md",
+          "score": 0.015332
+        },
+        {
+          "document_ref": "comparison__classic_vs_one_stage.md",
+          "score": 0.01527
+        }
+      ],
+      "s080_cross_topic": [
+        {
+          "document_ref": "comparison__implant_vs_bridge.md",
+          "score": 0.015475
+        },
+        {
+          "document_ref": "clinic__info__payment_terms.md",
+          "score": 0.01529
+        },
+        {
+          "document_ref": "implantation__faq__what_included.md",
+          "score": 0.014917
+        }
+      ],
+      "s081_cross_topic": [
+        {
+          "document_ref": "implantation__info__steps.md",
+          "score": 0.01542
+        },
+        {
+          "document_ref": "comparison__implant_vs_bridge.md",
+          "score": 0.01529
+        },
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.015162
+        }
+      ],
+      "s082_cross_topic": [
+        {
+          "document_ref": "doctors__doctor__fedorova.md",
+          "score": 0.015937
+        },
+        {
+          "document_ref": "treatment__service__caries.md",
+          "score": 0.015773
+        },
+        {
+          "document_ref": "whitening__service__teeth_whitening.md",
+          "score": 0.015344
+        }
+      ],
+      "s083_cross_topic": [
+        {
+          "document_ref": "comparison__bone_graft_vs_all_on_4.md",
+          "score": 0.015476
+        },
+        {
+          "document_ref": "comparison__all_on_4_vs_all_on_6.md",
+          "score": 0.015162
+        },
+        {
+          "document_ref": "doctors__doctor__kuznetsov.md",
+          "score": 0.014788
+        }
+      ],
+      "s084_cross_topic": [
+        {
+          "document_ref": "clinic__info__technology.md",
+          "score": 0.015943
+        },
+        {
+          "document_ref": "treatment__service__teeth_treatment.md",
+          "score": 0.01546
+        },
+        {
+          "document_ref": "doctors__doctor__overview.md",
+          "score": 0.015329
+        }
+      ],
+      "s099_unknown_wording": [
+        {
+          "document_ref": "implantation__service__bone_graft.md",
+          "score": 0.016141
+        },
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.015162
+        },
+        {
+          "document_ref": "implantation__service__zygomatic_implants.md",
+          "score": 0.014917
+        }
+      ],
+      "s100_unknown_wording": [
+        {
+          "document_ref": "clinic__info__technology.md",
+          "score": 0.016065
+        },
+        {
+          "document_ref": "implantation__faq__osseointegration.md",
+          "score": 0.014982
+        },
+        {
+          "document_ref": "treatment__service__teeth_treatment.md",
+          "score": 0.014795
+        }
+      ],
+      "s101_unknown_wording": [
+        {
+          "document_ref": "implantation__faq__osseointegration.md",
+          "score": 0.016201
+        },
+        {
+          "document_ref": "implantation__service__zygomatic_implants.md",
+          "score": 0.01527
+        },
+        {
+          "document_ref": "implantation__faq__cost.md",
+          "score": 0.015069
+        }
+      ],
+      "s102_unknown_wording": [
+        {
+          "document_ref": "implantation__faq__osseointegration.md",
+          "score": 0.016141
+        },
+        {
+          "document_ref": "clinic__info__warranty.md",
+          "score": 0.015637
+        },
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.015109
+        }
+      ],
+      "s103_unknown_wording": [
+        {
+          "document_ref": "implantation__faq__tooth_loss.md",
+          "score": 0.015937
+        },
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.014785
+        },
+        {
+          "document_ref": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+          "score": 0.014765
+        }
+      ],
+      "s104_unknown_wording": [
+        {
+          "document_ref": "implantation__service__bone_graft.md",
+          "score": 0.015918
+        },
+        {
+          "document_ref": "comparison__implant_vs_bridge.md",
+          "score": 0.015625
+        },
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.015521
+        }
+      ],
+      "s111_medically_risky_personal": [
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.016393
+        },
+        {
+          "document_ref": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+          "score": 0.015581
+        },
+        {
+          "document_ref": "implantation__service__all_on_4.md",
+          "score": 0.015396
+        }
+      ],
+      "s112_medically_risky_personal": [
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.016393
+        },
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.015943
+        },
+        {
+          "document_ref": "extraction__service__tooth_extraction.md",
+          "score": 0.015329
+        }
+      ],
+      "s113_medically_risky_personal": [
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.016393
+        },
+        {
+          "document_ref": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+          "score": 0.015581
+        },
+        {
+          "document_ref": "implantation__service__all_on_4.md",
+          "score": 0.015396
+        }
+      ],
+      "s114_medically_risky_personal": [
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.016393
+        },
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.015943
+        },
+        {
+          "document_ref": "extraction__service__tooth_extraction.md",
+          "score": 0.015329
+        }
+      ],
+      "s115_medically_risky_personal": [
+        {
+          "document_ref": "prosthetics__service__implant_supported_prosthetics.md",
+          "score": 0.015693
+        },
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.015628
+        },
+        {
+          "document_ref": "extraction__service__tooth_extraction.md",
+          "score": 0.015569
+        }
+      ],
+      "s116_medically_risky_personal": [
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.016327
+        },
+        {
+          "document_ref": "implantation__faq__duration.md",
+          "score": 0.015885
+        },
+        {
+          "document_ref": "extraction__service__tooth_extraction.md",
+          "score": 0.015751
+        }
+      ],
+      "s117_medically_risky_personal": [
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.016327
+        },
+        {
+          "document_ref": "implantation__faq__duration.md",
+          "score": 0.015817
+        },
+        {
+          "document_ref": "extraction__service__tooth_extraction.md",
+          "score": 0.01527
+        }
+      ],
+      "s118_medically_risky_personal": [
+        {
+          "document_ref": "implantation__info__contraindications.md",
+          "score": 0.016026
+        },
+        {
+          "document_ref": "extraction__service__tooth_extraction.md",
+          "score": 0.016003
+        },
+        {
+          "document_ref": "implantation__service__one_stage.md",
+          "score": 0.015162
+        }
+      ]
+    }
+  }
+}

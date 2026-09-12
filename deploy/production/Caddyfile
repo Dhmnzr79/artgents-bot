@@ -1,0 +1,43 @@
+{
+	admin off
+	email {$CADDY_ACME_EMAIL:?set CADDY_ACME_EMAIL}
+}
+
+(common_security_headers) {
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
+
+(public_bot_tls) {
+	import common_security_headers
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+}
+
+# Public clinic hostnames only — add new clinics here, then redeploy/reload Caddy.
+demo.bot.artgents.ru {
+	import public_bot_tls
+	reverse_proxy bot:8000 {
+		header_up Host {http.request.host}
+	}
+}
+
+nikadent.bot.artgents.ru {
+	import public_bot_tls
+	reverse_proxy bot:8000 {
+		header_up Host {http.request.host}
+	}
+}
+
+# Private admin: published on the host as 127.0.0.1:9100 only (see README).
+:9100 {
+	basic_auth {
+		{$CADDY_ADMIN_BASIC_AUTH_USER:?set CADDY_ADMIN_BASIC_AUTH_USER} {$CADDY_ADMIN_BASIC_AUTH_HASH:?set CADDY_ADMIN_BASIC_AUTH_HASH}
+	}
+	reverse_proxy admin:9100 {
+		header_up X-Admin-Dashboard-Token {$ADMIN_DASHBOARD_TOKEN:?set ADMIN_DASHBOARD_TOKEN}
+		header_up Host {http.request.host}
+	}
+}

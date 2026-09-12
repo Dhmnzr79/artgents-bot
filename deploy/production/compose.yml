@@ -1,0 +1,175 @@
+# Production stack (T6B pass 3). Not an automatic deploy — see README.md.
+# Run from repo root with external secrets file, e.g.:
+#   docker compose --env-file /path/to/production.env -f deploy/production/compose.yml config
+
+name: demo-bot-production
+
+x-app-hardening: &app-hardening
+  user: "10001:10001"
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+  tmpfs:
+    - /tmp
+  init: true
+  stop_grace_period: 45s
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?set POSTGRES_IMAGE}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - db_internal
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    stop_grace_period: 60s
+
+  migrate:
+    image: ${BOT_IMAGE:?set BOT_IMAGE}
+    <<: *app-hardening
+    restart: "no"
+    command: ["python", "-m", "deploy.postgres.migrate"]
+    environment:
+      BOT_MIGRATOR_PG_DSN: ${BOT_MIGRATOR_PG_DSN:?set BOT_MIGRATOR_PG_DSN}
+    networks:
+      - db_internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  bot:
+    image: ${BOT_IMAGE:?set BOT_IMAGE}
+    <<: *app-hardening
+    restart: unless-stopped
+    command: ["/app/start.sh"]
+    environment:
+      APP_ENV: prod
+      ALLOWED_CLIENTS: ${ALLOWED_CLIENTS:?set ALLOWED_CLIENTS}
+      DEFAULT_CLIENT_ID: ${DEFAULT_CLIENT_ID:?set DEFAULT_CLIENT_ID}
+      BOT_PG_DSN: ${BOT_PG_DSN:?set BOT_PG_DSN}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:?set DASHSCOPE_API_KEY}
+      CHAT_BASE_URL: ${CHAT_BASE_URL:?set CHAT_BASE_URL}
+      CHAT_API_KEY: ${CHAT_API_KEY:-}
+      QWEN_ENABLE_THINKING: ${QWEN_ENABLE_THINKING:-0}
+      GUNICORN_THREADS: ${GUNICORN_THREADS:-8}
+      BOT_OBSERVABILITY_RETENTION_HOURS: ${BOT_OBSERVABILITY_RETENTION_HOURS:-168}
+      BOT_OBSERVABILITY_RETENTION_INTERVAL_SEC: ${BOT_OBSERVABILITY_RETENTION_INTERVAL_SEC:-3600}
+      BOT_LOG_RETENTION_DAYS: ${BOT_LOG_RETENTION_DAYS:-7}
+      SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:?set SMTP_PORT}
+      SMTP_USE_SSL: ${SMTP_USE_SSL:-1}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-0}
+      SMTP_USER: ${SMTP_USER:?set SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:?set SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM:?set SMTP_FROM}
+      BOT_LLM_USD_PER_1M_PROMPT: ${BOT_LLM_USD_PER_1M_PROMPT:-0.40}
+      BOT_LLM_USD_PER_1M_COMPLETION: ${BOT_LLM_USD_PER_1M_COMPLETION:-1.60}
+    volumes:
+      - bot_data:/app/data
+      - bot_logs:/app/logs
+    networks:
+      - db_internal
+      - edge
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=3)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  admin:
+    image: ${BOT_IMAGE:?set BOT_IMAGE}
+    <<: *app-hardening
+    restart: unless-stopped
+    command: ["/app/deploy/production/start_admin.sh"]
+    environment:
+      APP_ENV: prod
+      ADMIN_DASHBOARD_PORT: "9100"
+      ADMIN_DASHBOARD_TOKEN: ${ADMIN_DASHBOARD_TOKEN:?set ADMIN_DASHBOARD_TOKEN}
+      BOT_PG_DSN: ${BOT_PG_DSN:?set BOT_PG_DSN}
+      ADMIN_GUNICORN_THREADS: ${ADMIN_GUNICORN_THREADS:-4}
+      ADMIN_DASHBOARD_DB_CONNECT_TIMEOUT_SEC: ${ADMIN_DASHBOARD_DB_CONNECT_TIMEOUT_SEC:-3}
+      ADMIN_DIALOG_VISIT_GAP_MIN: ${ADMIN_DIALOG_VISIT_GAP_MIN:-30}
+      BOT_LLM_USD_PER_1M_PROMPT: ${BOT_LLM_USD_PER_1M_PROMPT:-0.40}
+      BOT_LLM_USD_PER_1M_COMPLETION: ${BOT_LLM_USD_PER_1M_COMPLETION:-1.60}
+    networks:
+      - db_internal
+      - edge
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "/app/deploy/production/admin_container_healthcheck.py"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  caddy:
+    profiles:
+      - public
+    image: ${CADDY_IMAGE:?set CADDY_IMAGE}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "127.0.0.1:9100:9100"
+    environment:
+      CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL:?set CADDY_ACME_EMAIL}
+      CADDY_ADMIN_BASIC_AUTH_USER: ${CADDY_ADMIN_BASIC_AUTH_USER:?set CADDY_ADMIN_BASIC_AUTH_USER}
+      CADDY_ADMIN_BASIC_AUTH_HASH: ${CADDY_ADMIN_BASIC_AUTH_HASH:?set CADDY_ADMIN_BASIC_AUTH_HASH}
+      ADMIN_DASHBOARD_TOKEN: ${ADMIN_DASHBOARD_TOKEN:?set ADMIN_DASHBOARD_TOKEN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - edge
+    depends_on:
+      bot:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+    stop_grace_period: 30s
+
+networks:
+  db_internal:
+    internal: true
+  edge:
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+  bot_data:
+  bot_logs:

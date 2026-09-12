@@ -1,0 +1,9 @@
+{
+  "measurement_id": "s49_fullcontext_response_re_eval_v2",
+  "matrix_git_blob_hash": "615714c519a92a75e23c2f15bbaa01a0f88a4d95",
+  "parent_matrix_git_blob_hash": "14b1cbd4c3a8d906e0b19adb10ffaa60849803b3",
+  "total_llm_calls": 38,
+  "attempt_marker_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\fullcontext_response_eval_v2_live_attempt.json",
+  "raw_artifact_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\fullcontext_response_eval_v2_live_raw.json",
+  "result_artifact_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\fullcontext_response_eval_v2_live_result.json"
+}

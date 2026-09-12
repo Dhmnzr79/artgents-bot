@@ -81,13 +81,14 @@ def _bare_day_with_mogno(s: str) -> bool:
 _DATE_CHANGE_RX = re.compile(
     r"(?:"
     r"другой\s+день"
-    r"|передумал"
     r"|поменя(?:ть|йте)\s+дат"
     r"|(?:а\s+)?раньше\s+можно"
     r"|на\s+друг(?:ой|ую)\b"
     r")",
     re.I | re.U,
 )
+
+_PEREDUMAL_DATE_CHANGE_RX = re.compile(r"\bпередумал(?:а)?\b", re.I | re.U)
 
 
 def _is_phone_like(q: str) -> bool:
@@ -112,6 +113,8 @@ def extract_booking_datetime_preference(q: str) -> str | None:
     s = (q or "").strip()
     if not s:
         return None
+
+    candidates: list[tuple[int, int, str]] = []
     for rx in (
         _DAY_MONTH_WORD_RX,
         _DAY_DOT_MONTH_RX,
@@ -120,13 +123,30 @@ def extract_booking_datetime_preference(q: str) -> str | None:
         _BARE_DAY_ON_RX,
         _TIME_RX,
     ):
-        m = rx.search(s)
-        if m:
-            return m.group(0).strip()
+        for m in rx.finditer(s):
+            value = m.group(0).strip()
+            if value:
+                candidates.append((m.start(), m.end(), value))
     if _bare_day_with_mogno(s):
         m = _BARE_DAY_WITH_MOGNO_RX.search(s)
         if m:
-            return m.group(0).strip()
+            value = m.group(0).strip()
+            if value:
+                candidates.append((m.start(), m.end(), value))
+
+    # Prefer longer semantic matches over overlapping partial ones, then retain
+    # non-overlapping date + time fragments in their original order.
+    selected: list[tuple[int, int, str]] = []
+    for start, end, value in sorted(candidates, key=lambda x: (-(x[1] - x[0]), x[0])):
+        if any(
+            start < chosen_end and end > chosen_start
+            for chosen_start, chosen_end, _ in selected
+        ):
+            continue
+        selected.append((start, end, value))
+    if selected:
+        return ", ".join(value for _, _, value in sorted(selected, key=lambda x: x[0]))
+
     if _DATE_CHANGE_RX.search(s):
         return s
     return None
@@ -148,9 +168,13 @@ def looks_like_booking_datetime_signal(
     bare_with_mogno = _bare_day_with_mogno(s) and (
         in_lead_flow or has_prior_preference or bool(_BOOKING_ON_DATE_RX.search(s))
     )
-    date_change = bool(_DATE_CHANGE_RX.search(s)) and (
+    explicit_date_change = bool(_DATE_CHANGE_RX.search(s)) and (
         in_lead_flow or has_prior_preference or strong or bare_on or bare_with_mogno
     )
+    peredumal_date_change = bool(_PEREDUMAL_DATE_CHANGE_RX.search(s)) and (
+        strong or bare_on or bare_with_mogno
+    )
+    date_change = explicit_date_change or peredumal_date_change
 
     if not (strong or bare_on or bare_with_mogno or date_change):
         return False
@@ -207,7 +231,10 @@ def build_booking_date_defer_answer(*, txt: dict, resume_step: str) -> str:
     step = (resume_step or "").strip()
     body = (
         txt.get("lead_booking_date_defer")
-        or "Приняла запрос — по дате с вами свяжется и уточнит администратор."
+        or (
+            "Пожелание по дате передам администратору. "
+            "Удобные дату и время он уточнит с вами при звонке."
+        )
     ).strip()
     if step == "collecting_phone":
         phone = (

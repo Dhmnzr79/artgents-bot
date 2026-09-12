@@ -1,0 +1,10 @@
+{
+  "measurement_id": "s63_target_runtime_live",
+  "baseline_live_commit": "ca456073d35cf32fc0177417c19939f28ff3b8b6",
+  "turns_git_blob_hash": "df7e9f4fca3bb04d0affb99f619bc09ff5cec0be1c24bedff569eb3a5b299e06",
+  "result_sha256": "503acb431f30042c482fd51c4d414639815a7c955c0e957adac28ccec741cd59",
+  "provider_ledger_sha256": "9b284604d67e1b90bf636a11b645e91e540552d75e607ec7e451b5090d4808a8",
+  "attempt_marker_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\s63_target_runtime_live_attempt.json",
+  "call_ledger_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\s63_target_runtime_live_call_ledger.jsonl",
+  "rerun_blocked_without_owner_approval": true
+}

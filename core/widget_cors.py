@@ -3,8 +3,7 @@ from __future__ import annotations
 
 from flask import Response, request
 
-from config import resolve_client_id
-from core.client_host import client_id_from_host, resolve_request_client_id
+from core.client_host import resolve_request_client_id
 from core.origin_guard import matching_widget_origin
 
 _WIDGET_CORS_PREFIXES = (
@@ -37,11 +36,7 @@ def resolve_widget_cors_client_id() -> str | None:
             raw = str(data.get("client_id") or "").strip()
     if raw:
         return resolve_request_client_id(raw, host=request.host)
-    # Static/widget.js: Host is {id}.bot.* — use that pack's allowed_origins (not DEFAULT_CLIENT_ID).
-    host_cid = client_id_from_host(request.host)
-    if host_cid:
-        return host_cid
-    return resolve_client_id(None)
+    return resolve_request_client_id(None, host=request.host)
 
 
 def _cors_headers(allow_origin: str) -> dict[str, str]:

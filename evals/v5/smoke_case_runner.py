@@ -10,6 +10,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
+import yaml
+
 import urllib.error
 import urllib.request
 
@@ -735,6 +737,541 @@ def validate_smoke_case(
                 coverage_class=cov,
             )
 
+    pres_reason = validate_preservation_contract(row=row, resp=resp, answer=answer, route=route)
+    if pres_reason:
+        return CaseResult(
+            case_id=case_id,
+            status="FAIL",
+            reason=pres_reason,
+            coverage_class=cov,
+        )
+
+    return None
+
+
+_PROTECTED_UI_CONTRACT_KEYS: frozenset[str] = frozenset(
+    {
+        "note",
+        "composer_must_not_substitute_contacts_boundary",
+        "followup_source",
+        "source_doc_id",
+        "turn_scope",
+        "source_catalog_refs_ordered",
+        "source_catalog_labels_ordered",
+        "expected_visible_followup_refs_ordered",
+        "expected_visible_followup_labels_ordered",
+        "expected_video_key",
+        "surface",
+        "pricebook_source",
+        "expected_unit",
+        "allowed_optional_amounts",
+        "required_amounts",
+        "forbidden_amounts",
+        "expected_price_followup_actions_ordered",
+    }
+)
+
+_MARKETING_CONTRACT_KEYS: frozenset[str] = frozenset(
+    {
+        "promo_overlay_required",
+        "core_answer_independent_of_promo",
+        "blocked_promo_aspect_source",
+        "blocked_promo_aspect",
+        "core_must_pass_without_promo_cards",
+        "must_not_block_on_promo_absence",
+        "verification_scope",
+        "expected_promo_absent",
+        "core_answer_required",
+    }
+)
+
+_KNOWN_TURN_SCOPES: frozenset[str] = frozenset({"fresh_session_first_turn"})
+_KNOWN_FOLLOWUP_SOURCES: frozenset[str] = frozenset({"suggest_h3"})
+_KNOWN_VERIFICATION_SCOPES: frozenset[str] = frozenset({"natural_absence_only"})
+_KNOWN_UI_SURFACES: frozenset[str] = frozenset({"meta.followups", "quick_replies"})
+
+
+def _contract_unknown_keys(contract: dict[str, Any], allowed: frozenset[str]) -> list[str]:
+    return sorted(k for k in contract if k not in allowed)
+
+
+def _doc_id_from_ref(ref: str) -> str:
+    r = (ref or "").strip()
+    if not r:
+        return ""
+    base = r.split("#", 1)[0].strip()
+    if base.endswith(".md"):
+        base = base[:-3]
+    return base
+
+
+def _int_list_field(obj: dict[str, Any], key: str) -> list[int]:
+    raw = obj.get(key)
+    if not isinstance(raw, list):
+        return []
+    out: list[int] = []
+    for x in raw:
+        try:
+            out.append(int(x))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _ordered_str_lists_equal(got: list[str], want: list[str]) -> bool:
+    if len(got) != len(want):
+        return False
+    return all(str(a) == str(b) for a, b in zip(got, want))
+
+
+def _followup_items(resp: dict[str, Any], *, surface: str) -> list[dict[str, str]]:
+    if surface == "quick_replies":
+        raw = resp.get("quick_replies") or []
+    elif surface == "meta.followups":
+        meta = resp.get("meta") if isinstance(resp.get("meta"), dict) else {}
+        raw = meta.get("followups") or []
+    else:
+        return []
+    out: list[dict[str, str]] = []
+    if not isinstance(raw, list):
+        return out
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get("label") or "").strip()
+        ref = str(item.get("ref") or "").strip()
+        if label and ref:
+            out.append({"label": label, "ref": ref})
+    return out
+
+
+def extract_evidence_source_doc_id(resp: dict[str, Any]) -> tuple[str | None, str | None]:
+    """Return (doc_id, provenance_field) from explicit response telemetry only."""
+    meta = resp.get("meta") if isinstance(resp.get("meta"), dict) else {}
+    mf = meta.get("metadata_first") if isinstance(meta.get("metadata_first"), dict) else {}
+
+    packet = meta.get("answer_packet")
+    if isinstance(packet, dict):
+        for card in packet.get("cards") or []:
+            if not isinstance(card, dict) or str(card.get("kind") or "") != "content":
+                continue
+            ref = str(card.get("source_ref") or "").strip()
+            doc_id = _doc_id_from_ref(ref)
+            if doc_id:
+                return doc_id, "answer_packet.cards.source_ref"
+
+    gen = meta.get("generator_input") if isinstance(meta.get("generator_input"), dict) else {}
+    gen_doc = str(gen.get("doc_id") or "").strip()
+    if gen_doc:
+        return gen_doc, "generator_input.doc_id"
+
+    sel = str(mf.get("selected_doc_id") or "").strip()
+    if sel:
+        return sel, "metadata_first.selected_doc_id"
+
+    doc_id = str(meta.get("doc_id") or "").strip()
+    if not doc_id:
+        f = str(meta.get("file") or "").strip()
+        if f.endswith(".md"):
+            doc_id = f[:-3]
+    answer_path = str(meta.get("answer_path") or "").strip().lower()
+    if doc_id and answer_path in {"composer", "single_source", "contacts"}:
+        return doc_id, "meta.doc_id"
+
+    srd = mf.get("source_route_decision")
+    if isinstance(srd, dict):
+        ref = str(srd.get("ref") or "").strip()
+        doc_id = _doc_id_from_ref(ref)
+        if doc_id:
+            return doc_id, "metadata_first.source_route_decision.ref"
+
+    return None, None
+
+
+def _build_source_catalog_from_doc(
+    *,
+    client_id: str,
+    source_doc_id: str,
+    followup_source: str,
+) -> tuple[tuple[list[str], list[str]] | None, str | None]:
+    if followup_source not in _KNOWN_FOLLOWUP_SOURCES:
+        return None, f"unsupported followup_source: {followup_source!r}"
+    doc_name = f"{source_doc_id.strip()}.md"
+    ensure_repo_on_path()
+    from meta_loader import get_doc_meta
+    from ux_builder import heading_label
+
+    meta = get_doc_meta(doc_name, client_id=client_id)
+    if not meta:
+        return None, f"source doc not found: {doc_name!r}"
+    suggest = meta.get("suggest_h3") or []
+    if not isinstance(suggest, list):
+        return None, f"suggest_h3 missing in {doc_name!r}"
+    refs: list[str] = []
+    labels: list[str] = []
+    for raw in suggest:
+        h_id = raw if isinstance(raw, str) else (raw.get("h3_id") or raw.get("id"))
+        h_id_s = str(h_id or "").strip()
+        if not h_id_s:
+            continue
+        refs.append(f"{doc_name}#{h_id_s}")
+        labels.append(heading_label(doc_name, h_id_s, client_id=client_id))
+    return (refs, labels), None
+
+
+def _parse_yaml_anchor_ref(ref: str) -> tuple[str, str]:
+    raw = (ref or "").strip()
+    if "#" not in raw:
+        return raw, ""
+    path, anchor = raw.split("#", 1)
+    return path.strip(), anchor.strip()
+
+
+def _promo_present_in_response(resp: dict[str, Any]) -> bool:
+    meta = resp.get("meta") if isinstance(resp.get("meta"), dict) else {}
+    packet = meta.get("answer_packet")
+    if isinstance(packet, dict):
+        for card in packet.get("cards") or []:
+            if isinstance(card, dict) and str(card.get("kind") or "") == "promo":
+                return True
+        for dec in packet.get("promo_decisions") or []:
+            if isinstance(dec, dict) and bool(dec.get("allowed")):
+                return True
+    applied = meta.get("marketing_promos_applied")
+    if isinstance(applied, list) and applied:
+        return True
+    return False
+
+
+def _core_answer_blocked(resp: dict[str, Any], answer: str) -> bool:
+    if not str(answer or "").strip():
+        return True
+    meta = resp.get("meta") if isinstance(resp.get("meta"), dict) else {}
+    if bool(meta.get("low_score")):
+        return True
+    if str(meta.get("error") or "").strip():
+        return True
+    fb = str(meta.get("fallback_reason") or "").strip().lower()
+    if fb in {
+        "ask_failed",
+        "retrieval_no_candidates",
+        "low_score_fallback",
+        "price_not_in_catalog",
+    }:
+        return True
+    return False
+
+
+def _load_pricebook_service(rel_path: str) -> dict[str, Any]:
+    root = ensure_repo_on_path()
+    path = os.path.join(root, rel_path.replace("/", os.sep))
+    with open(path, encoding="utf-8") as f:
+        obj = json.load(f)
+    if not isinstance(obj, dict):
+        raise ValueError("pricebook service must be an object")
+    return obj
+
+
+def _pricebook_variant_totals(pb: dict[str, Any]) -> set[int]:
+    totals: set[int] = set()
+    variants = pb.get("variants")
+    if not isinstance(variants, list):
+        return totals
+    for variant in variants:
+        if not isinstance(variant, dict):
+            continue
+        try:
+            totals.add(int(variant.get("total")))
+        except (TypeError, ValueError):
+            continue
+    return totals
+
+
+def _price_unit_amount_hint_ok(*, want_unit: str, answer: str) -> bool:
+    """Amount-only fallback for protected_ui.expected_unit (smoke parity, no prose hints)."""
+    jaw_hint = "318 000" in answer or "368 000" in answer
+    tooth_hint = "76 200" in answer or "85 200" in answer
+    if want_unit == "jaw":
+        return jaw_hint and "76 200" not in answer
+    if want_unit == "one_tooth":
+        return tooth_hint and "318 000" not in answer
+    return False
+
+
+def _validate_pricebook_amounts(
+    *,
+    ui: dict[str, Any],
+    pb: dict[str, Any],
+    answer: str,
+) -> str | None:
+    try:
+        from composer_parity import amount_in_text
+    except ModuleNotFoundError:
+        from evals.v5.composer_parity import amount_in_text
+
+    pb_totals = _pricebook_variant_totals(pb)
+    required = set(_int_list_field(ui, "required_amounts"))
+    optional = set(_int_list_field(ui, "allowed_optional_amounts"))
+    forbidden = set(_int_list_field(ui, "forbidden_amounts"))
+    declared_allowed = required | optional
+
+    for amt in declared_allowed:
+        if amt not in pb_totals:
+            return f"protected_ui.amount_not_in_pricebook: {amt}"
+
+    for req in sorted(required):
+        if not amount_in_text(req, answer):
+            return f"protected_ui.required_amount missing: {req}"
+
+    for forb in sorted(forbidden):
+        if amount_in_text(forb, answer):
+            return f"protected_ui.forbidden_amount present: {forb}"
+
+    for total in sorted(pb_totals):
+        if total in forbidden:
+            continue
+        if amount_in_text(total, answer) and total not in declared_allowed:
+            return f"protected_ui.undeclared_pricebook_total: {total}"
+
+    return None
+
+
+def validate_price_followup_contract(
+    *,
+    expected_actions: list[dict[str, Any]],
+    pb_followups: list[dict[str, Any]],
+    quick_replies: list[dict[str, str]],
+) -> str | None:
+    if len(quick_replies) != len(expected_actions):
+        return (
+            f"protected_ui.price_quick_reply_count: got={len(quick_replies)} "
+            f"want={len(expected_actions)}"
+        )
+    if len(pb_followups) < len(expected_actions):
+        return (
+            f"protected_ui.price_followup_source_count: got={len(pb_followups)} "
+            f"want={len(expected_actions)}"
+        )
+
+    for idx, exp in enumerate(expected_actions):
+        if not isinstance(exp, dict):
+            return f"protected_ui.price_followup[{idx}]: expected object"
+        label = str(exp.get("label") or "").strip()
+        ref = str(exp.get("ref") or "").strip()
+        action = str(exp.get("action") or "").strip()
+        aspect = str(exp.get("aspect") or "").strip()
+
+        pb_fu = pb_followups[idx]
+        if not isinstance(pb_fu, dict):
+            return f"protected_ui.price_followup_source[{idx}]: missing PriceBook entry"
+        pb_label = str(pb_fu.get("label") or "").strip()
+        pb_action = str(pb_fu.get("action") or "").strip()
+        pb_aspect = str(pb_fu.get("aspect") or "").strip()
+        if pb_label != label:
+            return (
+                f"protected_ui.price_followup_source[{idx}].label: "
+                f"got={pb_label!r} want={label!r}"
+            )
+        if pb_action != action:
+            return (
+                f"protected_ui.price_followup_source[{idx}].action: "
+                f"got={pb_action!r} want={action!r}"
+            )
+        if pb_aspect != aspect:
+            return (
+                f"protected_ui.price_followup_source[{idx}].aspect: "
+                f"got={pb_aspect!r} want={aspect!r}"
+            )
+
+        if quick_replies[idx]["label"] != label:
+            return (
+                f"protected_ui.price_quick_reply[{idx}].label: "
+                f"got={quick_replies[idx]['label']!r} want={label!r}"
+            )
+        if quick_replies[idx]["ref"] != ref:
+            return (
+                f"protected_ui.price_quick_reply[{idx}].ref: "
+                f"got={quick_replies[idx]['ref']!r} want={ref!r}"
+            )
+
+    return None
+
+
+def validate_preservation_contract(
+    *,
+    row: dict[str, Any],
+    resp: dict[str, Any],
+    answer: str,
+    route: str,
+) -> str | None:
+    """Universal A0 preservation contract checks (spec-driven, no per-case ids)."""
+    meta = resp.get("meta") if isinstance(resp.get("meta"), dict) else {}
+    client_id = str(row.get("client_id") or meta.get("client_id") or "demo").strip()
+
+    expected_evidence = row.get("expected_evidence_source_doc_id")
+    if expected_evidence is not None:
+        want = str(expected_evidence).strip()
+        got, prov = extract_evidence_source_doc_id(resp)
+        if not got:
+            return (
+                "evidence_source: provenance missing in response "
+                "(need answer_packet.cards.source_ref, generator_input.doc_id, "
+                "metadata_first.selected_doc_id, meta.doc_id, or source_route_decision.ref)"
+            )
+        if norm(got) != norm(want):
+            return f"evidence_source: got={got!r} via {prov!r} want={want!r}"
+
+    ui = row.get("protected_ui_contract")
+    if isinstance(ui, dict) and ui:
+        unknown = _contract_unknown_keys(ui, _PROTECTED_UI_CONTRACT_KEYS)
+        if unknown:
+            return f"protected_ui_contract unknown fields: {unknown!r}"
+
+        if ui.get("composer_must_not_substitute_contacts_boundary") is True:
+            ap = str(meta.get("answer_path") or "").strip().lower()
+            if ap == "composer":
+                return "protected_ui.contacts_boundary: composer substituted contacts route"
+
+        followup_source = ui.get("followup_source")
+        source_doc_id = ui.get("source_doc_id")
+        if followup_source is not None and str(followup_source).strip() not in _KNOWN_FOLLOWUP_SOURCES:
+            return f"protected_ui.followup_source unsupported: {followup_source!r}"
+
+        turn_scope = ui.get("turn_scope")
+        if turn_scope is not None and str(turn_scope).strip() not in _KNOWN_TURN_SCOPES:
+            return f"protected_ui.turn_scope unsupported: {turn_scope!r}"
+
+        if source_doc_id and followup_source:
+            catalog, err = _build_source_catalog_from_doc(
+                client_id=client_id,
+                source_doc_id=str(source_doc_id).strip(),
+                followup_source=str(followup_source).strip(),
+            )
+            if err:
+                return f"protected_ui.source_catalog: {err}"
+            assert catalog is not None
+            refs, labels = catalog
+            want_refs = str_list_field(ui, "source_catalog_refs_ordered")
+            want_labels = str_list_field(ui, "source_catalog_labels_ordered")
+            if want_refs and not _ordered_str_lists_equal(refs, want_refs):
+                return f"protected_ui.source_catalog_refs: got={refs!r} want={want_refs!r}"
+            if want_labels and not _ordered_str_lists_equal(labels, want_labels):
+                return f"protected_ui.source_catalog_labels: got={labels!r} want={want_labels!r}"
+
+        surface = str(ui.get("surface") or "meta.followups").strip()
+        if ui.get("expected_visible_followup_refs_ordered") or ui.get("expected_visible_followup_labels_ordered"):
+            if surface not in _KNOWN_UI_SURFACES:
+                return f"protected_ui.surface unsupported: {surface!r}"
+            visible = _followup_items(resp, surface=surface)
+            got_refs = [x["ref"] for x in visible]
+            got_labels = [x["label"] for x in visible]
+            want_refs = str_list_field(ui, "expected_visible_followup_refs_ordered")
+            want_labels = str_list_field(ui, "expected_visible_followup_labels_ordered")
+            if want_refs and not _ordered_str_lists_equal(got_refs, want_refs):
+                return f"protected_ui.visible_followup_refs: got={got_refs!r} want={want_refs!r}"
+            if want_labels and not _ordered_str_lists_equal(got_labels, want_labels):
+                return f"protected_ui.visible_followup_labels: got={got_labels!r} want={want_labels!r}"
+
+        if ui.get("expected_video_key") is not None:
+            want_vk = str(ui.get("expected_video_key") or "").strip()
+            video = resp.get("video") if isinstance(resp.get("video"), dict) else {}
+            got_vk = str(video.get("key") or "").strip()
+            if want_vk and got_vk != want_vk:
+                return f"protected_ui.video_key: got={got_vk!r} want={want_vk!r}"
+
+        if ui.get("pricebook_source"):
+            pb_path = str(ui.get("pricebook_source") or "").strip()
+            try:
+                pb = _load_pricebook_service(pb_path)
+            except OSError as e:
+                return f"protected_ui.pricebook_source unreadable: {pb_path!r} ({e})"
+            want_unit = str(ui.get("expected_unit") or "").strip().lower()
+            if want_unit:
+                got_unit = str(meta.get("price_offer_unit") or "").strip().lower()
+                unit_ok = bool(got_unit) and got_unit == want_unit
+                if not unit_ok:
+                    unit_ok = _price_unit_amount_hint_ok(want_unit=want_unit, answer=answer)
+                if not unit_ok:
+                    return f"protected_ui.expected_unit: got={got_unit!r} want={want_unit!r}"
+
+            amount_reason = _validate_pricebook_amounts(ui=ui, pb=pb, answer=answer)
+            if amount_reason:
+                return amount_reason
+
+            expected_actions = ui.get("expected_price_followup_actions_ordered")
+            if isinstance(expected_actions, list) and expected_actions:
+                quick = _followup_items(resp, surface="quick_replies")
+                pb_followups = pb.get("followups") or []
+                if not isinstance(pb_followups, list):
+                    pb_followups = []
+                followup_reason = validate_price_followup_contract(
+                    expected_actions=expected_actions,
+                    pb_followups=pb_followups,
+                    quick_replies=quick,
+                )
+                if followup_reason:
+                    return followup_reason
+
+    marketing = row.get("marketing_contract")
+    if isinstance(marketing, dict) and marketing:
+        unknown = _contract_unknown_keys(marketing, _MARKETING_CONTRACT_KEYS)
+        if unknown:
+            return f"marketing_contract unknown fields: {unknown!r}"
+
+        if marketing.get("verification_scope") is not None:
+            vs = str(marketing.get("verification_scope") or "").strip()
+            if vs not in _KNOWN_VERIFICATION_SCOPES:
+                return f"marketing.verification_scope unsupported: {vs!r}"
+
+        aspect_source = str(marketing.get("blocked_promo_aspect_source") or "").strip()
+        blocked_aspect = str(marketing.get("blocked_promo_aspect") or "").strip()
+        if aspect_source and blocked_aspect:
+            rel_path, anchor = _parse_yaml_anchor_ref(aspect_source)
+            root = ensure_repo_on_path()
+            yaml_path = os.path.join(root, rel_path.replace("/", os.sep))
+            try:
+                with open(yaml_path, encoding="utf-8") as f:
+                    yaml_obj = yaml.safe_load(f) or {}
+            except OSError as e:
+                return f"marketing.blocked_promo_aspect_source unreadable: {aspect_source!r} ({e})"
+            if not isinstance(yaml_obj, dict):
+                return f"marketing.blocked_promo_aspect_source invalid yaml: {aspect_source!r}"
+            key = anchor or "blocked_aspects_for_promo"
+            aspects_raw = yaml_obj.get(key)
+            if not isinstance(aspects_raw, list):
+                return f"marketing.blocked_promo_aspect_source missing anchor {key!r}"
+            aspects = {norm(str(x)) for x in aspects_raw if str(x).strip()}
+            if norm(blocked_aspect) not in aspects:
+                return (
+                    f"marketing.blocked_promo_aspect: {blocked_aspect!r} "
+                    f"not listed in {aspect_source!r}"
+                )
+
+        if marketing.get("promo_overlay_required") is not False and marketing.get("promo_overlay_required") is not None:
+            if bool(marketing.get("promo_overlay_required")):
+                return "marketing.promo_overlay_required=true is not supported in A0 harness"
+
+        promo_absent = marketing.get("expected_promo_absent")
+        if promo_absent is True and _promo_present_in_response(resp):
+            return "marketing.expected_promo_absent: promo card/decision present"
+
+        if marketing.get("core_answer_required") is True and _core_answer_blocked(resp, answer):
+            return "marketing.core_answer_required: empty or fallback-blocking answer"
+
+        if marketing.get("core_must_pass_without_promo_cards") is True:
+            if _promo_present_in_response(resp):
+                return "marketing.core_must_pass_without_promo_cards: promo cards present"
+            if _core_answer_blocked(resp, answer):
+                return "marketing.core_must_pass_without_promo_cards: core answer blocked"
+
+        if marketing.get("must_not_block_on_promo_absence") is True:
+            if not _promo_present_in_response(resp) and _core_answer_blocked(resp, answer):
+                return "marketing.must_not_block_on_promo_absence: answer blocked without promo"
+
+        if marketing.get("core_answer_independent_of_promo") is True:
+            if _core_answer_blocked(resp, answer):
+                return "marketing.core_answer_independent_of_promo: core answer blocked"
+
     return None
 
 
@@ -781,8 +1318,9 @@ def http_post_json(url: str, payload: dict[str, Any], timeout_sec: float) -> dic
 
 
 def parse_sse_ui_payload(body: str) -> dict[str, Any]:
-    """Parse final ``ui`` event JSON from /ask/stream SSE body."""
+    """Parse final ``ui`` event JSON from /ask/stream SSE body (last ui wins)."""
     event_name: str | None = None
+    last_ui: dict[str, Any] | None = None
     for line in (body or "").splitlines():
         if line.startswith("event: "):
             event_name = line[7:].strip()
@@ -790,8 +1328,10 @@ def parse_sse_ui_payload(body: str) -> dict[str, Any]:
             raw = json.loads(line[6:])
             if not isinstance(raw, dict):
                 raise ValueError("ui payload is not a JSON object")
-            return raw
-    raise ValueError("no ui event in SSE body")
+            last_ui = raw
+    if last_ui is None:
+        raise ValueError("no ui event in SSE body")
+    return last_ui
 
 
 def ask_stream_url(bot_url: str) -> str:
@@ -919,6 +1459,11 @@ def run_smoke_suite(
     if isinstance(known_raw, list):
         known_fail_ids = {str(x).strip() for x in known_raw if str(x).strip()}
     routing_matrix = bool(spec.get("routing_matrix"))
+    pipeline_contract = spec.get("pipeline_contract")
+    use_stream = (
+        isinstance(pipeline_contract, dict)
+        and str(pipeline_contract.get("endpoint") or "").strip() == "/ask/stream"
+    )
 
     if expand_multiclient:
         cases = expand_cases([r for r in cases if isinstance(r, dict)])
@@ -954,6 +1499,12 @@ def run_smoke_suite(
         if uses_test_client():
             reset_smoke_session(sid)
 
+        ui_contract = row.get("protected_ui_contract")
+        if isinstance(ui_contract, dict) and str(ui_contract.get("turn_scope") or "").strip() == "fresh_session_first_turn":
+            sid = f"smoke_{case_id}_{ts}_{run_tag}_fresh"
+            if uses_test_client():
+                reset_smoke_session(sid)
+
         if isinstance(history, list):
             for h in history:
                 if isinstance(h, dict) and str(h.get("question") or "").strip():
@@ -982,9 +1533,11 @@ def run_smoke_suite(
             apply_session_seed(sid, session_seed)
 
         try:
-            resp = post_ask_json(
-                bot_url, {"q": question, "sid": sid, "client_id": client_id}, timeout_sec
-            )
+            ask_payload = {"q": question, "sid": sid, "client_id": client_id}
+            if use_stream:
+                resp = post_ask_stream(bot_url, ask_payload, timeout_sec)
+            else:
+                resp = post_ask_json(bot_url, ask_payload, timeout_sec)
         except (urllib.error.URLError, urllib.error.HTTPError) as e:
             errors += 1
             results.append(

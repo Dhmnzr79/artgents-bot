@@ -1,0 +1,28 @@
+﻿ M contracts/response_schema.py
+ M contracts/target_response_policy.py
+ M contracts/target_response_spec.py
+ M core/response_schema_loader.py
+ M core/target_composer_executor.py
+ M core/target_composer_request.py
+ M core/target_family_price_overview.py
+ M core/target_response_followup_policy.py
+ M core/target_response_policy.py
+ M core/target_runtime_turn.py
+ M core/target_runtime_turn_frame_hydration.py
+ M core/target_runtime_widget.py
+ M core/target_scoped_response_evidence.py
+ M core/target_spec_offline_response_package.py
+ M core/target_turn_frame_dispatch.py
+ M tests/test_demo_target_price_offers.py
+ M tests/test_response_schema_loader.py
+ M tests/test_target_response_followup_policy.py
+ M tests/test_target_response_policy.py
+ M tests/test_target_response_spec.py
+ M tests/test_target_turn_frame_dispatch.py
+ M tests/test_w1_family_price_overview_offline.py
+?? clients/demo/target_response/family_price_groups.yaml
+?? contracts/target_family_price_group_followup.py
+?? contracts/target_family_price_groups.py
+?? docs/artifacts/
+?? tests/test_w1b_family_price_group_drilldown_offline.py
+?? tests/test_w1b_family_price_situation_menu_offline.py

@@ -15,7 +15,10 @@ from config import KT_EXPLICIT_RE
 from core.attribute_followup import catalog_match_is_authoritative, is_vague_attribute_followup
 from core.client_config_loader import resolve_pack_client_id
 from core.client_runtime import client_md_dir
-from query_selector import match_service_from_catalog
+from core.target_client_data import (
+    match_service_from_target_catalog,
+    service_catalog_dict,
+)
 
 _NAMES_INDEX_LOCK = threading.Lock()
 _NAMES_INDEX: dict[str, tuple[float, frozenset[str]]] = {}
@@ -65,18 +68,10 @@ def _safe_client_id(client_id: str | None) -> str:
     return resolve_pack_client_id(client_id)
 
 
-def _client_catalog_path(client_id: str | None) -> str:
-    base = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base, "clients", _safe_client_id(client_id), "service_catalog.json")
-
-
 def _read_service_catalog(client_id: str | None) -> dict[str, Any]:
-    path = _client_catalog_path(client_id)
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            obj = json.load(f)
-        return obj if isinstance(obj, dict) else {}
-    except (OSError, json.JSONDecodeError):
+        return service_catalog_dict(client_id)
+    except Exception:
         return {}
 
 
@@ -84,7 +79,7 @@ def _infer_entry_topic(entry: dict[str, Any]) -> str | None:
     t = entry.get("topic")
     if isinstance(t, str) and t.strip():
         return t.strip().lower()
-    ref = str(entry.get("md_entry_ref") or "").strip().lower().removesuffix(".md")
+    ref = str(entry.get("md_entry_ref") or entry.get("content_ref") or "").strip().lower().removesuffix(".md")
     if not ref:
         return None
     first = ref.split("__", 1)[0].strip()
@@ -759,7 +754,7 @@ def doctors_lookup(
                 return hit
 
     # --- 2) Услуга из каталога (уверенный матч)
-    cat_match = match_service_from_catalog(q0, client_id=client_id)
+    cat_match = match_service_from_target_catalog(q0, client_id=client_id)
     if cat_match.get("matched_service_id") and bool(cat_match.get("is_confident")):
         if not (vague_doctor and not catalog_match_is_authoritative(cat_match, q0)):
             sid = str(cat_match.get("matched_service_id") or "")

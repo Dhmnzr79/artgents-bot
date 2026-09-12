@@ -1,0 +1,46 @@
+version: 1
+services:
+  all_on_4:
+    - installment_12
+    - implant_same_day_discount
+  all_on_6:
+    - installment_12
+    - implant_same_day_discount
+  classic:
+    - installment_12
+    - implant_same_day_discount
+  one_stage:
+    - installment_12
+    - implant_same_day_discount
+  bone_graft:
+    - installment_12
+    - implant_same_day_discount
+  sinus_lift:
+    - installment_12
+    - implant_same_day_discount
+  zygomatic_implants:
+    - installment_12
+    - implant_same_day_discount
+  pterygoid_implants:
+    - installment_12
+    - implant_same_day_discount
+  implant_supported_prosthetics:
+    - installment_12
+    - free_implant_consult
+  veneers:
+    - installment_12
+    - free_implant_consult
+  zirconia_crowns:
+    - installment_12
+    - free_implant_consult
+  clasp_dentures:
+    - installment_12
+    - free_implant_consult
+  removable_dentures:
+    - installment_12
+    - free_implant_consult
+  temporary_teeth:
+    - installment_12
+    - free_implant_consult
+  professional_whitening:
+    - professional_whitening_discount

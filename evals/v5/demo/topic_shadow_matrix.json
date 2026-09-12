@@ -1,0 +1,305 @@
+{
+  "schema_version": 1,
+  "suite_id": "a6_topic_shadow_quality_matrix",
+  "client_id": "demo",
+  "execution_mode": "planner_direct_live",
+  "fresh_session_per_case": true,
+  "authority": "shadow_only",
+  "taxonomy_source": "clients/{client_id}/md/*.md frontmatter.topic",
+  "expected_taxonomy_ordered": [
+    "clinic",
+    "doctors",
+    "extraction",
+    "implantation",
+    "orthodontics",
+    "periodontology",
+    "prosthetics",
+    "treatment",
+    "whitening"
+  ],
+  "scoring_contract": {
+    "scored_field": "turn_plan.topic",
+    "confidence_field": "turn_plan.topic_confidence",
+    "match_rule": "exact_normalized_or_null",
+    "one_live_call_per_case": true,
+    "retry_failed_case": false,
+    "confidence_is_descriptive_only": true,
+    "confidence_pass_threshold": null,
+    "required_metrics": [
+      "overall_exact_match",
+      "per_topic_exact_match",
+      "ambiguous_null_exact_match",
+      "confusion_matrix",
+      "planner_unavailable_count",
+      "invalid_or_out_of_taxonomy_count",
+      "confidence_by_correctness_descriptive"
+    ],
+    "authority_decision_allowed": false
+  },
+  "cases": [
+    {
+      "id": "topic_a6_01_clinic_payment",
+      "case_kind": "grounded_single_topic",
+      "question": "Какие способы оплаты есть в клинике?",
+      "expected_topic": "clinic",
+      "source_doc_id": "clinic__info__payment_terms",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc clinic__info__payment_terms."
+    },
+    {
+      "id": "topic_a6_02_clinic_warranty",
+      "case_kind": "grounded_single_topic",
+      "question": "Какая гарантия действует в клинике?",
+      "expected_topic": "clinic",
+      "source_doc_id": "clinic__info__warranty",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc clinic__info__warranty."
+    },
+    {
+      "id": "topic_a6_03_clinic_consultation",
+      "case_kind": "grounded_single_topic",
+      "question": "Как проходит консультация в клинике?",
+      "expected_topic": "clinic",
+      "source_doc_id": "clinic__info__consultation",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc clinic__info__consultation."
+    },
+    {
+      "id": "topic_a6_04_doctors_overview",
+      "case_kind": "grounded_single_topic",
+      "question": "Какие врачи работают в клинике?",
+      "expected_topic": "doctors",
+      "source_doc_id": "doctors__doctor__overview",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc doctors__doctor__overview."
+    },
+    {
+      "id": "topic_a6_05_doctors_named",
+      "case_kind": "grounded_single_topic",
+      "question": "Расскажите о докторе Волкове",
+      "expected_topic": "doctors",
+      "source_doc_id": "doctors__doctor__volkov",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc doctors__doctor__volkov."
+    },
+    {
+      "id": "topic_a6_06_doctors_implants",
+      "case_kind": "grounded_single_topic",
+      "question": "Кто из врачей занимается имплантацией?",
+      "expected_topic": "doctors",
+      "source_doc_id": "doctors__doctor__overview",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc doctors__doctor__overview; вопрос про врачей, не про имплантацию."
+    },
+    {
+      "id": "topic_a6_07_extraction_process",
+      "case_kind": "grounded_single_topic",
+      "question": "Как проходит удаление зуба?",
+      "expected_topic": "extraction",
+      "source_doc_id": "extraction__service__tooth_extraction",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc extraction__service__tooth_extraction."
+    },
+    {
+      "id": "topic_a6_08_extraction_pain",
+      "case_kind": "grounded_single_topic",
+      "question": "Больно ли удалять зуб?",
+      "expected_topic": "extraction",
+      "source_doc_id": "extraction__service__tooth_extraction",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc extraction__service__tooth_extraction."
+    },
+    {
+      "id": "topic_a6_09_extraction_aftercare",
+      "case_kind": "grounded_single_topic",
+      "question": "Что делать после удаления зуба?",
+      "expected_topic": "extraction",
+      "source_doc_id": "extraction__service__tooth_extraction",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc extraction__service__tooth_extraction."
+    },
+    {
+      "id": "topic_a6_10_implantation_survival",
+      "case_kind": "grounded_single_topic",
+      "question": "Какая приживаемость имплантов?",
+      "expected_topic": "implantation",
+      "source_doc_id": "implantation__faq__osseointegration",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc implantation__faq__osseointegration."
+    },
+    {
+      "id": "topic_a6_11_implantation_comparison",
+      "case_kind": "grounded_single_topic",
+      "question": "All-on-4 или All-on-6 — чем отличаются?",
+      "expected_topic": "implantation",
+      "source_doc_id": "comparison__all_on_4_vs_all_on_6",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc comparison__all_on_4_vs_all_on_6."
+    },
+    {
+      "id": "topic_a6_12_implantation_pain",
+      "case_kind": "grounded_single_topic",
+      "question": "Больно ли устанавливать имплант?",
+      "expected_topic": "implantation",
+      "source_doc_id": "implantation__faq__pain",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc implantation__faq__pain."
+    },
+    {
+      "id": "topic_a6_13_orthodontics_overview",
+      "case_kind": "grounded_single_topic",
+      "question": "Что такое элайнеры?",
+      "expected_topic": "orthodontics",
+      "source_doc_id": "orthodontics__service__aligners",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc orthodontics__service__aligners."
+    },
+    {
+      "id": "topic_a6_14_orthodontics_indications",
+      "case_kind": "grounded_single_topic",
+      "question": "Какие проблемы исправляют элайнеры?",
+      "expected_topic": "orthodontics",
+      "source_doc_id": "orthodontics__service__aligners",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc orthodontics__service__aligners."
+    },
+    {
+      "id": "topic_a6_15_orthodontics_process",
+      "case_kind": "grounded_single_topic",
+      "question": "Как проходит лечение на элайнерах?",
+      "expected_topic": "orthodontics",
+      "source_doc_id": "orthodontics__service__aligners",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc orthodontics__service__aligners."
+    },
+    {
+      "id": "topic_a6_16_periodontology_overview",
+      "case_kind": "grounded_single_topic",
+      "question": "Что такое пародонтит?",
+      "expected_topic": "periodontology",
+      "source_doc_id": "periodontology__service__periodontitis",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc periodontology__service__periodontitis."
+    },
+    {
+      "id": "topic_a6_17_periodontology_gums",
+      "case_kind": "grounded_single_topic",
+      "question": "Почему кровоточат дёсны?",
+      "expected_topic": "periodontology",
+      "source_doc_id": "periodontology__service__periodontitis",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc periodontology__service__periodontitis."
+    },
+    {
+      "id": "topic_a6_18_periodontology_save_teeth",
+      "case_kind": "grounded_single_topic",
+      "question": "Можно ли сохранить шатающиеся зубы?",
+      "expected_topic": "periodontology",
+      "source_doc_id": "periodontology__service__periodontitis",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc periodontology__service__periodontitis."
+    },
+    {
+      "id": "topic_a6_19_prosthetics_veneers",
+      "case_kind": "grounded_single_topic",
+      "question": "Что такое виниры?",
+      "expected_topic": "prosthetics",
+      "source_doc_id": "prosthetics__service__veneers",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc prosthetics__service__veneers."
+    },
+    {
+      "id": "topic_a6_20_prosthetics_removable",
+      "case_kind": "grounded_single_topic",
+      "question": "Какие бывают съёмные протезы?",
+      "expected_topic": "prosthetics",
+      "source_doc_id": "prosthetics__service__removable_dentures",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc prosthetics__service__removable_dentures."
+    },
+    {
+      "id": "topic_a6_21_prosthetics_zirconia",
+      "case_kind": "grounded_single_topic",
+      "question": "Что такое циркониевая коронка?",
+      "expected_topic": "prosthetics",
+      "source_doc_id": "prosthetics__service__zirconia_crowns",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc prosthetics__service__zirconia_crowns."
+    },
+    {
+      "id": "topic_a6_22_treatment_caries",
+      "case_kind": "grounded_single_topic",
+      "question": "Как лечат кариес?",
+      "expected_topic": "treatment",
+      "source_doc_id": "treatment__service__caries",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc treatment__service__caries."
+    },
+    {
+      "id": "topic_a6_23_treatment_pulpitis",
+      "case_kind": "grounded_single_topic",
+      "question": "Что такое пульпит?",
+      "expected_topic": "treatment",
+      "source_doc_id": "treatment__service__pulpitis",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc treatment__service__pulpitis."
+    },
+    {
+      "id": "topic_a6_24_treatment_overview",
+      "case_kind": "grounded_single_topic",
+      "question": "Как проходит лечение зубов?",
+      "expected_topic": "treatment",
+      "source_doc_id": "treatment__service__teeth_treatment",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc treatment__service__teeth_treatment."
+    },
+    {
+      "id": "topic_a6_25_whitening_overview",
+      "case_kind": "grounded_single_topic",
+      "question": "Что такое профессиональное отбеливание зубов?",
+      "expected_topic": "whitening",
+      "source_doc_id": "whitening__service__teeth_whitening",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc whitening__service__teeth_whitening."
+    },
+    {
+      "id": "topic_a6_26_whitening_cleaning",
+      "case_kind": "grounded_single_topic",
+      "question": "Нужна ли чистка перед отбеливанием?",
+      "expected_topic": "whitening",
+      "source_doc_id": "whitening__service__teeth_whitening",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc whitening__service__teeth_whitening."
+    },
+    {
+      "id": "topic_a6_27_whitening_safety",
+      "case_kind": "grounded_single_topic",
+      "question": "Безопасно ли отбеливание для эмали?",
+      "expected_topic": "whitening",
+      "source_doc_id": "whitening__service__teeth_whitening",
+      "rationale": "Ожидаемая тема совпадает с frontmatter source doc whitening__service__teeth_whitening."
+    },
+    {
+      "id": "topic_a6_28_null_general_price",
+      "case_kind": "ambiguous_null",
+      "question": "Сколько стоит лечение?",
+      "expected_topic": null,
+      "source_doc_id": null,
+      "rationale": "Не названа услуга или предметная область."
+    },
+    {
+      "id": "topic_a6_29_null_choice",
+      "case_kind": "ambiguous_null",
+      "question": "Что лучше выбрать?",
+      "expected_topic": null,
+      "source_doc_id": null,
+      "rationale": "Нет вариантов и нет предыдущего контекста."
+    },
+    {
+      "id": "topic_a6_30_null_booking",
+      "case_kind": "ambiguous_null",
+      "question": "Хочу записаться",
+      "expected_topic": null,
+      "source_doc_id": null,
+      "rationale": "Намерение есть, предметная область не названа."
+    },
+    {
+      "id": "topic_a6_31_null_pain",
+      "case_kind": "ambiguous_null",
+      "question": "Мне больно",
+      "expected_topic": null,
+      "source_doc_id": null,
+      "rationale": "Не указано, где и с какой услугой связан вопрос."
+    },
+    {
+      "id": "topic_a6_32_null_more",
+      "case_kind": "ambiguous_null",
+      "question": "Расскажите подробнее",
+      "expected_topic": null,
+      "source_doc_id": null,
+      "rationale": "Fresh session, отсутствует объект follow-up."
+    },
+    {
+      "id": "topic_a6_33_null_options",
+      "case_kind": "ambiguous_null",
+      "question": "Какие у вас есть варианты?",
+      "expected_topic": null,
+      "source_doc_id": null,
+      "rationale": "Не указано, варианты чего нужны."
+    }
+  ]
+}

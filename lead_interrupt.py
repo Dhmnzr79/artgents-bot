@@ -10,6 +10,9 @@ from session import extract_phone, normalize_phone
 LEAD_RESUME_REF = "lead:resume"
 LEAD_CANCEL_REF = "lead:cancel"
 LEAD_PAUSE_REF = "lead:pause"
+LEAD_PENDING_ANSWER_REF = "lead:pending:answer"
+LEAD_PENDING_CONTINUE_NAME_REF = "lead:pending:continue_name"
+LEAD_PENDING_RETRY_PHONE_REF = "lead:pending:retry_phone"
 
 _LEAD_CANCEL_RX = re.compile(
     r"^(?:"
@@ -23,6 +26,7 @@ _LEAD_CANCEL_RX = re.compile(
     r"|не\s+хочу(?:\s+запис\w*)?"
     r"|отмен(?:ить|а|ить\s+запись|я)?"
     r"|передумал(?:а)?"
+    r"|(?:не\s*,?\s*)?я\s+передумал(?:а)?"
     r")\W*$",
     re.I | re.U,
 )

@@ -1,0 +1,2030 @@
+{
+  "measurement_id": "a9r2_patient_scope_live",
+  "matrix_blob": "6a9cc6f7a964d0ab3ead79e5dd2cf0a64d743f57",
+  "planner_model": "qwen3.6-flash",
+  "calls": [
+    {
+      "call_id": "a9r_extent_01_full_arch_price_question",
+      "question": "Сколько стоит имплантация всей челюсти?",
+      "planner_status": "ok",
+      "raw_turn_plan": {
+        "intent": "price_lookup",
+        "topic": "implantation",
+        "aspects": [
+          "price"
+        ],
+        "primary_aspect": "price",
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "full_arch",
+          "jaw": "unknown",
+          "stage": "unknown",
+          "modifiers": []
+        },
+        "service_id": null,
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": false,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 1.0,
+            "provenance": "turn_plan.raw.topic",
+            "status": "valid",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "valid",
+            "error": null
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects[0]",
+            "status": "valid",
+            "error": null
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    },
+    {
+      "call_id": "a9r_extent_02_one_tooth_restore",
+      "question": "Нужно восстановить один зуб",
+      "planner_status": "ok",
+      "raw_turn_plan": {
+        "intent": "content",
+        "topic": "prosthetics",
+        "aspects": [
+          "overview"
+        ],
+        "primary_aspect": "overview",
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "one_tooth",
+          "jaw": "unknown",
+          "stage": "unknown",
+          "modifiers": []
+        },
+        "service_id": null,
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": true,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 0.8,
+            "provenance": "turn_plan.raw.topic",
+            "status": "valid",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "valid",
+            "error": null
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects[0]",
+            "status": "valid",
+            "error": null
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    },
+    {
+      "call_id": "a9r_extent_03_few_teeth_missing",
+      "question": "Нет нескольких зубов",
+      "planner_status": "ok",
+      "raw_turn_plan": {
+        "intent": "content",
+        "topic": "prosthetics",
+        "aspects": [
+          "overview"
+        ],
+        "primary_aspect": "overview",
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "few_teeth",
+          "jaw": "unknown",
+          "stage": "natural_tooth_present",
+          "modifiers": []
+        },
+        "service_id": null,
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": false,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 0.8,
+            "provenance": "turn_plan.raw.topic",
+            "status": "valid",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "valid",
+            "error": null
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects[0]",
+            "status": "valid",
+            "error": null
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    },
+    {
+      "call_id": "a9r_jaw_01_upper",
+      "question": "Нет зубов на верхней челюсти",
+      "planner_status": "ok",
+      "raw_turn_plan": {
+        "intent": "content",
+        "topic": "implantation",
+        "aspects": [
+          "overview"
+        ],
+        "primary_aspect": "overview",
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "full_arch",
+          "jaw": "upper",
+          "stage": "extraction_context",
+          "modifiers": []
+        },
+        "service_id": null,
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": false,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 0.9,
+            "provenance": "turn_plan.raw.topic",
+            "status": "valid",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "valid",
+            "error": null
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects[0]",
+            "status": "valid",
+            "error": null
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    },
+    {
+      "call_id": "a9r_jaw_02_lower",
+      "question": "Восстановление нужно на нижней челюсти",
+      "planner_status": "ok",
+      "raw_turn_plan": {
+        "intent": "content",
+        "topic": "prosthetics",
+        "aspects": [
+          "overview"
+        ],
+        "primary_aspect": "overview",
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "unknown",
+          "jaw": "lower",
+          "stage": "unknown",
+          "modifiers": []
+        },
+        "service_id": null,
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": true,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 0.8,
+            "provenance": "turn_plan.raw.topic",
+            "status": "valid",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "valid",
+            "error": null
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects[0]",
+            "status": "valid",
+            "error": null
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    },
+    {
+      "call_id": "a9r_jaw_03_both",
+      "question": "Нужно восстановить обе челюсти",
+      "planner_status": "ok",
+      "raw_turn_plan": {
+        "intent": "content",
+        "topic": "prosthetics",
+        "aspects": [
+          "overview"
+        ],
+        "primary_aspect": "overview",
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "full_arch",
+          "jaw": "both",
+          "stage": "unknown",
+          "modifiers": []
+        },
+        "service_id": null,
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": false,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 0.85,
+            "provenance": "turn_plan.raw.topic",
+            "status": "valid",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "valid",
+            "error": null
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects[0]",
+            "status": "valid",
+            "error": null
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    },
+    {
+      "call_id": "a9r_stage_01_implant_placed",
+      "question": "Имплант уже установлен, сколько будет коронка?",
+      "planner_status": "ok",
+      "raw_turn_plan": {
+        "intent": "price_lookup",
+        "topic": "prosthetics",
+        "aspects": [
+          "price"
+        ],
+        "primary_aspect": "price",
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "unknown",
+          "jaw": "unknown",
+          "stage": "implant_placed",
+          "modifiers": []
+        },
+        "service_id": "implant_supported_prosthetics",
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": false,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 0.95,
+            "provenance": "turn_plan.raw.topic",
+            "status": "valid",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "valid",
+            "error": null
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects[0]",
+            "status": "valid",
+            "error": null
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    },
+    {
+      "call_id": "a9r_stage_02_natural_tooth_present",
+      "question": "Свой зуб ещё сохранился, можно ли поставить коронку?",
+      "planner_status": "ok",
+      "raw_turn_plan": {
+        "intent": "content",
+        "topic": "prosthetics",
+        "aspects": [
+          "overview"
+        ],
+        "primary_aspect": "overview",
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "one_tooth",
+          "jaw": "unknown",
+          "stage": "natural_tooth_present",
+          "modifiers": []
+        },
+        "service_id": "zirconia_crowns",
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": false,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 0.95,
+            "provenance": "turn_plan.raw.topic",
+            "status": "valid",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "valid",
+            "error": null
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects[0]",
+            "status": "valid",
+            "error": null
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    },
+    {
+      "call_id": "a9r_correction_01_one_tooth_after_full_arch:turn1",
+      "question": "Нужно восстановить всю челюсть",
+      "planner_status": "ok",
+      "raw_turn_plan": {
+        "intent": "content",
+        "topic": "prosthetics",
+        "aspects": [
+          "overview"
+        ],
+        "primary_aspect": "overview",
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "full_arch",
+          "jaw": "unknown",
+          "stage": "unknown",
+          "modifiers": []
+        },
+        "service_id": null,
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": true,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 0.8,
+            "provenance": "turn_plan.raw.topic",
+            "status": "valid",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "valid",
+            "error": null
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects[0]",
+            "status": "valid",
+            "error": null
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    },
+    {
+      "call_id": "a9r_correction_01_one_tooth_after_full_arch:turn2",
+      "question": "Нет, речь об одном зубе",
+      "planner_status": "partial",
+      "raw_turn_plan": {
+        "intent": "content",
+        "topic": "prosthetics",
+        "aspects": [],
+        "primary_aspect": null,
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "one_tooth",
+          "jaw": "unknown",
+          "stage": "unknown",
+          "modifiers": []
+        },
+        "service_id": null,
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": true,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 0.8,
+            "provenance": "turn_plan.raw.topic",
+            "status": "valid",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "invalid",
+            "error": "aspects_empty"
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "invalid",
+            "error": "primary_aspect_unavailable"
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    },
+    {
+      "call_id": "a9r_typo_01_chelyust",
+      "question": "Сколько стоит имплантация всей чилюсти?",
+      "planner_status": "ok",
+      "raw_turn_plan": {
+        "intent": "price_lookup",
+        "topic": "implantation",
+        "aspects": [
+          "price"
+        ],
+        "primary_aspect": "price",
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "full_arch",
+          "jaw": "unknown",
+          "stage": "unknown",
+          "modifiers": []
+        },
+        "service_id": null,
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": false,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 1.0,
+            "provenance": "turn_plan.raw.topic",
+            "status": "valid",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "valid",
+            "error": null
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects[0]",
+            "status": "valid",
+            "error": null
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    },
+    {
+      "call_id": "a9r_typo_02_odin_zub_colloquial",
+      "question": "Один зубик сломался, сколько восстановление?",
+      "planner_status": "ok",
+      "raw_turn_plan": {
+        "intent": "price_lookup",
+        "topic": "prosthetics",
+        "aspects": [
+          "overview"
+        ],
+        "primary_aspect": "overview",
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "one_tooth",
+          "jaw": "unknown",
+          "stage": "natural_tooth_present",
+          "modifiers": []
+        },
+        "service_id": null,
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": true,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 0.5,
+            "provenance": "turn_plan.raw.topic",
+            "status": "valid",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "valid",
+            "error": null
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects[0]",
+            "status": "valid",
+            "error": null
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    },
+    {
+      "call_id": "a9r_negative_01_all_on_4_info",
+      "question": "Что такое All-on-4?",
+      "planner_status": "ok",
+      "raw_turn_plan": {
+        "intent": "content",
+        "topic": "implantation",
+        "aspects": [
+          "overview"
+        ],
+        "primary_aspect": "overview",
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "unknown",
+          "jaw": "unknown",
+          "stage": "unknown",
+          "modifiers": []
+        },
+        "service_id": "all_on_4",
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": false,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 1.0,
+            "provenance": "turn_plan.raw.topic",
+            "status": "valid",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "valid",
+            "error": null
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects[0]",
+            "status": "valid",
+            "error": null
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    },
+    {
+      "call_id": "a9r_negative_02_all_on_4_price",
+      "question": "Сколько стоит All-on-4?",
+      "planner_status": "ok",
+      "raw_turn_plan": {
+        "intent": "price_lookup",
+        "topic": "implantation",
+        "aspects": [
+          "price"
+        ],
+        "primary_aspect": "price",
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "full_arch",
+          "jaw": "unknown",
+          "stage": "implant_placed",
+          "modifiers": []
+        },
+        "service_id": "all_on_4",
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": false,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 1.0,
+            "provenance": "turn_plan.raw.topic",
+            "status": "valid",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "valid",
+            "error": null
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects[0]",
+            "status": "valid",
+            "error": null
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    },
+    {
+      "call_id": "a9r_negative_03_implant_word_only",
+      "question": "Расскажите про имплант",
+      "planner_status": "ok",
+      "raw_turn_plan": {
+        "intent": "content",
+        "topic": "implantation",
+        "aspects": [
+          "overview"
+        ],
+        "primary_aspect": "overview",
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "unknown",
+          "jaw": "unknown",
+          "stage": "unknown",
+          "modifiers": []
+        },
+        "service_id": null,
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": true,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 0.8,
+            "provenance": "turn_plan.raw.topic",
+            "status": "valid",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "valid",
+            "error": null
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects[0]",
+            "status": "valid",
+            "error": null
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    },
+    {
+      "call_id": "a9r_ambiguous_01_contradictory_extent",
+      "question": "Один зуб, ну или может вся челюсть, не знаю",
+      "planner_status": "partial",
+      "raw_turn_plan": {
+        "intent": "content",
+        "topic": null,
+        "aspects": [
+          "overview"
+        ],
+        "primary_aspect": "overview",
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "unknown",
+          "jaw": "unknown",
+          "stage": "unknown",
+          "modifiers": []
+        },
+        "service_id": null,
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": true,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.topic",
+            "status": "missing",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "valid",
+            "error": null
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects[0]",
+            "status": "valid",
+            "error": null
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    },
+    {
+      "call_id": "a9r_ambiguous_02_vague_several",
+      "question": "Зубов не хватает",
+      "planner_status": "ok",
+      "raw_turn_plan": {
+        "intent": "content",
+        "topic": "prosthetics",
+        "aspects": [
+          "overview"
+        ],
+        "primary_aspect": "overview",
+        "emotion": "none",
+        "specificity": "unknown",
+        "patient_scope": {
+          "extent": "unknown",
+          "jaw": "unknown",
+          "stage": "extraction_context",
+          "modifiers": []
+        },
+        "service_id": null,
+        "follow_up": false,
+        "followup_of": null,
+        "needs_clarification": true,
+        "field_meta": {
+          "intent": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.route",
+            "status": "valid",
+            "error": null
+          },
+          "topic": {
+            "confidence": 0.8,
+            "provenance": "turn_plan.raw.topic",
+            "status": "valid",
+            "error": null
+          },
+          "aspects": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects",
+            "status": "valid",
+            "error": null
+          },
+          "primary_aspect": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.aspects[0]",
+            "status": "valid",
+            "error": null
+          },
+          "emotion": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "specificity": {
+            "confidence": 0.0,
+            "provenance": "a7.not_migrated",
+            "status": "defaulted",
+            "error": null
+          },
+          "patient_scope": {
+            "container": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope",
+              "status": "valid",
+              "error": null
+            },
+            "extent": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.extent",
+              "status": "valid",
+              "error": null
+            },
+            "jaw": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.jaw",
+              "status": "valid",
+              "error": null
+            },
+            "stage": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.stage",
+              "status": "valid",
+              "error": null
+            },
+            "modifiers": {
+              "confidence": 0.0,
+              "provenance": "turn_plan.raw.patient_scope.modifiers",
+              "status": "valid",
+              "error": null
+            }
+          },
+          "service_id": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.service_id",
+            "status": "valid",
+            "error": null
+          },
+          "follow_up": {
+            "confidence": 0.0,
+            "provenance": "derived.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "followup_of": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.followup_of",
+            "status": "valid",
+            "error": null
+          },
+          "needs_clarification": {
+            "confidence": 0.0,
+            "provenance": "turn_plan.raw.needs_clarify",
+            "status": "valid",
+            "error": null
+          }
+        }
+      }
+    }
+  ],
+  "aborted": false,
+  "abort_reason": null
+}

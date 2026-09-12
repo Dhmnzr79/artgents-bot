@@ -299,17 +299,26 @@ def hard_reject_lead_name(text: str) -> bool:
     return False
 
 
-def accept_lead_name(text: str) -> str | None:
-    """extract_name + hard_reject + token plausibility; None если сомнительно."""
-    from session import extract_name
+def normalize_lead_name_input(text: str) -> str:
+    """Public wrapper for lead-slot normalization."""
+    return _normalize_lead_name_input(text)
 
-    raw = (text or "").strip()
-    if not raw or hard_reject_lead_name(raw):
-        return None
-    name = extract_name(raw)
-    if not name:
-        return None
-    for part in name.split():
-        if not is_plausible_name_token(part):
-            return None
-    return name
+
+def normalize_lead_name_token(tok: str) -> str:
+    return _normalize_token(tok)
+
+
+def is_lead_name_reject_token(tok: str) -> bool:
+    """Greeting/filler tokens that are clearly not a name (existing name_gate list)."""
+    return _normalize_token(tok) in _LEAD_NAME_REJECT
+
+
+def matches_lead_name_token_shape(tok: str) -> bool:
+    return bool(_NAME_TOKEN_RX.fullmatch((tok or "").strip()))
+
+
+def accept_lead_name(text: str) -> str | None:
+    """Permissive lead-slot name accept; None → pending on collecting_name."""
+    from core.lead_name_slot import accept_lead_name_for_slot
+
+    return accept_lead_name_for_slot(text)

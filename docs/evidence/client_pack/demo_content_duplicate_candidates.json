@@ -1,0 +1,587 @@
+{
+  "audit": "FINAL_CLIENT_PACK_CONTENT_DEDUP_AND_TOKEN_AUDIT",
+  "client_id": "demo",
+  "methodology": {
+    "exact_duplicate": "normalized_hash equality (NFKC normalize, casefold, collapse whitespace, strip markdown emphasis/bullets/heading-hashes; numbers/currency/negation preserved); min block length 12 chars",
+    "near_duplicate": "word 5-gram shingle Jaccard similarity >= 0.6 on casefolded [a-zа-яё0-9]+ tokens; candidate for manual review only, not deletion basis; min block length 40 chars",
+    "structured_duplicate_price": "offer canonical amount (pricebook/services/*.json) cross-referenced against RUB-formatted numbers inside the MD body of the SAME service's content_ref",
+    "structured_duplicate_contact": "phone/hours regex patterns found in any content block outside clinic_policies.yaml contact: block",
+    "structured_duplicate_doctor": "doctor full name (doctor_catalog.json) found in a paragraph/list block outside that doctor's own profile MD",
+    "structured_duplicate_marketing_fact": "facts.json text_fact string found verbatim inside marketing.yaml raw text (marketing.yaml should hold refs, not literal fact text per docs/CLIENT_PACK_AUTHORING.md)",
+    "conflict": "same service_id price scalar context where a differing RUB amount is found in that service's own MD body"
+  },
+  "total_blocks_analyzed": 1060,
+  "content_blocks_eligible_for_dedup": 433,
+  "candidate_count_by_class": {
+    "INTENTIONAL_DUPLICATE": 2,
+    "EXACT_DUPLICATE": 5,
+    "NEAR_DUPLICATE": 10
+  },
+  "candidates": [
+    {
+      "candidate_id": "dup00001",
+      "class": "INTENTIONAL_DUPLICATE",
+      "recommendation": "MARK_INTENTIONAL",
+      "method": "exact_normalized_hash",
+      "locations": [
+        {
+          "doc_path": "clients/demo/md/doctors__doctor__fedorova.md",
+          "block_id": "b00226",
+          "unit_type": "paragraph",
+          "heading": "Коротко",
+          "char_count": 21,
+          "preview": "Опыт и специализация:"
+        },
+        {
+          "doc_path": "clients/demo/md/doctors__doctor__grigoriev.md",
+          "block_id": "b00237",
+          "unit_type": "paragraph",
+          "heading": "Коротко",
+          "char_count": 21,
+          "preview": "Опыт и специализация:"
+        },
+        {
+          "doc_path": "clients/demo/md/doctors__doctor__kuznetsov.md",
+          "block_id": "b00248",
+          "unit_type": "paragraph",
+          "heading": "Коротко",
+          "char_count": 21,
+          "preview": "Опыт и специализация:"
+        },
+        {
+          "doc_path": "clients/demo/md/doctors__doctor__morozova.md",
+          "block_id": "b00259",
+          "unit_type": "paragraph",
+          "heading": "Коротко",
+          "char_count": 21,
+          "preview": "Опыт и специализация:"
+        },
+        {
+          "doc_path": "clients/demo/md/doctors__doctor__orlov.md",
+          "block_id": "b00270",
+          "unit_type": "paragraph",
+          "heading": "Коротко",
+          "char_count": 21,
+          "preview": "Опыт и специализация:"
+        },
+        {
+          "doc_path": "clients/demo/md/doctors__doctor__volkov.md",
+          "block_id": "b00290",
+          "unit_type": "paragraph",
+          "heading": "Коротко",
+          "char_count": 21,
+          "preview": "Опыт и специализация:"
+        }
+      ],
+      "normalized_hash": "50428ccdb7d5568f",
+      "potential_savings_chars": 105,
+      "potential_savings_tokens_est": 26
+    },
+    {
+      "candidate_id": "dup00002",
+      "class": "INTENTIONAL_DUPLICATE",
+      "recommendation": "MARK_INTENTIONAL",
+      "method": "exact_normalized_hash",
+      "locations": [
+        {
+          "doc_path": "clients/demo/md/doctors__doctor__fedorova.md",
+          "block_id": "b00228",
+          "unit_type": "paragraph",
+          "heading": "Коротко",
+          "char_count": 16,
+          "preview": "Подход в работе:"
+        },
+        {
+          "doc_path": "clients/demo/md/doctors__doctor__grigoriev.md",
+          "block_id": "b00239",
+          "unit_type": "paragraph",
+          "heading": "Коротко",
+          "char_count": 16,
+          "preview": "Подход в работе:"
+        },
+        {
+          "doc_path": "clients/demo/md/doctors__doctor__kuznetsov.md",
+          "block_id": "b00250",
+          "unit_type": "paragraph",
+          "heading": "Коротко",
+          "char_count": 16,
+          "preview": "Подход в работе:"
+        },
+        {
+          "doc_path": "clients/demo/md/doctors__doctor__morozova.md",
+          "block_id": "b00261",
+          "unit_type": "paragraph",
+          "heading": "Коротко",
+          "char_count": 16,
+          "preview": "Подход в работе:"
+        },
+        {
+          "doc_path": "clients/demo/md/doctors__doctor__orlov.md",
+          "block_id": "b00272",
+          "unit_type": "paragraph",
+          "heading": "Коротко",
+          "char_count": 16,
+          "preview": "Подход в работе:"
+        },
+        {
+          "doc_path": "clients/demo/md/doctors__doctor__volkov.md",
+          "block_id": "b00292",
+          "unit_type": "paragraph",
+          "heading": "Коротко",
+          "char_count": 16,
+          "preview": "Подход в работе:"
+        }
+      ],
+      "normalized_hash": "130418779471d2a2",
+      "potential_savings_chars": 80,
+      "potential_savings_tokens_est": 20
+    },
+    {
+      "candidate_id": "dup00003",
+      "class": "EXACT_DUPLICATE",
+      "recommendation": "MERGE",
+      "method": "exact_normalized_hash",
+      "locations": [
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_4.jaw.implantium.json",
+          "block_id": "b00987",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 194,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 4 импланта с документами хирургия и анестезия несъёмный…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_4.jaw.impro.json",
+          "block_id": "b00989",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 194,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 4 импланта с документами хирургия и анестезия несъёмный…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_4.jaw.nobel.json",
+          "block_id": "b00991",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 194,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 4 импланта с документами хирургия и анестезия несъёмный…"
+        }
+      ],
+      "normalized_hash": "30011904d7412f93",
+      "potential_savings_chars": 388,
+      "potential_savings_tokens_est": 97
+    },
+    {
+      "candidate_id": "dup00004",
+      "class": "EXACT_DUPLICATE",
+      "recommendation": "MERGE",
+      "method": "exact_normalized_hash",
+      "locations": [
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_6.jaw.implantium.json",
+          "block_id": "b00993",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 195,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 6 имплантов с документами хирургия и анестезия несъёмны…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_6.jaw.impro.json",
+          "block_id": "b00995",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 195,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 6 имплантов с документами хирургия и анестезия несъёмны…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_6.jaw.nobel.json",
+          "block_id": "b00997",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 195,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 6 имплантов с документами хирургия и анестезия несъёмны…"
+        }
+      ],
+      "normalized_hash": "2d249ac028b0ec31",
+      "potential_savings_chars": 390,
+      "potential_savings_tokens_est": 98
+    },
+    {
+      "candidate_id": "dup00005",
+      "class": "EXACT_DUPLICATE",
+      "recommendation": "MERGE",
+      "method": "exact_normalized_hash",
+      "locations": [
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/classic.one_tooth.implantium.json",
+          "block_id": "b01002",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 146,
+          "preview": "за один зуб под ключ; КТ при необходимости — отдельно имплант с документами хирургия и анестезия коронка на импланте ко…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/classic.one_tooth.impro.json",
+          "block_id": "b01004",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 146,
+          "preview": "за один зуб под ключ; КТ при необходимости — отдельно имплант с документами хирургия и анестезия коронка на импланте ко…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/classic.one_tooth.nobel.json",
+          "block_id": "b01006",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 146,
+          "preview": "за один зуб под ключ; КТ при необходимости — отдельно имплант с документами хирургия и анестезия коронка на импланте ко…"
+        }
+      ],
+      "normalized_hash": "c2fec0cf53d7ea11",
+      "potential_savings_chars": 292,
+      "potential_savings_tokens_est": 73
+    },
+    {
+      "candidate_id": "dup00006",
+      "class": "EXACT_DUPLICATE",
+      "recommendation": "MERGE",
+      "method": "exact_normalized_hash",
+      "locations": [
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/one_stage.one_tooth.implantium.json",
+          "block_id": "b01009",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 221,
+          "preview": "за один зуб под ключ; КТ и лечение воспаления до операции — по показаниям, отдельно удаление зуба при показаниях имплан…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/one_stage.one_tooth.impro.json",
+          "block_id": "b01011",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 221,
+          "preview": "за один зуб под ключ; КТ и лечение воспаления до операции — по показаниям, отдельно удаление зуба при показаниях имплан…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/one_stage.one_tooth.nobel.json",
+          "block_id": "b01013",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 221,
+          "preview": "за один зуб под ключ; КТ и лечение воспаления до операции — по показаниям, отдельно удаление зуба при показаниях имплан…"
+        }
+      ],
+      "normalized_hash": "d9568230778e64bb",
+      "potential_savings_chars": 442,
+      "potential_savings_tokens_est": 110
+    },
+    {
+      "candidate_id": "dup00007",
+      "class": "EXACT_DUPLICATE",
+      "recommendation": "MERGE",
+      "method": "exact_normalized_hash",
+      "locations": [
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/removable_dentures.jaw.full.json",
+          "block_id": "b01019",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 97,
+          "preview": "за одну челюсть; имплантация — отдельно осмотр и слепки изготовление протеза примерка и коррекция"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/removable_dentures.jaw.partial.json",
+          "block_id": "b01021",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 97,
+          "preview": "за одну челюсть; имплантация — отдельно осмотр и слепки изготовление протеза примерка и коррекция"
+        }
+      ],
+      "normalized_hash": "50d6dd884f2fb7d2",
+      "potential_savings_chars": 97,
+      "potential_savings_tokens_est": 24
+    },
+    {
+      "candidate_id": "dup00008",
+      "class": "NEAR_DUPLICATE",
+      "recommendation": "KEEP",
+      "method": "word_5gram_jaccard_shingle",
+      "similarity_score": 0.625,
+      "threshold": 0.6,
+      "locations": [
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_4.jaw.implantium.json",
+          "block_id": "b00987",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 194,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 4 импланта с документами хирургия и анестезия несъёмный…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_6.jaw.implantium.json",
+          "block_id": "b00993",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 195,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 6 имплантов с документами хирургия и анестезия несъёмны…"
+        }
+      ],
+      "potential_savings_chars": null,
+      "potential_savings_tokens_est": null
+    },
+    {
+      "candidate_id": "dup00009",
+      "class": "NEAR_DUPLICATE",
+      "recommendation": "KEEP",
+      "method": "word_5gram_jaccard_shingle",
+      "similarity_score": 0.625,
+      "threshold": 0.6,
+      "locations": [
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_4.jaw.implantium.json",
+          "block_id": "b00987",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 194,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 4 импланта с документами хирургия и анестезия несъёмный…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_6.jaw.impro.json",
+          "block_id": "b00995",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 195,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 6 имплантов с документами хирургия и анестезия несъёмны…"
+        }
+      ],
+      "potential_savings_chars": null,
+      "potential_savings_tokens_est": null
+    },
+    {
+      "candidate_id": "dup00010",
+      "class": "NEAR_DUPLICATE",
+      "recommendation": "KEEP",
+      "method": "word_5gram_jaccard_shingle",
+      "similarity_score": 0.625,
+      "threshold": 0.6,
+      "locations": [
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_4.jaw.implantium.json",
+          "block_id": "b00987",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 194,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 4 импланта с документами хирургия и анестезия несъёмный…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_6.jaw.nobel.json",
+          "block_id": "b00997",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 195,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 6 имплантов с документами хирургия и анестезия несъёмны…"
+        }
+      ],
+      "potential_savings_chars": null,
+      "potential_savings_tokens_est": null
+    },
+    {
+      "candidate_id": "dup00011",
+      "class": "NEAR_DUPLICATE",
+      "recommendation": "KEEP",
+      "method": "word_5gram_jaccard_shingle",
+      "similarity_score": 0.625,
+      "threshold": 0.6,
+      "locations": [
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_4.jaw.impro.json",
+          "block_id": "b00989",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 194,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 4 импланта с документами хирургия и анестезия несъёмный…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_6.jaw.implantium.json",
+          "block_id": "b00993",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 195,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 6 имплантов с документами хирургия и анестезия несъёмны…"
+        }
+      ],
+      "potential_savings_chars": null,
+      "potential_savings_tokens_est": null
+    },
+    {
+      "candidate_id": "dup00012",
+      "class": "NEAR_DUPLICATE",
+      "recommendation": "KEEP",
+      "method": "word_5gram_jaccard_shingle",
+      "similarity_score": 0.625,
+      "threshold": 0.6,
+      "locations": [
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_4.jaw.impro.json",
+          "block_id": "b00989",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 194,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 4 импланта с документами хирургия и анестезия несъёмный…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_6.jaw.impro.json",
+          "block_id": "b00995",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 195,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 6 имплантов с документами хирургия и анестезия несъёмны…"
+        }
+      ],
+      "potential_savings_chars": null,
+      "potential_savings_tokens_est": null
+    },
+    {
+      "candidate_id": "dup00013",
+      "class": "NEAR_DUPLICATE",
+      "recommendation": "KEEP",
+      "method": "word_5gram_jaccard_shingle",
+      "similarity_score": 0.625,
+      "threshold": 0.6,
+      "locations": [
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_4.jaw.impro.json",
+          "block_id": "b00989",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 194,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 4 импланта с документами хирургия и анестезия несъёмный…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_6.jaw.nobel.json",
+          "block_id": "b00997",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 195,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 6 имплантов с документами хирургия и анестезия несъёмны…"
+        }
+      ],
+      "potential_savings_chars": null,
+      "potential_savings_tokens_est": null
+    },
+    {
+      "candidate_id": "dup00014",
+      "class": "NEAR_DUPLICATE",
+      "recommendation": "KEEP",
+      "method": "word_5gram_jaccard_shingle",
+      "similarity_score": 0.625,
+      "threshold": 0.6,
+      "locations": [
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_4.jaw.nobel.json",
+          "block_id": "b00991",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 194,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 4 импланта с документами хирургия и анестезия несъёмный…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_6.jaw.implantium.json",
+          "block_id": "b00993",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 195,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 6 имплантов с документами хирургия и анестезия несъёмны…"
+        }
+      ],
+      "potential_savings_chars": null,
+      "potential_savings_tokens_est": null
+    },
+    {
+      "candidate_id": "dup00015",
+      "class": "NEAR_DUPLICATE",
+      "recommendation": "KEEP",
+      "method": "word_5gram_jaccard_shingle",
+      "similarity_score": 0.625,
+      "threshold": 0.6,
+      "locations": [
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_4.jaw.nobel.json",
+          "block_id": "b00991",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 194,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 4 импланта с документами хирургия и анестезия несъёмный…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_6.jaw.impro.json",
+          "block_id": "b00995",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 195,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 6 имплантов с документами хирургия и анестезия несъёмны…"
+        }
+      ],
+      "potential_savings_chars": null,
+      "potential_savings_tokens_est": null
+    },
+    {
+      "candidate_id": "dup00016",
+      "class": "NEAR_DUPLICATE",
+      "recommendation": "KEEP",
+      "method": "word_5gram_jaccard_shingle",
+      "similarity_score": 0.625,
+      "threshold": 0.6,
+      "locations": [
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_4.jaw.nobel.json",
+          "block_id": "b00991",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 194,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 4 импланта с документами хирургия и анестезия несъёмный…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/all_on_6.jaw.nobel.json",
+          "block_id": "b00997",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 195,
+          "preview": "за одну челюсть; КТ и костная пластика по показаниям — отдельно 6 имплантов с документами хирургия и анестезия несъёмны…"
+        }
+      ],
+      "potential_savings_chars": null,
+      "potential_savings_tokens_est": null
+    },
+    {
+      "candidate_id": "dup00017",
+      "class": "NEAR_DUPLICATE",
+      "recommendation": "KEEP",
+      "method": "word_5gram_jaccard_shingle",
+      "similarity_score": 0.739,
+      "threshold": 0.6,
+      "locations": [
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/sinus_lift.one_site.closed.json",
+          "block_id": "b01023",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 188,
+          "preview": "за одну область; стоимость зависит от объёма костного материала и способа доступа; имплант, коронка и КТ — отдельно ане…"
+        },
+        {
+          "doc_path": "clients/demo/target_response/pricebook/services/sinus_lift.one_site.open.json",
+          "block_id": "b01024",
+          "unit_type": "offer_package",
+          "heading": null,
+          "char_count": 171,
+          "preview": "за одну область; стоимость зависит от объёма костного материала и способа доступа; имплант, коронка и КТ — отдельно ане…"
+        }
+      ],
+      "potential_savings_chars": null,
+      "potential_savings_tokens_est": null
+    }
+  ]
+}

@@ -15,7 +15,13 @@ from core.booking_date_defer import (
 from core.lead_turn_classifier import classify_lead_active_turn
 from flow_handlers import handle_flows
 from lead_interrupt import detect_lead_interrupt
-from session import get_lead_preferred_datetime, mem_get, mem_reset, set_lead_intent
+from session import get_lead_preferred_datetime, mem_get, mem_reset, session_client_scope, set_lead_intent
+
+
+@pytest.fixture(autouse=True)
+def _explicit_demo_session_binding():
+    with session_client_scope("demo"):
+        yield
 
 
 @pytest.fixture
@@ -39,9 +45,12 @@ def gate_off(monkeypatch):
 _FORBIDDEN_REPLY_RX = re.compile(
     r"(?:"
     r"записал[аи]"
+    r"|принял[аи]?"
     r"|зафиксировал[аи]"
     r"|меняю\s+дат"
     r"|подтвердит"
+    r"|согласован"
+    r"|заброниров"
     r"|свободн"
     r"|жд[её]м\s+вас"
     r"|\d"
@@ -75,10 +84,11 @@ def _txt() -> dict:
     return {
         "lead_name_prompt": "Как к вам можно обращаться?",
         "lead_booking_date_defer": (
-            "Приняла запрос — по дате с вами свяжется и уточнит администратор."
+            "Пожелание по дате передам администратору. "
+            "Удобные дату и время он уточнит с вами при звонке."
         ),
         "lead_booking_date_defer_phone": (
-            "Оставьте, пожалуйста, номер телефона — администратор свяжется с вами."
+            "Оставьте, пожалуйста, номер телефона для звонка администратора."
         ),
     }
 
@@ -143,12 +153,15 @@ def test_entry_with_date_neutral_stub(gate_on):
 
 
 def test_classifier_bare_day_before_gray_zone(gate_on):
-    decision = classify_lead_active_turn(
-        "а на 11 можно?",
-        st={"lead_intent": "collecting_name"},
-        client_id="demo",
-        sid="s-bare-11",
-    )
+    from session import session_client_scope
+
+    with session_client_scope("demo"):
+        decision = classify_lead_active_turn(
+            "а на 11 можно?",
+            st={"lead_intent": "collecting_name"},
+            client_id="demo",
+            sid="s-bare-11",
+        )
     assert decision.kind == "booking_date"
     assert detect_lead_interrupt("а на 11 можно?", resume_step="collecting_name") == "generic"
 
@@ -171,7 +184,43 @@ def test_negatives_not_booking_date_signal(gate_on, q: str):
 def test_extract_preference_internal_only(gate_on):
     assert extract_booking_datetime_preference("можно на 10 июля?") == "10 июля"
     assert extract_booking_datetime_preference("на 11?") == "на 11"
+    assert extract_booking_datetime_preference("завтра в 18:00") == "завтра, 18:00"
     assert extract_booking_datetime_preference("сколько стоит имплант?") is None
+
+
+@pytest.mark.parametrize("q", ["Я передумал", "Не, я передумал"])
+def test_cancel_phrase_is_not_a_booking_date_signal(gate_on, q: str):
+    assert not looks_like_booking_datetime_signal(q, in_lead_flow=True)
+    assert not looks_like_booking_datetime_signal(
+        q,
+        in_lead_flow=True,
+        has_prior_preference=True,
+    )
+
+
+def test_date_change_with_new_date_remains_booking_date(gate_on):
+    decision = classify_lead_active_turn(
+        "передумал, а на 11?",
+        st={"lead_intent": "collecting_name"},
+        client_id="demo",
+        sid="s-date-change",
+    )
+    assert decision.kind == "booking_date"
+
+
+@pytest.mark.parametrize(
+    "q",
+    ["другой день", "поменяйте дату", "а раньше можно", "на другую"],
+)
+def test_explicit_date_change_phrases_remain_booking_date(gate_on, q: str):
+    assert looks_like_booking_datetime_signal(q, in_lead_flow=True)
+    decision = classify_lead_active_turn(
+        q,
+        st={"lead_intent": "collecting_name"},
+        client_id="demo",
+        sid="s-explicit-date-change",
+    )
+    assert decision.kind == "booking_date"
 
 
 def test_classifier_gate_off_preserves_content_interrupt(gate_off):
@@ -180,18 +229,19 @@ def test_classifier_gate_off_preserves_content_interrupt(gate_off):
         st={"lead_intent": "collecting_name"},
         client_id="demo",
     )
-    assert decision.kind == "content"
-    assert decision.content_hint == "generic"
+    assert decision.kind == "pending_interrupt"
 
 
 def test_mid_lead_date_question_gate_off_old_interrupt(gate_off):
     sid = f"bdd-off-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
-    set_lead_intent(sid, "collecting_name")
+    with session_client_scope("demo"):
+        mem_reset(sid)
+        set_lead_intent(sid, "collecting_name")
+        st = mem_get(sid)
 
     result = handle_flows(
         data={},
-        st=mem_get(sid),
+        st=st,
         sid=sid,
         q="а можно на 24 июля?",
         client_id="demo",
@@ -201,4 +251,8 @@ def test_mid_lead_date_question_gate_off_old_interrupt(gate_off):
         get_topic_state=lambda _sid, _doc: {},
     )
 
-    assert result is None
+    assert result is not None
+    qrs = (result.get("payload") or {}).get("quick_replies") or []
+    from lead_interrupt import LEAD_PENDING_ANSWER_REF
+
+    assert any(q.get("ref") == LEAD_PENDING_ANSWER_REF for q in qrs)

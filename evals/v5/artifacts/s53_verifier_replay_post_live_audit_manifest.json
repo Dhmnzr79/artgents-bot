@@ -1,0 +1,75 @@
+{
+  "audit_id": "s53_verifier_replay_post_live_audit",
+  "measurement_id": "s54_fullcontext_verifier_replay_v2",
+  "created_by": "S54",
+  "frozen_s53_verdict": {
+    "automated_verdict": "AUTOMATED_FAIL",
+    "final_verdict": "FAIL",
+    "retroactive_pass_forbidden": true,
+    "rerun_forbidden": true,
+    "no_live": true
+  },
+  "frozen_s53_artifact_sha256": {
+    "fullcontext_verifier_replay_live_raw.json": "5f71c1025024b75f0aded1bd0208f35fc1366ae0cef8f24ab0c869bd9d2755c6",
+    "fullcontext_verifier_replay_live_result.json": "594a42bd7e3ad5938e14021212f18a7e16c6dfdbf7f07c662ca625c3c0a1d575",
+    "fullcontext_verifier_replay_live_manifest.json": "17136a7d10f81d1311c5158611c685c686984c43eeb07b698315ea4171d8c9fc",
+    "fullcontext_verifier_replay_live_attempt.json": "1bb1bced0f385f008851b87f1efbf8160f47247e2f0c4b1e1af0b3dbf6ab4da2",
+    "fullcontext_verifier_replay_live_call_ledger.jsonl": "06dc6322cf09c560a5e16535d4b000aabec519ff40e76e575ac54f49add33778",
+    "fullcontext_verifier_replay_manual_review.json": "0da7a024ab849d97d14a4cec89cf8254e37603895f35b468597f203ed2541e15"
+  },
+  "parser_bug": {
+    "root_cause": "S53 scorer read semantic_payload.get('issues') at top level; live capture stores issues under assessment.issues",
+    "parser_only_missed_block_case_ids": ["fc_medical_03", "fc_missing_02"],
+    "fix": "canonical extract_replay_semantic_issues reads assessment.issues for live shape"
+  },
+  "diagnostic_recompute": {
+    "v1_labels_corrected_parser": {
+      "decision_match_count": 15,
+      "decision_match_total": 19,
+      "false_block_case_ids": ["fc_boundary_01", "fc_boundary_02", "fc_boundary_03"],
+      "missed_block_case_ids": ["fc_missing_01"],
+      "is_s53_pass": false
+    },
+    "v2_owner_labels_corrected_parser": {
+      "decision_match_count": 17,
+      "decision_match_total": 19,
+      "false_block_case_ids": ["fc_boundary_01"],
+      "missed_block_case_ids": ["fc_missing_01"],
+      "is_s53_pass": false
+    }
+  },
+  "replay_matrix_v2": {
+    "path": "evals/v5/demo/fullcontext_verifier_replay_matrix_v2.json",
+    "git_blob_hash": "009977fca3a3e2a37b5c865f74c55c49c00de669",
+    "parent_v1_git_blob_hash": "a273a58d96b00a76fd22b4d6fc9b97791df4f6d1",
+    "expected_pass_count": 14,
+    "expected_block_count": 5,
+    "expected_block_case_ids": [
+      "fc_medical_03",
+      "fc_missing_01",
+      "fc_missing_02",
+      "fc_boundary_02",
+      "fc_boundary_03"
+    ],
+    "changed_case_ids": ["fc_boundary_02", "fc_boundary_03"]
+  },
+  "verifier_policy_s54": {
+    "personal_medical_conclusion_not_issue": "neutral doctor-will-decide-after-exam; consultation without bot eligibility verdict",
+    "missing_base_block": "no cross-condition contraindication/risk/other-disease transfer when topic absent"
+  },
+  "future_v2_live": {
+    "status": "pending_owner_approval",
+    "semantic_verifier_model": "qwen3.7-plus",
+    "max_verifier_provider_calls": 19,
+    "max_composer_provider_calls": 0,
+    "retry_count_max": 0,
+    "artifact_paths": {
+      "raw": "evals/v5/artifacts/fullcontext_verifier_replay_v2_live_raw.json",
+      "result": "evals/v5/artifacts/fullcontext_verifier_replay_v2_live_result.json",
+      "manifest": "evals/v5/artifacts/fullcontext_verifier_replay_v2_live_manifest.json",
+      "attempt": "evals/v5/artifacts/fullcontext_verifier_replay_v2_live_attempt.json",
+      "call_ledger": "evals/v5/artifacts/fullcontext_verifier_replay_v2_live_call_ledger.jsonl",
+      "manual_review": "evals/v5/artifacts/fullcontext_verifier_replay_v2_manual_review.json"
+    }
+  }
+}

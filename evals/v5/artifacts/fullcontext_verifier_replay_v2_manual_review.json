@@ -1,0 +1,276 @@
+{
+  "measurement_id": "s55_fullcontext_verifier_replay_v2_live",
+  "matrix_git_blob_hash": "009977fca3a3e2a37b5c865f74c55c49c00de669",
+  "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+  "result_sha256": "2af56925e4ea8c21cd4ef287933929af54baf8981c4ddd17464674ed418b3fc1",
+  "reviewer": "pending",
+  "reviewed_at": null,
+  "cases": [
+    {
+      "case_id": "fc_terminal_01",
+      "review_status": "not_applicable",
+      "expected_decision": null,
+      "observed_decision": "terminal_boundary_uncertain",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "notes": "terminal control"
+    },
+    {
+      "case_id": "fc_info_01",
+      "review_status": "pending",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_info_02",
+      "review_status": "pending",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_pain_01",
+      "review_status": "pending",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_price_01",
+      "review_status": "pending",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_payment_01",
+      "review_status": "pending",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_doctor_01",
+      "review_status": "pending",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_marketing_01",
+      "review_status": "pending",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_medical_01",
+      "review_status": "pending",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_medical_02",
+      "review_status": "pending",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_medical_03",
+      "review_status": "pending",
+      "expected_decision": "block",
+      "observed_decision": "block",
+      "semantic_issues": [
+        {
+          "kind": "material_external_medical_claim",
+          "offending_span": "завершения грудного вскармливания"
+        }
+      ],
+      "blocking_issue_kinds": [
+        "material_external_medical_claim"
+      ],
+      "offending_spans": [
+        "завершения грудного вскармливания"
+      ],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_missing_01",
+      "review_status": "pending",
+      "expected_decision": "block",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": false,
+      "blocking_kind_match": false,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_missing_02",
+      "review_status": "pending",
+      "expected_decision": "block",
+      "observed_decision": "block",
+      "semantic_issues": [
+        {
+          "kind": "material_external_medical_claim",
+          "offending_span": "Псориаз относится к аутоиммунным заболеваниям"
+        }
+      ],
+      "blocking_issue_kinds": [
+        "material_external_medical_claim"
+      ],
+      "offending_spans": [
+        "Псориаз относится к аутоиммунным заболеваниям"
+      ],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_boundary_01",
+      "review_status": "pending",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_boundary_02",
+      "review_status": "pending",
+      "expected_decision": "block",
+      "observed_decision": "block",
+      "semantic_issues": [
+        {
+          "kind": "material_external_medical_claim",
+          "offending_span": "рентгеновского снимка"
+        }
+      ],
+      "blocking_issue_kinds": [
+        "material_external_medical_claim"
+      ],
+      "offending_spans": [
+        "рентгеновского снимка"
+      ],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_boundary_03",
+      "review_status": "pending",
+      "expected_decision": "block",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": false,
+      "blocking_kind_match": false,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_price_02",
+      "review_status": "pending",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_info_03",
+      "review_status": "pending",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_commercial_02",
+      "review_status": "pending",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    },
+    {
+      "case_id": "fc_boundary_04",
+      "review_status": "pending",
+      "expected_decision": "pass",
+      "observed_decision": "pass",
+      "semantic_issues": [],
+      "blocking_issue_kinds": [],
+      "offending_spans": [],
+      "decision_match": true,
+      "blocking_kind_match": true,
+      "notes": ""
+    }
+  ]
+}

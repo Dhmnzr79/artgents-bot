@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
+
 from core.observability_pii import observability_user_texts
 from core.lead_paused_overlay import finish_lead_paused_payload
 from flow_handlers import (
@@ -13,6 +15,8 @@ from flow_handlers import (
 )
 from lead_interrupt import (
     LEAD_PAUSE_REF,
+    LEAD_PENDING_ANSWER_REF,
+    LEAD_PENDING_CONTINUE_NAME_REF,
     detect_lead_interrupt,
     is_ambiguous_short_reply,
     looks_like_slot_answer,
@@ -28,8 +32,15 @@ from session import (
     mem_reset,
     pause_lead_flow,
     resume_lead_from_pause,
+    session_client_scope,
     set_lead_intent,
 )
+
+
+@pytest.fixture(autouse=True)
+def _explicit_demo_session_binding():
+    with session_client_scope("demo"):
+        yield
 
 
 def test_detect_lead_interrupt_contacts_price_generic() -> None:
@@ -60,8 +71,8 @@ def test_parse_lead_cancel_includes_ne_seychas() -> None:
     assert parse_lead_cancel("Не хочу")
     assert parse_lead_cancel("не хочу записываться")
     assert parse_lead_cancel("передумал")
-    assert not parse_lead_cancel("Я передумал")
-    assert not parse_lead_cancel("Не, я передумал")
+    assert parse_lead_cancel("Я передумал")
+    assert parse_lead_cancel("Не, я передумал")
     assert not parse_lead_cancel("я не буду")
     assert not parse_lead_cancel("Мария")
 
@@ -192,7 +203,7 @@ def test_first_lead_prompt_has_no_ask_question_qr() -> None:
     assert not any((qr.get("ref") or "") == LEAD_PAUSE_REF for qr in qrs)
 
 
-def test_lead_invalid_name_gets_unclear_with_ask_question_qr() -> None:
+def test_lead_invalid_name_gets_pending_choice_qrs() -> None:
     sid = uuid.uuid4().hex
     mem_reset(sid)
     set_lead_intent(sid, "collecting_name")
@@ -209,12 +220,12 @@ def test_lead_invalid_name_gets_unclear_with_ask_question_qr() -> None:
         }
 
     payload = _collecting_name_reply(
-        sid, "12345", "demo", txt=txt, service_payload=_sp
+        sid, "А сколько стоит All-on-4?", "demo", txt=txt, service_payload=_sp
     )
     assert payload is not None
     qrs = payload.get("quick_replies") or []
-    assert any((qr.get("ref") or "") == LEAD_PAUSE_REF for qr in qrs)
-    assert any((qr.get("label") or "") == "Задать вопрос" for qr in qrs)
+    assert any((qr.get("ref") or "") == LEAD_PENDING_ANSWER_REF for qr in qrs)
+    assert any((qr.get("ref") or "") == LEAD_PENDING_CONTINUE_NAME_REF for qr in qrs)
 
 
 def test_lead_pause_ref_prompt() -> None:

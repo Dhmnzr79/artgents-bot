@@ -1,31 +1,30 @@
 """Validate per-client index artifacts before app serves traffic."""
 from __future__ import annotations
 
-import json
 import logging
 import os
 import sys
 
-from core.client_runtime import client_md_dir, client_pack_dir, list_buildable_client_ids
-from core.pricebook_loader import pricebook_services_dir
+from config import ALLOWED_CLIENTS, APP_ENV, SALES_ONE_PLUS_MODEL
+from core.client_runtime import client_md_dir, list_buildable_client_ids
+from core.prod_readiness import evaluate_allowed_client_registry
+from core.one_call_prompt_contract import ONE_CALL_PROMPT_CONTRACT_VERSION
+from core.target_client_data import load_target_client_data
 from logging_setup import log_json
 
 
-def _client_has_price_source(cid: str) -> bool:
-    prices_path = os.path.join(client_pack_dir(cid), "prices.json")
-    if os.path.isfile(prices_path):
-        return True
-    svc_dir = pricebook_services_dir(cid)
-    if not os.path.isdir(svc_dir):
-        return False
-    try:
-        return any(name.endswith(".json") for name in os.listdir(svc_dir))
-    except OSError:
-        return False
-
-
 def run_startup_check(logger: logging.Logger) -> None:
-    client_ids = list_buildable_client_ids()
+    if APP_ENV == "prod":
+        registry_errors = evaluate_allowed_client_registry()
+        if registry_errors:
+            logger.error(
+                "startup_check_failed: allowed client registry invalid: %s",
+                ",".join(registry_errors),
+            )
+            sys.exit(1)
+        client_ids = sorted(ALLOWED_CLIENTS)
+    else:
+        client_ids = list_buildable_client_ids()
     if not client_ids:
         logger.error("startup_check_failed: no client packs with md/")
         sys.exit(1)
@@ -33,8 +32,6 @@ def run_startup_check(logger: logging.Logger) -> None:
     total_md_files = 0
     for cid in client_ids:
         md_dir = client_md_dir(cid)
-        catalog_path = os.path.join(client_pack_dir(cid), "service_catalog.json")
-        prices_path = os.path.join(client_pack_dir(cid), "prices.json")
 
         if not os.path.isdir(md_dir):
             logger.error("startup_check_failed: md dir missing for %s: %s", cid, md_dir)
@@ -53,36 +50,27 @@ def run_startup_check(logger: logging.Logger) -> None:
             sys.exit(1)
         total_md_files += len(md_files)
 
-        if not os.path.isfile(catalog_path):
-            logger.error("startup_check_failed: service_catalog missing for %s: %s", cid, catalog_path)
-            sys.exit(1)
         try:
-            with open(catalog_path, "r", encoding="utf-8") as f:
-                catalog_obj = json.load(f)
-            if not isinstance(catalog_obj, dict):
-                logger.error("startup_check_failed: service_catalog must be object for %s", cid)
-                sys.exit(1)
+            data = load_target_client_data(cid)
         except Exception as e:
-            logger.error("startup_check_failed: invalid service_catalog for %s: %s", cid, e)
-            sys.exit(1)
-
-        if not _client_has_price_source(cid):
             logger.error(
-                "startup_check_failed: price source missing for %s "
-                "(need prices.json or pricebook/services/*.json)",
+                "startup_check_failed: canonical target_response invalid for %s: %s",
                 cid,
+                e,
             )
             sys.exit(1)
-
-        if os.path.isfile(prices_path):
-            try:
-                with open(prices_path, "r", encoding="utf-8") as f:
-                    prices_obj = json.load(f)
-                if not isinstance(prices_obj, dict):
-                    logger.error("startup_check_failed: prices must be object for %s", cid)
-                    sys.exit(1)
-            except Exception as e:
-                logger.error("startup_check_failed: invalid prices for %s: %s", cid, e)
-                sys.exit(1)
+        if not data.bundle.services:
+            logger.error("startup_check_failed: target service catalog empty for %s", cid)
+            sys.exit(1)
+        if not data.bundle.offers:
+            logger.error("startup_check_failed: target price offers empty for %s", cid)
+            sys.exit(1)
 
     log_json(logger, "startup_check_ok", clients=client_ids, md_files=total_md_files)
+    log_json(
+        logger,
+        "runtime_provenance_startup",
+        architecture="fullcontext_one_call",
+        model=SALES_ONE_PLUS_MODEL,
+        prompt_contract=ONE_CALL_PROMPT_CONTRACT_VERSION,
+    )

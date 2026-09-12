@@ -1,0 +1,50 @@
+{
+  "doctors": {
+    "doctors__doctor__danilov": {
+      "name": "Данилов Вениамин Валерьевич",
+      "position": "Стоматолог-терапевт",
+      "experience_years": 25,
+      "service_ids": [
+        "teeth_treatment"
+      ],
+      "profile_ref": "kb:doctors__doctor__danilov.md#korotko"
+    },
+    "doctors__doctor__gadzhimuradov": {
+      "name": "Гаджимурадов Мурадали Гасанмутдинович",
+      "position": "Стоматолог общей практики",
+      "experience_years": 2,
+      "service_ids": [
+        "teeth_treatment"
+      ],
+      "profile_ref": "kb:doctors__doctor__gadzhimuradov.md#korotko"
+    },
+    "doctors__doctor__kadiev": {
+      "name": "Кадиев Хамид Хасанович",
+      "position": "Стоматолог-имплантолог, стоматолог-хирург",
+      "experience_years": 3,
+      "service_ids": [
+        "classic"
+      ],
+      "profile_ref": "kb:doctors__doctor__kadiev.md#korotko"
+    },
+    "doctors__doctor__kitasova": {
+      "name": "Китасова Екатерина Петровна",
+      "position": "Врач-стоматолог терапевт, хирург",
+      "experience_years": 16,
+      "service_ids": [
+        "teeth_treatment"
+      ],
+      "profile_ref": "kb:doctors__doctor__kitasova.md#korotko"
+    },
+    "doctors__doctor__lavrenov": {
+      "name": "Лавренов Евгений Юрьевич",
+      "position": "Стоматолог-терапевт, стоматолог-хирург",
+      "experience_years": 25,
+      "service_ids": [
+        "teeth_treatment",
+        "tooth_extraction"
+      ],
+      "profile_ref": "kb:doctors__doctor__lavrenov.md#korotko"
+    }
+  }
+}

@@ -1,0 +1,74 @@
+"""Non-PII observability for the sales-fast widget path."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from core.one_call_cache_observability import OneCallCacheObservability
+from core.provider_call_budget import current_provider_call_budget
+from core import turn_timing
+
+
+def collect_sales_fast_timings_ms() -> dict[str, int]:
+    bucket = turn_timing.summary_for_turn_complete()
+    key_map = {
+        "sales_fast_local_gate_ms": "local_gate",
+        "sales_fast_resolver_ms": "resolver",
+        "sales_fast_model_ms": "provider",
+        "sales_fast_presentation_ms": "presentation",
+        "sales_fast_ms": "sales_fast",
+    }
+    timings: dict[str, int] = {}
+    for raw_key, label in key_map.items():
+        value = bucket.get(raw_key)
+        if isinstance(value, int):
+            timings[label] = value
+    total = bucket.get("total_ms")
+    if isinstance(total, int):
+        timings["total"] = total
+    elif isinstance(timings.get("sales_fast"), int):
+        timings["total"] = timings["sales_fast"]
+    return timings
+
+
+def record_sales_fast_observability(
+    *,
+    architecture: str,
+    route: str,
+    provider_calls: int,
+    model: str | None,
+    failure_kind: str | None = None,
+    timings: dict[str, int] | None = None,
+    backend_invocations: int | None = None,
+    cache_observability: OneCallCacheObservability | None = None,
+    client_id: str | None = None,
+    prompt_contract: int | None = None,
+    client_pack_hash: str | None = None,
+) -> None:
+    backend_count = int(backend_invocations or 0)
+    reported_calls = int(provider_calls)
+    budget = current_provider_call_budget()
+    if budget is not None and budget.call_count > 0:
+        reported_calls = int(budget.call_count)
+    else:
+        reported_calls = max(reported_calls, backend_count)
+    payload: dict[str, Any] = {
+        "architecture": architecture,
+        "route": route,
+        "provider_calls": reported_calls,
+        "model": model,
+        "failure_kind": failure_kind,
+    }
+    if backend_invocations is not None:
+        payload["backend_invocations"] = int(backend_invocations)
+    if timings:
+        payload["timings_ms"] = dict(timings)
+    if cache_observability is not None:
+        payload.update(cache_observability.as_dict())
+    if client_id:
+        payload["client_id"] = client_id
+    if prompt_contract is not None:
+        payload["prompt_contract"] = int(prompt_contract)
+    if client_pack_hash:
+        payload["client_pack_hash"] = client_pack_hash
+    turn_timing.set_flag("sales_fast_observability", payload)

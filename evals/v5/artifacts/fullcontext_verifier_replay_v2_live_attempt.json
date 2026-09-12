@@ -1,0 +1,10 @@
+{
+  "measurement_id": "s52_fullcontext_verifier_replay",
+  "matrix_git_blob_hash": "009977fca3a3e2a37b5c865f74c55c49c00de669",
+  "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+  "status": "in_progress",
+  "started_provider_calls": 19,
+  "max_verifier_provider_calls": 19,
+  "max_composer_provider_calls": 0,
+  "rerun_blocked_without_owner_approval": true
+}

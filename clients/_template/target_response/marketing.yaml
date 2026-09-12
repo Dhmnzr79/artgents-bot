@@ -1,0 +1,13 @@
+version: 1
+
+limits:
+  max_marketing_facts_per_turn: 1
+  max_amplifiers_per_turn: 1
+  max_scenarios_per_turn: 1
+
+initial_commercial_blocks: {}
+
+scenario_rules: {}
+
+cta_contexts:
+  default: callback

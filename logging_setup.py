@@ -1,18 +1,32 @@
 # logging_setup.py
+import atexit
 import json
 import logging
 import os
+import queue
 import re
 import sys
+import threading
 import time
 import uuid
-from logging.handlers import RotatingFileHandler
 from datetime import datetime
+from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
+from pathlib import Path
 
 from config import estimate_llm_usage_usd
 
-LOG_DIR = os.getenv("BOT_LOG_DIR", "logs")
-LOG_FILE = os.path.join(LOG_DIR, os.getenv("BOT_LOG_FILE", "app.jsonl"))
+_REPO_ROOT = Path(__file__).resolve().parent
+_LOG_ROTATION_MAX_BYTES = int(os.getenv("BOT_LOG_MAX_BYTES", "10000000"))
+_LOG_ROTATION_BACKUP_COUNT = int(os.getenv("BOT_LOG_BACKUP_COUNT", "5"))
+_LOG_WRITER_MODE = "queue_listener"
+
+_log_init_lock = threading.Lock()
+_log_queue: queue.Queue | None = None
+_log_listener: QueueListener | None = None
+_loggers_with_queue: set[str] = set()
+_logging_initialized = False
+_startup_event_emitted = False
+
 _LOG_RETENTION_DAYS = int(os.getenv("BOT_LOG_RETENTION_DAYS", "7"))
 _LOG_PURGE_DONE = False
 _LOG_NAME_RX = re.compile(r"\.(?:jsonl|log)(?:\.\d+)?$", re.IGNORECASE)
@@ -25,6 +39,54 @@ _PHONE_DIGIT_MAX = 15
 _PHONE_TEXT_RX = re.compile(r"(?<!\d)(?:\+?\d[\d\-\s().]{8,}\d)(?!\d)")
 
 BOT_EVENTS_SCHEMA_VERSION = int(os.getenv("BOT_EVENTS_SCHEMA_VERSION", "1"))
+
+
+def resolve_log_paths(
+    *,
+    repo_root: Path | None = None,
+    log_dir_env: str | None = None,
+    log_file_env: str | None = None,
+) -> tuple[str, str]:
+    """Resolve absolute LOG_DIR and LOG_FILE independent of process CWD."""
+    root = (repo_root or _REPO_ROOT).resolve()
+    raw_dir = log_dir_env if log_dir_env is not None else os.getenv("BOT_LOG_DIR", "logs")
+    raw_file = log_file_env if log_file_env is not None else os.getenv("BOT_LOG_FILE", "app.jsonl")
+
+    file_path = Path(raw_file)
+    if file_path.is_absolute():
+        log_file = file_path.resolve()
+        log_dir = log_file.parent
+        return str(log_dir), str(log_file)
+
+    dir_path = Path(raw_dir)
+    if not dir_path.is_absolute():
+        dir_path = (root / dir_path).resolve()
+    else:
+        dir_path = dir_path.resolve()
+
+    resolved_file = (dir_path / file_path).resolve()
+    try:
+        resolved_file.relative_to(dir_path)
+    except ValueError as exc:
+        raise ValueError(
+            f"BOT_LOG_FILE must resolve inside LOG_DIR ({dir_path}): {raw_file!r}"
+        ) from exc
+    return str(dir_path), str(resolved_file)
+
+
+LOG_DIR, LOG_FILE = resolve_log_paths()
+
+
+def log_rotation_max_bytes() -> int:
+    return _LOG_ROTATION_MAX_BYTES
+
+
+def log_rotation_backup_count() -> int:
+    return _LOG_ROTATION_BACKUP_COUNT
+
+
+def log_writer_mode() -> str:
+    return _LOG_WRITER_MODE
 
 
 def _mask_phone_like(value):
@@ -42,9 +104,33 @@ def _mask_phone_in_text(value):
     return _PHONE_TEXT_RX.sub(lambda m: str(_mask_phone_like(m.group())), s)
 
 
+def _mask_user_contacts_in_text(value: str) -> str:
+    from core.user_text_privacy import observability_safe_user_text
+
+    return observability_safe_user_text(value or "")
+
+
+def _mask_bot_contacts_in_text(value: str, *, max_len: int = 8000) -> str:
+    from core.user_text_privacy import observability_safe_bot_text
+
+    return observability_safe_bot_text(value or "", max_len=max_len)
+
+
+_OBSERVABILITY_BOT_TEXT_KEYS = frozenset({"bot_text", "bot_text_redacted"})
+_OBSERVABILITY_USER_TEXT_KEYS = frozenset(
+    {
+        "user_text",
+        "user_text_redacted",
+        "user_preview_redacted",
+        "preview",
+        "question_preview",
+    }
+)
+
+
 def redact_text(value: str, *, max_len: int | None = None) -> str:
     """Явная редактирующая функция для payload до записи в любое хранилище."""
-    out = _mask_phone_in_text(value or "")
+    out = _mask_user_contacts_in_text(value or "")
     if max_len is not None and max_len > 0 and len(out) > max_len:
         return out[:max_len]
     return out
@@ -61,17 +147,22 @@ def _sanitize(d):
         elif isinstance(k, str) and ("phone" in kl or "tel" in kl):
             clean[k] = _mask_phone_like(v)
         elif isinstance(k, str) and "situation" in kl:
-            txt = _mask_phone_in_text(v)
+            txt = _mask_user_contacts_in_text(v)
             clean[k] = (txt[:80] + "…") if len(txt) > 80 else txt
         elif isinstance(v, dict):
             clean[k] = _sanitize(v)
         elif isinstance(v, list):
             clean[k] = [
-                _sanitize(x) if isinstance(x, dict) else (_mask_phone_in_text(x) if isinstance(x, str) else x)
+                _sanitize(x) if isinstance(x, dict) else (_mask_user_contacts_in_text(x) if isinstance(x, str) else x)
                 for x in v
             ]
         elif isinstance(v, str):
-            clean[k] = _mask_phone_in_text(v)
+            if isinstance(k, str) and kl in _OBSERVABILITY_BOT_TEXT_KEYS:
+                clean[k] = _mask_bot_contacts_in_text(v)
+            elif isinstance(k, str) and kl in _OBSERVABILITY_USER_TEXT_KEYS:
+                clean[k] = _mask_user_contacts_in_text(v)
+            else:
+                clean[k] = _mask_user_contacts_in_text(v)
         else:
             clean[k] = v
     return clean
@@ -103,15 +194,19 @@ def _is_log_file_name(name: str) -> bool:
 def purge_old_log_files(*, logger: logging.Logger | None = None) -> list[str]:
     """Delete rotated/local log files older than BOT_LOG_RETENTION_DAYS (by mtime)."""
     days = log_retention_days()
-    if days <= 0 or not os.path.isdir(LOG_DIR):
+    retention_dir = os.path.dirname(os.path.normpath(LOG_FILE))
+    active_path = os.path.normpath(LOG_FILE)
+    if days <= 0 or not os.path.isdir(retention_dir):
         return []
     cutoff = time.time() - days * 86400
     removed: list[str] = []
-    for name in os.listdir(LOG_DIR):
+    for name in os.listdir(retention_dir):
         if not _is_log_file_name(name):
             continue
-        path = os.path.join(LOG_DIR, name)
+        path = os.path.join(retention_dir, name)
         if not os.path.isfile(path):
+            continue
+        if os.path.normpath(path) == active_path:
             continue
         try:
             if os.path.getmtime(path) < cutoff:
@@ -124,24 +219,96 @@ def purge_old_log_files(*, logger: logging.Logger | None = None) -> list[str]:
     return removed
 
 
+def _shutdown_logging() -> None:
+    global _log_listener
+    with _log_init_lock:
+        listener = _log_listener
+        _log_listener = None
+    if listener is not None:
+        listener.stop()
+
+
+def _emit_logging_startup(logger: logging.Logger) -> None:
+    global _startup_event_emitted
+    if _startup_event_emitted:
+        return
+    log_json(
+        logger,
+        "logging_startup",
+        log_path=LOG_FILE,
+        writer_mode=_LOG_WRITER_MODE,
+        pid=os.getpid(),
+        max_bytes=_LOG_ROTATION_MAX_BYTES,
+        backup_count=_LOG_ROTATION_BACKUP_COUNT,
+        retention_days=log_retention_days(),
+    )
+    _startup_event_emitted = True
+
+
+def _ensure_logging_initialized() -> None:
+    global _logging_initialized, _log_queue, _log_listener, LOG_DIR, LOG_FILE
+    if _logging_initialized:
+        return
+    with _log_init_lock:
+        if _logging_initialized:
+            return
+        LOG_DIR, LOG_FILE = resolve_log_paths()
+        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
+        _log_queue = queue.Queue(-1)
+        file_handler = RotatingFileHandler(
+            LOG_FILE,
+            maxBytes=_LOG_ROTATION_MAX_BYTES,
+            backupCount=_LOG_ROTATION_BACKUP_COUNT,
+            encoding="utf-8",
+        )
+        fmt = JsonLineFormatter()
+        file_handler.setFormatter(fmt)
+
+        stream = sys.stdout
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+        console_handler = logging.StreamHandler(stream)
+        console_handler.setFormatter(fmt)
+
+        _log_listener = QueueListener(
+            _log_queue,
+            file_handler,
+            console_handler,
+            respect_handler_level=True,
+        )
+        _log_listener.start()
+        atexit.register(_shutdown_logging)
+
+        startup_logger = logging.getLogger("logging_startup")
+        startup_logger.setLevel(logging.INFO)
+        startup_logger.propagate = False
+        if "logging_startup" not in _loggers_with_queue:
+            startup_logger.addHandler(QueueHandler(_log_queue))
+            _loggers_with_queue.add("logging_startup")
+        _emit_logging_startup(startup_logger)
+        _logging_initialized = True
+
+
 def get_logger(name="bot"):
     global _LOG_PURGE_DONE
-    os.makedirs(LOG_DIR, exist_ok=True)
-    logger = logging.getLogger(name)
-    if logger.handlers:
+    _ensure_logging_initialized()
+    with _log_init_lock:
+        logger = logging.getLogger(name)
+        if name in _loggers_with_queue:
+            return logger
+        logger.setLevel(logging.INFO)
+        logger.propagate = False
+        assert _log_queue is not None
+        logger.addHandler(QueueHandler(_log_queue))
+        _loggers_with_queue.add(name)
+        if not _LOG_PURGE_DONE:
+            _LOG_PURGE_DONE = True
+            purge_old_log_files()
         return logger
-    if not _LOG_PURGE_DONE:
-        _LOG_PURGE_DONE = True
-        purge_old_log_files()
-    logger.setLevel(logging.INFO)
-    fh = RotatingFileHandler(LOG_FILE, maxBytes=10_000_000, backupCount=5, encoding="utf-8")
-    ch = logging.StreamHandler(sys.stdout)
-    fmt = JsonLineFormatter()
-    fh.setFormatter(fmt)
-    ch.setFormatter(fmt)
-    logger.addHandler(fh)
-    logger.addHandler(ch)
-    return logger
 
 
 def request_context_defaults() -> dict:
@@ -209,10 +376,10 @@ def emit_bot_event(
     safe_row = _sanitize(row)
     try:
         from core.client_config_loader import postgres_events_enabled
-        from pg_sink import enqueue_bot_event
+        from pg_sink import enqueue_bot_event, tenant_client_id_for_pg_write
 
-        cid = safe_row.get("client_id")
-        if postgres_events_enabled(cid):
+        tenant = tenant_client_id_for_pg_write(safe_row)
+        if tenant and postgres_events_enabled(tenant):
             enqueue_bot_event(safe_row)
     except Exception:
         pass
@@ -226,7 +393,40 @@ def log_json(logger, message, **fields):
         if k == "session_id":
             continue
         fields.setdefault(k, v)
-    logger.info(message, extra={"extra_data": _sanitize(fields)})
+    _write_log_json(logger, message, fields)
+
+
+def log_json_no_context(logger, message, **fields):
+    """Structured log without implicit Flask request-context fields."""
+    _write_log_json(logger, message, fields)
+
+
+def _write_log_json(logger, message, fields) -> None:
+    safe = _sanitize(fields)
+    logger.info(message, extra={"extra_data": safe})
+    _forward_record_for_pytest_caplog(logger, message, safe)
+
+
+def _forward_record_for_pytest_caplog(logger, message, extra_data) -> None:
+    if "PYTEST_CURRENT_TEST" not in os.environ:
+        return
+    root = logging.getLogger()
+    if not root.handlers:
+        return
+    record = logger.makeRecord(
+        logger.name,
+        logging.INFO,
+        "(logging_setup)",
+        0,
+        message,
+        (),
+        None,
+    )
+    record.extra_data = extra_data
+    for handler in root.handlers:
+        module = getattr(handler.__class__, "__module__", "")
+        if module.startswith("_pytest") or handler.__class__.__name__ == "LogCaptureHandler":
+            handler.handle(record)
 
 
 def _cached_tokens_from_usage_obj(u: object) -> int | None:

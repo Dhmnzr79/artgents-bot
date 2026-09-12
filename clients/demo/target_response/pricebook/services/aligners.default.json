@@ -1,0 +1,17 @@
+{
+  "offer_id": "aligners.default",
+  "service_id": "aligners",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 195000,
+    "currency": "RUB",
+    "billing_unit": "course"
+  },
+  "package": {
+    "label": "за полный курс лечения; зависит от сложности прикуса и количества кап",
+    "includes": []
+  },
+  "fact_refs": [],
+  "followups": []
+}

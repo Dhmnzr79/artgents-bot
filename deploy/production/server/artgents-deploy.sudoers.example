@@ -1,0 +1,11 @@
+# Example sudoers fragment — install with visudo -cf after replacing DEPLOY_USER.
+# Deploy user must NOT be in the docker group and must NOT receive a general root shell.
+#
+# Requirements:
+# - File owner root:root, mode 0440
+# - /opt/artgents/bin/deploy-production owned root:root, mode 0750, not writable by deploy user
+# - SSH forced command points at deploy-receiver.sh (see server README)
+
+Defaults:DEPLOY_USER !requiretty
+
+DEPLOY_USER ALL=(root) NOPASSWD: /opt/artgents/bin/deploy-production, /opt/artgents/bin/rollback-production

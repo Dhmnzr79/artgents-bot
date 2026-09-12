@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "measurement_id": "s62_target_runtime_post_live_audit",
+  "status": "S62_NOT_PASSED",
+  "no_live": true,
+  "retroactive_pass_forbidden": true,
+  "rerun_forbidden": true,
+  "rerun_blocked_without_owner_approval": true,
+  "live_baseline_commit": "c00fa4dc9f8437fc95847189577e5d2e49c43213",
+  "artifact_commit": "0a43da180423a8c7bb54fe9f4985ccda9589bf8f",
+  "audit_capture_commit": null,
+  "turns_git_blob_hash": "f3b41f7b250f7ab72111cdce72b2346e0e54c299a0b72276a9848c281b205c55",
+  "frozen_live_artifacts_sha256": {
+    "s62_target_runtime_live_raw.json": "1091fff43615e9a9adb43bf492dabb46009636eed23d92eac95d8a6073b2a428",
+    "s62_target_runtime_live_result.json": "1091fff43615e9a9adb43bf492dabb46009636eed23d92eac95d8a6073b2a428",
+    "s62_target_runtime_live_manifest.json": "4643a99ccb768d5863f96c286c30f8b76ee352c837064d14a7bc2e13a831f1e3",
+    "s62_target_runtime_live_attempt.json": "2570338b15cba9b4caf5b71c0c873c9ecb1fa8dcbca64014148665184ecfe657",
+    "s62_target_runtime_live_call_ledger.jsonl": "fd71c6460b4f8658dab85a2ec1c847d5ff7c2f29ab9a2d82886bf2ba98cf97a2",
+    "s62_target_runtime_live_manual_review.json": "9983da4ee2dcf0f9c35d4f40815a599607c87daf13846880c548052d9c885741",
+    "s62_target_runtime_live_audit.log": "e6a2d1e5bdc1cfe20e20dfe5d7f23c644103a97ab1eda8132346fc9616e82e02"
+  },
+  "stdout_capture_sha256": "3CA6A7EBB971FEDAFD5A3507442A49BE660CB56B96BD862CB11528C9D15D7AFC",
+  "stdout_capture_path": "evals/v5/artifacts/s62_live_stdout_capture.txt",
+  "frozen_harness_verdict": {
+    "automated_verdict": "AUTOMATED_PASS",
+    "final_verdict": "PENDING_MANUAL_REVIEW",
+    "verdict_correct": false,
+    "corrected_ruling": "S62_NOT_PASSED"
+  },
+  "corrected_provider_accounting": {
+    "total_actual_calls": 18,
+    "committed_ledger_calls": 10,
+    "ledger_complete": false,
+    "retries": 0,
+    "legacy_hits": 0,
+    "role_totals_actual": {
+      "ingress": 4,
+      "planner": 4,
+      "medical_boundary": 4,
+      "composer": 3,
+      "semantic_verifier": 3
+    },
+    "role_totals_committed_ledger": {
+      "ingress": 0,
+      "planner": 0,
+      "medical_boundary": 4,
+      "composer": 3,
+      "semantic_verifier": 3
+    }
+  },
+  "acceptance_failures": [
+    "followup_ref_pass_false",
+    "turn_3_doctors_terminal_defer",
+    "cta_key_without_widget_cta",
+    "ledger_incomplete",
+    "incorrect_frozen_automated_pass"
+  ],
+  "preflight_incident": {
+    "accepted_zero_call_marker_reclaim": true,
+    "precedent_for_provider_call_rerun": false,
+    "baseline_before_fix": "9a6bc2ad14190b9b8ed88db7cbc5e72ccb56b9be",
+    "harness_fix_commit": "c00fa4dc9f8437fc95847189577e5d2e49c43213"
+  },
+  "manual_review_summary": {
+    "turn_1": "answer_pass_cta_fail",
+    "turn_2": "answer_pass_session_pass_ref_click_not_tested",
+    "turn_3": "fail_doctors_defer",
+    "turn_4": "answer_pass_sse_pass",
+    "overall": "fail"
+  },
+  "immutable_frozen_paths": [
+    "evals/v5/artifacts/s62_target_runtime_live_raw.json",
+    "evals/v5/artifacts/s62_target_runtime_live_result.json",
+    "evals/v5/artifacts/s62_target_runtime_live_manifest.json",
+    "evals/v5/artifacts/s62_target_runtime_live_attempt.json",
+    "evals/v5/artifacts/s62_target_runtime_live_call_ledger.jsonl",
+    "evals/v5/artifacts/s62_target_runtime_live_manual_review.json",
+    "evals/v5/artifacts/s62_target_runtime_live_audit.log"
+  ]
+}

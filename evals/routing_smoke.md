@@ -44,7 +44,7 @@
 ### Case 05
 - q: если кости мало, что делать?
 - expected_route: retrieval_chunk
-- expected_doc_id: implantation__info__bone_graft
+- expected_doc_id: implantation__service__bone_graft
 - forbidden_doc_id: implantation__service__classic
 - note: про костную пластику/наращивание (если в базе так описано), без цены.
 

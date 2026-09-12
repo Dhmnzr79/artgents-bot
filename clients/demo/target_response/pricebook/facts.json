@@ -1,0 +1,262 @@
+{
+  "tax_deduction": {
+    "id": "tax_deduction",
+    "kind": "benefit",
+    "catalog_label": "Налоговый вычет за лечение",
+    "text_fact": "Поможем подготовить документы для оформления налогового вычета за лечение.",
+    "render_mode": "strict",
+    "active": true,
+    "detail_ref": "clinic__info__payment_terms.md#nalogovyj-vychet",
+    "allowed_service_ids": [
+      "aligners",
+      "all_on_4",
+      "all_on_6",
+      "bone_graft",
+      "caries",
+      "clasp_dentures",
+      "classic",
+      "implant_supported_prosthetics",
+      "one_stage",
+      "periodontitis",
+      "professional_whitening",
+      "pterygoid_implants",
+      "pulpitis",
+      "removable_dentures",
+      "sinus_lift",
+      "teeth_treatment",
+      "temporary_teeth",
+      "tomography",
+      "tooth_extraction",
+      "veneers",
+      "zirconia_crowns",
+      "zygomatic_implants"
+    ],
+    "incompatible_with": []
+  },
+  "installment_12": {
+    "id": "installment_12",
+    "kind": "payment",
+    "catalog_label": "Рассрочка на лечение",
+    "text_fact": "Доступна рассрочка на имплантацию и протезирование до 12 месяцев; оформление на консультации.",
+    "microfact_text": "Рассрочка до 12 месяцев, оформление на консультации.",
+    "render_mode": "strict",
+    "active": true,
+    "detail_ref": "clinic__info__payment_terms.md#rassrochka",
+    "allowed_service_ids": [
+      "classic",
+      "one_stage",
+      "all_on_4",
+      "all_on_6",
+      "bone_graft",
+      "sinus_lift",
+      "zygomatic_implants",
+      "pterygoid_implants",
+      "temporary_teeth",
+      "implant_supported_prosthetics",
+      "veneers",
+      "zirconia_crowns",
+      "clasp_dentures",
+      "removable_dentures"
+    ],
+    "requested_display_policy": {
+      "allow_clinic": true,
+      "allowed_topic_ids": [
+        "implantation",
+        "prosthetics"
+      ],
+      "canonical_text_is_scope_qualified": true
+    },
+    "excluded_service_ids": [
+      "caries",
+      "tooth_extraction"
+    ],
+    "excluded_scope_text": "На лечение кариеса и удаление зуба рассрочка не предоставляется.",
+    "incompatible_with": []
+  },
+  "free_implant_consult": {
+    "id": "free_implant_consult",
+    "kind": "promo",
+    "catalog_label": "Условия консультации по имплантации и протезированию",
+    "text_fact": "До 31 декабря 2026 — бесплатная консультация по имплантации и протезированию. На консультации подготовим три варианта плана лечения по стоимости, чтобы вы могли выбрать подходящий под свой бюджет. Врач подскажет, какой протокол или конструкция подойдут именно вам. КТ при необходимости оплачивается отдельно.",
+    "microfact_text": "Бесплатная консультация до 31.12.2026.",
+    "render_mode": "natural",
+    "active": true,
+    "detail_ref": "clinic__info__promo__free_implant_consult.md#korotko",
+    "allowed_service_ids": [
+      "classic",
+      "one_stage",
+      "all_on_4",
+      "all_on_6",
+      "bone_graft",
+      "sinus_lift",
+      "zygomatic_implants",
+      "pterygoid_implants",
+      "temporary_teeth",
+      "implant_supported_prosthetics",
+      "veneers",
+      "zirconia_crowns",
+      "clasp_dentures",
+      "removable_dentures"
+    ],
+    "allowed_topics": [
+      "implantation",
+      "prosthetics"
+    ],
+    "incompatible_with": [],
+    "active_until": "2026-12-31"
+  },
+  "implant_warranty": {
+    "id": "implant_warranty",
+    "kind": "warranty",
+    "catalog_label": "Гарантия при имплантации",
+    "text_fact": "Гарантия на работу врача — 1 год (корректировки и помощь бесплатно). На импланты Impro и Nobel — пожизненная, на Implantium — 5 лет.",
+    "render_mode": "strict",
+    "active": true,
+    "allowed_service_ids": [
+      "classic",
+      "one_stage",
+      "all_on_4",
+      "all_on_6",
+      "zygomatic_implants",
+      "pterygoid_implants"
+    ],
+    "incompatible_with": [],
+    "requested_display_policy": {
+      "allow_clinic": false,
+      "allowed_topic_ids": [
+        "implantation"
+      ],
+      "canonical_text_is_scope_qualified": true
+    },
+    "detail_ref": "clinic__info__warranty.md#korotko"
+  },
+  "implant_same_day_discount": {
+    "id": "implant_same_day_discount",
+    "kind": "promo",
+    "catalog_label": "Скидка при оплате в день обращения",
+    "text_fact": "При оплате в день обращения — скидка до 15% на имплантацию.",
+    "microfact_text": "Скидка до 15% при оплате в день обращения.",
+    "render_mode": "strict",
+    "active": true,
+    "detail_ref": "clinic__info__promo__implant_same_day_discount.md#korotko",
+    "allowed_service_ids": [
+      "classic",
+      "one_stage",
+      "all_on_4",
+      "all_on_6",
+      "bone_graft",
+      "sinus_lift",
+      "zygomatic_implants",
+      "pterygoid_implants"
+    ],
+    "incompatible_with": [],
+    "active_until": "2026-12-31"
+  },
+  "professional_whitening_discount": {
+    "id": "professional_whitening_discount",
+    "kind": "promo",
+    "catalog_label": "Скидка на профессиональное отбеливание",
+    "text_fact": "Сейчас на профессиональное отбеливание действует скидка 10% до 30 ноября 2026 года.",
+    "microfact_text": "Скидка 10% до 30.11.2026.",
+    "render_mode": "strict",
+    "active": true,
+    "detail_ref": "clinic__info__promo__professional_whitening_discount.md#korotko",
+    "allowed_service_ids": [
+      "professional_whitening"
+    ],
+    "incompatible_with": [],
+    "active_until": "2026-11-30"
+  },
+  "payment_stages": {
+    "id": "payment_stages",
+    "kind": "payment",
+    "catalog_label": "Оплата по этапам",
+    "text_fact": "Доступна оплата лечения по этапам.",
+    "microfact_text": "Оплата по этапам лечения.",
+    "render_mode": "strict",
+    "active": true,
+    "detail_ref": "clinic__info__payment_terms.md#oplata-po-etapam",
+    "allowed_service_ids": [
+      "classic",
+      "one_stage",
+      "all_on_4",
+      "all_on_6",
+      "bone_graft",
+      "sinus_lift",
+      "zygomatic_implants",
+      "pterygoid_implants",
+      "temporary_teeth",
+      "implant_supported_prosthetics",
+      "veneers",
+      "zirconia_crowns",
+      "clasp_dentures",
+      "removable_dentures"
+    ],
+    "incompatible_with": []
+  },
+  "fixed_price": {
+    "id": "fixed_price",
+    "kind": "benefit",
+    "catalog_label": "Фиксация стоимости в договоре",
+    "text_fact": "Стоимость согласованного плана лечения фиксируется в договоре до начала лечения.",
+    "microfact_text": "Стоимость фиксируется в договоре.",
+    "render_mode": "strict",
+    "active": true,
+    "detail_ref": "clinic__info__payment_terms.md#fiksatsiya-stoimosti",
+    "allowed_service_ids": [
+      "aligners",
+      "all_on_4",
+      "all_on_6",
+      "bone_graft",
+      "caries",
+      "clasp_dentures",
+      "classic",
+      "implant_supported_prosthetics",
+      "one_stage",
+      "periodontitis",
+      "professional_whitening",
+      "pterygoid_implants",
+      "pulpitis",
+      "removable_dentures",
+      "sinus_lift",
+      "teeth_treatment",
+      "temporary_teeth",
+      "tomography",
+      "tooth_extraction",
+      "veneers",
+      "zirconia_crowns",
+      "zygomatic_implants"
+    ],
+    "incompatible_with": []
+  },
+  "sv_3d_diagnocat": {
+    "id": "sv_3d_diagnocat",
+    "kind": "service_value",
+    "catalog_label": "3D-планирование и Diagnocat",
+    "text_fact": "Имплантацию планируем по 3D-диагностике: заранее оцениваем костную ткань и позицию импланта. При необходимости подключаем ИИ-анализ снимков Diagnocat — он помогает врачу точнее разобрать 3D-изображение и не упустить важные детали.",
+    "render_mode": "strict",
+    "active": true,
+    "allowed_service_ids": [
+      "classic",
+      "one_stage",
+      "all_on_4",
+      "all_on_6",
+      "zygomatic_implants",
+      "pterygoid_implants"
+    ],
+    "incompatible_with": []
+  },
+  "sv_aprf": {
+    "id": "sv_aprf",
+    "kind": "service_value",
+    "catalog_label": "APRF для восстановления тканей",
+    "text_fact": "При необходимости используем APRF — биоматериал из собственной крови пациента. Он поддерживает восстановление тканей и может снизить отёк после процедуры.",
+    "render_mode": "strict",
+    "active": true,
+    "allowed_service_ids": [
+      "bone_graft",
+      "sinus_lift"
+    ],
+    "incompatible_with": []
+  }
+}

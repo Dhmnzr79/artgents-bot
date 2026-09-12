@@ -1,0 +1,17 @@
+{
+  "offer_id": "periodontitis.default",
+  "service_id": "periodontitis",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 15000,
+    "currency": "RUB",
+    "billing_unit": "course"
+  },
+  "package": {
+    "label": "за полный курс лечения; точный план после диагностики дёсен",
+    "includes": []
+  },
+  "fact_refs": [],
+  "followups": []
+}

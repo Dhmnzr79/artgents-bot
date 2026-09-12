@@ -1,12 +1,11 @@
-# clients/nikadent/brand.yaml
-clinic_name: "НикаДент"
-logo_url: "/static/clients/nikadent/logo.svg"
-logo_width: 120
-logo_height: 52
-avatar_url: "/static/clients/nikadent/avatar.png"
+clinic_name: "Никадент"
+logo_url: null
+logo_width: null
+logo_height: null
+avatar_url: null
 
 colors:
-  brand: "#7c3aed"
-  action: "#5b21b6"
-  button_1: "#7c3aed"
-  button_2: "#f97316"
+  brand: "#1F4E79"
+  action: "#2E6DA4"
+  button_1: "#1F4E79"
+  button_2: "#2E6DA4"

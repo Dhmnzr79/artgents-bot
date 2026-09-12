@@ -1,0 +1,497 @@
+{
+  "schema_version": 2,
+  "gold_id": "perf8_retrieval_relevance_gold_v2",
+  "client_id": "demo",
+  "method": "Independent gold-author role: labels derived from question meaning and canonical demo-pack authority only, no retrieval algorithm was run or consulted while authoring this file.",
+  "scenario_count": 49,
+  "scenarios": [
+    {
+      "scenario_id": "s011_broad_service",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": true,
+      "rationale": "The corpus has no single prosthetics-overview page, while the evaluated retrievers return only one MD document. Selecting any one per-type service page would omit the other variants and falsely narrow a broad catalogue question, so FullContext fallback is required."
+    },
+    {
+      "scenario_id": "s012_broad_service",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "periodontology__service__periodontitis.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "periodontology__service__periodontitis.md directly answers gum/periodontitis treatment methods: 'врач оценивает состояние дёсен, делает диагностику и подбирает лечение: профессиональную гигиену, обработку воспалённых участков, домашний уход и контрольные осмотры.' This single doc is a specific, sufficient match."
+    },
+    {
+      "scenario_id": "s013_broad_service",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": true,
+      "rationale": "This is the same broad catalogue intent as s011. The relevant answer spans several per-type documents, but every evaluated candidate emits at most one document; accepting one would be an unsafe false narrowing, so FullContext fallback is required."
+    },
+    {
+      "scenario_id": "s014_broad_service",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "whitening__service__teeth_whitening.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "whitening__service__teeth_whitening.md is the direct, single match: 'Отбеливание помогает сделать зубы светлее и освежить улыбку без виниров и коронок.' It covers who it suits, prep, and safety, which is exactly what a general 'tell me about whitening' question needs."
+    },
+    {
+      "scenario_id": "s015_broad_service",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "treatment__service__teeth_treatment.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "treatment__service__teeth_treatment.md is the corpus's general treatment overview and itself enumerates caries treatment, root canals and tooth restoration. A single caries or pulpitis page would falsely narrow the broad question, so only the overview document is allowed."
+    },
+    {
+      "scenario_id": "s016_broad_service",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "orthodontics__service__aligners.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "Aligners are the only teeth-straightening method documented in the corpus (no traditional braces/bracket-system doc exists). orthodontics__service__aligners.md states: 'Элайнеры — это прозрачные съёмные капы, которые постепенно выравнивают зубы без брекетов,' directly and specifically answering what alignment method is offered."
+    },
+    {
+      "scenario_id": "s039_sterilization_safety",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "implantation__faq__safety.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "implantation__faq__safety.md is the sole doc in the corpus discussing sterilization and instrument handling, and it matches this query almost verbatim: 'Централизованное стерилизационное отделение — как в крупных больницах... Полная обработка инструментов — химическая и термическая дезинфекция.'"
+    },
+    {
+      "scenario_id": "s040_sterilization_safety",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "implantation__faq__safety.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "Same doc, direct textual match: 'Полная обработка инструментов — химическая и термическая дезинфекция.' No other document in the corpus discusses disinfection methods."
+    },
+    {
+      "scenario_id": "s041_sterilization_safety",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "implantation__faq__safety.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "'Как обеззараживают инструменты перед приёмом' is answered by the same list: '...Каждый инструмент проверяется перед использованием... Только одноразовые материалы — перчатки, маски, салфетки.'"
+    },
+    {
+      "scenario_id": "s042_sterilization_safety",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "implantation__faq__safety.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "Direct general match on 'какая у вас стерилизация' — the doc's whole body is the clinic's sterilization protocol description, headed 'Безопасность и стерильность при имплантации'."
+    },
+    {
+      "scenario_id": "s043_sterilization_safety",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "implantation__faq__safety.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "Single-word query 'стерилизация' matches the doc's own aliases list ('стерильность при имплантации') and its content is entirely about sterilization procedures."
+    },
+    {
+      "scenario_id": "s044_sterilization_safety",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "implantation__faq__safety.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "Single-word query 'обеззараживание' is covered by the doc's bullet 'Полная обработка инструментов — химическая и термическая дезинфекция' and 'Кварцевание воздуха — уничтожение микробов в помещении'."
+    },
+    {
+      "scenario_id": "s048_own_fresh_ct",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "diagnostics__service__tomography.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "diagnostics__service__tomography.md directly answers this: 'При наличии свежего КТ (до 1 месяца) врач может использовать уже готовое исследование.' This is a specific, sufficient single-doc match."
+    },
+    {
+      "scenario_id": "s049_own_fresh_ct",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "diagnostics__service__tomography.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "Same doc answers the 'CT taken a month ago' case precisely: 'Свежее КТ — это исследование давностью до одного месяца. При наличии свежего КТ (до 1 месяца) врач может использовать уже готовое исследование.'"
+    },
+    {
+      "scenario_id": "s050_own_fresh_ct",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "diagnostics__service__tomography.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "Same doc's 'Нужно ли делать новое КТ' section answers directly: 'Если КТ старше месяца, врач на консультации оценит, можно ли использовать имеющийся снимок или лучше сделать новый.'"
+    },
+    {
+      "scenario_id": "s051_treatment_plan_other_clinic",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [
+        "clinic__info__consultation.md"
+      ],
+      "fallback_required": true,
+      "rationale": "The query asks to have an external clinic's plan verified/checked ('хочу проверить у вас'). clinic__info__consultation.md only supports that a free consultation exists where 'врач составит понятный план лечения' for this clinic — it never states that the clinic reviews, verifies, or gives opinions on plans made elsewhere. No document in the corpus supports the specific claim the question needs, so honest behavior is fallback; consultation.md is flagged because it is the plausible-looking but insufficient match a lexical search would likely surface."
+    },
+    {
+      "scenario_id": "s052_treatment_plan_other_clinic",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "clinic__info__consultation.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "The literal ask here is narrower than the other scenarios in this class: 'можно ли к вам на консультацию' (can I book a consultation with you), with the other-clinic plan only as background context. clinic__info__consultation.md directly answers that a free consultation is available ('Бесплатная консультация по имплантации и протезированию — до 31 декабря 2026'). The rationale stops at 'yes, a consultation is available' — it does not claim the doc supports reviewing the other clinic's plan itself."
+    },
+    {
+      "scenario_id": "s053_treatment_plan_other_clinic",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [
+        "clinic__info__consultation.md"
+      ],
+      "fallback_required": true,
+      "rationale": "This explicitly requests a 'second opinion' service ('второе мнение... от другого врача'). No document in the corpus mentions second opinions or reviewing another doctor's plan. clinic__info__consultation.md only supports getting your own plan drawn up at this clinic's free consultation, a weaker and different claim, so it is flagged as forbidden rather than allowed, and fallback is the honest answer."
+    },
+    {
+      "scenario_id": "s054_treatment_plan_other_clinic",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [
+        "clinic__info__consultation.md"
+      ],
+      "fallback_required": true,
+      "rationale": "The query asks whether it's worth 're-checking' ('перепроверить') a plan already made elsewhere. clinic__info__consultation.md describes only the standard consultation flow for a new plan at this clinic and never mentions re-checking or auditing an existing plan, so it cannot honestly be cited as supporting this specific claim. Fallback is correct; consultation.md flagged as the near-miss."
+    },
+    {
+      "scenario_id": "s055_treatment_plan_other_clinic",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [
+        "clinic__info__consultation.md"
+      ],
+      "fallback_required": true,
+      "rationale": "The query explicitly asks the clinic to look at documents/plan brought from elsewhere ('посмотрите план лечения'). clinic__info__consultation.md's text is limited to composing a plan during a free consultation at this clinic; it does not say the clinic will examine outside documents or plans. No document supports the specific claim, so fallback is honest; consultation.md flagged as forbidden."
+    },
+    {
+      "scenario_id": "s056_treatment_plan_other_clinic",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [
+        "clinic__info__consultation.md"
+      ],
+      "fallback_required": true,
+      "rationale": "The query asks specifically whether 'консультация по чужому плану лечения' (a consultation about someone else's plan) is possible — this is the direct ask being probed by the whole scenario class. clinic__info__consultation.md never mentions consulting on a plan made by another doctor/clinic, only composing a fresh plan here. Fallback is the honest answer; consultation.md flagged as the plausible near-miss."
+    },
+    {
+      "scenario_id": "s071_comparison",
+      "required_md_refs": [
+        "implantation__service__all_on_4.md"
+      ],
+      "allowed_retrieval_md_refs": [
+        "comparison__all_on_4_vs_all_on_6.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "comparison__all_on_4_vs_all_on_6.md (doc_type: comparison) genuinely and specifically compares the two things asked about: 'All-on-4 и All-on-6 решают одну задачу — восстановить весь зубной ряд... Разница в количестве опор: четыре или шесть имплантов.' Combined with the required all_on_4 service doc this is sufficient."
+    },
+    {
+      "scenario_id": "s072_comparison",
+      "required_md_refs": [
+        "implantation__service__classic.md"
+      ],
+      "allowed_retrieval_md_refs": [
+        "comparison__implant_vs_bridge.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "comparison__implant_vs_bridge.md is a dedicated comparison doc for exactly this question: 'Имплант чаще выбирают, когда хочется восстановить зуб отдельно... Мост может быть разумным вариантом, если соседние зубы уже нуждаются в коронках.' It genuinely addresses 'имплант или мост что лучше'."
+    },
+    {
+      "scenario_id": "s073_comparison",
+      "required_md_refs": [
+        "implantation__service__bone_graft.md"
+      ],
+      "allowed_retrieval_md_refs": [
+        "comparison__bone_graft_vs_all_on_4.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "comparison__bone_graft_vs_all_on_4.md exactly compares these two: 'Это не конкурирующие «акции», а разные ответы на дефицит кости... All-on-4... иногда позволяет обойтись без наращивания за счёт угловой установки — но только если это подтверждает КТ.'"
+    },
+    {
+      "scenario_id": "s074_comparison",
+      "required_md_refs": [
+        "implantation__service__classic.md"
+      ],
+      "allowed_retrieval_md_refs": [
+        "comparison__classic_vs_one_stage.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "The query's 'одноэтапной методики' refers to the same protocol the corpus calls 'одномоментная' (one_stage service, aliased 'одномоментный протокол имплантации'). comparison__classic_vs_one_stage.md directly compares classic vs. one-stage: 'Классическая (двухэтапная)... Одномоментная — удаление зуба и установка импланта за один визит.'"
+    },
+    {
+      "scenario_id": "s075_comparison",
+      "required_md_refs": [
+        "implantation__service__all_on_4.md"
+      ],
+      "allowed_retrieval_md_refs": [
+        "comparison__all_on_4_vs_all_on_6.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "Same comparison pairing as s071 ('что лучше выбрать' vs 'в чем разница' — same underlying comparison). comparison__all_on_4_vs_all_on_6.md directly answers with the trade-off guidance: 'Больше опор — выше запас прочности... но протокол сложнее и обычно дороже.'"
+    },
+    {
+      "scenario_id": "s076_comparison",
+      "required_md_refs": [
+        "implantation__service__classic.md"
+      ],
+      "allowed_retrieval_md_refs": [
+        "comparison__classic_vs_one_stage.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "Same pairing as s074, reworded ('в чем отличие' instead of 'сравнение подходов'). comparison__classic_vs_one_stage.md directly and specifically compares classic vs. one-stage implantation."
+    },
+    {
+      "scenario_id": "s077_comparison",
+      "required_md_refs": [
+        "prosthetics__service__clasp_dentures.md"
+      ],
+      "allowed_retrieval_md_refs": [
+        "comparison__bugel_prosthesis_vs_fixed_bridge.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "comparison__bugel_prosthesis_vs_fixed_bridge.md is a dedicated comparison doc for exactly this pairing: 'Бюгельный протез — это съёмная конструкция на металлическом каркасе... Несъёмный мост выбирают, когда есть надёжные опорные зубы или импланты.'"
+    },
+    {
+      "scenario_id": "s078_comparison",
+      "required_md_refs": [
+        "implantation__service__all_on_6.md"
+      ],
+      "allowed_retrieval_md_refs": [
+        "comparison__bugel_prosthesis_vs_fixed_bridge.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "The question's actual content is 'бюгельного протеза по сравнению с мостовидным протезом' (clasp denture vs. bridge), which has nothing to do with All-on-6 despite the input's service_id/required_md_refs pointing there. Judged purely on question meaning, comparison__bugel_prosthesis_vs_fixed_bridge.md is the document that genuinely and specifically compares the two things actually asked about, listing pros/cons of each side."
+    },
+    {
+      "scenario_id": "s079_cross_topic",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": true,
+      "rationale": "The query asks for a three-way comparison (implantation, veneers, whitening) for front teeth. No comparison doc in the corpus covers this combination — comparison docs only pair implantation-family options against each other. Forcing any single service doc (veneers or whitening) would answer only one leg of a three-way comparison, which is not genuinely sufficient, so fallback is the honest choice."
+    },
+    {
+      "scenario_id": "s080_cross_topic",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [
+        "orthodontics__service__aligners.md"
+      ],
+      "fallback_required": true,
+      "rationale": "The query asks to compare implant cost vs. braces ('брекеты') cost, but the corpus has no traditional-braces document (only aligners exist as the straightening service) and no doc compares implantation pricing against orthodontic pricing. orthodontics__service__aligners.md is flagged as forbidden because it shares 'выравнивание/брекеты' vocabulary but does not discuss cost comparison with implants at all."
+    },
+    {
+      "scenario_id": "s081_cross_topic",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "implantation__info__contraindications.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "implantation__info__contraindications.md directly states the requested relationship: gum disease may require preparation and gum treatment before implantation. The periodontitis service page describes gum treatment but does not itself establish the cross-topic relationship, so only the contraindications document is allowed."
+    },
+    {
+      "scenario_id": "s082_cross_topic",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "whitening__service__teeth_whitening.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "whitening__service__teeth_whitening.md addresses the caries-vs-whitening relationship directly: 'Отбеливание чаще подходит, если зубы здоровы, нет активного кариеса... Если есть кариес, воспаление или сильная чувствительность, сначала лучше подготовить зубы.' This supports the honest answer (caries is usually treated first, order decided at the visit) without claiming the doc explicitly confirms same-visit combination, which it does not state."
+    },
+    {
+      "scenario_id": "s083_cross_topic",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [
+        "doctors__doctor__overview.md"
+      ],
+      "fallback_required": true,
+      "rationale": "This is a scheduling/logistics question (seeing an orthodontist and a general dentist in one visit for separate issues) that no document addresses. doctors__doctor__overview.md discusses the team of specialists generally ('от терапии и ортодонтии до имплантации и протезирования') but never addresses booking multiple specialists in one visit, so it is flagged as a plausible-but-wrong match rather than allowed."
+    },
+    {
+      "scenario_id": "s084_cross_topic",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [
+        "treatment__service__teeth_treatment.md"
+      ],
+      "fallback_required": true,
+      "rationale": "The query asks for a conceptual comparison of 'терапия' vs. 'хирургия' as clinic departments/approaches. treatment__service__teeth_treatment.md mentions 'терапевтическая стоматология' but never contrasts it with surgical treatment, and no other doc frames this therapy-vs-surgery distinction, so it is flagged as forbidden rather than allowed and fallback is honest."
+    },
+    {
+      "scenario_id": "s099_unknown_wording",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": true,
+      "rationale": "The query deliberately avoids naming any specific procedure ('альтернативных методик... без привычных терминов'). It is too vague to point to any one document without guessing which real service it might mean, so the honest behavior is fallback to the full corpus rather than picking a narrow guess."
+    },
+    {
+      "scenario_id": "s100_unknown_wording",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": true,
+      "rationale": "'Нестандартный подход к зубам без операции вообще' is generic enough to match many non-surgical services (whitening, veneers, aligners, removable dentures) with equal weakness and none with genuine specificity. No document is a specific match for this deliberately vague phrasing, so fallback is correct."
+    },
+    {
+      "scenario_id": "s101_unknown_wording",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": true,
+      "rationale": "The query explicitly asks about a method the clinic 'may not be advertising yet' — by construction this cannot correspond to any existing published document. No document can honestly be cited, so fallback is the only correct answer."
+    },
+    {
+      "scenario_id": "s102_unknown_wording",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": true,
+      "rationale": "'Что можете предложить, если ничего из обычного не подходит' is a fully generic fallback question with no procedure named. implantation__service__bone_graft.md discusses alternatives only in the narrow context of bone deficiency, which is a different, more specific situation than what this query describes, so no document genuinely and specifically answers it."
+    },
+    {
+      "scenario_id": "s103_unknown_wording",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": true,
+      "rationale": "'Необычное решение проблемы с зубами нестандартное совсем' names no concrete problem or procedure, so it cannot be matched to a specific document without guessing. Fallback is the honest answer."
+    },
+    {
+      "scenario_id": "s104_unknown_wording",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": true,
+      "rationale": "'Восстановление отсутствующих элементов альтернативным способом' could plausibly point to several different prosthetics/implant docs (removable dentures, implant-supported prosthetics, clasp dentures) with roughly equal, non-specific relevance, and 'альтернативным способом' names no baseline to be an alternative to. No single document specifically matches this deliberately unanchored phrasing, so fallback is the honest choice rather than picking one of several equally plausible guesses."
+    },
+    {
+      "scenario_id": "s111_medically_risky_personal",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "implantation__info__contraindications.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "implantation__info__contraindications.md directly names this exact condition: 'неконтролируемый диабет' is listed among absolute contraindications, and separately clarifies: 'При неконтролируемом [диабете] — противопоказана из-за высокого риска осложнений.' This is the clinic's general published position, not a personal eligibility judgment."
+    },
+    {
+      "scenario_id": "s112_medically_risky_personal",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "implantation__info__contraindications.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "Same document directly addresses type 2 diabetes and implantation: 'при компенсированном диабете имплантация возможна — под контролем врача. При неконтролируемом — противопоказана из-за высокого риска осложнений.'"
+    },
+    {
+      "scenario_id": "s113_medically_risky_personal",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "implantation__info__contraindications.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "Identical query text to s111; response_mode (medical_handoff) governs how the final answer is composed downstream, not which document's general published content genuinely addresses the topic. The same contraindications doc is the correct retrieval target."
+    },
+    {
+      "scenario_id": "s114_medically_risky_personal",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "implantation__info__contraindications.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "Identical query text to s112; response_mode does not change which document's content is topically relevant. implantation__info__contraindications.md remains the specific, genuine match for diabetes-and-implantation content."
+    },
+    {
+      "scenario_id": "s115_medically_risky_personal",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "implantation__info__contraindications.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "General phrasing 'можно ли ставить импланты при диабете' is answered by the same doc's diabetes-specific clause distinguishing compensated (possible, under medical supervision) from uncontrolled (contraindicated) diabetes."
+    },
+    {
+      "scenario_id": "s116_medically_risky_personal",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "implantation__info__contraindications.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "The same doc lists 'беременность' among the conditions requiring preparation/postponement rather than being an absolute block: pregnancy appears under the relative-contraindications list ('К таким состояниям относятся: ... беременность'), which directly and specifically addresses this query."
+    },
+    {
+      "scenario_id": "s117_medically_risky_personal",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "implantation__info__contraindications.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "The doc's 'Возраст и All-on' section names this exact factor: 'Важнее общее состояние здоровья, состояние кости и дёсен, приём лекарств (например, антикоагулянтов) и контроль хронических заболеваний.' This directly and specifically addresses anticoagulant use as a factor considered before implantation."
+    },
+    {
+      "scenario_id": "s118_medically_risky_personal",
+      "required_md_refs": [],
+      "allowed_retrieval_md_refs": [
+        "implantation__info__contraindications.md"
+      ],
+      "forbidden_retrieval_md_refs": [],
+      "fallback_required": false,
+      "rationale": "Same diabetes-and-implantation content as s111/s112/s115 answers this personal phrasing of the question ('подходит ли имплантация в моем случае') at the level of the clinic's general published policy: compensated diabetes is workable under medical supervision, uncontrolled diabetes is an absolute contraindication."
+    }
+  ]
+}

@@ -1,4 +1,6 @@
 """Состояние сессии: история, профиль, эмпатия, поля для policy — в SQLite."""
+from __future__ import annotations
+
 import json
 import os
 import re
@@ -7,7 +9,9 @@ import threading
 import time
 import uuid
 from collections import deque
+from contextlib import contextmanager
 from datetime import datetime
+from typing import Iterator
 
 from config import MAX_IDLE_SEC, MAX_TURNS
 from core.client_config_loader import resolve_pack_client_id
@@ -25,15 +29,75 @@ YES_RX = re.compile(
 _lock = threading.RLock()
 _conns: dict[str, sqlite3.Connection] = {}
 _tls = threading.local()
+_UNSET = object()
+_SESSION_PURGE_INTERVAL_SEC = 300.0
+_last_session_purge_at: dict[str, float] = {}
+
+
+class SessionClientNotBoundError(RuntimeError):
+    """Session storage accessed without an explicit thread-local client binding."""
+
+
+def current_session_client_id() -> str | None:
+    """Return the active thread-local pack id, or None when unbound."""
+    return getattr(_tls, "client_id", None)
+
+
+def clear_session_store_cache() -> None:
+    """Close and drop cached per-pack SQLite connections."""
+    with _lock:
+        for conn in _conns.values():
+            try:
+                conn.close()
+            except Exception:
+                pass
+        _conns.clear()
+
+
+def clear_session_client_binding() -> None:
+    """Drop thread-local client binding (request/worker cleanup)."""
+    if hasattr(_tls, "client_id"):
+        delattr(_tls, "client_id")
+
+
+def _canonical_pack_id(client_id: str) -> str:
+    raw = (client_id or "").strip()
+    if not raw:
+        raise SessionClientNotBoundError(
+            "session client binding requires explicit client_id; "
+            "choose DEFAULT_CLIENT_ID at ingress instead of silent demo fallback"
+        )
+    return resolve_pack_client_id(raw)
 
 
 def bind_session_client(client_id: str | None) -> None:
     """Thread-local client pack for SQLite path (set before mem_get)."""
-    _tls.client_id = resolve_pack_client_id(client_id)
+    _tls.client_id = _canonical_pack_id(str(client_id or ""))
+
+
+@contextmanager
+def session_client_scope(client_id: str) -> Iterator[str]:
+    """Bind client pack for a scope; restore or clear previous binding in finally."""
+    pack = _canonical_pack_id(client_id)
+    prev = getattr(_tls, "client_id", _UNSET)
+    _tls.client_id = pack
+    try:
+        yield pack
+    finally:
+        if prev is _UNSET:
+            clear_session_client_binding()
+        else:
+            _tls.client_id = prev
 
 
 def _session_pack_id() -> str:
-    return getattr(_tls, "client_id", None) or "demo"
+    pack = getattr(_tls, "client_id", None)
+    if not pack:
+        raise SessionClientNotBoundError(
+            "session operation requires explicit client binding via bind_session_client "
+            "or session_client_scope"
+        )
+    return str(pack)
 
 
 def _connect() -> sqlite3.Connection:
@@ -83,20 +147,15 @@ def _fresh_defaults() -> dict:
         "lead_paused_answer_count": 0,
         "lead_preferred_datetime": "",
         "booking_intent_ever": False,
-        "anti_spam_redirect_shown": False,
         "lead_pending_name": "",
+        "lead_pending_interruption_text": "",
+        "lead_pending_interruption_step": "",
         "shown_cta_topics": [],
         "topic_state": {},
         "last_content_ui_payload": None,
         "last_catalog_service_id": None,
-        "last_subject": None,
-        "last_patient_situation": None,
         "last_aspect": None,
-        "subject_turn_age": 0,
-        "patient_situation_turn_age": 0,
-        "pending_clarify": None,
         "pending_lead_offer": False,
-        "user_turn_timestamps": [],
         "consult_streak": 0,
         "nav_refs_used": [],
     }
@@ -106,6 +165,8 @@ def _deserialize_row(payload_json: str) -> dict:
     raw = json.loads(payload_json)
     st = _fresh_defaults()
     for k, v in raw.items():
+        if k == "pending_clarify":
+            continue
         if k == "hist" and isinstance(v, list):
             st["hist"] = deque(v, maxlen=MAX_TURNS * 2)
         else:
@@ -131,6 +192,20 @@ def _now() -> float:
     return time.time()
 
 
+def _maybe_purge_idle_sessions() -> None:
+    """Tenant-scoped: drop SQLite rows idle longer than MAX_IDLE_SEC (bounded, throttled)."""
+    pack = _session_pack_id()
+    now = _now()
+    with _lock:
+        last = float(_last_session_purge_at.get(pack) or 0.0)
+        if now - last < _SESSION_PURGE_INTERVAL_SEC:
+            return
+        _last_session_purge_at[pack] = now
+        cutoff = now - float(MAX_IDLE_SEC)
+    conn = _connect()
+    conn.execute("DELETE FROM sessions WHERE updated_at < ?", (cutoff,))
+
+
 def bind_client_id(session_id: str, client_id: str | None) -> None:
     """Фиксируем client_id в SQLite-сессии (дашборд / мультиклиент)."""
     cid = (client_id or "").strip()
@@ -153,6 +228,10 @@ def sid_from_body(body: dict) -> str:
 
 def mem_get(session_id: str) -> dict:
     with _lock:
+        try:
+            _maybe_purge_idle_sessions()
+        except SessionClientNotBoundError:
+            pass
         conn = _connect()
         row = conn.execute(
             "SELECT payload, updated_at FROM sessions WHERE sid = ?",
@@ -171,34 +250,18 @@ def mem_get(session_id: str) -> dict:
 
 
 def mem_add_user(session_id: str, text: str) -> None:
+    from core.user_text_privacy import provider_safe_user_text
+
     with _lock:
         st = mem_get(session_id)
-        if isinstance(st.get("last_subject"), dict) and st["last_subject"].get("service_id"):
-            st["subject_turn_age"] = int(st.get("subject_turn_age") or 0) + 1
-        if isinstance(st.get("last_patient_situation"), dict) and str(
-            st["last_patient_situation"].get("kind") or ""
-        ).strip():
-            st["patient_situation_turn_age"] = int(st.get("patient_situation_turn_age") or 0) + 1
         st["turn_count"] = int(st.get("turn_count") or 0) + 1
         st["session_turn_count"] = int(st.get("session_turn_count") or 0) + 1
-        ts_list = list(st.get("user_turn_timestamps") or [])
-        ts_list.append(time.time())
-        st["user_turn_timestamps"] = ts_list[-50:]
         if is_lead_context(st):
             _persist_unlocked(session_id, st)
             return
-        st["hist"].append({"role": "user", "content": text})
-        m = PHONE_RX.search(text)
-        if m:
-            st["profile"]["phone"] = m.group().replace(" ", "")
-        if "меня зовут" in text.lower():
-            parts = text.lower().split("меня зовут", 1)
-            if len(parts) > 1:
-                name_parts = parts[1].strip().split()
-                if name_parts:
-                    name = name_parts[0]
-                    if name:
-                        st["profile"]["name"] = name.capitalize()
+        safe = provider_safe_user_text(text or "")
+        if safe:
+            st["hist"].append({"role": "user", "content": safe})
         _persist_unlocked(session_id, st)
 
 
@@ -238,6 +301,23 @@ def recent_dialog_history(
     return "\n".join(lines)
 
 
+def recent_dialog_history_for_provider(
+    session_id: str,
+    *,
+    max_messages: int = RECENT_DIALOG_MAX_MESSAGES,
+) -> str:
+    """Provider-bound dialog tail with per-message user sanitization."""
+    from core.user_text_privacy import format_hist_messages_for_provider
+
+    if not (session_id or "").strip():
+        return ""
+    hist = list(mem_get(session_id).get("hist") or [])
+    if not hist:
+        return ""
+    tail = hist[-max(1, int(max_messages)) :]
+    return format_hist_messages_for_provider(tail)
+
+
 def format_dialog_context_for_understanding(dialog_history: str) -> str:
     """Prompt block: dialog context only for continuation, not facts."""
     dctx = (dialog_history or "").strip()
@@ -249,7 +329,15 @@ def format_dialog_context_for_understanding(dialog_history: str) -> str:
     )
 
 
-def mem_reset(session_id: str) -> None:
+def mem_reset(session_id: str, *, client_id: str | None = None) -> None:
+    if client_id is not None:
+        with session_client_scope(client_id):
+            _mem_reset_unlocked(session_id)
+        return
+    _mem_reset_unlocked(session_id)
+
+
+def _mem_reset_unlocked(session_id: str) -> None:
     with _lock:
         conn = _connect()
         conn.execute("DELETE FROM sessions WHERE sid = ?", (session_id,))
@@ -278,64 +366,6 @@ def set_pending_lead_offer(session_id: str, active: bool = True) -> None:
 
 def clear_pending_lead_offer(session_id: str) -> None:
     set_pending_lead_offer(session_id, False)
-
-
-def get_pending_clarify(session_id: str) -> dict | None:
-    st = mem_get(session_id)
-    raw = st.get("pending_clarify")
-    return raw if isinstance(raw, dict) else None
-
-
-def set_pending_clarify(
-    session_id: str,
-    *,
-    question: str,
-    option_service_ids: list[str],
-    reask_count: int = 0,
-    route: str = "",
-) -> None:
-    q = str(question or "").strip()
-    ids = [str(x or "").strip() for x in (option_service_ids or []) if str(x or "").strip()]
-    if not q or not ids:
-        clear_pending_clarify(session_id)
-        return
-    with _lock:
-        st = mem_get(session_id)
-        st["pending_clarify"] = {
-            "question": q,
-            "option_service_ids": ids,
-            "asked_at_turn": int(st.get("session_turn_count") or 0),
-            "reask_count": int(reask_count or 0),
-            "route": str(route or "").strip(),
-        }
-        _persist_unlocked(session_id, st)
-
-
-def clear_pending_clarify(session_id: str) -> None:
-    with _lock:
-        st = mem_get(session_id)
-        st["pending_clarify"] = None
-        _persist_unlocked(session_id, st)
-
-
-def increment_pending_clarify_reask(session_id: str) -> dict | None:
-    with _lock:
-        st = mem_get(session_id)
-        raw = st.get("pending_clarify")
-        if not isinstance(raw, dict):
-            return None
-        updated = dict(raw)
-        updated["reask_count"] = int(updated.get("reask_count") or 0) + 1
-        st["pending_clarify"] = updated
-        _persist_unlocked(session_id, st)
-        return updated
-
-
-def pending_clarify_age(session_state: dict) -> int:
-    raw = (session_state or {}).get("pending_clarify")
-    if not isinstance(raw, dict):
-        return 0
-    return max(0, int((session_state or {}).get("session_turn_count") or 0) - int(raw.get("asked_at_turn") or 0))
 
 
 def record_last_bot_payload(session_id: str, payload: dict) -> None:
@@ -378,21 +408,6 @@ def record_last_bot_payload(session_id: str, payload: dict) -> None:
 
         answer_text = str(payload.get("answer") or "")
         lead_flow = bool(meta.get("lead_flow")) or bool(meta.get("situation_collect"))
-        clarify_meta = meta.get("clarify")
-        if isinstance(clarify_meta, dict):
-            question = str(clarify_meta.get("question") or answer_text).strip()
-            option_ids = [
-                str(x or "").strip()
-                for x in list(clarify_meta.get("option_service_ids") or [])
-                if str(x or "").strip()
-            ]
-            if question and option_ids:
-                st["pending_clarify"] = {
-                    "question": question,
-                    "option_service_ids": option_ids,
-                    "asked_at_turn": int(st.get("session_turn_count") or 0),
-                    "reask_count": int(clarify_meta.get("reask_count") or 0),
-                }
         st["pending_lead_offer"] = bool(
             not lead_flow
             and not meta.get("low_score")
@@ -489,98 +504,17 @@ def set_last_catalog_service(session_id: str, service_id: str) -> None:
         _persist_unlocked(session_id, st)
 
 
-def get_last_subject(session_id: str) -> dict | None:
-    st = mem_get(session_id)
-    sub = st.get("last_subject")
-    if isinstance(sub, dict) and str(sub.get("service_id") or "").strip():
-        return sub
-    return None
-
-
-def set_last_subject(
-    session_id: str,
-    *,
-    service_id: str,
-    topic: str,
-    label: str,
-    last_route: str = "",
-) -> None:
-    sid = (service_id or "").strip()
-    if not sid:
-        return
-    with _lock:
-        st = mem_get(session_id)
-        st["last_subject"] = {
-            "service_id": sid,
-            "topic": (topic or "").strip() or "unknown",
-            "label": (label or sid).strip(),
-            "last_route": (last_route or "").strip(),
-        }
-        st["subject_turn_age"] = 0
-        _persist_unlocked(session_id, st)
-
-
-def get_last_patient_situation(session_id: str) -> dict | None:
-    from core.routing_loader import THRESHOLDS
-
-    st = mem_get(session_id)
-    snap = st.get("last_patient_situation")
-    if not isinstance(snap, dict) or not str(snap.get("kind") or "").strip():
-        return None
-    age = int(st.get("patient_situation_turn_age") or 0)
-    if age > int(THRESHOLDS.patient_situation.max_turn_age):
-        return None
-    return dict(snap)
-
-
-def patient_situation_turn_age(session_id: str) -> int:
-    st = mem_get(session_id)
-    return int(st.get("patient_situation_turn_age") or 0)
-
-
-def set_last_patient_situation(session_id: str, snapshot: dict) -> None:
-    kind = str((snapshot or {}).get("kind") or "").strip()
-    if not kind or kind == "unknown":
-        return
-    with _lock:
-        st = mem_get(session_id)
-        st["last_patient_situation"] = dict(snapshot)
-        st["patient_situation_turn_age"] = 0
-        _persist_unlocked(session_id, st)
-
-
-def clear_last_patient_situation(session_id: str) -> None:
-    with _lock:
-        st = mem_get(session_id)
-        if st.get("last_patient_situation") is None and int(st.get("patient_situation_turn_age") or 0) == 0:
-            return
-        st["last_patient_situation"] = None
-        st["patient_situation_turn_age"] = 0
-        _persist_unlocked(session_id, st)
-
-
 def clear_focus_context(session_id: str) -> None:
-    """Reset dialog focus: subject, aspect, patient_situation, turn ages (4a/4b)."""
+    """Reset dialog focus: target service focus and aspect."""
+    from core.target_runtime_session import clear_target_service_focus
+
+    clear_target_service_focus(session_id)
     with _lock:
         st = mem_get(session_id)
-        if (
-            st.get("last_subject") is None
-            and st.get("last_aspect") is None
-            and st.get("last_patient_situation") is None
-            and int(st.get("subject_turn_age") or 0) == 0
-            and int(st.get("patient_situation_turn_age") or 0) == 0
-        ):
+        if st.get("last_aspect") is None:
             return
-        st["last_subject"] = None
         st["last_aspect"] = None
-        st["subject_turn_age"] = 0
-        st["last_patient_situation"] = None
-        st["patient_situation_turn_age"] = 0
         _persist_unlocked(session_id, st)
-
-
-def clear_last_subject(session_id: str) -> None:
-    clear_focus_context(session_id)
 
 
 def get_last_aspect(session_id: str) -> str | None:
@@ -846,6 +780,10 @@ def exit_lead_flow(session_id: str) -> None:
         st["lead_paused_answer_count"] = 0
         _persist_unlocked(session_id, st)
     clear_lead_pii(session_id)
+    clear_lead_pending_interruption(session_id)
+    from core.lead_context import clear_lead_provider_question_turn
+
+    clear_lead_provider_question_turn()
     clear_focus_context(session_id)
 
 
@@ -872,13 +810,6 @@ def mark_booking_intent_ever(session_id: str) -> None:
     with _lock:
         st = mem_get(session_id)
         st["booking_intent_ever"] = True
-        _persist_unlocked(session_id, st)
-
-
-def set_anti_spam_redirect_shown(session_id: str, shown: bool = True) -> None:
-    with _lock:
-        st = mem_get(session_id)
-        st["anti_spam_redirect_shown"] = bool(shown)
         _persist_unlocked(session_id, st)
 
 
@@ -1015,8 +946,34 @@ def clear_lead_pii(session_id: str) -> None:
         st["situation_note"] = ""
         st["lead_preferred_datetime"] = ""
         st["lead_pending_name"] = ""
+        st["lead_pending_interruption_text"] = ""
+        st["lead_pending_interruption_step"] = ""
         st["lead_resume_step"] = ""
         st["lead_return_doc_id"] = ""
         st["lead_interrupt_kind"] = ""
         st["lead_paused_answer_count"] = 0
+        _persist_unlocked(session_id, st)
+
+
+def set_lead_pending_interruption(session_id: str, *, text: str, step: str) -> None:
+    with _lock:
+        st = mem_get(session_id)
+        st["lead_pending_interruption_text"] = (text or "").strip()[:2000]
+        st["lead_pending_interruption_step"] = (step or "").strip()
+        _persist_unlocked(session_id, st)
+
+
+def get_lead_pending_interruption(session_id: str) -> tuple[str, str]:
+    st = mem_get(session_id)
+    return (
+        (st.get("lead_pending_interruption_text") or "").strip(),
+        (st.get("lead_pending_interruption_step") or "").strip(),
+    )
+
+
+def clear_lead_pending_interruption(session_id: str) -> None:
+    with _lock:
+        st = mem_get(session_id)
+        st["lead_pending_interruption_text"] = ""
+        st["lead_pending_interruption_step"] = ""
         _persist_unlocked(session_id, st)

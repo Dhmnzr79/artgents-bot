@@ -1,5 +1,6 @@
 ﻿import { postAsk, streamAsk } from "./api.js";
 import { setBotAnswerBody } from "./answer_format.js";
+import { mergeFollowupControls } from "./followup_controls.js";
 
 const STORAGE_SID = "clinic_widget_sid";
 const STORAGE_LAUNCHER_TEASER = "clinic_widget_launcher_teaser_shown";
@@ -37,6 +38,13 @@ const PLAIN_ATTRIBUTION_ROUTES = new Set([
   "offtopic",
   "situation_collect",
   "situation_back",
+  "target_fullcontext_terminal_clarify",
+  "target_fullcontext_terminal_defer",
+  "target_fullcontext_terminal_medical_handoff_nonmaterializable",
+  "target_fullcontext_boundary_uncertain",
+  "target_fullcontext_error",
+  "target_fullcontext_verifier_blocked",
+  "target_fullcontext_followup_unknown",
 ]);
 /** Синхронно с config.BOOKING_INTENT_RE — до ответа сервера не показываем «базу знаний». */
 const BOOKING_INTENT_RE =
@@ -409,6 +417,12 @@ function isPlainAttributionRoute(route) {
 
 /** @param {unknown} meta @returns {TurnAttributionKind} */
 function resolveTurnAttributionKind(meta) {
+  if (meta && typeof meta === "object") {
+    const explicit = String(meta.attribution_kind || "").trim().toLowerCase();
+    if (explicit === "content" || explicit === "lead" || explicit === "plain") {
+      return /** @type {TurnAttributionKind} */ (explicit);
+    }
+  }
   if (isLeadFlowBotMeta(meta)) return "lead";
   if (meta && typeof meta === "object") {
     if (meta.offtopic) return "plain";
@@ -652,6 +666,14 @@ export function mountWidget(root, config) {
     unread: false,
     started: false,
     errorLine: "",
+    // PERF-0: local-only perf timestamp (ms via performance.now()), never
+    // sent over the network — see PERF-0 seam audit client-timing finding.
+    perfPendingStartMs: null,
+    perfFirstLocalStatusLogged: false,
+    // PERF-1: real-time status text from event: status (optional — old
+    // servers/clients simply never set this, falling back to the existing
+    // typingLabelForPhase() canned text unchanged).
+    statusMessage: null,
   };
 
   /** @type {Record<string, { src: string, title: string }>} */
@@ -1226,8 +1248,18 @@ export function mountWidget(root, config) {
     const bubble = feed.querySelector(".clinic-shell__typing");
     const labelWrap = feed.querySelector(".clinic-shell__typing-label");
     if (!bubble || !labelWrap) return;
-    fillTypingLabel(labelWrap, typingLabelForPhase(state.typingPhase));
+    fillTypingLabel(labelWrap, state.statusMessage || typingLabelForPhase(state.typingPhase));
     bubble.classList.toggle("clinic-shell__typing--shimmer", state.typingPhase === "searching");
+  }
+
+  /** PERF-1: honest early status text (event: status). No-op for old servers —
+   * state.statusMessage simply stays null and the existing canned phase label
+   * (typingLabelForPhase) keeps rendering exactly as before this milestone.
+   * @param {string} message */
+  function setStatusMessage(message) {
+    if (!message || message === state.statusMessage) return;
+    state.statusMessage = message;
+    updateTypingIndicatorText();
   }
 
   /** @param {Record<string, unknown>} body */
@@ -1246,6 +1278,9 @@ export function mountWidget(root, config) {
   function beginPendingRequest(body = {}) {
     state.pending = true;
     state.typingPhase = shouldShowKbSearchTyping(body) ? "searching" : "writing";
+    state.perfPendingStartMs = performance.now();
+    state.perfFirstLocalStatusLogged = false;
+    state.statusMessage = null;
     renderFeed();
   }
 
@@ -1260,6 +1295,7 @@ export function mountWidget(root, config) {
   function endPendingRequest() {
     state.pending = false;
     state.typingPhase = "searching";
+    state.statusMessage = null;
   }
 
   /**
@@ -1272,13 +1308,19 @@ export function mountWidget(root, config) {
     let fullText = "";
     let uiData = null;
     let writingRevealTimer = 0;
+    let turnFinalized = false;
     const liveAttributionKind = predictLiveAttributionKind(body, state.lastPayload);
 
-    const revealLiveBubble = () => {
+    const clearWritingRevealTimer = () => {
       if (writingRevealTimer) {
         clearTimeout(writingRevealTimer);
         writingRevealTimer = 0;
       }
+    };
+
+    const revealLiveBubble = () => {
+      if (turnFinalized) return;
+      clearWritingRevealTimer();
       if (!liveBubble && fullText.length > 0) {
         liveBubble = _createLiveBubble(feed, config.botName, liveAttributionKind);
         _updateLiveBubble(liveBubble, fullText, feed);
@@ -1287,11 +1329,69 @@ export function mountWidget(root, config) {
       }
     };
 
+    const finalizeTurn = () => {
+      if (turnFinalized) return;
+      turnFinalized = true;
+      clearWritingRevealTimer();
+      const streamedText = fullText.trim();
+      if (uiData) {
+        if (uiData.meta && uiData.meta.sid) setSid(uiData.meta.sid);
+        const turn = botTurnFromPayload(uiData);
+        if (turn) {
+          // The verified final payload remains the source of truth. A blocked
+          // or corrected route must replace speculative streamed prose.
+          if (streamedText && streamedText === String(turn.text || "").trim()) {
+            turn.text = streamedText;
+          }
+          state.messages.push(turn);
+        }
+        state.lastPayload = uiData;
+        if (!state.isOpen) state.unread = true;
+      } else if (streamedText) {
+        state.messages.push({
+          role: "bot",
+          text: streamedText,
+          followups: [],
+          quickReplies: [],
+          linksDismissed: false,
+          videoKey: "",
+          videoSrc: "",
+          videoTitleText: "",
+          videoRevealed: false,
+          situation: null,
+          cta: null,
+          trailingDismissed: false,
+          attributionKind: liveAttributionKind,
+        });
+      }
+      endPendingRequest();
+      if (state.unread && !state.isOpen) unreadDot?.classList.add("is-visible");
+      renderFeed();
+      syncSendState();
+    };
+
+    const logFirstLocalStatusOnce = () => {
+      if (state.perfFirstLocalStatusLogged || typeof state.perfPendingStartMs !== "number") return;
+      state.perfFirstLocalStatusLogged = true;
+      if (typeof console !== "undefined" && console.debug) {
+        console.debug("[perf] time_to_first_local_status_ms", Math.round(performance.now() - state.perfPendingStartMs));
+      }
+    };
+
     return streamAsk(apiBase, body, {
+      onStatus(message) {
+        // PERF-1: the real first local status now — old servers never send
+        // event: status, so this simply never fires and onTyping below is the
+        // fallback measurement point, exactly like before this milestone.
+        logFirstLocalStatusOnce();
+        setStatusMessage(message);
+      },
       onTyping(phase) {
+        logFirstLocalStatusOnce();
         setTypingPhase(phase);
       },
       onDelta(delta) {
+        if (turnFinalized) return;
         const chunk = String(delta || "");
         if (!chunk) return;
         fullText += chunk;
@@ -1316,54 +1416,15 @@ export function mountWidget(root, config) {
         }
       },
       onUi(data) {
+        if (turnFinalized || uiData) return;
         uiData = data;
       },
       onDone() {
-        if (writingRevealTimer) {
-          clearTimeout(writingRevealTimer);
-          writingRevealTimer = 0;
-        }
-        if (!liveBubble && fullText.length > 0) {
-          revealLiveBubble();
-        }
-        const streamedText = fullText.trim();
-        if (uiData) {
-          if (uiData.meta && uiData.meta.sid) setSid(uiData.meta.sid);
-          const turn = botTurnFromPayload(uiData);
-          if (turn) {
-            // Текст ответа: единственный источник правды — то, что уже показали в стриме.
-            if (streamedText) turn.text = streamedText;
-            state.messages.push(turn);
-          }
-          state.lastPayload = uiData;
-          if (!state.isOpen) state.unread = true;
-        } else if (streamedText) {
-          state.messages.push({
-            role: "bot",
-            text: streamedText,
-            followups: [],
-            quickReplies: [],
-            linksDismissed: false,
-            videoKey: "",
-            videoSrc: "",
-            videoTitleText: "",
-            videoRevealed: false,
-            situation: null,
-            cta: null,
-            trailingDismissed: false,
-            attributionKind: liveAttributionKind,
-          });
-        }
-        endPendingRequest();
-        if (state.unread && !state.isOpen) unreadDot?.classList.add("is-visible");
-        renderFeed();
-        syncSendState();
+        finalizeTurn();
       },
       onError(msg) {
-        if (writingRevealTimer) {
-          clearTimeout(writingRevealTimer);
-          writingRevealTimer = 0;
-        }
+        if (turnFinalized) return;
+        clearWritingRevealTimer();
         setError(msg);
         endPendingRequest();
         renderFeed();
@@ -1390,13 +1451,7 @@ export function mountWidget(root, config) {
    */
   function renderInlineLinks(bubble, m, msgIndex) {
     if (m.linksDismissed) return;
-    const items = [];
-    for (const f of m.followups || []) {
-      items.push({ label: (f.label || f.ref || "").trim(), ref: f.ref });
-    }
-    for (const r of m.quickReplies || []) {
-      items.push({ label: (r.label || r.ref || "").trim(), ref: r.ref });
-    }
+    const items = mergeFollowupControls(m.followups, m.quickReplies);
     if (!items.length) return;
 
     const box = getOrCreateLinksBox(bubble);

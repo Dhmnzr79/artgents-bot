@@ -8,6 +8,11 @@ _MORPH = None
 _MORPH_FAILED = False
 
 
+def morph_analyzer():
+    """Shared lazy MorphAnalyzer for local lexical helpers (one instance per process)."""
+    return _analyzer()
+
+
 def _analyzer():
     """Ленивая загрузка pymorphy3; при отсутствии пакета — только lower()."""
     global _MORPH, _MORPH_FAILED

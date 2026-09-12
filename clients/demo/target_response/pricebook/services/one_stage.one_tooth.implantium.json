@@ -1,0 +1,72 @@
+{
+  "offer_id": "one_stage.one_tooth.implantium",
+  "service_id": "one_stage",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 86500,
+    "currency": "RUB",
+    "billing_unit": "tooth_package"
+  },
+  "package": {
+    "label": "за восстановление одного зуба (имплант в день удаления + постоянная коронка); КТ, лечение воспаления и временная коронка — по показаниям, отдельно",
+    "includes": [
+      "удаление зуба при показаниях",
+      "имплант с документами в день удаления",
+      "хирургия и местная анестезия",
+      "постоянная коронка на импланте",
+      "контрольные осмотры и куратор"
+    ],
+    "excludes": [
+      "КТ",
+      "лечение воспаления по показаниям",
+      "временная коронка"
+    ],
+    "price_scope_label": "имплант в день удаления + постоянная коронка"
+  },
+  "payment_stages": [
+    {
+      "label": "Удаление и хирургический этап",
+      "amount": 52000,
+      "currency": "RUB",
+      "timing_text": "Оплачивается в день удаления и установки импланта."
+    },
+    {
+      "label": "Ортопедический этап (коронка)",
+      "amount": 34500,
+      "currency": "RUB",
+      "timing_text": "Оплачивается при установке постоянной коронки, обычно через 3–6 месяцев после хирургического этапа. Точный срок зависит от приживления импланта и плана лечения."
+    }
+  ],
+  "fact_refs": [
+    "free_implant_consult",
+    "implant_warranty",
+    "installment_12",
+    "implant_same_day_discount"
+  ],
+  "followups": [
+    {
+      "id": "stages",
+      "label": "Оплата по этапам",
+      "action": "price_aspect"
+    },
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "brand_id": "implantium",
+  "applies_to_extents": [
+    "one_tooth"
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "КТ, лечение воспаления по показаниям и временная коронка — отдельно"
+      }
+    ]
+  }
+}

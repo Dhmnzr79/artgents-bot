@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "suite_id": "final_scope_widget_e2e",
+  "client_id": "demo",
+  "description": "Final scope/price/widget E2E — implantation + prosthetics, AC1→A9R3→AC2→AC3",
+  "turns": [
+    {
+      "turn": 1,
+      "turn_id": "fsw_turn_01_implant_broad",
+      "endpoint": "/ask",
+      "request": {
+        "q": "Сколько стоит имплантация?"
+      },
+      "expect": {
+        "materialized": true,
+        "response_stage": "broad_family_price",
+        "scope_nav_count": 3,
+        "max_price_followups": 0,
+        "max_payment_stage_followups": 0
+      }
+    },
+    {
+      "turn": 2,
+      "turn_id": "fsw_turn_02_scope_full_arch_click",
+      "endpoint": "/ask",
+      "request_kind": "ui_scope_ref_from_turn",
+      "from_turn": 1,
+      "pick_extent": "full_arch",
+      "pick_topic": "implantation",
+      "expect": {
+        "materialized": true,
+        "scope_nav_count": 0,
+        "session_extent": "full_arch",
+        "ui_ref_used": true
+      }
+    },
+    {
+      "turn": 3,
+      "turn_id": "fsw_turn_03_extent_correction_one_tooth",
+      "endpoint": "/ask",
+      "request": {
+        "q": "Нет, речь об одном зубе"
+      },
+      "expect": {
+        "materialized": true,
+        "session_extent": "one_tooth",
+        "effective_extent": "one_tooth",
+        "effective_extent_source": "a9_turn"
+      }
+    },
+    {
+      "turn": 4,
+      "turn_id": "fsw_turn_04_implant_full_arch_a9_stream",
+      "endpoint": "/ask/stream",
+      "fresh_sid": true,
+      "request": {
+        "q": "Сколько стоит имплантация всей челюсти?"
+      },
+      "expect": {
+        "materialized": true,
+        "scope_nav_count": 0,
+        "effective_extent": "full_arch",
+        "session_extent": "full_arch",
+        "stream_required": true
+      }
+    },
+    {
+      "turn": 5,
+      "turn_id": "fsw_turn_05_prosthetics_broad",
+      "endpoint": "/ask",
+      "fresh_sid": true,
+      "request": {
+        "q": "Сколько стоит протезирование?"
+      },
+      "expect": {
+        "materialized": true,
+        "response_stage": "broad_family_price",
+        "scope_nav_count": 3,
+        "max_price_followups": 0
+      }
+    },
+    {
+      "turn": 6,
+      "turn_id": "fsw_turn_06_scope_one_tooth_click",
+      "endpoint": "/ask",
+      "request_kind": "ui_scope_ref_from_turn",
+      "from_turn": 5,
+      "pick_extent": "one_tooth",
+      "pick_topic": "prosthetics",
+      "expect": {
+        "materialized": true,
+        "session_extent": "one_tooth",
+        "ui_ref_used": true,
+        "stage_nav_min": 1
+      }
+    },
+    {
+      "turn": 7,
+      "turn_id": "fsw_turn_07_stage_implant_placed_click",
+      "endpoint": "/ask",
+      "request_kind": "ui_stage_ref_from_turn",
+      "from_turn": 6,
+      "pick_stage": "implant_placed",
+      "pick_topic": "prosthetics",
+      "expect": {
+        "materialized": true,
+        "scope_nav_count": 0,
+        "stage_nav_count": 0,
+        "session_stage": "implant_placed",
+        "ui_ref_used": true
+      }
+    },
+    {
+      "turn": 8,
+      "turn_id": "fsw_turn_08_prosthetics_a9_implant_placed_stream",
+      "endpoint": "/ask/stream",
+      "fresh_sid": true,
+      "request": {
+        "q": "Имплант уже установлен, сколько будет коронка?"
+      },
+      "expect": {
+        "materialized": true,
+        "scope_nav_count": 0,
+        "effective_stage": "implant_placed",
+        "effective_topic": "prosthetics",
+        "stream_required": true
+      }
+    }
+  ]
+}

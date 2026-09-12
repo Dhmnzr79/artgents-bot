@@ -2,9 +2,9 @@ flask
 gunicorn
 openai
 python-dotenv
-numpy
+numpy==2.2.6
 python-frontmatter
 pyyaml
-pydantic>=2.0
+pydantic>=2.0,<3
 pymorphy3
 psycopg[binary]

@@ -1,0 +1,15 @@
+{
+  "measurement_id": "s57_fullcontext_quality_eval",
+  "matrix_git_blob_hash": "89616cbde59229e222d4c87f4e2abc06361aa05d",
+  "baseline_live_commit": "cac54a5cfb30841fc2e6b4669083a8b8dc9ee790",
+  "total_llm_calls": 18,
+  "composer_calls": 9,
+  "verifier_calls": 9,
+  "attempt_marker_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\fullcontext_quality_eval_live_attempt.json",
+  "call_ledger_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\fullcontext_quality_eval_live_call_ledger.jsonl",
+  "raw_artifact_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\fullcontext_quality_eval_live_raw.json",
+  "result_artifact_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\fullcontext_quality_eval_live_result.json",
+  "manual_review_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\fullcontext_quality_eval_manual_review.json",
+  "result_sha256": "77cad1231a963e13875396adf29900fe8e3f82934671af0b4932fb1705b0c30d",
+  "rerun_blocked_without_owner_approval": true
+}

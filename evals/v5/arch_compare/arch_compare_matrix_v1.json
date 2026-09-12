@@ -1,0 +1,489 @@
+{
+  "schema": "one_call_arch_compare_matrix_v1",
+  "scenarios": [
+    {
+      "scenario_id": "SVC-01",
+      "relevant_source_refs": [
+        "prosthetics__service__removable_dentures.md"
+      ],
+      "evaluation_kind": "model_text",
+      "required_exact_facts": [],
+      "forbidden_facts": [],
+      "session_reset": true,
+      "notes": "",
+      "turns": [
+        {
+          "turn_id": "SVC-01_t1",
+          "user_message": "Расскажите про съёмные протезы",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "none",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": [],
+          "expected_service_id": "removable_dentures"
+        }
+      ]
+    },
+    {
+      "scenario_id": "PRC-01",
+      "relevant_source_refs": [
+        "implantation__service__all_on_4.md",
+        "implantation__info__implant_systems.md",
+        "implantation__faq__cost.md"
+      ],
+      "evaluation_kind": "both",
+      "required_exact_facts": [
+        "318000:Implantium:all_on_4",
+        "368000:Impro:all_on_4",
+        "428000:Nobel Biocare:all_on_4",
+        "billing_unit:jaw"
+      ],
+      "forbidden_facts": [
+        "35000"
+      ],
+      "session_reset": true,
+      "notes": "",
+      "turns": [
+        {
+          "turn_id": "PRC-01_t1",
+          "user_message": "Сколько стоит All-on-4?",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "price",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": [],
+          "expected_service_id": "all_on_4"
+        }
+      ]
+    },
+    {
+      "scenario_id": "PRC-02",
+      "relevant_source_refs": [
+        "implantation__service__all_on_6.md",
+        "implantation__service__all_on_4.md",
+        "comparison__all_on_4_vs_all_on_6.md"
+      ],
+      "evaluation_kind": "both",
+      "required_exact_facts": [
+        "398000:Implantium:all_on_6",
+        "458000:Impro:all_on_6",
+        "528000:Nobel Biocare:all_on_6",
+        "billing_unit:jaw"
+      ],
+      "forbidden_facts": [],
+      "session_reset": true,
+      "notes": "",
+      "turns": [
+        {
+          "turn_id": "PRC-02_t1",
+          "user_message": "Сколько стоит All-on-6?",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "price",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": [],
+          "expected_service_id": "all_on_6"
+        }
+      ]
+    },
+    {
+      "scenario_id": "BRD-01",
+      "relevant_source_refs": [
+        "implantation__service__all_on_4.md",
+        "implantation__info__implant_systems.md"
+      ],
+      "evaluation_kind": "both",
+      "required_exact_facts": [
+        "428000:Nobel Biocare:all_on_4"
+      ],
+      "forbidden_facts": [
+        "318000",
+        "368000"
+      ],
+      "session_reset": true,
+      "notes": "",
+      "turns": [
+        {
+          "turn_id": "BRD-01_t1",
+          "user_message": "Сколько стоит All-on-4 на Nobel Biocare?",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "price",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": [],
+          "expected_service_id": "all_on_4",
+          "expected_brand": "Nobel Biocare"
+        }
+      ]
+    },
+    {
+      "scenario_id": "MT-01",
+      "relevant_source_refs": [
+        "implantation__service__all_on_4.md",
+        "implantation__info__implant_systems.md"
+      ],
+      "evaluation_kind": "both",
+      "required_exact_facts": [
+        "428000:Nobel Biocare:all_on_4"
+      ],
+      "forbidden_facts": [],
+      "session_reset": true,
+      "notes": "",
+      "turns": [
+        {
+          "turn_id": "MT-01_t1",
+          "user_message": "Сколько стоит All-on-4?",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "price",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": [],
+          "expected_service_id": "all_on_4"
+        },
+        {
+          "turn_id": "MT-01_t2",
+          "user_message": "А Nobel?",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "price",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": [
+            "MT-01_t1"
+          ],
+          "expected_service_id": "all_on_4",
+          "expected_brand": "Nobel Biocare"
+        }
+      ]
+    },
+    {
+      "scenario_id": "PRC-03",
+      "relevant_source_refs": [
+        "implantation__faq__cost.md",
+        "implantation__service__classic.md",
+        "implantation__info__methods_overview.md"
+      ],
+      "evaluation_kind": "model_text",
+      "required_exact_facts": [
+        "no_random_single_offer"
+      ],
+      "forbidden_facts": [
+        "318000",
+        "428000"
+      ],
+      "session_reset": true,
+      "notes": "",
+      "turns": [
+        {
+          "turn_id": "PRC-03_t1",
+          "user_message": "Сколько стоит имплантация?",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "price",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "OBJ-01",
+      "relevant_source_refs": [
+        "implantation__faq__cost.md",
+        "implantation__faq__pain.md",
+        "clinic__info__consultation.md"
+      ],
+      "evaluation_kind": "model_text",
+      "required_exact_facts": [],
+      "forbidden_facts": [
+        "15%",
+        "скидка"
+      ],
+      "session_reset": true,
+      "notes": "",
+      "turns": [
+        {
+          "turn_id": "OBJ-01_t1",
+          "user_message": "Я боюсь, что имплантация — это дорого",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "none",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": [],
+          "expected_service_id": "classic"
+        }
+      ]
+    },
+    {
+      "scenario_id": "PRM-01",
+      "relevant_source_refs": [
+        "clinic__info__consultation.md",
+        "clinic__info__advantages.md",
+        "implantation__service__benefits.md"
+      ],
+      "evaluation_kind": "both",
+      "required_exact_facts": [
+        "promo_allowed:max_2"
+      ],
+      "forbidden_facts": [
+        "выдуманная_акция"
+      ],
+      "session_reset": true,
+      "notes": "",
+      "turns": [
+        {
+          "turn_id": "PRM-01_t1",
+          "user_message": "Какие у вас акции?",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "promotion",
+          "promotion_scope": "general",
+          "dialog_history_turn_ids": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "PAY-01",
+      "relevant_source_refs": [
+        "clinic__info__consultation.md",
+        "implantation__faq__cost.md"
+      ],
+      "evaluation_kind": "both",
+      "required_exact_facts": [
+        "installment_fact:exact_catalog"
+      ],
+      "forbidden_facts": [],
+      "session_reset": true,
+      "notes": "",
+      "turns": [
+        {
+          "turn_id": "PAY-01_t1",
+          "user_message": "Есть ли рассрочка?",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "none",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "DOC-01",
+      "relevant_source_refs": [
+        "implantation__service__all_on_4.md",
+        "doctors__doctor__orlov.md",
+        "doctors__doctor__volkov.md",
+        "doctors__doctor__overview.md"
+      ],
+      "evaluation_kind": "model_text",
+      "required_exact_facts": [
+        "Орлов",
+        "Волков"
+      ],
+      "forbidden_facts": [
+        "Кадиев"
+      ],
+      "session_reset": true,
+      "notes": "",
+      "turns": [
+        {
+          "turn_id": "DOC-01_t1",
+          "user_message": "Расскажите про All-on-4",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "none",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": [],
+          "expected_service_id": "all_on_4"
+        },
+        {
+          "turn_id": "DOC-01_t2",
+          "user_message": "Кто проводит такую имплантацию?",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "none",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": [
+            "DOC-01_t1"
+          ],
+          "expected_service_id": "all_on_4"
+        }
+      ]
+    },
+    {
+      "scenario_id": "MED-01",
+      "relevant_source_refs": [
+        "implantation__info__aftercare.md",
+        "implantation__faq__pain.md"
+      ],
+      "evaluation_kind": "model_text",
+      "required_exact_facts": [],
+      "forbidden_facts": [
+        "ADMIN"
+      ],
+      "session_reset": true,
+      "notes": "",
+      "turns": [
+        {
+          "turn_id": "MED-01_t1",
+          "user_message": "Боюсь, что после имплантации будет отёк",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "none",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": [],
+          "expected_service_id": "classic"
+        }
+      ]
+    },
+    {
+      "scenario_id": "ADM-01",
+      "relevant_source_refs": [
+        "clinic__info__contacts.md"
+      ],
+      "evaluation_kind": "code_facts",
+      "required_exact_facts": [
+        "admin_stub",
+        "demo_phone"
+      ],
+      "forbidden_facts": [
+        "318000",
+        "скидка"
+      ],
+      "session_reset": true,
+      "notes": "",
+      "turns": [
+        {
+          "turn_id": "ADM-01_t1",
+          "user_message": "После имплантации появился отёк и становится хуже",
+          "provider_turn": false,
+          "expected_route_class": "ADMIN",
+          "commercial_intent": "none",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "BRD-02",
+      "relevant_source_refs": [
+        "implantation__service__all_on_4.md",
+        "implantation__info__implant_systems.md"
+      ],
+      "evaluation_kind": "model_text",
+      "required_exact_facts": [
+        "no_invented_offer"
+      ],
+      "forbidden_facts": [
+        "MegaImplant",
+        "428000"
+      ],
+      "session_reset": true,
+      "notes": "",
+      "turns": [
+        {
+          "turn_id": "BRD-02_t1",
+          "user_message": "Сколько стоит All-on-4 на MegaImplant X?",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "price",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": [],
+          "expected_service_id": "all_on_4",
+          "expected_brand": "MegaImplant X"
+        }
+      ]
+    },
+    {
+      "scenario_id": "SW-01",
+      "relevant_source_refs": [
+        "implantation__service__all_on_4.md",
+        "orthodontics__service__aligners.md"
+      ],
+      "evaluation_kind": "both",
+      "required_exact_facts": [
+        "195000:aligners"
+      ],
+      "forbidden_facts": [],
+      "session_reset": true,
+      "notes": "",
+      "turns": [
+        {
+          "turn_id": "SW-01_t1",
+          "user_message": "Расскажите про All-on-4",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "none",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": [],
+          "expected_service_id": "all_on_4"
+        },
+        {
+          "turn_id": "SW-01_t2",
+          "user_message": "А сколько стоят элайнеры?",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "price",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": [
+            "SW-01_t1"
+          ],
+          "expected_service_id": "aligners"
+        }
+      ]
+    },
+    {
+      "scenario_id": "CNT-01",
+      "relevant_source_refs": [
+        "clinic__info__contacts.md"
+      ],
+      "evaluation_kind": "code_facts",
+      "required_exact_facts": [
+        "+7 (495) 128",
+        "Тверская"
+      ],
+      "forbidden_facts": [
+        "Рябикова"
+      ],
+      "session_reset": true,
+      "notes": "",
+      "turns": [
+        {
+          "turn_id": "CNT-01_t1",
+          "user_message": "Как с вами связаться?",
+          "provider_turn": false,
+          "expected_route_class": "LOCAL",
+          "commercial_intent": "none",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "NPP-01",
+      "relevant_source_refs": [
+        "implantation__service__bone_graft.md",
+        "diagnostics__service__tomography.md"
+      ],
+      "evaluation_kind": "both",
+      "required_exact_facts": [
+        "no_fixed_price_without_diagnostics"
+      ],
+      "forbidden_facts": [
+        "318000"
+      ],
+      "session_reset": true,
+      "notes": "",
+      "turns": [
+        {
+          "turn_id": "NPP-01_t1",
+          "user_message": "Сколько стоит костная пластика?",
+          "provider_turn": true,
+          "expected_route_class": "ANSWER",
+          "commercial_intent": "price",
+          "promotion_scope": "none",
+          "dialog_history_turn_ids": [],
+          "expected_service_id": "bone_graft"
+        }
+      ]
+    }
+  ]
+}

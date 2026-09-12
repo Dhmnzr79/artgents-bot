@@ -1,0 +1,477 @@
+{
+  "schema_version": 1,
+  "note": "Query text + structural hints for the 49 gold scenarios, copied verbatim (unchanged wording) from the frozen PERF-7C matrix (evals/v5/perf7c_local_evidence_package_eval_matrix.json). This file exists so the retrieval-executor role does not need to touch the gold file to find query text.",
+  "scenarios": [
+    {
+      "scenario_id": "s011_broad_service",
+      "scenario_class": "broad_service",
+      "synthetic_query": "Расскажите про варианты протезирования зубов",
+      "comparison_required": false,
+      "topic_hint": [
+        "prosthetics"
+      ]
+    },
+    {
+      "scenario_id": "s012_broad_service",
+      "scenario_class": "broad_service",
+      "synthetic_query": "Какие у вас методы лечения пародонтита и дёсен",
+      "comparison_required": false,
+      "topic_hint": [
+        "periodontology"
+      ]
+    },
+    {
+      "scenario_id": "s013_broad_service",
+      "scenario_class": "broad_service",
+      "synthetic_query": "Расскажите про виды протезирования зубов",
+      "comparison_required": false,
+      "topic_hint": [
+        "prosthetics"
+      ]
+    },
+    {
+      "scenario_id": "s014_broad_service",
+      "scenario_class": "broad_service",
+      "synthetic_query": "Расскажите про отбеливание зубов вообще",
+      "comparison_required": false,
+      "topic_hint": [
+        "whitening"
+      ]
+    },
+    {
+      "scenario_id": "s015_broad_service",
+      "scenario_class": "broad_service",
+      "synthetic_query": "Какие у вас методы лечения зубов",
+      "comparison_required": false,
+      "topic_hint": [
+        "treatment"
+      ]
+    },
+    {
+      "scenario_id": "s016_broad_service",
+      "scenario_class": "broad_service",
+      "synthetic_query": "Какие есть методы выравнивания зубов",
+      "comparison_required": false,
+      "topic_hint": [
+        "orthodontics"
+      ]
+    },
+    {
+      "scenario_id": "s039_sterilization_safety",
+      "scenario_class": "sterilization_safety",
+      "synthetic_query": "централизованное стерилизационное отделение и обработка инструментов",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s040_sterilization_safety",
+      "scenario_class": "sterilization_safety",
+      "synthetic_query": "дезинфекция инструментов химическая термическая",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s041_sterilization_safety",
+      "scenario_class": "sterilization_safety",
+      "synthetic_query": "как обеззараживают инструменты перед приёмом",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s042_sterilization_safety",
+      "scenario_class": "sterilization_safety",
+      "synthetic_query": "какая у вас стерилизация",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s043_sterilization_safety",
+      "scenario_class": "sterilization_safety",
+      "synthetic_query": "стерилизация",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s044_sterilization_safety",
+      "scenario_class": "sterilization_safety",
+      "synthetic_query": "обеззараживание",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s048_own_fresh_ct",
+      "scenario_class": "own_fresh_ct",
+      "synthetic_query": "у меня уже есть свежая компьютерная томография можно ли использовать",
+      "comparison_required": false,
+      "topic_hint": [
+        "clinic"
+      ]
+    },
+    {
+      "scenario_id": "s049_own_fresh_ct",
+      "scenario_class": "own_fresh_ct",
+      "synthetic_query": "снимок кт сделан месяц назад подойдёт ли он",
+      "comparison_required": false,
+      "topic_hint": [
+        "clinic"
+      ]
+    },
+    {
+      "scenario_id": "s050_own_fresh_ct",
+      "scenario_class": "own_fresh_ct",
+      "synthetic_query": "нужно ли делать новую томографию если недавно делал",
+      "comparison_required": false,
+      "topic_hint": [
+        "clinic"
+      ]
+    },
+    {
+      "scenario_id": "s051_treatment_plan_other_clinic",
+      "scenario_class": "treatment_plan_other_clinic",
+      "synthetic_query": "мне в другой клинике предложили план лечения хочу проверить у вас",
+      "comparison_required": false,
+      "topic_hint": [
+        "clinic",
+        "orthodontics"
+      ]
+    },
+    {
+      "scenario_id": "s052_treatment_plan_other_clinic",
+      "scenario_class": "treatment_plan_other_clinic",
+      "synthetic_query": "был в другой клинике составили план лечения можно ли к вам на консультацию",
+      "comparison_required": false,
+      "topic_hint": [
+        "clinic",
+        "orthodontics"
+      ]
+    },
+    {
+      "scenario_id": "s053_treatment_plan_other_clinic",
+      "scenario_class": "treatment_plan_other_clinic",
+      "synthetic_query": "хочу второе мнение по плану лечения от другого врача",
+      "comparison_required": false,
+      "topic_hint": [
+        "clinic",
+        "orthodontics"
+      ]
+    },
+    {
+      "scenario_id": "s054_treatment_plan_other_clinic",
+      "scenario_class": "treatment_plan_other_clinic",
+      "synthetic_query": "сделали снимки в другой клинике стоит ли перепроверить план",
+      "comparison_required": false,
+      "topic_hint": [
+        "clinic",
+        "orthodontics"
+      ]
+    },
+    {
+      "scenario_id": "s055_treatment_plan_other_clinic",
+      "scenario_class": "treatment_plan_other_clinic",
+      "synthetic_query": "принесу документы из другой клиники посмотрите план лечения",
+      "comparison_required": false,
+      "topic_hint": [
+        "clinic",
+        "orthodontics"
+      ]
+    },
+    {
+      "scenario_id": "s056_treatment_plan_other_clinic",
+      "scenario_class": "treatment_plan_other_clinic",
+      "synthetic_query": "консультация по чужому плану лечения возможна ли у вас",
+      "comparison_required": false,
+      "topic_hint": [
+        "clinic",
+        "orthodontics"
+      ]
+    },
+    {
+      "scenario_id": "s071_comparison",
+      "scenario_class": "comparison",
+      "synthetic_query": "в чем разница между all-on-4 и all-on-6",
+      "comparison_required": true,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s072_comparison",
+      "scenario_class": "comparison",
+      "synthetic_query": "имплант или мост что лучше поставить",
+      "comparison_required": true,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s073_comparison",
+      "scenario_class": "comparison",
+      "synthetic_query": "костная пластика или all-on-4 сравнение вариантов",
+      "comparison_required": true,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s074_comparison",
+      "scenario_class": "comparison",
+      "synthetic_query": "классическая двухэтапная имплантация против одноэтапной методики сравнение подходов",
+      "comparison_required": true,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s075_comparison",
+      "scenario_class": "comparison",
+      "synthetic_query": "all-on-4 или all-on-6 что лучше выбрать",
+      "comparison_required": true,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s076_comparison",
+      "scenario_class": "comparison",
+      "synthetic_query": "классическая имплантация или одноэтапная в чем отличие",
+      "comparison_required": true,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s077_comparison",
+      "scenario_class": "comparison",
+      "synthetic_query": "бюгельный протез или мостовидный протез сравнение",
+      "comparison_required": true,
+      "topic_hint": [
+        "prosthetics"
+      ]
+    },
+    {
+      "scenario_id": "s078_comparison",
+      "scenario_class": "comparison",
+      "synthetic_query": "плюсы и минусы бюгельного протеза по сравнению с мостовидным протезом",
+      "comparison_required": true,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s079_cross_topic",
+      "scenario_class": "cross_topic",
+      "synthetic_query": "сравните имплантацию виниры и отбеливание что выбрать для передних зубов",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation",
+        "prosthetics",
+        "whitening",
+        "treatment"
+      ]
+    },
+    {
+      "scenario_id": "s080_cross_topic",
+      "scenario_class": "cross_topic",
+      "synthetic_query": "что дешевле поставить импланты или брекеты в вашей клинике",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation",
+        "prosthetics",
+        "whitening",
+        "treatment"
+      ]
+    },
+    {
+      "scenario_id": "s081_cross_topic",
+      "scenario_class": "cross_topic",
+      "synthetic_query": "какая связь между лечением дёсен и имплантацией зубов у вас",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation",
+        "prosthetics",
+        "whitening",
+        "treatment"
+      ]
+    },
+    {
+      "scenario_id": "s082_cross_topic",
+      "scenario_class": "cross_topic",
+      "synthetic_query": "можно ли совместить отбеливание и лечение кариеса за один визит",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation",
+        "prosthetics",
+        "whitening",
+        "treatment"
+      ]
+    },
+    {
+      "scenario_id": "s083_cross_topic",
+      "scenario_class": "cross_topic",
+      "synthetic_query": "нужна консультация ортодонта и стоматолога одновременно по разным вопросам",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation",
+        "prosthetics",
+        "whitening",
+        "treatment"
+      ]
+    },
+    {
+      "scenario_id": "s084_cross_topic",
+      "scenario_class": "cross_topic",
+      "synthetic_query": "какая разница между терапией и хирургией зубов у вас в клинике",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation",
+        "prosthetics",
+        "whitening",
+        "treatment"
+      ]
+    },
+    {
+      "scenario_id": "s099_unknown_wording",
+      "scenario_class": "unknown_wording",
+      "synthetic_query": "подскажите насчёт альтернативных методик восстановления улыбки без привычных терминов",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation",
+        "prosthetics"
+      ]
+    },
+    {
+      "scenario_id": "s100_unknown_wording",
+      "scenario_class": "unknown_wording",
+      "synthetic_query": "интересует нестандартный подход к зубам без операции вообще",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation",
+        "prosthetics"
+      ]
+    },
+    {
+      "scenario_id": "s101_unknown_wording",
+      "scenario_class": "unknown_wording",
+      "synthetic_query": "хочу узнать про новый способ который вы возможно ещё не рекламируете",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation",
+        "prosthetics"
+      ]
+    },
+    {
+      "scenario_id": "s102_unknown_wording",
+      "scenario_class": "unknown_wording",
+      "synthetic_query": "что можете предложить если ничего из обычного не подходит мне",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation",
+        "prosthetics"
+      ]
+    },
+    {
+      "scenario_id": "s103_unknown_wording",
+      "scenario_class": "unknown_wording",
+      "synthetic_query": "ищу необычное решение проблемы с зубами нестандартное совсем",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation",
+        "prosthetics"
+      ]
+    },
+    {
+      "scenario_id": "s104_unknown_wording",
+      "scenario_class": "unknown_wording",
+      "synthetic_query": "расскажите про восстановление отсутствующих элементов альтернативным способом",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation",
+        "prosthetics"
+      ]
+    },
+    {
+      "scenario_id": "s111_medically_risky_personal",
+      "scenario_class": "medically_risky_personal",
+      "synthetic_query": "есть противопоказания при неконтролируемом диабете",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s112_medically_risky_personal",
+      "scenario_class": "medically_risky_personal",
+      "synthetic_query": "диабет второго типа можно ли делать имплантацию зубов",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s113_medically_risky_personal",
+      "scenario_class": "medically_risky_personal",
+      "synthetic_query": "есть противопоказания при неконтролируемом диабете",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s114_medically_risky_personal",
+      "scenario_class": "medically_risky_personal",
+      "synthetic_query": "диабет второго типа можно ли делать имплантацию зубов",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s115_medically_risky_personal",
+      "scenario_class": "medically_risky_personal",
+      "synthetic_query": "можно ли ставить импланты при диабете",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s116_medically_risky_personal",
+      "scenario_class": "medically_risky_personal",
+      "synthetic_query": "импланты и беременность можно ли делать",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s117_medically_risky_personal",
+      "scenario_class": "medically_risky_personal",
+      "synthetic_query": "принимаю антикоагулянты можно ли имплантацию",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation"
+      ]
+    },
+    {
+      "scenario_id": "s118_medically_risky_personal",
+      "scenario_class": "medically_risky_personal",
+      "synthetic_query": "у меня сахарный диабет подходит ли имплантация в моем случае",
+      "comparison_required": false,
+      "topic_hint": [
+        "implantation"
+      ]
+    }
+  ]
+}

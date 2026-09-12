@@ -1,0 +1,8 @@
+{
+  "measurement_id": "s49_fullcontext_response_re_eval_v2",
+  "matrix_git_blob_hash": "615714c519a92a75e23c2f15bbaa01a0f88a4d95",
+  "status": "in_progress",
+  "started_provider_calls": 38,
+  "max_llm_calls": 38,
+  "rerun_blocked_without_owner_approval": true
+}

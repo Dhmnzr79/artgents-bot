@@ -1,14 +1,22 @@
 """Tests for Host → client_id resolution."""
 from __future__ import annotations
 
+import config
 import core.client_host as client_host
 from core.client_host import client_id_from_host, resolve_request_client_id
 
 
-def test_client_id_from_bot_subdomain():
-    assert client_id_from_host("cesi.bot.artgents.ru") == "cesi"
-    assert client_id_from_host("nikadent.bot.artgents.ru:443") == "nikadent"
+def test_client_id_from_bot_subdomain_demo_only():
     assert client_id_from_host("demo.bot.artgents.ru") == "demo"
+    assert client_id_from_host("cesi.bot.artgents.ru") is None
+    assert client_id_from_host("nikadent.bot.artgents.ru") is None
+
+
+def test_client_id_from_nikadent_when_allowed(monkeypatch):
+    allowed = frozenset({"demo", "nikadent"})
+    monkeypatch.setattr(config, "ALLOWED_CLIENTS", allowed)
+    monkeypatch.setattr(client_host, "ALLOWED_CLIENTS", allowed)
+    assert client_id_from_host("nikadent.bot.artgents.ru") == "nikadent"
 
 
 def test_client_id_from_marketing_domain_not_api():
@@ -21,28 +29,37 @@ def test_client_id_from_localhost_none():
 
 
 def test_resolve_request_local_uses_body():
-    assert resolve_request_client_id("cesi", host="localhost:9001") == "cesi"
+    assert resolve_request_client_id("demo", host="localhost:9001") == "demo"
 
 
 def test_resolve_request_prod_host_only(monkeypatch):
     monkeypatch.setattr(client_host, "APP_ENV", "prod")
-    assert resolve_request_client_id(None, host="cesi.bot.artgents.ru") == "cesi"
-    assert resolve_request_client_id("", host="cesi.bot.artgents.ru") == "cesi"
+    assert resolve_request_client_id(None, host="demo.bot.artgents.ru") == "demo"
+    assert resolve_request_client_id("", host="demo.bot.artgents.ru") == "demo"
+    assert resolve_request_client_id(None, host="cesi.bot.artgents.ru") is None
 
 
 def test_resolve_request_prod_host_and_matching_body(monkeypatch):
     monkeypatch.setattr(client_host, "APP_ENV", "prod")
-    assert resolve_request_client_id("cesi", host="cesi.bot.artgents.ru") == "cesi"
+    assert resolve_request_client_id("demo", host="demo.bot.artgents.ru") == "demo"
 
 
 def test_resolve_request_prod_host_body_mismatch(monkeypatch):
     monkeypatch.setattr(client_host, "APP_ENV", "prod")
-    assert resolve_request_client_id("nikadent", host="cesi.bot.artgents.ru") is None
+    assert resolve_request_client_id("nikadent", host="demo.bot.artgents.ru") is None
 
 
-def test_resolve_request_prod_demo_host(monkeypatch):
+def test_resolve_request_prod_nikadent_host(monkeypatch):
     monkeypatch.setattr(client_host, "APP_ENV", "prod")
-    assert resolve_request_client_id(None, host="demo.bot.artgents.ru") == "demo"
+    allowed = frozenset({"demo", "nikadent"})
+    monkeypatch.setattr(config, "ALLOWED_CLIENTS", allowed)
+    monkeypatch.setattr(client_host, "ALLOWED_CLIENTS", allowed)
+    assert resolve_request_client_id(None, host="nikadent.bot.artgents.ru") == "nikadent"
+    assert resolve_request_client_id("nikadent", host="nikadent.bot.artgents.ru") == "nikadent"
+    assert resolve_request_client_id("demo", host="nikadent.bot.artgents.ru") is None
+
+
+def test_resolve_request_prod_localhost_rejects_non_demo(monkeypatch):
     monkeypatch.setattr(client_host, "APP_ENV", "prod")
     assert resolve_request_client_id("cesi", host="localhost:9001") is None
     assert resolve_request_client_id(None, host="localhost:9001") is None

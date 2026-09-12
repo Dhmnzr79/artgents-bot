@@ -1,0 +1,284 @@
+{
+  "baseline": 6,
+  "description": "A0 protected parity net (TASK.md): six preservation groups before Strangler pile A. Full /ask/stream pipeline contract; facts and UI follow-ups frozen after spec review.",
+  "task_baseline": {
+    "governance_commit": "db277d4",
+    "runtime_commit": "96bc321",
+    "emotion_wip_commit": "74e681c",
+    "precondition_status": "resolved",
+    "scope": "clean main before emotion runtime"
+  },
+  "pipeline_contract": {
+    "endpoint": "/ask/stream",
+    "sse_event": "ui",
+    "note": "Harness must post_ask_stream and assert final ui payload; current smoke_case_runner uses /ask JSON only."
+  },
+  "known_failures": [],
+  "cases": [
+    {
+      "id": "preservation_01_contacts_address",
+      "group": "contacts_address",
+      "client_id": "demo",
+      "question": "Какой у вас адрес?",
+      "coverage_class": "STRONG",
+      "expected_route": "contacts_chunk",
+      "expected_doc_id": "clinic__info__contacts",
+      "answer_signals_all": [
+        "москв",
+        "тверск",
+        "пушкинск"
+      ],
+      "composer_parity": {
+        "expect_not_composer": true
+      },
+      "protected_ui_contract": {
+        "composer_must_not_substitute_contacts_boundary": true,
+        "note": "Contacts route must return deterministic clinic payload, not generic composer prose."
+      }
+    },
+    {
+      "id": "preservation_02_osseointegration",
+      "group": "osseointegration_followups",
+      "client_id": "demo",
+      "question": "Какая у вас приживаемость имплантов?",
+      "coverage_class": "STRONG",
+      "expected_evidence_source_doc_id": "implantation__faq__osseointegration",
+      "answer_signals_all": [
+        "99,8%",
+        "26 лет"
+      ],
+      "answer_signals_any": [
+        "прижив",
+        "имплант"
+      ],
+      "forbidden_routes": [
+        "price_lookup",
+        "price_concern"
+      ],
+      "forbidden_doc_id": [
+        "implantation__faq__pain"
+      ],
+      "forbidden_signals": [
+        "76 200",
+        "85 200",
+        "318 000",
+        "368 000"
+      ],
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true
+      },
+      "protected_ui_contract": {
+        "followup_source": "suggest_h3",
+        "source_doc_id": "implantation__faq__osseointegration",
+        "turn_scope": "fresh_session_first_turn",
+        "source_catalog_refs_ordered": [
+          "implantation__faq__osseointegration.md#a-esli-implant-ne-prizhivetsya",
+          "implantation__faq__osseointegration.md#ot-chego-zavisit-prizhivlenie",
+          "implantation__faq__osseointegration.md#chto-budet-esli-nichego-ne-delat"
+        ],
+        "source_catalog_labels_ordered": [
+          "А если имплант не приживётся",
+          "От чего зависит приживление",
+          "Что будет, если ничего не делать"
+        ],
+        "expected_visible_followup_refs_ordered": [
+          "implantation__faq__osseointegration.md#a-esli-implant-ne-prizhivetsya"
+        ],
+        "expected_visible_followup_labels_ordered": [
+          "А если имплант не приживётся"
+        ],
+        "expected_video_key": "pain-doctor-explains",
+        "surface": "meta.followups"
+      }
+    },
+    {
+      "id": "preservation_03_all_on_4_vs_all_on_6",
+      "group": "comparison_followups",
+      "client_id": "demo",
+      "question": "All-on-4 или All-on-6: чем отличаются?",
+      "coverage_class": "STRONG",
+      "expected_evidence_source_doc_id": "comparison__all_on_4_vs_all_on_6",
+      "answer_signals_all": [
+        "all-on-4",
+        "all-on-6",
+        "опор"
+      ],
+      "forbidden_routes": [
+        "price_lookup",
+        "price_concern"
+      ],
+      "forbidden_signals": [
+        "у вас диагноз",
+        "вам нужен all-on-6",
+        "вам нужен all-on-4"
+      ],
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true
+      },
+      "protected_ui_contract": {
+        "followup_source": "suggest_h3",
+        "source_doc_id": "comparison__all_on_4_vs_all_on_6",
+        "turn_scope": "fresh_session_first_turn",
+        "source_catalog_refs_ordered": [
+          "comparison__all_on_4_vs_all_on_6.md#kogda-dostatochno-chetyreh",
+          "comparison__all_on_4_vs_all_on_6.md#kogda-vybirayut-shest",
+          "comparison__all_on_4_vs_all_on_6.md#verhnyaya-chelust-i-nagruzka"
+        ],
+        "source_catalog_labels_ordered": [
+          "Когда достаточно четырёх имплантов",
+          "Когда выбирают шесть имплантов",
+          "Верхняя челюсть и нагрузка"
+        ],
+        "expected_visible_followup_refs_ordered": [
+          "comparison__all_on_4_vs_all_on_6.md#kogda-dostatochno-chetyreh",
+          "comparison__all_on_4_vs_all_on_6.md#kogda-vybirayut-shest"
+        ],
+        "expected_visible_followup_labels_ordered": [
+          "Когда достаточно четырёх имплантов",
+          "Когда выбирают шесть имплантов"
+        ],
+        "surface": "meta.followups"
+      }
+    },
+    {
+      "id": "preservation_04_classic_one_tooth_price",
+      "group": "price_one_tooth",
+      "client_id": "demo",
+      "question": "Сколько стоит поставить один имплант?",
+      "coverage_class": "STRONG",
+      "expected_route": "price_lookup",
+      "expected_service_id": "classic",
+      "expected_price_unit": "one_tooth",
+      "answer_signals_any": [
+        "76 200",
+        "85 200",
+        "101 200"
+      ],
+      "forbidden_signals": [
+        "318 000"
+      ],
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "price"
+        ],
+        "expected_service_id": "classic",
+        "expected_packet_amounts": [
+          76200,
+          85200
+        ]
+      },
+      "protected_ui_contract": {
+        "pricebook_source": "clients/demo/pricebook/services/classic.json",
+        "expected_unit": "one_tooth",
+        "allowed_optional_amounts": [
+          101200
+        ],
+        "required_amounts": [
+          76200,
+          85200
+        ],
+        "forbidden_amounts": [
+          318000
+        ]
+      }
+    },
+    {
+      "id": "preservation_05_all_on_4_jaw_price",
+      "group": "price_all_on_4_jaw",
+      "client_id": "demo",
+      "question": "Сколько стоит All-on-4?",
+      "coverage_class": "STRONG",
+      "expected_route": "price_lookup",
+      "expected_service_id": "all_on_4",
+      "expected_price_unit": "jaw",
+      "answer_signals_any": [
+        "318 000",
+        "368 000",
+        "428 000"
+      ],
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "price"
+        ],
+        "expected_service_id": "all_on_4",
+        "expected_packet_amounts": [
+          318000,
+          368000
+        ]
+      },
+      "protected_ui_contract": {
+        "pricebook_source": "clients/demo/pricebook/services/all_on_4.json",
+        "expected_unit": "jaw",
+        "allowed_optional_amounts": [
+          428000
+        ],
+        "required_amounts": [
+          318000,
+          368000
+        ],
+        "expected_price_followup_actions_ordered": [
+          {
+            "label": "Оплата по этапам",
+            "ref": "price:all_on_4/stages",
+            "action": "price_aspect",
+            "aspect": "stages"
+          },
+          {
+            "label": "Что входит",
+            "ref": "price:all_on_4/includes",
+            "action": "price_aspect",
+            "aspect": "includes"
+          }
+        ],
+        "surface": "quick_replies"
+      }
+    },
+    {
+      "id": "preservation_06_marketing_optional_overlay",
+      "group": "marketing_degradation",
+      "client_id": "demo",
+      "question": "Больно ли ставить имплант?",
+      "coverage_class": "STRONG",
+      "expected_evidence_source_doc_id": "implantation__faq__pain",
+      "answer_signals_any": [
+        "анестез",
+        "боль",
+        "небольно",
+        "обезбол"
+      ],
+      "forbidden_routes": [
+        "price_lookup",
+        "price_concern"
+      ],
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "pain"
+        ]
+      },
+      "marketing_contract": {
+        "promo_overlay_required": false,
+        "core_answer_independent_of_promo": true,
+        "blocked_promo_aspect_source": "clients/demo/marketing.yaml#blocked_aspects_for_promo",
+        "blocked_promo_aspect": "pain",
+        "core_must_pass_without_promo_cards": true,
+        "must_not_block_on_promo_absence": true,
+        "verification_scope": "natural_absence_only",
+        "expected_promo_absent": true,
+        "core_answer_required": true
+      }
+    }
+  ]
+}

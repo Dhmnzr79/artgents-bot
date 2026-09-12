@@ -1,0 +1,23 @@
+﻿ contracts/response_schema.py                   |   6 +
+ contracts/target_response_policy.py            |   3 +
+ contracts/target_response_spec.py              |  14 +-
+ core/response_schema_loader.py                 |   7 +
+ core/target_composer_executor.py               |  27 ++-
+ core/target_composer_request.py                |  52 ++++-
+ core/target_family_price_overview.py           | 311 ++++++++++++++++++++++---
+ core/target_response_followup_policy.py        |   2 +
+ core/target_response_policy.py                 |   3 +
+ core/target_runtime_turn.py                    |   2 +
+ core/target_runtime_turn_frame_hydration.py    |  69 +++++-
+ core/target_runtime_widget.py                  |  19 +-
+ core/target_scoped_response_evidence.py        |  38 ++-
+ core/target_spec_offline_response_package.py   |  77 +++---
+ core/target_turn_frame_dispatch.py             |  52 +++--
+ tests/test_demo_target_price_offers.py         |   4 +
+ tests/test_response_schema_loader.py           |  14 +-
+ tests/test_target_response_followup_policy.py  |   8 +-
+ tests/test_target_response_policy.py           |   1 +
+ tests/test_target_response_spec.py             |   5 +-
+ tests/test_target_turn_frame_dispatch.py       |  41 +++-
+ tests/test_w1_family_price_overview_offline.py |  51 ++--
+ 22 files changed, 678 insertions(+), 128 deletions(-)

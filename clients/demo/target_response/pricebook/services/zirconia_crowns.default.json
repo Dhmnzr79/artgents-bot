@@ -1,0 +1,27 @@
+{
+  "offer_id": "zirconia_crowns.default",
+  "service_id": "zirconia_crowns",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 25000,
+    "currency": "RUB",
+    "billing_unit": "tooth"
+  },
+  "package": {
+    "label": "за одну циркониевую коронку на собственном зубе (изготовление, примерка и фиксация включены); подготовительное лечение зуба — отдельно",
+    "includes": [
+      "изготовление циркониевой коронки",
+      "примерка и фиксация"
+    ]
+  },
+  "fact_refs": [
+    "free_implant_consult",
+    "installment_12"
+  ],
+  "followups": [],
+  "applies_to_extents": [
+    "one_tooth",
+    "few_teeth"
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "offer_id": "classic.one_tooth.impro",
+  "service_id": "classic",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 85200,
+    "currency": "RUB",
+    "billing_unit": "tooth_package"
+  },
+  "package": {
+    "label": "за восстановление одного зуба (имплант + постоянная коронка); КТ при необходимости и временная коронка — отдельно",
+    "includes": [
+      "имплант с документами",
+      "хирургия и местная анестезия",
+      "постоянная коронка на импланте",
+      "контрольные осмотры и куратор"
+    ],
+    "excludes": [
+      "КТ при необходимости",
+      "временная коронка"
+    ],
+    "price_scope_label": "имплант + постоянная коронка"
+  },
+  "payment_stages": [
+    {
+      "label": "Хирургический этап",
+      "amount": 54200,
+      "currency": "RUB",
+      "timing_text": "Оплачивается в день установки импланта."
+    },
+    {
+      "label": "Ортопедический этап (коронка)",
+      "amount": 31000,
+      "currency": "RUB",
+      "timing_text": "Оплачивается при установке постоянной коронки, обычно через 3–6 месяцев после хирургического этапа. Точный срок зависит от приживления импланта и плана лечения."
+    }
+  ],
+  "fact_refs": [
+    "free_implant_consult",
+    "implant_warranty",
+    "installment_12",
+    "implant_same_day_discount"
+  ],
+  "followups": [
+    {
+      "id": "stages",
+      "label": "Оплата по этапам",
+      "action": "price_aspect"
+    },
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "brand_id": "impro",
+  "applies_to_extents": [
+    "one_tooth"
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "КТ при необходимости и временная коронка — отдельно"
+      }
+    ]
+  }
+}

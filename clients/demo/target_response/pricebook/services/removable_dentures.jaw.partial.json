@@ -1,0 +1,37 @@
+{
+  "offer_id": "removable_dentures.jaw.partial",
+  "service_id": "removable_dentures",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 45000,
+    "currency": "RUB",
+    "billing_unit": "jaw"
+  },
+  "package": {
+    "label": "за одну челюсть; имплантация — отдельно",
+    "includes": [
+      "осмотр и слепки",
+      "изготовление протеза",
+      "примерка и коррекция"
+    ]
+  },
+  "fact_refs": [
+    "free_implant_consult",
+    "installment_12"
+  ],
+  "followups": [],
+  "option_id": "partial",
+  "applies_to_extents": [
+    "few_teeth"
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Имплантация — отдельно."
+      }
+    ]
+  }
+}

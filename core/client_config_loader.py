@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -63,6 +65,10 @@ _FALLBACK_TXT: dict[str, str] = {
         "{name}, оставьте, пожалуйста, номер телефона — администратор свяжется с вами, "
         "чтобы подтвердить запись."
     ),
+    "lead_phone_prompt_neutral": (
+        "Оставьте, пожалуйста, номер телефона — администратор свяжется с вами, "
+        "чтобы подтвердить запись."
+    ),
     "lead_phone_retry": "Не получилось распознать номер. Напишите в формате +7XXXXXXXXXX.",
     "lead_submit_ok": "Спасибо! Администратор свяжется с вами в ближайшее время.",
     "lead_submit_ok_after_hours": (
@@ -101,10 +107,11 @@ _FALLBACK_TXT: dict[str, str] = {
         "Хорошо, без спешки. Когда будете готовы — нажмите «Записаться» или напишите."
     ),
     "lead_booking_date_defer": (
-        "Приняла запрос — по дате с вами свяжется и уточнит администратор."
+        "Пожелание по дате передам администратору. "
+        "Удобные дату и время он уточнит с вами при звонке."
     ),
     "lead_booking_date_defer_phone": (
-        "Оставьте, пожалуйста, номер телефона — администратор свяжется с вами."
+        "Оставьте, пожалуйста, номер телефона для звонка администратора."
     ),
     "bare_affirmative_fallback": "Напишите, пожалуйста, ваш вопрос — так будет проще подсказать.",
     "followup_choose_topic": "Могу рассказать про этапы или про сроки — что выбрать?",
@@ -121,6 +128,57 @@ def resolve_pack_client_id(client_id: str | None) -> str:
     if raw == "default":
         return "demo"
     return raw
+
+
+_EXPLICIT_PACK_SEGMENT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+
+
+class ExplicitPackClientIdError(ValueError):
+    """Fail-closed tenant id for active pack-owned resource boundaries."""
+
+    def __init__(self, code: str, value: object) -> None:
+        self.code = code
+        self.value = value
+        super().__init__(f"{code}: {value!r}")
+
+
+def explicit_pack_clients_root() -> Path:
+    return Path(_REPO_ROOT).resolve() / "clients"
+
+
+def require_explicit_pack_client_id(client_id: str | None) -> str:
+    """Strict tenant key for active One Call resource loaders (no Demo fallback)."""
+
+    if client_id is None:
+        raise ExplicitPackClientIdError("explicit_pack_client_id_missing", client_id)
+    if not isinstance(client_id, str):
+        raise ExplicitPackClientIdError("explicit_pack_client_id_invalid_type", client_id)
+    if client_id != client_id.strip():
+        raise ExplicitPackClientIdError("explicit_pack_client_id_whitespace", client_id)
+    if not client_id:
+        raise ExplicitPackClientIdError("explicit_pack_client_id_empty", client_id)
+    if client_id == "default":
+        raise ExplicitPackClientIdError("explicit_pack_client_id_default_alias", client_id)
+    if ".." in client_id or "/" in client_id or "\\" in client_id:
+        raise ExplicitPackClientIdError("explicit_pack_client_id_path_escape", client_id)
+    if client_id.startswith((".", "-")):
+        raise ExplicitPackClientIdError("explicit_pack_client_id_unsafe_segment", client_id)
+    if not _EXPLICIT_PACK_SEGMENT_RE.fullmatch(client_id):
+        raise ExplicitPackClientIdError("explicit_pack_client_id_unsafe_segment", client_id)
+    clients_root = explicit_pack_clients_root()
+    pack_root = (clients_root / client_id).resolve()
+    if pack_root.parent != clients_root:
+        raise ExplicitPackClientIdError("explicit_pack_client_id_containment_failed", client_id)
+    return client_id
+
+
+def require_existing_explicit_pack_client_id(client_id: str | None) -> str:
+    """Strict tenant key plus on-disk client pack directory (no implicit demo fallback)."""
+    tenant = require_explicit_pack_client_id(client_id)
+    pack_root = explicit_pack_clients_root() / tenant
+    if not pack_root.is_dir():
+        raise ExplicitPackClientIdError("explicit_pack_client_not_found", client_id)
+    return tenant
 
 
 def _pack_path(client_id: str | None, file_name: str) -> str:
@@ -438,6 +496,19 @@ def load_brand(client_id: str | None) -> dict[str, Any]:
     return _cached_load(_BRAND_CACHE, pack, "brand.yaml")
 
 
+def list_trusted_tenant_ids() -> list[str]:
+    """Server-owned registry: ALLOWED_CLIENTS with an on-disk pack (ignores admin flag)."""
+    from config import ALLOWED_CLIENTS
+
+    out: list[str] = []
+    for name in sorted(ALLOWED_CLIENTS):
+        try:
+            out.append(require_existing_explicit_pack_client_id(name))
+        except ExplicitPackClientIdError:
+            continue
+    return out
+
+
 def list_admin_client_ids() -> list[str]:
     from config import ALLOWED_CLIENTS
 
@@ -471,15 +542,7 @@ def numeric_fact_gate_enabled(client_id: str | None) -> bool:
     return feature_flag(client_id, "verifier_gate", "numeric_fact", "enabled", default=False)
 
 
-def consult_nudge_enabled(client_id: str | None) -> bool:
-    return feature_flag(client_id, "consult_nudge", "enabled", default=True)
-
-
 def price_symptom_consult_enabled(client_id: str | None) -> bool:
-    from config import PRICE_SYMPTOM_CONSULT_ON
-
-    if not PRICE_SYMPTOM_CONSULT_ON:
-        return False
     return feature_flag(client_id, "price_symptom_consult", "enabled", default=False)
 
 
@@ -593,8 +656,6 @@ class UiBundle:
     offtopic: UiMenu
     empty_question: UiMenu
     bare_affirmative: UiMenu
-    consult_nudge_exhausted: str
-    consult_nudge_streak: str
     anti_spam_soft_redirect: str
 
 
@@ -611,28 +672,12 @@ _DEFAULT_GUIDED_REPLIES: tuple[dict[str, str], ...] = (
     {"label": "Хочу записаться", "ref": "lead:booking"},
 )
 
-_DEFAULT_CONSULT_EXHAUSTED = (
-    "\n\nЗадача на этот ответ:\n"
-    "Тема для справочного ответа исчерпана.\n"
-    "Не добавляй рекламный хвост, скидки или утверждение о бесплатной консультации.\n"
-    "Если нужен следующий шаг, сформулируй его нейтрально и кратко: можно уточнить ситуацию у администратора или врача."
-)
-
-_DEFAULT_CONSULT_STREAK = (
-    "\n\nЗадача на этот ответ:\n"
-    "Пациент уже несколько раз уточнял по теме клиники.\n"
-    "Сначала ответь по существу на вопрос.\n"
-    "Не добавляй рекламный хвост, скидки или утверждение о бесплатной консультации.\n"
-    "Если нужен следующий шаг, сформулируй его нейтрально: можно уточнить ситуацию у администратора или врача."
-)
-
 
 def load_ui_bundle(client_id: str | None) -> UiBundle:
     ui = load_ui_raw(client_id)
     fb = ui.get("fallback_menu") if isinstance(ui.get("fallback_menu"), dict) else {}
     guided = ui.get("guided_menu") if isinstance(ui.get("guided_menu"), dict) else {}
     cont = ui.get("continuation_clarify") if isinstance(ui.get("continuation_clarify"), dict) else {}
-    cn = ui.get("consult_nudge") if isinstance(ui.get("consult_nudge"), dict) else {}
     msg = ui.get("messaging") if isinstance(ui.get("messaging"), dict) else {}
 
     guided_menu = _parse_menu(
@@ -686,8 +731,6 @@ def load_ui_bundle(client_id: str | None) -> UiBundle:
             fb.get("bare_affirmative"),
             default_answer=_FALLBACK_TXT["bare_affirmative_fallback"],
         ),
-        consult_nudge_exhausted=str(cn.get("exhausted_prompt") or _DEFAULT_CONSULT_EXHAUSTED).strip(),
-        consult_nudge_streak=str(cn.get("streak_prompt") or _DEFAULT_CONSULT_STREAK).strip(),
         anti_spam_soft_redirect=anti_spam,
     )
 

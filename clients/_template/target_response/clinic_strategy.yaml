@@ -1,0 +1,5 @@
+version: 1
+default_max_options: 3
+default_service_priorities: {}
+default_offer_priorities: {}
+rules: []

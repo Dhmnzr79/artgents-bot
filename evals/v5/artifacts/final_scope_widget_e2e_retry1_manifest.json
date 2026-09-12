@@ -1,0 +1,10 @@
+{
+  "measurement_id": "final_scope_widget_e2e_retry1",
+  "baseline_live_commit": "0b10b00b6e5a32d0caaf7c9396bba77c042e1f49",
+  "turns_git_blob_hash": "f4eecf7532481a288d1db6a6ee107dd147117dae44afc991451836dd3589434f",
+  "attempt_marker_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\final_scope_widget_e2e_retry1_attempt.json",
+  "call_ledger_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\final_scope_widget_e2e_retry1_call_ledger.jsonl",
+  "status": "live_aborted_mid_attempt",
+  "abort_reason": "HarnessConfigError: missing scope ref from_turn=5 extent=one_tooth",
+  "rerun_blocked_without_owner_approval": true
+}

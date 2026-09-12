@@ -1,0 +1,20 @@
+{
+  "offer_id": "veneers.default",
+  "service_id": "veneers",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 35000,
+    "currency": "RUB",
+    "billing_unit": "tooth"
+  },
+  "package": {
+    "label": "за один зуб; полная реставрация улыбки рассчитывается на консультации",
+    "includes": []
+  },
+  "fact_refs": [
+    "free_implant_consult",
+    "installment_12"
+  ],
+  "followups": []
+}

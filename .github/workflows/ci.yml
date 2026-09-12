@@ -1,78 +1,174 @@
-# CI — content lint + deterministic unit tests (full-context architecture).
-# Живые eval'ы (product/risk/live-composer) в CI НЕ гоняются — они стоят токенов
-# и запускаются локально по протоколу ревью (docs/FULLCONTEXT_ROADMAP.md).
-# Secrets (Settings → Actions): DASHSCOPE_API_KEY — только для импорта llm-клиента;
-# LLM-вызовов в этом workflow нет (юниты мокают модель). OPENAI_API_KEY больше не нужен.
-
+# G2 — Pull Request CI: lint/validate, offline contracts, secret scan (no provider secrets).
 name: CI
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
-      - master
-      - "fullctx**"
-      - "feature/**"
-      - "feat/**"
-  pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  content-lint-and-unit:
-    name: Content lint + unit
+  lint-and-validate:
+    name: Lint and validate
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.11"
           cache: pip
+          cache-dependency-path: requirements-ci.lock
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest
+        run: pip install --require-hashes -r requirements-ci.lock
 
       - name: Lint client md (all packs)
         run: python scripts/lint_content.py --client all
 
-      - name: Lint pricebook (money invariants)
+      - name: Lint pricebook (target_response invariants)
         run: python scripts/lint_pricebook.py
 
+      - name: Validate client pack (demo)
+        run: python scripts/validate_client_pack.py --client-id demo
+
+      - name: Validate client pack (_template)
+        run: python scripts/validate_client_pack.py --client-id _template
+
       - name: App import smoke
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
         run: python -c "import app"
 
-      - name: Unit tests (deterministic, LLM mocked)
+      - name: Compile production Python sources
+        env:
+          PYTHONPYCACHEPREFIX: ${{ runner.temp }}/pycache
         run: |
-          python -m pytest \
+          python <<'PY'
+          import compileall
+          import pathlib
+          import sys
+
+          root = pathlib.Path(".").resolve()
+          skip_dirs = {
+              ".git",
+              ".venv",
+              "venv",
+              "tests",
+              "evals",
+              "docs",
+              ".pytest_cache",
+              "__pycache__",
+              "data",
+              "logs",
+              "drafts",
+              "agent-transcripts",
+              "terminals",
+          }
+          failed = False
+          for path in sorted(root.rglob("*.py")):
+              if skip_dirs.intersection(path.parts):
+                  continue
+              ok = compileall.compile_file(str(path), quiet=1)
+              if ok is False:
+                  failed = True
+          if failed:
+              sys.exit(1)
+          PY
+
+  offline-unit-and-contracts:
+    name: Offline unit and contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-ci.lock
+
+      - name: Install dependencies
+        run: pip install --require-hashes -r requirements-ci.lock
+
+      - name: Offline unit and contract tests
+        env:
+          BASETEMP: ${{ runner.temp }}/pytest-basetemp
+        run: |
+          unset DASHSCOPE_API_KEY CHAT_API_KEY OPENAI_API_KEY SMTP_PASSWORD SMTP_USER BOT_PG_DSN BOT_MIGRATOR_PG_DSN BOT_TEST_PG_DSN ADMIN_DASHBOARD_TOKEN || true
+          mkdir -p "$BASETEMP"
+          python -m pytest -p no:cacheprovider --basetemp "$BASETEMP" --tb=short -q \
             tests/test_turn_planner_llm.py \
             tests/test_turn_planner_wiring.py \
-            tests/test_turn_plan_protocol_guard.py \
-            tests/test_composer_flow.py \
-            tests/test_composer_display_chunk.py \
             tests/test_composer_parity_eval.py \
             tests/test_composer_live_eval.py \
             tests/test_md_chunks.py \
-            tests/test_knowledge_base.py \
-            tests/test_answer_packet_composer.py \
             tests/test_answer_planner.py \
             tests/test_contacts_intent.py \
             tests/test_client_runtime.py \
             tests/test_e2e_smoke_infer.py \
-            tests/test_source_routing_golden.py \
             tests/test_aspect_metadata.py \
-            tests/test_price_offers.py \
-            tests/test_price_group_overview.py \
-            tests/test_price_scope_router.py \
-            tests/test_price_layer_parity.py \
             tests/test_price_ref_routing.py \
-            tests/test_pricebook_golden.py \
-            -q --tb=short
+            tests/test_validate_client_pack.py \
+            tests/test_tenant_resource_isolation_offline.py \
+            tests/test_one_call_tenant_isolation_offline.py \
+            tests/test_tenant_ingress_prod_boundary_offline.py \
+            tests/test_session_tenant_binding_hardening_offline.py \
+            tests/test_tenant_lead_routing_context_offline.py \
+            tests/test_tenant_lead_pending_question_offline.py \
+            tests/test_pg_tenant_context_offline.py \
+            tests/test_pg_tenant_write_contract_offline.py \
+            tests/test_pg_schema_readiness_offline.py \
+            tests/test_pg_sink_tenant_worker_offline.py \
+            tests/test_pg_sink_connection_reuse_offline.py \
+            tests/test_pg_retention_non_admin_tenant_offline.py \
+            tests/test_pg_retention_trusted_registry_offline.py \
+            tests/test_user_text_privacy_contract_offline.py \
+            tests/test_leads_pg_no_pii_offline.py \
+            tests/test_observability_pii.py \
+            tests/test_admin_dashboard_tenant_offline.py \
+            tests/test_admin_dashboard_schema_health_offline.py \
+            tests/test_t6b_pass1_health_runtime_offline.py \
+            tests/test_t6b_pass2_postgres_migrate_offline.py \
+            tests/test_t6b_pass3_production_deploy_offline.py \
+            tests/test_migrations_postgresql_static.py \
+            tests/test_migration_002_constraint_drift.py \
+            tests/test_g2_pr_ci_contract.py \
+            tests/test_g4_manual_deploy_contract.py \
+            tests/test_g5_manual_rollback_contract.py
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0; bundles gitleaks CLI with --redact
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+          GITLEAKS_ENABLE_SUMMARY: "false"
+          GITLEAKS_VERSION: "8.24.3"

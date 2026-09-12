@@ -1,0 +1,12 @@
+{
+  "measurement_id": "final_scope_widget_e2e_retry3",
+  "baseline_live_commit": "bb2c871554c0d145da0789d0e55958a5c8678c75",
+  "turns_git_blob_hash": "f4eecf7532481a288d1db6a6ee107dd147117dae44afc991451836dd3589434f",
+  "result_sha256": "bbab70c9e55392d037921c091a1ed75c26cf06a6673d9d3181cbe650d3c1fb81",
+  "provider_ledger_sha256": "1eeed9f6682e849020e54a51db8a0502046b69993ebc8f5bf74350d6a321dbd4",
+  "attempt_marker_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\final_scope_widget_e2e_retry3_attempt.json",
+  "call_ledger_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\final_scope_widget_e2e_retry3_call_ledger.jsonl",
+  "a9_patient_scope_authority": "1",
+  "planner_model": "qwen3.7-plus",
+  "rerun_blocked_without_owner_approval": true
+}

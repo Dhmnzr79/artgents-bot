@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "brands": {
+    "template_brand": {
+      "canonical_name": "Template Brand",
+      "country": "Германия",
+      "aliases": ["template"]
+    }
+  }
+}

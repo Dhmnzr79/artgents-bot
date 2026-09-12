@@ -3,7 +3,10 @@ import re
 import sys
 import time
 import json
+import queue
 import threading
+import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any
 from collections import deque
@@ -19,39 +22,223 @@ from flask import (
 from pg_sink import enqueue_v5_turn_trace, init_pg_sink
 
 from config import DEBUG_TOKEN, PORT
+from core import turn_timing
 from core.client_host import resolve_request_client_id
+from core.provider_call_budget import http_provider_budget_scope
 from contracts.ask_orchestration import AskOrchestrationResult
 from core.client_config_loader import load_widget_config, tone_to_txt_dict
 from core.origin_guard import validate_widget_origin
+from core.planner_compute_executor import discard_planner_speculation
+from core.target_sse_worker_context import worker_execution_context
 from core.widget_cors import (
     apply_widget_cors_headers,
     widget_cors_preflight_response,
 )
 from core.routing_loader import THRESHOLDS
+from core.runtime_diagnostics import (
+    SseRenderDiagnosticTracker,
+    build_runtime_turn_diagnostic_payload,
+)
 from core.video_catalog_loader import catalog_for_widget, get_external_video_src
 from lead_service import handle_lead
-from core.observability_pii import observability_turn_preview, observability_user_texts
-from logging_setup import LOG_FILE, emit_bot_event, get_logger, make_request_context, log_json, redact_text
-from chunk_responder import respond_from_chunk, respond_from_chunk_stream, respond_from_composer
+from core.observability_pii import error_turn_complete_details, observability_turn_preview
+from logging_setup import LOG_FILE, emit_bot_event, get_logger, log_json, log_json_no_context, make_request_context
 from session import (
     bind_client_id,
+    clear_session_client_binding,
     get_topic_state,
     mem_add_bot,
     mem_add_user,
     mem_get,
     is_active_lead_flow,
+    is_lead_paused,
     record_last_bot_payload,
+    sid_from_body,
 )
-from orchestration.ask_turn import orchestrate_routing_after_resolver
 from orchestration.helpers import get_last_content_ui_payload_compat
-from orchestration.lead_flow import build_service_payload, lead_flow_orchestration_result
-from orchestration.policy_compat import apply_response_policy_compat
+from orchestration.lead_flow import build_service_payload
 from orchestration.finalize_turn import finalize_ask
-from orchestration.pre_resolver_turn import run_pre_resolver_turn
-from orchestration.resolver_turn import run_resolver_turn
+from orchestration.sales_one_plus_ask_turn import orchestrate_sales_one_plus_ask_turn
 from orchestration.route_guards import resolve_client_ip
 from policy import apply_ui_source_policy
 from ux_builder import internal_error_response, normalize_policy_payload, reset_session_response
+
+
+def _current_transport_kind() -> str:
+    try:
+        from flask import has_request_context, request as flask_request
+
+        if has_request_context():
+            path = str(
+                getattr(flask_request, "path", "")
+                or (getattr(flask_request, "ctx", {}) or {}).get("path")
+                or ""
+            )
+            if path.endswith("/ask/stream"):
+                return "sse"
+    except Exception:
+        pass
+    return "json"
+
+
+def _route_from_orch_result(orch_r: AskOrchestrationResult | None) -> str | None:
+    if orch_r is None:
+        return None
+    route = getattr(orch_r, "service_route", None)
+    if route:
+        return str(route)
+    kind = getattr(orch_r, "kind", None)
+    if kind:
+        return str(kind)
+    return None
+
+
+def _snapshot_provider_budget(budget) -> None:
+    turn_timing.set_flag("provider_calls", budget.call_count)
+    turn_timing.set_flag("provider_policy", budget.policy.value)
+    try:
+        from flask import has_request_context, request as flask_request
+
+        if has_request_context() and getattr(flask_request, "ctx", None):
+            flask_request.ctx["provider_calls"] = int(budget.call_count)
+            flask_request.ctx["provider_policy"] = budget.policy.value
+    except Exception:
+        pass
+
+
+def _provider_snapshot_from_context() -> tuple[int, str | None]:
+    provider_calls = 0
+    provider_policy: str | None = None
+    try:
+        from flask import has_request_context, request as flask_request
+
+        if has_request_context() and getattr(flask_request, "ctx", None):
+            ctx = flask_request.ctx
+            if ctx.get("provider_calls") is not None:
+                provider_calls = int(ctx["provider_calls"])
+            if ctx.get("provider_policy") is not None:
+                provider_policy = str(ctx["provider_policy"])
+    except Exception:
+        pass
+    if provider_calls == 0:
+        bucket = turn_timing.summary_for_turn_complete()
+        flag_calls = bucket.get("provider_calls")
+        if isinstance(flag_calls, int):
+            provider_calls = flag_calls
+    if provider_policy is None:
+        try:
+            from flask import has_request_context, request as flask_request
+
+            if has_request_context():
+                flags = (flask_request.ctx.get("turn_timing") or {}).get("flags") or {}
+                raw_policy = flags.get("provider_policy")
+                if raw_policy is not None:
+                    provider_policy = str(raw_policy)
+        except Exception:
+            pass
+    return provider_calls, provider_policy
+
+
+def _emit_runtime_turn_diagnostic(
+    *,
+    status: str,
+    route: str | None,
+    transport: str,
+    provider_calls: int | None = None,
+    provider_policy: str | None = None,
+    request_id: str | None = None,
+    client_id: str | None = None,
+) -> None:
+    if provider_calls is None or provider_policy is None:
+        snap_calls, snap_policy = _provider_snapshot_from_context()
+        if provider_calls is None:
+            provider_calls = snap_calls
+        if provider_policy is None:
+            provider_policy = snap_policy
+    ctx: dict[str, Any] = {}
+    sales_fast_obs = None
+    try:
+        from flask import has_request_context, request as flask_request
+
+        if has_request_context() and getattr(flask_request, "ctx", None):
+            ctx = dict(flask_request.ctx)
+            bucket = ctx.get("turn_timing") or {}
+            flags = bucket.get("flags") or {}
+            sales_fast_obs = flags.get("sales_fast_observability")
+    except Exception:
+        pass
+    resolved_request_id = request_id
+    if resolved_request_id is None and ctx.get("request_id"):
+        resolved_request_id = str(ctx.get("request_id"))
+    resolved_client_id = client_id
+    if resolved_client_id is None and ctx.get("client_id"):
+        resolved_client_id = str(ctx.get("client_id"))
+    payload = build_runtime_turn_diagnostic_payload(
+        request_id=resolved_request_id,
+        client_id=resolved_client_id,
+        transport=transport,
+        route=route,
+        status=status,
+        provider_calls=int(provider_calls),
+        provider_policy=provider_policy,
+        timing_summary=turn_timing.summary_for_turn_complete(),
+        sales_fast_observability=sales_fast_obs,
+    )
+    log_json_no_context(logger, "runtime_turn_diagnostic", **payload)
+
+
+def _runtime_turn_diagnostic_ready() -> bool:
+    try:
+        from flask import has_request_context, request as flask_request
+
+        if has_request_context() and getattr(flask_request, "ctx", None):
+            ctx = flask_request.ctx
+            if ctx.get("provider_calls") is not None:
+                return True
+            marks = (ctx.get("turn_timing") or {}).get("marks") or {}
+            if marks.get("orchestrate_done") is not None:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _emit_runtime_turn_diagnostic_once(
+    *,
+    status: str,
+    route: str | None,
+    transport: str,
+    request_id: str | None = None,
+    client_id: str | None = None,
+    provider_calls: int | None = None,
+    provider_policy: str | None = None,
+) -> None:
+    try:
+        from flask import has_request_context, request as flask_request
+
+        if has_request_context() and getattr(flask_request, "ctx", None):
+            ctx = flask_request.ctx
+            if ctx.get("runtime_turn_diagnostic_emitted"):
+                return
+            ctx["runtime_turn_diagnostic_emitted"] = True
+    except Exception:
+        pass
+    _emit_runtime_turn_diagnostic(
+        status=status,
+        route=route,
+        transport=transport,
+        request_id=request_id,
+        client_id=client_id,
+        provider_calls=provider_calls,
+        provider_policy=provider_policy,
+    )
+
+
+def _emit_sse_render_diagnostic(tracker: SseRenderDiagnosticTracker) -> None:
+    if tracker.emitted:
+        return
+    tracker.emitted = True
+    log_json_no_context(logger, "sse_render_diagnostic", **tracker.build_payload())
 
 
 def _enqueue_v5_resolver_trace(
@@ -99,41 +286,24 @@ def _skip_lead_pii_in_session_hist(payload: dict) -> bool:
     return bool(pmeta.get("lead_flow") or pmeta.get("situation_collect"))
 
 
-def _suppress_plan_append_quick_replies(payload: dict, plan_apply_meta: dict[str, Any]) -> None:
-    from core.answer_plan_apply import payment_terms_suppress_refs
-    from core.price_answer_assembler import hide_navigated_quick_replies
-
-    meta = payload.get("meta") or {}
-    suppress_list = payment_terms_suppress_refs(
-        plan_meta={
-            "answer_plan": meta.get("answer_plan"),
-            "answer_plan_apply": plan_apply_meta,
-        },
-        doc_id=meta.get("doc_id"),
-        answer_body=str(payload.get("answer") or ""),
-    )
-    if not suppress_list:
-        return
-    suppress = {str(r).strip().lower() for r in suppress_list if str(r).strip()}
-    payload["quick_replies"] = hide_navigated_quick_replies(
-        list(payload.get("quick_replies") or []),
-        exclude_refs=suppress,
-    )
-    meta = payload.setdefault("meta", {})
-    if isinstance(meta.get("followups"), list):
-        meta["followups"] = hide_navigated_quick_replies(
-            list(meta.get("followups") or []),
-            exclude_refs=suppress,
-        )
+def _skip_lead_pending_quote_in_session_hist(meta: dict | None) -> bool:
+    step = str((meta or {}).get("lead_step") or "").strip().lower()
+    return step in {"pending_name", "pending_phone"}
 
 
-def _stamp_service_answer_path(payload: dict, route: str | None) -> None:
-    """Telemetry only: mark which answer path produced the payload."""
-    r = (route or "").strip().lower()
-    if r in {"price_lookup", "price_concern"}:
-        payload.setdefault("meta", {})["answer_path"] = "price"
-    elif r == "price_symptom_consult":
-        payload.setdefault("meta", {})["answer_path"] = "price_symptom_consult"
+def _error_observability_meta(sid: str | None) -> dict:
+    sid_clean = (sid or "").strip()
+    if not sid_clean:
+        return {}
+    try:
+        st = mem_get(sid_clean)
+    except Exception:
+        return {}
+    lead_flow = bool(is_active_lead_flow(st) or is_lead_paused(st))
+    situation_collect = bool(st.get("situation_pending"))
+    if not lead_flow and not situation_collect:
+        return {}
+    return {"lead_flow": lead_flow, "situation_collect": situation_collect}
 
 
 def _service_reply(
@@ -145,75 +315,10 @@ def _service_reply(
     track_user: bool = True,
     route: str | None = None,
 ):
-    from core.answer_plan_apply import apply_answer_plan_append
-    from core.answer_packet_snapshot import build_and_publish_answer_packet
-    from core.answer_planner import answer_plan_from_ctx
-    from core.consult_nudge import record_consult_nudge_after_answer, reset_consult_nudge_on_route
-    from session import set_last_aspect
-
-    reset_consult_nudge_on_route(route, sid)
     if track_user and q and not _skip_lead_pii_in_session_hist(payload):
         mem_add_user(sid, q)
     if route:
         payload.setdefault("meta", {})["service_route"] = str(route).strip()
-    _stamp_service_answer_path(payload, route)
-    r = (route or "").strip().lower()
-    plan = answer_plan_from_ctx()
-    pmeta = payload.get("meta") or {}
-    if plan is not None and r in {"price_lookup", "price_concern", "catalog_facts"}:
-        svc_id = str(pmeta.get("matched_service_id") or plan.service_id or "").strip() or None
-        plan_tail, plan_apply_meta = apply_answer_plan_append(
-            plan,
-            client_id=pmeta.get("client_id"),
-            service_id=svc_id,
-            q=q,
-            existing_append=None,
-            price_offer_meta=pmeta if isinstance(pmeta, dict) else None,
-            answer_body=str(payload.get("answer") or ""),
-        )
-        if plan_tail:
-            base = str(payload.get("answer") or "").strip()
-            if plan_tail not in base:
-                payload["answer"] = f"{base}\n\n{plan_tail}" if base else plan_tail
-        if plan.primary_aspect:
-            set_last_aspect(sid, plan.primary_aspect)
-        payload.setdefault("meta", {})["answer_plan"] = plan.model_dump()
-        packet = build_and_publish_answer_packet(
-            plan,
-            client_id=pmeta.get("client_id"),
-            route=r,
-            service_id=svc_id,
-            apply_meta=plan_apply_meta,
-        )
-        payload.setdefault("meta", {})["answer_packet"] = packet.model_dump()
-        if plan_apply_meta.get("applied") or plan_apply_meta.get("suppressed"):
-            _suppress_plan_append_quick_replies(payload, plan_apply_meta)
-            payload.setdefault("meta", {})["answer_plan_apply"] = plan_apply_meta
-    if (
-        r in {"price_lookup", "price_concern", "catalog_facts"}
-        and not _skip_lead_pii_in_session_hist(payload)
-    ):
-        from core.follow_up_rewrite import persist_focus_from_service_turn
-
-        pmeta = payload.get("meta") or {}
-        svc_id = str(pmeta.get("matched_service_id") or "").strip() or None
-        topic = (plan.topic if plan else None) or str(pmeta.get("service_topic") or "").strip() or None
-        persist_focus_from_service_turn(
-            sid,
-            client_id=pmeta.get("client_id"),
-            matched_service_id=svc_id,
-            route=r,
-            answer=str(payload.get("answer") or ""),
-            topic=topic,
-        )
-    if r == "price_lookup" and not is_active_lead_flow(mem_get(sid)):
-        pmeta = payload.get("meta") or {}
-        record_consult_nudge_after_answer(
-            sid,
-            route,
-            pmeta.get("consult_nudge"),
-            str(payload.get("answer") or ""),
-        )
     payload = apply_ui_source_policy(payload, route=route)
     payload = normalize_policy_payload(payload)
     answer = (payload.get("answer") or "").strip()
@@ -227,8 +332,12 @@ def _service_reply(
             "preview": observability_turn_preview(qs, route=route, meta=pmeta),
         }
     out = finalize_ask(payload, sid, q, doc_id=doc_id, turn_meta=turn_meta, route=route)
-    if answer:
+    if answer and not _skip_lead_pending_quote_in_session_hist(out.get("meta")):
         mem_add_bot(sid, answer)
+    # PERF-0: /ask returns one JSON body — "first server event" and "request
+    # complete" are the same instant today (no progressive delivery yet).
+    turn_timing.mark("first_server_event")
+    turn_timing.mark("request_complete")
     return safe_jsonify(out)
 
 
@@ -288,6 +397,27 @@ def _startup_check() -> None:
 
 _startup_check()
 
+_HEALTH_PROBE_PATHS = frozenset({"/health/live", "/health/ready"})
+
+
+def _is_health_probe_path() -> bool:
+    return (request.path or "") in _HEALTH_PROBE_PATHS
+
+
+@app.get("/health/live")
+def health_live():
+    """Process liveness (no DB, no tenant routing, no secrets)."""
+    return jsonify({"ok": True, "status": "live"}), 200
+
+
+@app.get("/health/ready")
+def health_ready():
+    """Deployment readiness (prod fail-closed; local skips mandatory PG)."""
+    from core.prod_readiness import evaluate_readiness
+
+    ok, payload = evaluate_readiness()
+    return jsonify(payload), (200 if ok else 503)
+
 
 @app.before_request
 def _before():
@@ -299,12 +429,19 @@ def _before():
 
 @app.before_request
 def _widget_cors_preflight():
+    if _is_health_probe_path():
+        return None
     return widget_cors_preflight_response()
+
+
+@app.teardown_request
+def _clear_session_client_binding_teardown(exc):
+    clear_session_client_binding()
 
 
 @app.after_request
 def _after(resp):
-    if request.path.startswith("/dashboard"):
+    if request.path.startswith("/dashboard") or _is_health_probe_path():
         return resp
     latency = int((time.time() - request.ctx["t0"]) * 1000)
     log_json(
@@ -394,40 +531,51 @@ def dashboard_events_api():
     return jsonify(payload)
 
 
-def _orchestrate_ask_turn(data: dict):
-    pre = run_pre_resolver_turn(
+def _orchestrate_ask_turn(data: dict, *, resolved_client_id: str | None = None):
+    request_id = str(data.get("request_id") or uuid.uuid4())
+    try:
+        from flask import request as flask_request
+
+        request_id = str(flask_request.ctx.get("request_id") or request_id)
+    except RuntimeError:
+        pass
+    with http_provider_budget_scope(
+        request_id=request_id,
+        sales_one_plus_on=True,
+    ) as budget:
+        try:
+            return _orchestrate_ask_turn_inner(
+                data,
+                resolved_client_id=resolved_client_id,
+            )
+        finally:
+            _snapshot_provider_budget(budget)
+
+
+def _orchestrate_ask_turn_inner(
+    data: dict,
+    *,
+    resolved_client_id: str | None = None,
+):
+    # Stage 3A: unconditional One Call HTTP routing; legacy branch removed (Stage 3B: delete dormant modules).
+    trusted_cid = (resolved_client_id or "").strip() or None
+    if trusted_cid:
+
+        def _resolve_client_id(_raw, *, host):  # noqa: ARG001
+            return trusted_cid
+
+    else:
+        _resolve_client_id = resolve_request_client_id
+
+    return orchestrate_sales_one_plus_ask_turn(
         data,
-        resolve_client_id=resolve_request_client_id,
+        resolve_client_id=_resolve_client_id,
         bind_chat_ctx=_bind_chat_ctx,
         resolve_ip=_resolve_request_ip,
         client_txt=_client_txt,
         service_payload=build_service_payload,
         get_last_content_ui_payload=get_last_content_ui_payload_compat,
-    )
-    if isinstance(pre, AskOrchestrationResult):
-        return pre
-
-    resolver = run_resolver_turn(
-        q=pre.q,
-        sid=pre.sid,
-        client_id=pre.client_id,
-        st=pre.st,
         enqueue_resolver_trace=_enqueue_v5_resolver_trace,
-    )
-
-    return orchestrate_routing_after_resolver(
-        q=pre.q,
-        sid=pre.sid,
-        client_id=pre.client_id,
-        intent=resolver.intent,
-        decision=resolver.decision,
-        scope_topic_candidate=resolver.scope_topic_candidate,
-        resolver_bypassed_env=resolver.resolver_bypassed_env,
-        data=pre.data,
-        client_txt=_client_txt,
-        service_payload=build_service_payload,
-        lead_flow_from_result=lead_flow_orchestration_result,
-        apply_response_policy=apply_response_policy_compat,
     )
 
 
@@ -449,42 +597,12 @@ def _dispatch_orchestration_json(orch_r: AskOrchestrationResult):
         if orch_r.http_status != 200:
             return resp, orch_r.http_status
         return resp
-    if orch_r.kind == "composer":
-        out = respond_from_composer(
-            composed_answer=str(orch_r.composed_answer or ""),
-            materialized_cards=list(orch_r.materialized_cards or []),
-            q=orch_r.q,
-            sid=orch_r.sid,
-            client_id=orch_r.client_id,
-            matched_service_id=orch_r.matched_service_id,
-            route=orch_r.chunk_route or "retrieval_chunk",
-            primary_chunk_ref=orch_r.composer_primary_chunk_ref,
-            finalize_ask=finalize_ask,
-            logger=logger,
-            log_event="Answer generated from composer",
-        )
-        return safe_jsonify(out)
-    if orch_r.kind == "chunk":
-        return respond_from_chunk(
-            chunk=orch_r.chosen_chunk,
-            q=orch_r.q,
-            sid=orch_r.sid,
-            client_id=orch_r.client_id,
-            finalize_ask=finalize_ask,
-            safe_jsonify=safe_jsonify,
-            logger=logger,
-            llm_question=orch_r.llm_question,
-            log_event=orch_r.log_event,
-            route=orch_r.chunk_route,
-            generator_append_text=orch_r.generator_append_text,
-            price_offer_meta=orch_r.price_offer_meta,
-            matched_service_id=orch_r.matched_service_id,
-        )
     raise RuntimeError(f"bad orchestration kind: {orch_r.kind}")
 
 @app.post("/ask")
 def ask():
     q = ""
+    client_id: str | None = None
     request.ctx["turn_t0_monotonic"] = time.monotonic()
     try:
         data = request.get_json(force=True) or {}
@@ -499,42 +617,54 @@ def ask():
 
         mark("orchestrate_done")
         q = orch_r.q or ""
-        return _dispatch_orchestration_json(orch_r)
+        try:
+            resp = _dispatch_orchestration_json(orch_r)
+            _emit_runtime_turn_diagnostic_once(
+                status="completed",
+                route=_route_from_orch_result(orch_r),
+                transport="json",
+            )
+            return resp
+        except Exception:
+            _emit_runtime_turn_diagnostic_once(
+                status="error",
+                route=_route_from_orch_result(orch_r),
+                transport="json",
+            )
+            raise
     except Exception as e:
-        logger.exception("ask_failed", extra={"q": q, "err": str(e)})
-        if request.ctx.get("sid") and (q or "").strip():
+        if _runtime_turn_diagnostic_ready():
+            _emit_runtime_turn_diagnostic_once(
+                status="error",
+                route="error",
+                transport="json",
+            )
+        logger.exception("ask_failed", extra={"err": str(e)[:500]})
+        sid_err = str(request.ctx.get("sid") or "").strip()
+        if sid_err and (q or "").strip():
             emit_bot_event(
                 logger,
                 "turn_complete",
                 status="error",
-                details={
-                    "turn_number": None,
-                    "user_text_redacted": redact_text((q or ""), max_len=8000),
-                    "user_preview_redacted": redact_text((q or ""), max_len=200),
-                    "bot_text_redacted": "",
-                    "intent": None,
-                    "doc_id": None,
-                    "route": "error",
-                    "low_score": False,
-                    "lead_flow": False,
-                    "handoff_filter": False,
-                    "answer_chars": 0,
-                    "latency_ms": None,
-                    "fallback_reason": "ask_failed",
-                    "retrieval_scope_topic": None,
-                    "retrieval_scope_guard_reason": "none",
-                    "retrieval_scope_widen_fallback": False,
-                    "legacy_intent": None,
-                    "effective_intent": "",
-                },
+                details=error_turn_complete_details(
+                    q,
+                    fallback_reason="ask_failed",
+                    meta=_error_observability_meta(sid_err),
+                ),
             )
+        from core.user_text_privacy import observability_safe_user_text
+
         emit_bot_event(
             logger,
             "ask_failed",
             status="error",
-            details={"error": str(e)[:500], "question_preview": (q or "")[:200]},
+            details={
+                "error": str(e)[:500],
+                "question_preview": observability_safe_user_text(q or "", max_len=200),
+                **_error_observability_meta(sid_err),
+            },
         )
-        return safe_jsonify(internal_error_response()), 200
+        return safe_jsonify(internal_error_response(client_id=client_id)), 200
 
 _SSE_HEADERS = {
     "Cache-Control": "no-cache",
@@ -544,10 +674,6 @@ _SSE_HEADERS = {
 
 def _sse_typing_phase(*, kind: str, route: str | None) -> str:
     """Фаза индикатора в виджете: searching = «база знаний», writing = только «печатает»."""
-    if kind == "chunk":
-        return "searching"
-    if kind == "composer":
-        return "searching"
     r = (route or "").strip().lower()
     if r.startswith("ingress_"):
         return "writing"
@@ -569,6 +695,329 @@ def _sse_typing_line(phase: str) -> str:
     return f"event: typing\ndata: {json.dumps({'phase': phase}, ensure_ascii=False)}\n\n"
 
 
+# --- PERF-1: early SSE status events (docs/evidence/performance/
+# FINAL_EARLY_SSE_STATUS_STREAMING_SEAM_AUDIT.md) ---------------------------
+#
+# Bounded worker capacity: an explicit admission Semaphore gates whether a turn
+# runs on a background worker at all — NOT relying on ThreadPoolExecutor's own
+# (effectively unbounded) internal work queue as the admission control. When
+# capacity is exhausted, the SSE generator falls back to computing the turn
+# synchronously, on the request thread, after already having emitted the first
+# status event — /ask/stream never behaves worse than before this milestone.
+_SSE_WORKER_CAPACITY = max(1, int(os.getenv("SSE_WORKER_CAPACITY", "8")))
+_sse_worker_executor = ThreadPoolExecutor(
+    max_workers=_SSE_WORKER_CAPACITY, thread_name_prefix="ask-stream-worker"
+)
+_sse_worker_admission = threading.Semaphore(_SSE_WORKER_CAPACITY)
+_SSE_STATUS_QUEUE_MAXSIZE = 8
+_SSE_STATUS_POLL_INTERVAL_SEC = 0.05
+
+# Status text is derived only from PERF-0's real stage_start call sites (via the
+# notification hook in core/turn_timing.py) — never from reason/q/free text, and
+# skipped stages never enqueue (stage_skipped does not call the hook). No
+# internal LLM/Boundary/Verifier names are exposed to the user.
+_SSE_STAGE_STATUS_PHRASES = {
+    "ingress": "Проверяю вопрос",
+    "planner": "Проверяю вопрос",
+    "boundary": "Ищу информацию в материалах клиники",
+    "composer": "Ищу информацию в материалах клиники",
+    "verifier_deterministic": "Готовлю ответ",
+    "verifier_semantic": "Готовлю ответ",
+}
+_SSE_INITIAL_STATUS_PHRASE = _SSE_STAGE_STATUS_PHRASES["ingress"]
+
+
+def _sse_status_line(message: str) -> str:
+    return f"event: status\ndata: {json.dumps({'message': message}, ensure_ascii=False)}\n\n"
+
+
+def _sse_text_delta_line(delta: str) -> str:
+    return f"event: text_delta\ndata: {json.dumps({'delta': delta}, ensure_ascii=False)}\n\n"
+
+
+def _make_status_emitter(status_queue: "queue.Queue[str]", *, already_sent: str | None):
+    """Non-blocking, deduping, bounded-lossy status emitter for one turn.
+
+    Called from core.turn_timing's stage_start hook (via the ContextVar sink),
+    i.e. from the worker thread. Never blocks the pipeline: a full queue just
+    drops the update (status is informational and coalescable, never the final
+    result — see _run_sse_worker_turn / the guaranteed result channel below).
+    """
+    last = {"phrase": already_sent}
+
+    def _emit(stage_name: str, _event: str) -> None:
+        phrase = _SSE_STAGE_STATUS_PHRASES.get(stage_name)
+        if not phrase or phrase == last["phrase"]:
+            return
+        last["phrase"] = phrase
+        try:
+            status_queue.put_nowait(phrase)
+        except queue.Full:
+            pass
+
+    return _emit
+
+
+def _build_sse_payload(orch_r: AskOrchestrationResult) -> tuple[dict, int]:
+    """Build the final SSE `ui` payload dict (session writes + finalize_ask) for
+    an orchestration result, without any turn_timing marks — the caller (the SSE
+    generator, on its own kept-alive request context) marks first_server_event /
+    request_complete at the actual yield points, not at payload-build time."""
+    if orch_r.kind == "service_reply":
+        payload = orch_r.service_payload
+        sid = orch_r.sid
+        q = orch_r.q
+        doc_id = orch_r.service_doc_id
+        track_user = orch_r.service_track_user
+        route = orch_r.service_route
+        if track_user and q and not _skip_lead_pii_in_session_hist(payload):
+            mem_add_user(sid, q)
+        if route:
+            payload.setdefault("meta", {})["service_route"] = str(route).strip()
+        payload = apply_ui_source_policy(payload, route=route)
+        payload = normalize_policy_payload(payload)
+        answer = (payload.get("answer") or "").strip()
+        turn_meta = None
+        if track_user and (q or "").strip():
+            qs = (q or "").strip()
+            pmeta = payload.get("meta") or {}
+            turn_meta = {
+                "interaction": "user_message",
+                "question_len": len(qs),
+                "preview": observability_turn_preview(qs, route=route, meta=pmeta),
+            }
+        out = finalize_ask(payload, sid, q, doc_id=doc_id, turn_meta=turn_meta, route=route)
+        if answer and not _skip_lead_pending_quote_in_session_hist(out.get("meta")):
+            mem_add_bot(sid, answer)
+        http_status = orch_r.http_status if orch_r.http_status != 200 else 200
+        return out, http_status
+    if orch_r.kind == "reset_session":
+        return reset_session_response(orch_r.sid), 200
+    if orch_r.kind == "unknown_client":
+        return (orch_r.client_error or {"error": "unknown_client"}), orch_r.http_status
+    raise RuntimeError(f"bad orchestration kind: {orch_r.kind}")
+
+
+def _run_sse_worker_turn(
+    *,
+    data: dict,
+    client_id: str,
+    request_id: str,
+    sid: str,
+    turn_t0_monotonic: float,
+    status_emit,
+    text_emit=None,
+) -> tuple[dict, int]:
+    """Run the unmodified orchestration + payload build inside an independent,
+    per-turn worker request context (core.target_sse_worker_context) — never
+    shares request.ctx with the request-handling/generator thread. Never raises:
+    mirrors ask_stream()'s own top-level error handling so the caller's
+    Future.result() is always safe to read."""
+    diagnostic_emitted = False
+    worker_error: Exception | None = None
+    try:
+        with worker_execution_context(
+            app,
+            request_id=request_id,
+            sid=sid,
+            client_id=client_id,
+            turn_t0_monotonic=turn_t0_monotonic,
+            status_emit=status_emit,
+            text_emit=text_emit,
+        ):
+            try:
+                orch_r = _orchestrate_ask_turn(data, resolved_client_id=client_id)
+                turn_timing.mark("orchestrate_done")
+                out, http_status = _build_sse_payload(orch_r)
+                route = str((out.get("meta") or {}).get("service_route") or _route_from_orch_result(orch_r))
+                _emit_runtime_turn_diagnostic_once(
+                    status="completed",
+                    route=route or None,
+                    transport="sse",
+                )
+                diagnostic_emitted = True
+                return out, http_status
+            except Exception as exc:
+                worker_error = exc
+                _emit_runtime_turn_diagnostic_once(
+                    status="error",
+                    route="error",
+                    transport="sse",
+                )
+                diagnostic_emitted = True
+                raise
+    except Exception as e:
+        if not diagnostic_emitted:
+            _emit_runtime_turn_diagnostic_once(
+                status="error",
+                route="error",
+                transport="sse",
+                request_id=request_id,
+                client_id=client_id,
+                provider_calls=0,
+                provider_policy=None,
+            )
+        err = worker_error or e
+        logger.exception("ask_stream_worker_failed", extra={"sid": sid, "err": str(err)})
+        emit_bot_event(
+            logger,
+            "ask_stream_failed",
+            status="error",
+            details={"error": str(err)[:500]},
+            request_id=request_id,
+            sid=sid,
+            client_id=client_id,
+        )
+        return internal_error_response(client_id=client_id), 200
+
+
+def _stream_ask_turn_response(data: dict, client_id: str):
+    """PERF-1: /ask/stream's early-status path — first SSE event before
+    orchestration starts/finishes; bounded background worker with a safe
+    synchronous fallback under admission overload; exactly one orchestration
+    call either way.
+
+    Deliberately does NOT use flask.stream_with_context: that helper keeps the
+    *original* request context alive across generator iteration by re-pushing
+    it, which — observed directly — can leave a stale, unpopped RequestContext
+    behind when a generator is torn down other than by being fully iterated
+    in the exact same call frame that started it (Flask/Werkzeug's own
+    `ctx.pop()` then raises "Popped wrong request context" against a
+    *different* request's context, corrupting Flask's contextvar state for
+    later requests on the same thread). To avoid that failure mode entirely,
+    the generator body below never touches `flask.request` at all: the two
+    SSE-transport marks (`first_server_event`, `request_complete`) are written
+    directly into a bucket dict captured *before* the generator is returned,
+    and both the worker-available and admission-overload paths run through
+    the exact same `_run_sse_worker_turn` — which always pushes its own
+    short-lived, independent request context and pops it in `finally` — the
+    only difference being whether that call happens on a background thread
+    (worker available) or inline on this thread (overload fallback).
+    """
+    request_id = str(request.ctx.get("request_id") or uuid.uuid4())
+    sid = sid_from_body(data)
+    turn_t0 = request.ctx.get("turn_t0_monotonic")
+    if not isinstance(turn_t0, (int, float)):
+        turn_t0 = time.monotonic()
+    bucket = request.ctx.setdefault(
+        "turn_timing", {"durations_ms": {}, "flags": {}, "marks": {}, "stages": {}}
+    )
+    status_queue: "queue.Queue[str]" = queue.Queue(maxsize=_SSE_STATUS_QUEUE_MAXSIZE)
+    # Composer output is capped and correctness-critical: unlike coalescable status
+    # events, answer deltas use a non-lossy per-turn queue.
+    text_queue: "queue.SimpleQueue[str]" = queue.SimpleQueue()
+
+    def _drain_text_queue():
+        while True:
+            try:
+                delta = text_queue.get_nowait()
+            except queue.Empty:
+                break
+            if delta:
+                yield _sse_text_delta_line(delta)
+
+    def _gen():
+        tracker = SseRenderDiagnosticTracker(
+            request_id=request_id,
+            client_id=client_id,
+        )
+        try:
+            # Requirement: first SSE event before orchestration starts or waits on
+            # anything — this yield happens before any pipeline call whatsoever.
+            yield tracker.track(_sse_status_line(_SSE_INITIAL_STATUS_PHRASE))
+            bucket["marks"]["first_server_event"] = time.monotonic()
+
+            acquired = _sse_worker_admission.acquire(blocking=False)
+            if not acquired:
+                # Safe synchronous fallback, inside the generator, after the first
+                # status — runs the same _run_sse_worker_turn inline (own
+                # independent context, not the live one), on this thread. Never
+                # worse than pre-PERF-1 behavior.
+                out, _http_status = _run_sse_worker_turn(
+                    data=data,
+                    client_id=client_id,
+                    request_id=request_id,
+                    sid=sid,
+                    turn_t0_monotonic=turn_t0,
+                    status_emit=None,
+                    text_emit=text_queue.put,
+                )
+                for line in _drain_text_queue():
+                    yield tracker.track(line)
+                route = str((out.get("meta") or {}).get("service_route") or "")
+                tracker.route = route or tracker.route
+                yield tracker.track(_sse_typing_line(_sse_typing_phase(kind="service_reply", route=route)))
+                yield tracker.track(
+                    f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
+                )
+                bucket["marks"]["request_complete"] = time.monotonic()
+                yield tracker.track("event: done\ndata: {}\n\n")
+                return
+
+            emitter = _make_status_emitter(status_queue, already_sent=_SSE_INITIAL_STATUS_PHRASE)
+
+            def _worker_entry():
+                try:
+                    return _run_sse_worker_turn(
+                        data=data,
+                        client_id=client_id,
+                        request_id=request_id,
+                        sid=sid,
+                        turn_t0_monotonic=turn_t0,
+                        status_emit=emitter,
+                        text_emit=text_queue.put,
+                    )
+                finally:
+                    _sse_worker_admission.release()
+
+            try:
+                future = _sse_worker_executor.submit(_worker_entry)
+            except Exception:
+                _sse_worker_admission.release()
+                raise
+
+            while not future.done():
+                yielded_text = False
+                for line in _drain_text_queue():
+                    yielded_text = True
+                    yield tracker.track(line)
+                if yielded_text:
+                    continue
+                try:
+                    phrase = status_queue.get(timeout=_SSE_STATUS_POLL_INTERVAL_SEC)
+                except queue.Empty:
+                    continue
+                yield tracker.track(_sse_status_line(phrase))
+            for line in _drain_text_queue():
+                yield tracker.track(line)
+            while True:
+                try:
+                    phrase = status_queue.get_nowait()
+                except queue.Empty:
+                    break
+                yield tracker.track(_sse_status_line(phrase))
+
+            out, _http_status = future.result()
+            route = str((out.get("meta") or {}).get("service_route") or "")
+            tracker.route = route or tracker.route
+            yield tracker.track(_sse_typing_line(_sse_typing_phase(kind="service_reply", route=route)))
+            yield tracker.track(
+                f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
+            )
+            bucket["marks"]["request_complete"] = time.monotonic()
+            yield tracker.track("event: done\ndata: {}\n\n")
+        except GeneratorExit:
+            tracker.status = "client_closed"
+            raise
+        except Exception:
+            tracker.status = "error"
+            raise
+        finally:
+            _emit_sse_render_diagnostic(tracker)
+
+    return app.response_class(_gen(), mimetype="text/event-stream", headers=_SSE_HEADERS)
+
+
 def _sse_service_reply(
     payload: dict,
     sid: str,
@@ -579,23 +1028,12 @@ def _sse_service_reply(
     route: str | None = None,
 ):
     """Обёртка _service_reply для SSE: один event ui + done."""
-    from core.consult_nudge import record_consult_nudge_after_answer, reset_consult_nudge_on_route
-
-    reset_consult_nudge_on_route(route, sid)
     if track_user and q and not _skip_lead_pii_in_session_hist(payload):
         mem_add_user(sid, q)
     if route:
         payload.setdefault("meta", {})["service_route"] = str(route).strip()
-    _stamp_service_answer_path(payload, route)
-    r = (route or "").strip().lower()
-    if r == "price_lookup" and not is_active_lead_flow(mem_get(sid)):
-        pmeta = payload.get("meta") or {}
-        record_consult_nudge_after_answer(
-            sid,
-            route,
-            pmeta.get("consult_nudge"),
-            str(payload.get("answer") or ""),
-        )
+    payload = apply_ui_source_policy(payload, route=route)
+    payload = normalize_policy_payload(payload)
     answer = (payload.get("answer") or "").strip()
     turn_meta = None
     if track_user and (q or "").strip():
@@ -607,81 +1045,57 @@ def _sse_service_reply(
             "preview": observability_turn_preview(qs, route=route, meta=pmeta),
         }
     out = finalize_ask(payload, sid, q, doc_id=doc_id, turn_meta=turn_meta, route=route)
-    if answer:
+    if answer and not _skip_lead_pending_quote_in_session_hist(out.get("meta")):
         mem_add_bot(sid, answer)
 
+    # PERF-0: the full turn (incl. Composer/Verifier) is already computed by
+    # this point — the SSE generator below yields typing/ui/done back-to-back
+    # with no real gap (seam audit Finding 2). These marks honestly reflect
+    # that: they will only diverge once a future milestone streams Composer
+    # tokens progressively instead of one blocking backend.generate() call.
+    turn_timing.mark("first_server_event")
+    turn_timing.mark("request_complete")
+
+    _emit_runtime_turn_diagnostic_once(
+        status="completed",
+        route=str(route or "") or None,
+        transport="sse",
+    )
+
     phase = _sse_typing_phase(kind="service_reply", route=route)
+    request_id = None
+    client_id = None
+    try:
+        from flask import has_request_context, request as flask_request
+
+        if has_request_context() and getattr(flask_request, "ctx", None):
+            request_id = str(flask_request.ctx.get("request_id") or "") or None
+            client_id = str(flask_request.ctx.get("client_id") or "") or None
+    except Exception:
+        pass
 
     def _gen():
-        yield _sse_typing_line(phase)
-        yield f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
-        yield "event: done\ndata: {}\n\n"
+        tracker = SseRenderDiagnosticTracker(
+            request_id=request_id,
+            client_id=client_id,
+        )
+        tracker.route = str(route or "") or tracker.route
+        try:
+            yield tracker.track(_sse_typing_line(phase))
+            yield tracker.track(
+                f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
+            )
+            yield tracker.track("event: done\ndata: {}\n\n")
+        except GeneratorExit:
+            tracker.status = "client_closed"
+            raise
+        except Exception:
+            tracker.status = "error"
+            raise
+        finally:
+            _emit_sse_render_diagnostic(tracker)
 
     return app.response_class(_gen(), mimetype="text/event-stream", headers=_SSE_HEADERS)
-
-
-def _sse_composer_reply(
-    orch_r: AskOrchestrationResult,
-):
-    """Composer overlay via SSE: typing + ui + done (no text_delta)."""
-    out = respond_from_composer(
-        composed_answer=str(orch_r.composed_answer or ""),
-        materialized_cards=list(orch_r.materialized_cards or []),
-        q=orch_r.q,
-        sid=orch_r.sid,
-        client_id=orch_r.client_id,
-        matched_service_id=orch_r.matched_service_id,
-        route=orch_r.chunk_route or "retrieval_chunk",
-        primary_chunk_ref=orch_r.composer_primary_chunk_ref,
-        finalize_ask=finalize_ask,
-        logger=logger,
-        log_event="Answer generated from composer",
-    )
-    route = orch_r.chunk_route or "retrieval_chunk"
-    phase = _sse_typing_phase(kind="composer", route=route)
-
-    def _gen():
-        yield _sse_typing_line(phase)
-        yield f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
-        yield "event: done\ndata: {}\n\n"
-
-    return app.response_class(_gen(), mimetype="text/event-stream", headers=_SSE_HEADERS)
-
-
-def _sse_chunk_response(
-    chunk: dict,
-    q: str,
-    sid: str,
-    client_id: str | None,
-    *,
-    llm_question: str | None = None,
-    log_event: str = "Answer generated",
-    route: str = "retrieval_chunk",
-    generator_append_text: str | None = None,
-    price_offer_meta: dict | None = None,
-    matched_service_id: str | None = None,
-):
-    """Стриминговый ответ из чанка через SSE."""
-    return app.response_class(
-        stream_with_context(
-            respond_from_chunk_stream(
-                chunk=chunk,
-                q=q,
-                sid=sid,
-                client_id=client_id,
-                finalize_ask=finalize_ask,
-                logger=logger,
-                llm_question=llm_question,
-                log_event=log_event,
-                route=route,
-                generator_append_text=generator_append_text,
-                price_offer_meta=price_offer_meta,
-                matched_service_id=matched_service_id,
-            ),
-        ),
-        mimetype="text/event-stream",
-        headers=_SSE_HEADERS,
-    )
 
 
 def _dispatch_orchestration_sse(orch_r: AskOrchestrationResult):
@@ -702,34 +1116,23 @@ def _dispatch_orchestration_sse(orch_r: AskOrchestrationResult):
         if orch_r.http_status != 200:
             return resp, orch_r.http_status
         return resp
-    if orch_r.kind == "composer":
-        return _sse_composer_reply(orch_r)
-    if orch_r.kind == "chunk":
-        return _sse_chunk_response(
-            orch_r.chosen_chunk,
-            orch_r.q,
-            orch_r.sid,
-            orch_r.client_id,
-            llm_question=orch_r.llm_question,
-            log_event=orch_r.log_event,
-            route=orch_r.chunk_route,
-            generator_append_text=orch_r.generator_append_text,
-            price_offer_meta=orch_r.price_offer_meta,
-            matched_service_id=orch_r.matched_service_id,
-        )
     raise RuntimeError(f"bad orchestration kind: {orch_r.kind}")
 
 
 @app.post("/ask/stream")
 def ask_stream():
     """Стриминговый вариант /ask. Протокол SSE:
-      event: typing      data: {"phase":"searching"|"writing"} — фаза индикатора (первым)
-      event: text_delta  data: {"delta": "..."}   — токены ответа
+      event: status      data: {"message": "..."}   — PERF-1 честный ранний статус (опционален для клиента)
+      event: typing      data: {"phase":"searching"|"writing"} — фаза индикатора (перед ui, как раньше)
+      event: text_delta  data: {"delta": "..."}   — токены ответа (пока не используется)
       event: ui          data: {полный payload}    — UI элементы после генерации
       event: done        data: {}                  — конец стрима
     Direct-ответы (цены, контакты, flow) отдают typing + ui + done без text_delta.
+    /reset и /новая — тот же быстрый детерминированный путь, что и раньше, без early-status
+    (PERF-1 не относится к административным командам).
     """
     q = ""
+    client_id: str | None = None
     request.ctx["turn_t0_monotonic"] = time.monotonic()
     try:
         data = request.get_json(force=True) or {}
@@ -739,55 +1142,54 @@ def ask_stream():
         blocked = _widget_origin_forbidden(client_id)
         if blocked:
             return blocked
-        orch_r = _orchestrate_ask_turn(data)
-        from core.turn_timing import mark
 
-        mark("orchestrate_done")
-        q = orch_r.q or ""
-        return _dispatch_orchestration_sse(orch_r)
+        q_raw = str(data.get("q") or "").strip()
+        if q_raw.lower() in ("/reset", "/новая"):
+            orch_r = _orchestrate_ask_turn(data)
+            turn_timing.mark("orchestrate_done")
+            q = orch_r.q or ""
+            resp = _dispatch_orchestration_sse(orch_r)
+            _emit_runtime_turn_diagnostic_once(
+                status="completed",
+                route=_route_from_orch_result(orch_r),
+                transport="sse",
+            )
+            return resp
+
+        return _stream_ask_turn_response(data, client_id)
     except Exception as e:
-        logger.exception("ask_stream_failed", extra={"q": q, "err": str(e)})
-        if request.ctx.get("sid") and (q or "").strip():
+        if _runtime_turn_diagnostic_ready():
+            _emit_runtime_turn_diagnostic_once(
+                status="error",
+                route="error",
+                transport="sse",
+            )
+        logger.exception("ask_stream_failed", extra={"err": str(e)[:500]})
+        sid_err = str(request.ctx.get("sid") or "").strip()
+        if sid_err and (q or "").strip():
             emit_bot_event(
                 logger,
                 "turn_complete",
                 status="error",
-                details={
-                    "turn_number": None,
-                    "user_text_redacted": redact_text((q or ""), max_len=8000),
-                    "user_preview_redacted": redact_text((q or ""), max_len=200),
-                    "bot_text_redacted": "",
-                    "intent": None,
-                    "doc_id": None,
-                    "route": "error",
-                    "low_score": False,
-                    "lead_flow": False,
-                    "handoff_filter": False,
-                    "answer_chars": 0,
-                    "latency_ms": None,
-                    "fallback_reason": "ask_stream_failed",
-                    "retrieval_scope_topic": None,
-                    "retrieval_scope_guard_reason": "none",
-                    "retrieval_scope_widen_fallback": False,
-                    "legacy_intent": None,
-                    "effective_intent": "",
-                },
+                details=error_turn_complete_details(
+                    q,
+                    fallback_reason="ask_stream_failed",
+                    meta=_error_observability_meta(sid_err),
+                ),
             )
+        from core.user_text_privacy import observability_safe_user_text
+
         emit_bot_event(
             logger,
             "ask_stream_failed",
             status="error",
-            details={"error": str(e)[:500], "question_preview": (q or "")[:200]},
+            details={
+                "error": str(e)[:500],
+                "question_preview": observability_safe_user_text(q or "", max_len=200),
+                **_error_observability_meta(sid_err),
+            },
         )
-        return safe_jsonify(internal_error_response()), 200
-
-@app.get("/__debug/retrieval")
-def dbg():
-    if APP_ENV == "prod":
-        return jsonify({"error": "not_found"}), 404
-    if request.headers.get("X-Debug-Token") != DEBUG_TOKEN:
-        return jsonify({"error": "unauthorized"}), 401
-    return jsonify({"error": "retrieval_removed", "message": "Embed search debug endpoint is retired."}), 410
+        return safe_jsonify(internal_error_response(client_id=client_id)), 200
 
 
 @app.get("/api/video-catalog")
@@ -893,7 +1295,7 @@ def create_lead():
     data["sid"] = sid
     data["request_id"] = request.ctx.get("request_id")
     _bind_chat_ctx(sid, client_id)
-    payload, status = handle_lead(data)
+    payload, status = handle_lead(data, client_id=client_id)
     return jsonify(payload), status
 
 

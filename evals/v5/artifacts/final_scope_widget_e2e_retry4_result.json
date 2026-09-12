@@ -1,0 +1,1233 @@
+{
+  "summary": {
+    "technical": {
+      "http_turns_completed": 8,
+      "target_answer_path": 8,
+      "legacy_hits": [],
+      "fullcontext_build_count": 1,
+      "all_materialized": true,
+      "no_failure_routes": true,
+      "turn_automated_pass": 8,
+      "planner_model_plus_verified": true,
+      "planner_models_observed": [
+        "qwen3.7-plus",
+        "qwen3.7-plus",
+        "qwen3.7-plus",
+        "qwen3.7-plus",
+        "qwen3.7-plus"
+      ]
+    },
+    "provider": {
+      "total_calls": 34,
+      "role_totals": {
+        "composer": 8,
+        "ingress": 5,
+        "medical_boundary": 8,
+        "planner": 5,
+        "semantic_verifier": 8
+      },
+      "retries": 0,
+      "ledger_complete": true,
+      "ledger_balanced": true
+    },
+    "automated_verdict": "AUTOMATED_PASS",
+    "final_verdict": "PENDING_MANUAL_REVIEW",
+    "rerun_blocked_without_owner_approval": true,
+    "manual_review_required": true,
+    "baseline_live_commit": "084203e51581c8074cbaf519fffb530de1685037",
+    "primary_sid": "fsw-live-21f0acbdaabf",
+    "live_run": true
+  },
+  "turn_results": [
+    {
+      "turn": 1,
+      "turn_id": "fsw_turn_01_implant_broad",
+      "endpoint": "/ask",
+      "sid": "fsw-live-a95e8527a2ab",
+      "request": {
+        "q": "Сколько стоит имплантация?"
+      },
+      "expect": {
+        "materialized": true,
+        "response_stage": "broad_family_price",
+        "scope_nav_count": 3,
+        "max_price_followups": 0,
+        "max_payment_stage_followups": 0
+      },
+      "effective_scope": null,
+      "ui_ref_used": false,
+      "status_code": 200,
+      "body": {
+        "answer": "Стоимость имплантации зависит от выбранного метода и бренда системы. Вот основные ориентиры «под ключ»:\n\n*   **Классическая имплантация одного зуба** (имплант Impro, Германия) — **85 200 ₽**. В эту сумму входят сам имплант с документами, работа хирурга, анестезия и постоянная коронка.\n*   **Восстановление всей челюсти по протоколу All-on-4** (импланты Impro) — **368 000 ₽** за одну челюсть. Сюда включены 4 импланта, хирургический этап, несъёмный протез в день операции и постоянная конструкция через 3–6 месяцев.\n\nКомпьютерная томография (КТ) и костная пластика при необходимости оплачиваются отдельно. Точную стоимость для вашей ситуации врач рассчитает после диагностики на бесплатной консультации.",
+        "cta": null,
+        "meta": {
+          "answer_path": "target_fullcontext",
+          "attribution_kind": "content",
+          "client_id": "demo",
+          "followup_count": 3,
+          "followup_source": "quick_replies",
+          "followups": [],
+          "intent": "content",
+          "matched_service_id": null,
+          "policy_decision": {
+            "followups_before_ui_source_policy": 0,
+            "quick_replies_before_ui_source_policy": 3,
+            "ui_source_dropped": [],
+            "ui_source_family_effective": "price_navigation",
+            "ui_source_family_in": "price_navigation",
+            "ui_source_route": "target_fullcontext_materialized"
+          },
+          "response_stage": "broad_family_price",
+          "scope_price_topic": "implantation",
+          "service_route": "target_fullcontext_materialized",
+          "service_topic": "implantation",
+          "session_turn_count": 1,
+          "sid": "fsw-live-a95e8527a2ab",
+          "turn_count": 1,
+          "ui_source_family": "price_navigation"
+        },
+        "offer": null,
+        "quick_replies": [
+          {
+            "label": "Один зуб",
+            "ref": "target:ui_scope/implantation/one_tooth"
+          },
+          {
+            "label": "Несколько зубов",
+            "ref": "target:ui_scope/implantation/few_teeth"
+          },
+          {
+            "label": "Вся челюсть",
+            "ref": "target:ui_scope/implantation/full_arch"
+          }
+        ],
+        "situation": {
+          "mode": "normal",
+          "show": false
+        },
+        "video": null
+      },
+      "answer_text": "Стоимость имплантации зависит от выбранного метода и бренда системы. Вот основные ориентиры «под ключ»:\n\n*   **Классическая имплантация одного зуба** (имплант Impro, Германия) — **85 200 ₽**. В эту сумму входят сам имплант с документами, работа хирурга, анестезия и постоянная коронка.\n*   **Восстановление всей челюсти по протоколу All-on-4** (импланты Impro) — **368 000 ₽** за одну челюсть. Сюда включены 4 импланта, хирургический этап, несъёмный протез в день операции и постоянная конструкция через 3–6 месяцев.\n\nКомпьютерная томография (КТ) и костная пластика при необходимости оплачиваются отдельно. Точную стоимость для вашей ситуации врач рассчитает после диагностики на бесплатной консультации.",
+      "meta": {
+        "answer_path": "target_fullcontext",
+        "attribution_kind": "content",
+        "client_id": "demo",
+        "followup_count": 3,
+        "followup_source": "quick_replies",
+        "followups": [],
+        "intent": "content",
+        "matched_service_id": null,
+        "policy_decision": {
+          "followups_before_ui_source_policy": 0,
+          "quick_replies_before_ui_source_policy": 3,
+          "ui_source_dropped": [],
+          "ui_source_family_effective": "price_navigation",
+          "ui_source_family_in": "price_navigation",
+          "ui_source_route": "target_fullcontext_materialized"
+        },
+        "response_stage": "broad_family_price",
+        "scope_price_topic": "implantation",
+        "service_route": "target_fullcontext_materialized",
+        "service_topic": "implantation",
+        "session_turn_count": 1,
+        "sid": "fsw-live-a95e8527a2ab",
+        "turn_count": 1,
+        "ui_source_family": "price_navigation"
+      },
+      "quick_replies": [
+        {
+          "label": "Один зуб",
+          "ref": "target:ui_scope/implantation/one_tooth"
+        },
+        {
+          "label": "Несколько зубов",
+          "ref": "target:ui_scope/implantation/few_teeth"
+        },
+        {
+          "label": "Вся челюсть",
+          "ref": "target:ui_scope/implantation/full_arch"
+        }
+      ],
+      "cta": null,
+      "stream_text": null,
+      "session_before": {
+        "last_service_id": null,
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": [],
+        "patient_facts": null
+      },
+      "session_after": {
+        "last_service_id": null,
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": [
+          {
+            "ref": "target:ui_scope/implantation/one_tooth",
+            "label": "Один зуб"
+          },
+          {
+            "ref": "target:ui_scope/implantation/few_teeth",
+            "label": "Несколько зубов"
+          },
+          {
+            "ref": "target:ui_scope/implantation/full_arch",
+            "label": "Вся челюсть"
+          }
+        ],
+        "patient_facts": null
+      },
+      "gates": {
+        "flags": {
+          "http_completed": true,
+          "target_answer_path": true,
+          "no_legacy_route": true,
+          "materialized": true,
+          "no_error_route": true,
+          "no_terminal_route": true,
+          "quick_refs_unique": true,
+          "scope_nav_count": true,
+          "max_price_followups": true,
+          "max_payment_stage_followups": true,
+          "response_stage": true
+        },
+        "automated_turn_verdict": "PASS"
+      },
+      "automated_turn_verdict": "PASS",
+      "recommended_manual_review": "PENDING"
+    },
+    {
+      "turn": 2,
+      "turn_id": "fsw_turn_02_scope_full_arch_click",
+      "endpoint": "/ask",
+      "sid": "fsw-live-a95e8527a2ab",
+      "request": {
+        "q": "",
+        "ref": "target:ui_scope/implantation/full_arch"
+      },
+      "expect": {
+        "materialized": true,
+        "scope_nav_count": 0,
+        "session_extent": "full_arch",
+        "ui_ref_used": true
+      },
+      "effective_scope": null,
+      "ui_ref_used": true,
+      "ref": "target:ui_scope/implantation/full_arch",
+      "label": "Вся челюсть",
+      "status_code": 200,
+      "body": {
+        "answer": "Стоимость восстановления полного зубного ряда на одной челюсти зависит от выбранного протокола (All-on-4 или All-on-6) и бренда имплантов.\n\n**Протокол All-on-4 (на 4 имплантах):**\n*   Implantium — 318 000 руб.\n*   Impro — 368 000 руб.\n*   Nobel — 428 000 руб.\n\n**Протокол All-on-6 (на 6 имплантах):**\n*   Implantium — 398 000 руб.\n*   Impro — 458 000 руб.\n*   Nobel — 528 000 руб.\n\nВ стоимость входит хирургия, анестезия, несъёмный протез в день операции и постоянная конструкция через 3–6 месяцев. КТ и костная пластика оплачиваются отдельно при необходимости.",
+        "cta": null,
+        "meta": {
+          "answer_path": "target_fullcontext",
+          "attribution_kind": "content",
+          "client_id": "demo",
+          "followup_count": 0,
+          "followup_source": "quick_replies",
+          "followups": [],
+          "intent": "content",
+          "matched_service_id": null,
+          "policy_decision": {
+            "followups_before_ui_source_policy": 0,
+            "quick_replies_before_ui_source_policy": 0,
+            "ui_source_dropped": [],
+            "ui_source_family_effective": "price_navigation",
+            "ui_source_family_in": "price_navigation",
+            "ui_source_route": "target_fullcontext_materialized"
+          },
+          "response_stage": "scoped_family_price",
+          "scope_price_topic": "implantation",
+          "service_route": "target_fullcontext_materialized",
+          "service_topic": "implantation",
+          "session_turn_count": 2,
+          "sid": "fsw-live-a95e8527a2ab",
+          "turn_count": 2,
+          "ui_source_family": "price_navigation"
+        },
+        "offer": null,
+        "quick_replies": [],
+        "situation": {
+          "mode": "normal",
+          "show": false
+        },
+        "video": null
+      },
+      "answer_text": "Стоимость восстановления полного зубного ряда на одной челюсти зависит от выбранного протокола (All-on-4 или All-on-6) и бренда имплантов.\n\n**Протокол All-on-4 (на 4 имплантах):**\n*   Implantium — 318 000 руб.\n*   Impro — 368 000 руб.\n*   Nobel — 428 000 руб.\n\n**Протокол All-on-6 (на 6 имплантах):**\n*   Implantium — 398 000 руб.\n*   Impro — 458 000 руб.\n*   Nobel — 528 000 руб.\n\nВ стоимость входит хирургия, анестезия, несъёмный протез в день операции и постоянная конструкция через 3–6 месяцев. КТ и костная пластика оплачиваются отдельно при необходимости.",
+      "meta": {
+        "answer_path": "target_fullcontext",
+        "attribution_kind": "content",
+        "client_id": "demo",
+        "followup_count": 0,
+        "followup_source": "quick_replies",
+        "followups": [],
+        "intent": "content",
+        "matched_service_id": null,
+        "policy_decision": {
+          "followups_before_ui_source_policy": 0,
+          "quick_replies_before_ui_source_policy": 0,
+          "ui_source_dropped": [],
+          "ui_source_family_effective": "price_navigation",
+          "ui_source_family_in": "price_navigation",
+          "ui_source_route": "target_fullcontext_materialized"
+        },
+        "response_stage": "scoped_family_price",
+        "scope_price_topic": "implantation",
+        "service_route": "target_fullcontext_materialized",
+        "service_topic": "implantation",
+        "session_turn_count": 2,
+        "sid": "fsw-live-a95e8527a2ab",
+        "turn_count": 2,
+        "ui_source_family": "price_navigation"
+      },
+      "quick_replies": [],
+      "cta": null,
+      "stream_text": null,
+      "session_before": {
+        "last_service_id": null,
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": [
+          {
+            "ref": "target:ui_scope/implantation/one_tooth",
+            "label": "Один зуб"
+          },
+          {
+            "ref": "target:ui_scope/implantation/few_teeth",
+            "label": "Несколько зубов"
+          },
+          {
+            "ref": "target:ui_scope/implantation/full_arch",
+            "label": "Вся челюсть"
+          }
+        ],
+        "patient_facts": null
+      },
+      "session_after": {
+        "last_service_id": null,
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": [],
+        "patient_facts": {
+          "extent": "full_arch",
+          "topic": "implantation",
+          "stage": null,
+          "jaw": null,
+          "provenance": "ui_scope_ref",
+          "ref": "target:ui_scope/implantation/full_arch"
+        }
+      },
+      "gates": {
+        "flags": {
+          "http_completed": true,
+          "target_answer_path": true,
+          "no_legacy_route": true,
+          "materialized": true,
+          "no_error_route": true,
+          "no_terminal_route": true,
+          "quick_refs_unique": true,
+          "scope_nav_count": true,
+          "ui_ref_used": true,
+          "session_extent": true
+        },
+        "automated_turn_verdict": "PASS"
+      },
+      "automated_turn_verdict": "PASS",
+      "recommended_manual_review": "PENDING"
+    },
+    {
+      "turn": 3,
+      "turn_id": "fsw_turn_03_extent_correction_one_tooth",
+      "endpoint": "/ask",
+      "sid": "fsw-live-a95e8527a2ab",
+      "request": {
+        "q": "Нет, речь об одном зубе"
+      },
+      "expect": {
+        "materialized": true,
+        "session_extent": "one_tooth",
+        "effective_extent": "one_tooth",
+        "effective_extent_source": "a9_turn"
+      },
+      "effective_scope": null,
+      "ui_ref_used": false,
+      "status_code": 200,
+      "body": {
+        "answer": "Понял вас. Для восстановления одного зуба мы предлагаем классическую имплантацию «под ключ» — это полный цикл от установки импланта до фиксации постоянной коронки.\n\nСтоимость зависит от выбранной системы имплантов:\n*   **Implantium (Южная Корея)** — 76 200 ₽ за один зуб.\n*   **Impro (Германия)** — 85 200 ₽ за один зуб.\n\nВ эту сумму уже включены сам имплант с документами, хирургическая установка с анестезией, постоянная коронка, а также контрольные осмотры и сопровождение куратора. Оплата проходит в два этапа: сначала оплачивается хирургическая часть, а через 3–4 месяца, когда имплант приживется, — установка коронки. Компьютерная томография (КТ) при необходимости оплачивается отдельно.\n\nЧтобы подобрать оптимальный вариант именно для вашей ситуации, врач на консультации оценит состояние кости и соседних зубов, сравнит подходящие системы и составит понятный поэтапный план восстановления.",
+        "cta": {
+          "action": "lead",
+          "key": "plan",
+          "text": "Составить план лечения"
+        },
+        "meta": {
+          "answer_path": "target_fullcontext",
+          "attribution_kind": "content",
+          "client_id": "demo",
+          "cta_action": "lead",
+          "cta_key": "plan",
+          "followup_count": 2,
+          "followup_source": "quick_replies",
+          "followups": [],
+          "intent": "content",
+          "matched_service_id": "classic",
+          "policy_decision": {
+            "followups_before_ui_source_policy": 0,
+            "quick_replies_before_ui_source_policy": 2,
+            "ui_source_dropped": [],
+            "ui_source_family_effective": "price_navigation",
+            "ui_source_family_in": "price_navigation",
+            "ui_source_route": "target_fullcontext_materialized"
+          },
+          "service_route": "target_fullcontext_materialized",
+          "service_topic": "implantation",
+          "session_turn_count": 3,
+          "sid": "fsw-live-a95e8527a2ab",
+          "turn_count": 3,
+          "ui_source_family": "price_navigation"
+        },
+        "offer": null,
+        "quick_replies": [
+          {
+            "label": "Оплата по этапам",
+            "ref": "price:classic/stages"
+          },
+          {
+            "label": "Что входит",
+            "ref": "price:classic/includes"
+          }
+        ],
+        "situation": {
+          "mode": "normal",
+          "show": false
+        },
+        "video": null
+      },
+      "answer_text": "Понял вас. Для восстановления одного зуба мы предлагаем классическую имплантацию «под ключ» — это полный цикл от установки импланта до фиксации постоянной коронки.\n\nСтоимость зависит от выбранной системы имплантов:\n*   **Implantium (Южная Корея)** — 76 200 ₽ за один зуб.\n*   **Impro (Германия)** — 85 200 ₽ за один зуб.\n\nВ эту сумму уже включены сам имплант с документами, хирургическая установка с анестезией, постоянная коронка, а также контрольные осмотры и сопровождение куратора. Оплата проходит в два этапа: сначала оплачивается хирургическая часть, а через 3–4 месяца, когда имплант приживется, — установка коронки. Компьютерная томография (КТ) при необходимости оплачивается отдельно.\n\nЧтобы подобрать оптимальный вариант именно для вашей ситуации, врач на консультации оценит состояние кости и соседних зубов, сравнит подходящие системы и составит понятный поэтапный план восстановления.",
+      "meta": {
+        "answer_path": "target_fullcontext",
+        "attribution_kind": "content",
+        "client_id": "demo",
+        "cta_action": "lead",
+        "cta_key": "plan",
+        "followup_count": 2,
+        "followup_source": "quick_replies",
+        "followups": [],
+        "intent": "content",
+        "matched_service_id": "classic",
+        "policy_decision": {
+          "followups_before_ui_source_policy": 0,
+          "quick_replies_before_ui_source_policy": 2,
+          "ui_source_dropped": [],
+          "ui_source_family_effective": "price_navigation",
+          "ui_source_family_in": "price_navigation",
+          "ui_source_route": "target_fullcontext_materialized"
+        },
+        "service_route": "target_fullcontext_materialized",
+        "service_topic": "implantation",
+        "session_turn_count": 3,
+        "sid": "fsw-live-a95e8527a2ab",
+        "turn_count": 3,
+        "ui_source_family": "price_navigation"
+      },
+      "quick_replies": [
+        {
+          "label": "Оплата по этапам",
+          "ref": "price:classic/stages"
+        },
+        {
+          "label": "Что входит",
+          "ref": "price:classic/includes"
+        }
+      ],
+      "cta": {
+        "action": "lead",
+        "key": "plan",
+        "text": "Составить план лечения"
+      },
+      "stream_text": null,
+      "session_before": {
+        "last_service_id": null,
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": [],
+        "patient_facts": {
+          "extent": "full_arch",
+          "topic": "implantation",
+          "stage": null,
+          "jaw": null,
+          "provenance": "ui_scope_ref",
+          "ref": "target:ui_scope/implantation/full_arch"
+        }
+      },
+      "session_after": {
+        "last_service_id": "classic",
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [
+          "implantation__service__classic.md"
+        ],
+        "followups": [
+          {
+            "ref": "price:classic/stages",
+            "label": "Оплата по этапам"
+          },
+          {
+            "ref": "price:classic/includes",
+            "label": "Что входит"
+          }
+        ],
+        "patient_facts": {
+          "extent": "one_tooth",
+          "topic": "implantation",
+          "stage": null,
+          "jaw": null,
+          "provenance": "turn_plan.raw.patient_scope.extent",
+          "ref": "a9_turn:patient_scope"
+        }
+      },
+      "gates": {
+        "flags": {
+          "http_completed": true,
+          "target_answer_path": true,
+          "no_legacy_route": true,
+          "materialized": true,
+          "no_error_route": true,
+          "no_terminal_route": true,
+          "quick_refs_unique": true,
+          "session_extent": true
+        },
+        "automated_turn_verdict": "PASS"
+      },
+      "automated_turn_verdict": "PASS",
+      "recommended_manual_review": "PENDING"
+    },
+    {
+      "turn": 4,
+      "turn_id": "fsw_turn_04_implant_full_arch_a9_stream",
+      "endpoint": "/ask/stream",
+      "sid": "fsw-live-19f84d26d3e8",
+      "request": {
+        "q": "Сколько стоит имплантация всей челюсти?"
+      },
+      "expect": {
+        "materialized": true,
+        "scope_nav_count": 0,
+        "effective_extent": "full_arch",
+        "session_extent": "full_arch",
+        "stream_required": true
+      },
+      "effective_scope": null,
+      "ui_ref_used": false,
+      "status_code": 200,
+      "body": {
+        "answer": "Стоимость восстановления всей челюсти зависит от выбранного протокола (All-on-4 или All-on-6) и бренда имплантов. Ниже приведены фиксированные цены «под ключ» за одну челюсть:\n\n**Протокол All-on-4 (на 4 имплантах):**\n*   Implantium — 318 000 руб.\n*   Impro — 368 000 руб.\n*   Nobel Biocare — 428 000 руб.\n\n**Протокол All-on-6 (на 6 имплантах):**\n*   Implantium — 398 000 руб.\n*   Impro — 458 000 руб.\n*   Nobel Biocare — 528 000 руб.\n\nВ стоимость входит хирургия, анестезия, несъёмный протез в день операции и постоянный протез через 3–6 месяцев. КТ и костная пластика при необходимости оплачиваются отдельно.",
+        "quick_replies": [],
+        "cta": null,
+        "video": null,
+        "situation": {
+          "show": false,
+          "mode": "normal"
+        },
+        "offer": null,
+        "meta": {
+          "client_id": "demo",
+          "sid": "fsw-live-19f84d26d3e8",
+          "intent": "content",
+          "answer_path": "target_fullcontext",
+          "service_route": "target_fullcontext_materialized",
+          "ui_source_family": "price_navigation",
+          "attribution_kind": "content",
+          "matched_service_id": null,
+          "service_topic": "implantation",
+          "followup_count": 0,
+          "followup_source": "quick_replies",
+          "response_stage": "scoped_family_price",
+          "scope_price_topic": "implantation",
+          "followups": [],
+          "policy_decision": {
+            "ui_source_family_in": "price_navigation",
+            "ui_source_family_effective": "price_navigation",
+            "ui_source_route": "target_fullcontext_materialized",
+            "quick_replies_before_ui_source_policy": 0,
+            "followups_before_ui_source_policy": 0,
+            "ui_source_dropped": []
+          },
+          "turn_count": 1,
+          "session_turn_count": 1
+        }
+      },
+      "answer_text": "Стоимость восстановления всей челюсти зависит от выбранного протокола (All-on-4 или All-on-6) и бренда имплантов. Ниже приведены фиксированные цены «под ключ» за одну челюсть:\n\n**Протокол All-on-4 (на 4 имплантах):**\n*   Implantium — 318 000 руб.\n*   Impro — 368 000 руб.\n*   Nobel Biocare — 428 000 руб.\n\n**Протокол All-on-6 (на 6 имплантах):**\n*   Implantium — 398 000 руб.\n*   Impro — 458 000 руб.\n*   Nobel Biocare — 528 000 руб.\n\nВ стоимость входит хирургия, анестезия, несъёмный протез в день операции и постоянный протез через 3–6 месяцев. КТ и костная пластика при необходимости оплачиваются отдельно.",
+      "meta": {
+        "client_id": "demo",
+        "sid": "fsw-live-19f84d26d3e8",
+        "intent": "content",
+        "answer_path": "target_fullcontext",
+        "service_route": "target_fullcontext_materialized",
+        "ui_source_family": "price_navigation",
+        "attribution_kind": "content",
+        "matched_service_id": null,
+        "service_topic": "implantation",
+        "followup_count": 0,
+        "followup_source": "quick_replies",
+        "response_stage": "scoped_family_price",
+        "scope_price_topic": "implantation",
+        "followups": [],
+        "policy_decision": {
+          "ui_source_family_in": "price_navigation",
+          "ui_source_family_effective": "price_navigation",
+          "ui_source_route": "target_fullcontext_materialized",
+          "quick_replies_before_ui_source_policy": 0,
+          "followups_before_ui_source_policy": 0,
+          "ui_source_dropped": []
+        },
+        "turn_count": 1,
+        "session_turn_count": 1
+      },
+      "quick_replies": [],
+      "cta": null,
+      "stream_text": "event: typing\ndata: {\"phase\": \"writing\"}\n\nevent: ui\ndata: {\"answer\": \"Стоимость восстановления всей челюсти зависит от выбранного протокола (All-on-4 или All-on-6) и бренда имплантов. Ниже приведены фиксированные цены «под ключ» за одну челюсть:\\n\\n**Протокол All-on-4 (на 4 имплантах):**\\n*   Implantium — 318 000 руб.\\n*   Impro — 368 000 руб.\\n*   Nobel Biocare — 428 000 руб.\\n\\n**Протокол All-on-6 (на 6 имплантах):**\\n*   Implantium — 398 000 руб.\\n*   Impro — 458 000 руб.\\n*   Nobel Biocare — 528 000 руб.\\n\\nВ стоимость входит хирургия, анестезия, несъёмный протез в день операции и постоянный протез через 3–6 месяцев. КТ и костная пластика при необходимости оплачиваются отдельно.\", \"quick_replies\": [], \"cta\": null, \"video\": null, \"situation\": {\"show\": false, \"mode\": \"normal\"}, \"offer\": null, \"meta\": {\"client_id\": \"demo\", \"sid\": \"fsw-live-19f84d26d3e8\", \"intent\": \"content\", \"answer_path\": \"target_fullcontext\", \"service_route\": \"target_fullcontext_materialized\", \"ui_source_family\": \"price_navigation\", \"attribution_kind\": \"content\", \"matched_service_id\": null, \"service_topic\": \"implantation\", \"followup_count\": 0, \"followup_source\": \"quick_replies\", \"response_stage\": \"scoped_family_price\", \"scope_price_topic\": \"implantation\", \"followups\": [], \"policy_decision\": {\"ui_source_family_in\": \"price_navigation\", \"ui_source_family_effective\": \"price_navigation\", \"ui_source_route\": \"target_fullcontext_materialized\", \"quick_replies_before_ui_source_policy\": 0, \"followups_before_ui_source_policy\": 0, \"ui_source_dropped\": []}, \"turn_count\": 1, \"session_turn_count\": 1}}\n\nevent: done\ndata: {}\n\n",
+      "session_before": {
+        "last_service_id": null,
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": [],
+        "patient_facts": null
+      },
+      "session_after": {
+        "last_service_id": null,
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": [],
+        "patient_facts": {
+          "extent": "full_arch",
+          "topic": "implantation",
+          "stage": null,
+          "jaw": null,
+          "provenance": "turn_plan.raw.patient_scope.extent",
+          "ref": "a9_turn:patient_scope"
+        }
+      },
+      "gates": {
+        "flags": {
+          "http_completed": true,
+          "target_answer_path": true,
+          "no_legacy_route": true,
+          "materialized": true,
+          "no_error_route": true,
+          "no_terminal_route": true,
+          "quick_refs_unique": true,
+          "stream_ui_done": true,
+          "scope_nav_count": true,
+          "session_extent": true
+        },
+        "automated_turn_verdict": "PASS"
+      },
+      "automated_turn_verdict": "PASS",
+      "recommended_manual_review": "PENDING"
+    },
+    {
+      "turn": 5,
+      "turn_id": "fsw_turn_05_prosthetics_broad",
+      "endpoint": "/ask",
+      "sid": "fsw-live-9aaadca048d0",
+      "request": {
+        "q": "Сколько стоит протезирование?"
+      },
+      "expect": {
+        "materialized": true,
+        "response_stage": "broad_family_price",
+        "scope_nav_count": 3,
+        "max_price_followups": 0
+      },
+      "effective_scope": null,
+      "ui_ref_used": false,
+      "status_code": 200,
+      "body": {
+        "answer": "Стоимость съёмного протезирования начинается от **45 000 ₽** за одну челюсть. В эту сумму входят осмотр, снятие слепков, изготовление конструкции, а также примерка и коррекция для комфортной посадки.\n\nИмплантация и другие виды восстановления зубов рассчитываются отдельно, так как зависят от клинической ситуации. Точную цену врач назовёт после осмотра и диагностики.",
+        "cta": null,
+        "meta": {
+          "answer_path": "target_fullcontext",
+          "attribution_kind": "content",
+          "client_id": "demo",
+          "followup_count": 3,
+          "followup_source": "quick_replies",
+          "followups": [],
+          "intent": "content",
+          "matched_service_id": null,
+          "policy_decision": {
+            "followups_before_ui_source_policy": 0,
+            "quick_replies_before_ui_source_policy": 3,
+            "ui_source_dropped": [],
+            "ui_source_family_effective": "price_navigation",
+            "ui_source_family_in": "price_navigation",
+            "ui_source_route": "target_fullcontext_materialized"
+          },
+          "response_stage": "broad_family_price",
+          "scope_price_topic": "prosthetics",
+          "service_route": "target_fullcontext_materialized",
+          "service_topic": "prosthetics",
+          "session_turn_count": 1,
+          "sid": "fsw-live-9aaadca048d0",
+          "turn_count": 1,
+          "ui_source_family": "price_navigation"
+        },
+        "offer": null,
+        "quick_replies": [
+          {
+            "label": "Один зуб",
+            "ref": "target:ui_scope/prosthetics/one_tooth"
+          },
+          {
+            "label": "Несколько зубов",
+            "ref": "target:ui_scope/prosthetics/few_teeth"
+          },
+          {
+            "label": "Вся челюсть",
+            "ref": "target:ui_scope/prosthetics/full_arch"
+          }
+        ],
+        "situation": {
+          "mode": "normal",
+          "show": false
+        },
+        "video": null
+      },
+      "answer_text": "Стоимость съёмного протезирования начинается от **45 000 ₽** за одну челюсть. В эту сумму входят осмотр, снятие слепков, изготовление конструкции, а также примерка и коррекция для комфортной посадки.\n\nИмплантация и другие виды восстановления зубов рассчитываются отдельно, так как зависят от клинической ситуации. Точную цену врач назовёт после осмотра и диагностики.",
+      "meta": {
+        "answer_path": "target_fullcontext",
+        "attribution_kind": "content",
+        "client_id": "demo",
+        "followup_count": 3,
+        "followup_source": "quick_replies",
+        "followups": [],
+        "intent": "content",
+        "matched_service_id": null,
+        "policy_decision": {
+          "followups_before_ui_source_policy": 0,
+          "quick_replies_before_ui_source_policy": 3,
+          "ui_source_dropped": [],
+          "ui_source_family_effective": "price_navigation",
+          "ui_source_family_in": "price_navigation",
+          "ui_source_route": "target_fullcontext_materialized"
+        },
+        "response_stage": "broad_family_price",
+        "scope_price_topic": "prosthetics",
+        "service_route": "target_fullcontext_materialized",
+        "service_topic": "prosthetics",
+        "session_turn_count": 1,
+        "sid": "fsw-live-9aaadca048d0",
+        "turn_count": 1,
+        "ui_source_family": "price_navigation"
+      },
+      "quick_replies": [
+        {
+          "label": "Один зуб",
+          "ref": "target:ui_scope/prosthetics/one_tooth"
+        },
+        {
+          "label": "Несколько зубов",
+          "ref": "target:ui_scope/prosthetics/few_teeth"
+        },
+        {
+          "label": "Вся челюсть",
+          "ref": "target:ui_scope/prosthetics/full_arch"
+        }
+      ],
+      "cta": null,
+      "stream_text": null,
+      "session_before": {
+        "last_service_id": null,
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": [],
+        "patient_facts": null
+      },
+      "session_after": {
+        "last_service_id": null,
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": [
+          {
+            "ref": "target:ui_scope/prosthetics/one_tooth",
+            "label": "Один зуб"
+          },
+          {
+            "ref": "target:ui_scope/prosthetics/few_teeth",
+            "label": "Несколько зубов"
+          },
+          {
+            "ref": "target:ui_scope/prosthetics/full_arch",
+            "label": "Вся челюсть"
+          }
+        ],
+        "patient_facts": null
+      },
+      "gates": {
+        "flags": {
+          "http_completed": true,
+          "target_answer_path": true,
+          "no_legacy_route": true,
+          "materialized": true,
+          "no_error_route": true,
+          "no_terminal_route": true,
+          "quick_refs_unique": true,
+          "scope_nav_count": true,
+          "max_price_followups": true,
+          "response_stage": true
+        },
+        "automated_turn_verdict": "PASS"
+      },
+      "automated_turn_verdict": "PASS",
+      "recommended_manual_review": "PENDING"
+    },
+    {
+      "turn": 6,
+      "turn_id": "fsw_turn_06_scope_one_tooth_click",
+      "endpoint": "/ask",
+      "sid": "fsw-live-9aaadca048d0",
+      "request": {
+        "q": "",
+        "ref": "target:ui_scope/prosthetics/one_tooth"
+      },
+      "expect": {
+        "materialized": true,
+        "session_extent": "one_tooth",
+        "ui_ref_used": true,
+        "stage_nav_min": 1
+      },
+      "effective_scope": null,
+      "ui_ref_used": true,
+      "ref": "target:ui_scope/prosthetics/one_tooth",
+      "label": "Один зуб",
+      "status_code": 200,
+      "body": {
+        "answer": "Уточните, пожалуйста: вы хотите восстановить один отсутствующий зуб или укрепить сильно разрушенный, но сохранившийся?",
+        "cta": null,
+        "meta": {
+          "answer_path": "target_fullcontext",
+          "attribution_kind": "content",
+          "client_id": "demo",
+          "followup_count": 2,
+          "followup_source": "quick_replies",
+          "followups": [],
+          "intent": "content",
+          "matched_service_id": null,
+          "policy_decision": {
+            "followups_before_ui_source_policy": 0,
+            "quick_replies_before_ui_source_policy": 2,
+            "ui_source_dropped": [],
+            "ui_source_family_effective": "price_navigation",
+            "ui_source_family_in": "price_navigation",
+            "ui_source_route": "target_fullcontext_materialized"
+          },
+          "response_stage": "stage_clarify",
+          "scope_price_topic": "prosthetics",
+          "service_route": "target_fullcontext_materialized",
+          "service_topic": "prosthetics",
+          "session_turn_count": 2,
+          "sid": "fsw-live-9aaadca048d0",
+          "turn_count": 2,
+          "ui_source_family": "price_navigation"
+        },
+        "offer": null,
+        "quick_replies": [
+          {
+            "label": "Имплант установлен",
+            "ref": "target:ui_stage/prosthetics/implant_placed"
+          },
+          {
+            "label": "Свой зуб сохранился",
+            "ref": "target:ui_stage/prosthetics/natural_tooth_present"
+          }
+        ],
+        "situation": {
+          "mode": "normal",
+          "show": false
+        },
+        "video": null
+      },
+      "answer_text": "Уточните, пожалуйста: вы хотите восстановить один отсутствующий зуб или укрепить сильно разрушенный, но сохранившийся?",
+      "meta": {
+        "answer_path": "target_fullcontext",
+        "attribution_kind": "content",
+        "client_id": "demo",
+        "followup_count": 2,
+        "followup_source": "quick_replies",
+        "followups": [],
+        "intent": "content",
+        "matched_service_id": null,
+        "policy_decision": {
+          "followups_before_ui_source_policy": 0,
+          "quick_replies_before_ui_source_policy": 2,
+          "ui_source_dropped": [],
+          "ui_source_family_effective": "price_navigation",
+          "ui_source_family_in": "price_navigation",
+          "ui_source_route": "target_fullcontext_materialized"
+        },
+        "response_stage": "stage_clarify",
+        "scope_price_topic": "prosthetics",
+        "service_route": "target_fullcontext_materialized",
+        "service_topic": "prosthetics",
+        "session_turn_count": 2,
+        "sid": "fsw-live-9aaadca048d0",
+        "turn_count": 2,
+        "ui_source_family": "price_navigation"
+      },
+      "quick_replies": [
+        {
+          "label": "Имплант установлен",
+          "ref": "target:ui_stage/prosthetics/implant_placed"
+        },
+        {
+          "label": "Свой зуб сохранился",
+          "ref": "target:ui_stage/prosthetics/natural_tooth_present"
+        }
+      ],
+      "cta": null,
+      "stream_text": null,
+      "session_before": {
+        "last_service_id": null,
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": [
+          {
+            "ref": "target:ui_scope/prosthetics/one_tooth",
+            "label": "Один зуб"
+          },
+          {
+            "ref": "target:ui_scope/prosthetics/few_teeth",
+            "label": "Несколько зубов"
+          },
+          {
+            "ref": "target:ui_scope/prosthetics/full_arch",
+            "label": "Вся челюсть"
+          }
+        ],
+        "patient_facts": null
+      },
+      "session_after": {
+        "last_service_id": null,
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": [
+          {
+            "ref": "target:ui_stage/prosthetics/implant_placed",
+            "label": "Имплант установлен"
+          },
+          {
+            "ref": "target:ui_stage/prosthetics/natural_tooth_present",
+            "label": "Свой зуб сохранился"
+          }
+        ],
+        "patient_facts": {
+          "extent": "one_tooth",
+          "topic": "prosthetics",
+          "stage": null,
+          "jaw": null,
+          "provenance": "ui_scope_ref",
+          "ref": "target:ui_scope/prosthetics/one_tooth"
+        }
+      },
+      "gates": {
+        "flags": {
+          "http_completed": true,
+          "target_answer_path": true,
+          "no_legacy_route": true,
+          "materialized": true,
+          "no_error_route": true,
+          "no_terminal_route": true,
+          "quick_refs_unique": true,
+          "stage_nav_min": true,
+          "ui_ref_used": true,
+          "session_extent": true
+        },
+        "automated_turn_verdict": "PASS"
+      },
+      "automated_turn_verdict": "PASS",
+      "recommended_manual_review": "PENDING"
+    },
+    {
+      "turn": 7,
+      "turn_id": "fsw_turn_07_stage_implant_placed_click",
+      "endpoint": "/ask",
+      "sid": "fsw-live-9aaadca048d0",
+      "request": {
+        "q": "",
+        "ref": "target:ui_stage/prosthetics/implant_placed"
+      },
+      "expect": {
+        "materialized": true,
+        "scope_nav_count": 0,
+        "stage_nav_count": 0,
+        "session_stage": "implant_placed",
+        "ui_ref_used": true
+      },
+      "effective_scope": null,
+      "ui_ref_used": true,
+      "ref": "target:ui_stage/prosthetics/implant_placed",
+      "label": "Имплант установлен",
+      "status_code": 200,
+      "body": {
+        "answer": "Если имплант уже установлен, следующий этап — ортопедический. Стоимость коронки на имплант из диоксида циркония составляет от 25 000 ₽ за одну конструкцию.\n\nОртопедический этап для одного зуба (коронка или мост) обойдётся от 31 000 ₽; сама имплантация оплачивается отдельно. Точная сумма зависит от сложности случая и типа конструкции.",
+        "cta": null,
+        "meta": {
+          "answer_path": "target_fullcontext",
+          "attribution_kind": "content",
+          "client_id": "demo",
+          "followup_count": 0,
+          "followup_source": "quick_replies",
+          "followups": [],
+          "intent": "content",
+          "matched_service_id": null,
+          "policy_decision": {
+            "followups_before_ui_source_policy": 0,
+            "quick_replies_before_ui_source_policy": 0,
+            "ui_source_dropped": [],
+            "ui_source_family_effective": "price_navigation",
+            "ui_source_family_in": "price_navigation",
+            "ui_source_route": "target_fullcontext_materialized"
+          },
+          "response_stage": "scoped_family_price",
+          "scope_price_topic": "prosthetics",
+          "service_route": "target_fullcontext_materialized",
+          "service_topic": "prosthetics",
+          "session_turn_count": 3,
+          "sid": "fsw-live-9aaadca048d0",
+          "turn_count": 3,
+          "ui_source_family": "price_navigation"
+        },
+        "offer": null,
+        "quick_replies": [],
+        "situation": {
+          "mode": "normal",
+          "show": false
+        },
+        "video": null
+      },
+      "answer_text": "Если имплант уже установлен, следующий этап — ортопедический. Стоимость коронки на имплант из диоксида циркония составляет от 25 000 ₽ за одну конструкцию.\n\nОртопедический этап для одного зуба (коронка или мост) обойдётся от 31 000 ₽; сама имплантация оплачивается отдельно. Точная сумма зависит от сложности случая и типа конструкции.",
+      "meta": {
+        "answer_path": "target_fullcontext",
+        "attribution_kind": "content",
+        "client_id": "demo",
+        "followup_count": 0,
+        "followup_source": "quick_replies",
+        "followups": [],
+        "intent": "content",
+        "matched_service_id": null,
+        "policy_decision": {
+          "followups_before_ui_source_policy": 0,
+          "quick_replies_before_ui_source_policy": 0,
+          "ui_source_dropped": [],
+          "ui_source_family_effective": "price_navigation",
+          "ui_source_family_in": "price_navigation",
+          "ui_source_route": "target_fullcontext_materialized"
+        },
+        "response_stage": "scoped_family_price",
+        "scope_price_topic": "prosthetics",
+        "service_route": "target_fullcontext_materialized",
+        "service_topic": "prosthetics",
+        "session_turn_count": 3,
+        "sid": "fsw-live-9aaadca048d0",
+        "turn_count": 3,
+        "ui_source_family": "price_navigation"
+      },
+      "quick_replies": [],
+      "cta": null,
+      "stream_text": null,
+      "session_before": {
+        "last_service_id": null,
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": [
+          {
+            "ref": "target:ui_stage/prosthetics/implant_placed",
+            "label": "Имплант установлен"
+          },
+          {
+            "ref": "target:ui_stage/prosthetics/natural_tooth_present",
+            "label": "Свой зуб сохранился"
+          }
+        ],
+        "patient_facts": {
+          "extent": "one_tooth",
+          "topic": "prosthetics",
+          "stage": null,
+          "jaw": null,
+          "provenance": "ui_scope_ref",
+          "ref": "target:ui_scope/prosthetics/one_tooth"
+        }
+      },
+      "session_after": {
+        "last_service_id": null,
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": [],
+        "patient_facts": {
+          "extent": "one_tooth",
+          "topic": "prosthetics",
+          "stage": "implant_placed",
+          "jaw": null,
+          "provenance": "ui_stage_ref",
+          "ref": "target:ui_scope/prosthetics/one_tooth"
+        }
+      },
+      "gates": {
+        "flags": {
+          "http_completed": true,
+          "target_answer_path": true,
+          "no_legacy_route": true,
+          "materialized": true,
+          "no_error_route": true,
+          "no_terminal_route": true,
+          "quick_refs_unique": true,
+          "scope_nav_count": true,
+          "stage_nav_count": true,
+          "ui_ref_used": true,
+          "session_stage": true
+        },
+        "automated_turn_verdict": "PASS"
+      },
+      "automated_turn_verdict": "PASS",
+      "recommended_manual_review": "PENDING"
+    },
+    {
+      "turn": 8,
+      "turn_id": "fsw_turn_08_prosthetics_a9_implant_placed_stream",
+      "endpoint": "/ask/stream",
+      "sid": "fsw-live-21f0acbdaabf",
+      "request": {
+        "q": "Имплант уже установлен, сколько будет коронка?"
+      },
+      "expect": {
+        "materialized": true,
+        "scope_nav_count": 0,
+        "effective_stage": "implant_placed",
+        "effective_topic": "prosthetics",
+        "stream_required": true
+      },
+      "effective_scope": null,
+      "ui_ref_used": false,
+      "status_code": 200,
+      "body": {
+        "answer": "Стоимость коронки на уже установленный имплант составляет от **31 000 ₽** за один зуб.\n\nЭта сумма относится к ортопедическому этапу (изготовление и фиксация самой коронки), так как хирургическая часть с установкой импланта у вас уже выполнена. Точная цена зависит от выбранного материала и сложности работы, поэтому финальную сумму врач назовет после осмотра.\n\nНа бесплатной консультации ортопед оценит состояние десны вокруг импланта, снимет цифровые слепки и предложит варианты коронок под ваш бюджет.",
+        "quick_replies": [],
+        "cta": {
+          "text": "Составить план лечения",
+          "action": "lead",
+          "key": "plan"
+        },
+        "video": null,
+        "situation": {
+          "show": false,
+          "mode": "normal"
+        },
+        "offer": null,
+        "meta": {
+          "client_id": "demo",
+          "sid": "fsw-live-21f0acbdaabf",
+          "intent": "content",
+          "answer_path": "target_fullcontext",
+          "service_route": "target_fullcontext_materialized",
+          "ui_source_family": "price_navigation",
+          "attribution_kind": "content",
+          "matched_service_id": "implant_supported_prosthetics",
+          "service_topic": "prosthetics",
+          "followup_count": 0,
+          "followup_source": "quick_replies",
+          "cta_key": "plan",
+          "cta_action": "lead",
+          "followups": [],
+          "policy_decision": {
+            "ui_source_family_in": "price_navigation",
+            "ui_source_family_effective": "price_navigation",
+            "ui_source_route": "target_fullcontext_materialized",
+            "quick_replies_before_ui_source_policy": 0,
+            "followups_before_ui_source_policy": 0,
+            "ui_source_dropped": []
+          },
+          "turn_count": 1,
+          "session_turn_count": 1
+        }
+      },
+      "answer_text": "Стоимость коронки на уже установленный имплант составляет от **31 000 ₽** за один зуб.\n\nЭта сумма относится к ортопедическому этапу (изготовление и фиксация самой коронки), так как хирургическая часть с установкой импланта у вас уже выполнена. Точная цена зависит от выбранного материала и сложности работы, поэтому финальную сумму врач назовет после осмотра.\n\nНа бесплатной консультации ортопед оценит состояние десны вокруг импланта, снимет цифровые слепки и предложит варианты коронок под ваш бюджет.",
+      "meta": {
+        "client_id": "demo",
+        "sid": "fsw-live-21f0acbdaabf",
+        "intent": "content",
+        "answer_path": "target_fullcontext",
+        "service_route": "target_fullcontext_materialized",
+        "ui_source_family": "price_navigation",
+        "attribution_kind": "content",
+        "matched_service_id": "implant_supported_prosthetics",
+        "service_topic": "prosthetics",
+        "followup_count": 0,
+        "followup_source": "quick_replies",
+        "cta_key": "plan",
+        "cta_action": "lead",
+        "followups": [],
+        "policy_decision": {
+          "ui_source_family_in": "price_navigation",
+          "ui_source_family_effective": "price_navigation",
+          "ui_source_route": "target_fullcontext_materialized",
+          "quick_replies_before_ui_source_policy": 0,
+          "followups_before_ui_source_policy": 0,
+          "ui_source_dropped": []
+        },
+        "turn_count": 1,
+        "session_turn_count": 1
+      },
+      "quick_replies": [],
+      "cta": {
+        "text": "Составить план лечения",
+        "action": "lead",
+        "key": "plan"
+      },
+      "stream_text": "event: typing\ndata: {\"phase\": \"writing\"}\n\nevent: ui\ndata: {\"answer\": \"Стоимость коронки на уже установленный имплант составляет от **31 000 ₽** за один зуб.\\n\\nЭта сумма относится к ортопедическому этапу (изготовление и фиксация самой коронки), так как хирургическая часть с установкой импланта у вас уже выполнена. Точная цена зависит от выбранного материала и сложности работы, поэтому финальную сумму врач назовет после осмотра.\\n\\nНа бесплатной консультации ортопед оценит состояние десны вокруг импланта, снимет цифровые слепки и предложит варианты коронок под ваш бюджет.\", \"quick_replies\": [], \"cta\": {\"text\": \"Составить план лечения\", \"action\": \"lead\", \"key\": \"plan\"}, \"video\": null, \"situation\": {\"show\": false, \"mode\": \"normal\"}, \"offer\": null, \"meta\": {\"client_id\": \"demo\", \"sid\": \"fsw-live-21f0acbdaabf\", \"intent\": \"content\", \"answer_path\": \"target_fullcontext\", \"service_route\": \"target_fullcontext_materialized\", \"ui_source_family\": \"price_navigation\", \"attribution_kind\": \"content\", \"matched_service_id\": \"implant_supported_prosthetics\", \"service_topic\": \"prosthetics\", \"followup_count\": 0, \"followup_source\": \"quick_replies\", \"cta_key\": \"plan\", \"cta_action\": \"lead\", \"followups\": [], \"policy_decision\": {\"ui_source_family_in\": \"price_navigation\", \"ui_source_family_effective\": \"price_navigation\", \"ui_source_route\": \"target_fullcontext_materialized\", \"quick_replies_before_ui_source_policy\": 0, \"followups_before_ui_source_policy\": 0, \"ui_source_dropped\": []}, \"turn_count\": 1, \"session_turn_count\": 1}}\n\nevent: done\ndata: {}\n\n",
+      "session_before": {
+        "last_service_id": null,
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": [],
+        "patient_facts": null
+      },
+      "session_after": {
+        "last_service_id": "implant_supported_prosthetics",
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": [],
+        "patient_facts": null
+      },
+      "gates": {
+        "flags": {
+          "http_completed": true,
+          "target_answer_path": true,
+          "no_legacy_route": true,
+          "materialized": true,
+          "no_error_route": true,
+          "no_terminal_route": true,
+          "quick_refs_unique": true,
+          "stream_ui_done": true,
+          "scope_nav_count": true
+        },
+        "automated_turn_verdict": "PASS"
+      },
+      "automated_turn_verdict": "PASS",
+      "recommended_manual_review": "PENDING"
+    }
+  ]
+}

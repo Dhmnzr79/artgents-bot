@@ -8,7 +8,7 @@
 
 ## 1. Принцип
 
-Один кодовый движок обслуживает несколько строго изолированных client packs. Все клинические данные, бренд, цены, лиды и настройки лежат в `clients/{id}/`; сессии лежат в `data/{id}/bot.db`.
+Один кодовый движок обслуживает изолированные client packs. **Runtime (2026-07):** активен только `demo`; шаблон `clients/_template/` — scaffold, не runtime-клиент. Все клинические данные, бренд, цены и настройки лежат в `clients/{id}/`; сессии — в `data/{id}/bot.db`.
 
 Нет fallback между клиентами. `default` нормализуется в `demo`.
 
@@ -24,7 +24,7 @@ clients/{id}/
     manifest.json
     facts.json
     services/*.json
-  patient_playbook.yaml     # ситуация пациента → варианты клиники
+  patient_playbook.yaml     # удалён в C2d-D1; канон — target_response/clinic_strategy.yaml
   marketing.yaml            # promo/marketing facts
   clinic_policies.yaml      # ограничения и политики клиники
   video_catalog.yaml

@@ -1,0 +1,13 @@
+{
+  "head_sha": "1cf8bbd200bddf5732b5723d25dc34fcc1545ac0",
+  "record_count": 76,
+  "replay_id": "response_plan_replay_1cf8bbd_2026-08-31-01",
+  "source_attempt_id": "arch_compare_live_v1_2026-08-31-01",
+  "source_hashes": {
+    "facts": "F2DB17BEE7A2E54ADB46A3A1431A000A2401B475C7D7E55B9C08C1827B094CBD",
+    "manifest": "CD25D244D67B08D42B9826AF7ECD4A1EE7AEEC7FB59351B0C77A07BF0270851C",
+    "raw_turns": "6EAF6E3B38D05709772A6E5CCC0FE9305304A1527577E33B580F636F945BA3A8",
+    "structured_turns": "98D5F672F2B54B64A3A4624BE06853D2419A3C85E7A8E9B32959557248327357"
+  },
+  "source_root": "C:\\Cursor Projects\\demo-bot-one-call-baseline-verify-report-parity-1cf8bbd\\evals\\v5\\artifacts\\arch_compare\\arch_compare_live_v1_2026-08-31-01"
+}

@@ -176,8 +176,20 @@ def score_catalog_phrase(query: str, phrase: str) -> PhraseMatch:
     return PhraseMatch(score=best, channel=channel, containment_ok=containment_ok)
 
 
+def _service_title(entry: dict[str, Any]) -> str:
+    return str(entry.get("title") or entry.get("name") or "").strip()
+
+
+def _service_content_ref(entry: dict[str, Any]) -> str:
+    ref = str(entry.get("md_entry_ref") or entry.get("content_ref") or "").strip()
+    return ref.removesuffix(".md")
+
+
 def infer_catalog_service_topic(service_id: str, entry: dict[str, Any]) -> str | None:
-    md = str(entry.get("md_entry_ref") or "").strip()
+    topic = entry.get("topic")
+    if isinstance(topic, str) and topic.strip():
+        return topic.strip().lower()
+    md = _service_content_ref(entry)
     if md:
         head = md.split("__", 1)[0].strip().lower()
         if head:
@@ -226,7 +238,7 @@ def rank_catalog_services(
         if sid in skip:
             continue
         phrases: list[str] = []
-        title = str(entry.get("title") or "").strip()
+        title = _service_title(entry)
         if title:
             phrases.append(title)
         phrases.extend(str(x).strip() for x in (entry.get("aliases") or []) if str(x).strip())

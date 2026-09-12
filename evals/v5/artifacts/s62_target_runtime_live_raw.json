@@ -1,0 +1,494 @@
+{
+  "summary": {
+    "technical": {
+      "http_turns_completed": 4,
+      "target_answer_path": 4,
+      "legacy_hits": [],
+      "fullcontext_build_count": 1,
+      "followup_ref_pass": false
+    },
+    "provider": {
+      "total_calls": 10,
+      "role_totals": {
+        "composer": 3,
+        "ingress": 0,
+        "medical_boundary": 4,
+        "planner": 0,
+        "semantic_verifier": 3
+      },
+      "retries": 0
+    },
+    "automated_verdict": "AUTOMATED_PASS",
+    "final_verdict": "PENDING_MANUAL_REVIEW",
+    "rerun_blocked_without_owner_approval": true,
+    "followup_ref_pass": false,
+    "baseline_live_commit": "c00fa4dc9f8437fc95847189577e5d2e49c43213",
+    "sid": "s62-live-dc4b1a02a42d",
+    "live_run": true
+  },
+  "turn_results": [
+    {
+      "turn": 1,
+      "turn_id": "s62_turn_01_all_on_4_info",
+      "endpoint": "/ask",
+      "request": {
+        "q": "Что такое All-on-4?"
+      },
+      "followup_ref_used": false,
+      "status_code": 200,
+      "body": {
+        "answer": "All-on-4 — это методика восстановления всего зубного ряда на одной челюсти с помощью всего четырёх имплантов.\n\n**Как это работает:**\n*   **Быстрый результат:** Полный протокол лечения обычно занимает **1–3 дня**. В день операции вам устанавливают несъёмный временный протез, поэтому вы сразу можете улыбаться, говорить и есть мягкую пищу.\n*   **Без сложной пластики:** Метод позволяет обойти участки атрофии кости за счёт особого угла установки задних имплантов, что часто избавляет от необходимости в наращивании костной ткани.\n*   **Надёжность:** Конструкция распределяет жевательную нагрузку на все четыре опоры. Постоянный протез фиксируется через **3–6 месяцев** после полного приживления имплантов.\n*   **Долговечность:** При правильном уходе и соблюдении рекомендаций (тщательная гигиена, мягкая пища первые **2–3 месяца**) конструкция служит **15–20 лет** и более.\n\nЭтот вариант подходит, если у вас полностью или почти полностью отсутствуют зубы, либо оставшиеся зубы невозможно сохранить.\n\nЧтобы понять, подходит ли именно вам протокол All-on-4 или лучше рассмотреть другой вариант (например, All-on-6), врачу необходимо оценить объём и плотность кости по КТ. Приглашаем вас на бесплатную консультацию, где доктор составит понятный план лечения и ответит на все вопросы.",
+        "cta": null,
+        "meta": {
+          "answer_path": "target_fullcontext",
+          "client_id": "demo",
+          "cta_key": "plan",
+          "followups": [
+            {
+              "label": "Кому подходит All-on-4",
+              "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+            },
+            {
+              "label": "Как работает метод All-on-4",
+              "ref": "implantation__service__all_on_4.md#kak-rabotaet-metod-all-on-4"
+            }
+          ],
+          "intent": "content",
+          "matched_service_id": "all_on_4",
+          "policy_decision": {
+            "followups_before_ui_source_policy": 3,
+            "quick_replies_before_ui_source_policy": 3,
+            "ui_source_dropped": [],
+            "ui_source_family_effective": "md_navigation",
+            "ui_source_family_in": "target_fullcontext",
+            "ui_source_route": "target_fullcontext_materialized"
+          },
+          "service_route": "target_fullcontext_materialized",
+          "service_topic": "implantation",
+          "session_turn_count": 1,
+          "sid": "s62-live-dc4b1a02a42d",
+          "turn_count": 1,
+          "ui_dropped": [
+            "followups_over_limit",
+            "suggest_refs_over_limit"
+          ],
+          "ui_source_family": "md_navigation"
+        },
+        "offer": null,
+        "quick_replies": [
+          {
+            "label": "Кому подходит All-on-4",
+            "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+          }
+        ],
+        "situation": {
+          "mode": "normal",
+          "show": false
+        },
+        "video": null
+      },
+      "answer_text": "All-on-4 — это методика восстановления всего зубного ряда на одной челюсти с помощью всего четырёх имплантов.\n\n**Как это работает:**\n*   **Быстрый результат:** Полный протокол лечения обычно занимает **1–3 дня**. В день операции вам устанавливают несъёмный временный протез, поэтому вы сразу можете улыбаться, говорить и есть мягкую пищу.\n*   **Без сложной пластики:** Метод позволяет обойти участки атрофии кости за счёт особого угла установки задних имплантов, что часто избавляет от необходимости в наращивании костной ткани.\n*   **Надёжность:** Конструкция распределяет жевательную нагрузку на все четыре опоры. Постоянный протез фиксируется через **3–6 месяцев** после полного приживления имплантов.\n*   **Долговечность:** При правильном уходе и соблюдении рекомендаций (тщательная гигиена, мягкая пища первые **2–3 месяца**) конструкция служит **15–20 лет** и более.\n\nЭтот вариант подходит, если у вас полностью или почти полностью отсутствуют зубы, либо оставшиеся зубы невозможно сохранить.\n\nЧтобы понять, подходит ли именно вам протокол All-on-4 или лучше рассмотреть другой вариант (например, All-on-6), врачу необходимо оценить объём и плотность кости по КТ. Приглашаем вас на бесплатную консультацию, где доктор составит понятный план лечения и ответит на все вопросы.",
+      "meta": {
+        "answer_path": "target_fullcontext",
+        "client_id": "demo",
+        "cta_key": "plan",
+        "followups": [
+          {
+            "label": "Кому подходит All-on-4",
+            "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+          },
+          {
+            "label": "Как работает метод All-on-4",
+            "ref": "implantation__service__all_on_4.md#kak-rabotaet-metod-all-on-4"
+          }
+        ],
+        "intent": "content",
+        "matched_service_id": "all_on_4",
+        "policy_decision": {
+          "followups_before_ui_source_policy": 3,
+          "quick_replies_before_ui_source_policy": 3,
+          "ui_source_dropped": [],
+          "ui_source_family_effective": "md_navigation",
+          "ui_source_family_in": "target_fullcontext",
+          "ui_source_route": "target_fullcontext_materialized"
+        },
+        "service_route": "target_fullcontext_materialized",
+        "service_topic": "implantation",
+        "session_turn_count": 1,
+        "sid": "s62-live-dc4b1a02a42d",
+        "turn_count": 1,
+        "ui_dropped": [
+          "followups_over_limit",
+          "suggest_refs_over_limit"
+        ],
+        "ui_source_family": "md_navigation"
+      },
+      "quick_replies": [
+        {
+          "label": "Кому подходит All-on-4",
+          "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+        }
+      ],
+      "cta": null,
+      "stream_text": null,
+      "session_before": {
+        "last_service_id": null,
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": []
+      },
+      "session_after": {
+        "last_service_id": "all_on_4",
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "followups": [
+          {
+            "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4",
+            "label": "Кому подходит All-on-4"
+          },
+          {
+            "ref": "implantation__service__all_on_4.md#kak-rabotaet-metod-all-on-4",
+            "label": "Как работает метод All-on-4"
+          },
+          {
+            "ref": "implantation__service__all_on_4.md#ogranicheniya-i-uhod",
+            "label": "Ограничения и уход"
+          }
+        ]
+      },
+      "gates": {
+        "flags": {
+          "http_completed": true,
+          "target_answer_path": true,
+          "no_legacy_route": true,
+          "no_terminal_error": true
+        },
+        "automated_turn_verdict": "PASS"
+      },
+      "recommended_manual_review": "PENDING"
+    },
+    {
+      "turn": 2,
+      "turn_id": "s62_turn_02_price_followup",
+      "endpoint": "/ask",
+      "request": {
+        "q": "А сколько стоит?"
+      },
+      "followup_ref_used": false,
+      "followup_criterion": "FAIL_NO_PRICE_FOLLOWUP",
+      "status_code": 200,
+      "body": {
+        "answer": "Стоимость зависит от выбранной системы имплантов и объёма работы. В клинике действует принцип фиксированной цены: всё прописывается в договоре до начала лечения, без скрытых доплат.\n\nВот точные цены на восстановление полного зубного ряда на одной челюсти по протоколу All-on-4 (включает 4 импланта, хирургию, анестезию, несъёмный протез в день операции и постоянный протез через 3–6 месяцев):\n\n*   **Implantium (Южная Корея)** — 318 000 ₽ за одну челюсть.\n*   **Impro (Германия)** — 368 000 ₽ за одну челюсть.\n*   **Nobel Biocare (Швейцария)** — 428 000 ₽ за одну челюсть.\n\n**Важно:** КТ и костная пластика (если она потребуется по показаниям) оплачиваются отдельно.\n\nОплату можно разделить на два этапа:\n1.  **Этап 1** (хирургия и временный протез) — 60% от суммы.\n2.  **Этап 2** (постоянный протез) — 40% от суммы.\n\nТакже доступна рассрочка до 12 месяцев, а при оплате в день обращения действует скидка до 15% на имплантацию.\n\nЧтобы узнать точную стоимость для вашей ситуации, врач составит план лечения на бесплатной консультации (действует до 31 декабря 2026 года). На приёме предложат несколько вариантов под разный бюджет и объяснят, что входит в итоговую сумму.",
+        "cta": null,
+        "meta": {
+          "answer_path": "target_fullcontext",
+          "client_id": "demo",
+          "cta_key": "plan",
+          "followups": [
+            {
+              "label": "Оплата по этапам",
+              "ref": "price:all_on_4/stages"
+            },
+            {
+              "label": "Что входит",
+              "ref": "price:all_on_4/includes"
+            }
+          ],
+          "intent": "content",
+          "matched_service_id": "all_on_4",
+          "policy_decision": {
+            "followups_before_ui_source_policy": 2,
+            "quick_replies_before_ui_source_policy": 2,
+            "ui_source_dropped": [],
+            "ui_source_family_effective": "md_navigation",
+            "ui_source_family_in": "target_fullcontext",
+            "ui_source_route": "target_fullcontext_materialized"
+          },
+          "service_route": "target_fullcontext_materialized",
+          "service_topic": "implantation",
+          "session_turn_count": 2,
+          "sid": "s62-live-dc4b1a02a42d",
+          "turn_count": 2,
+          "ui_dropped": [
+            "suggest_refs_over_limit"
+          ],
+          "ui_source_family": "md_navigation"
+        },
+        "offer": null,
+        "quick_replies": [
+          {
+            "label": "Оплата по этапам",
+            "ref": "price:all_on_4/stages"
+          }
+        ],
+        "situation": {
+          "mode": "normal",
+          "show": false
+        },
+        "video": null
+      },
+      "answer_text": "Стоимость зависит от выбранной системы имплантов и объёма работы. В клинике действует принцип фиксированной цены: всё прописывается в договоре до начала лечения, без скрытых доплат.\n\nВот точные цены на восстановление полного зубного ряда на одной челюсти по протоколу All-on-4 (включает 4 импланта, хирургию, анестезию, несъёмный протез в день операции и постоянный протез через 3–6 месяцев):\n\n*   **Implantium (Южная Корея)** — 318 000 ₽ за одну челюсть.\n*   **Impro (Германия)** — 368 000 ₽ за одну челюсть.\n*   **Nobel Biocare (Швейцария)** — 428 000 ₽ за одну челюсть.\n\n**Важно:** КТ и костная пластика (если она потребуется по показаниям) оплачиваются отдельно.\n\nОплату можно разделить на два этапа:\n1.  **Этап 1** (хирургия и временный протез) — 60% от суммы.\n2.  **Этап 2** (постоянный протез) — 40% от суммы.\n\nТакже доступна рассрочка до 12 месяцев, а при оплате в день обращения действует скидка до 15% на имплантацию.\n\nЧтобы узнать точную стоимость для вашей ситуации, врач составит план лечения на бесплатной консультации (действует до 31 декабря 2026 года). На приёме предложат несколько вариантов под разный бюджет и объяснят, что входит в итоговую сумму.",
+      "meta": {
+        "answer_path": "target_fullcontext",
+        "client_id": "demo",
+        "cta_key": "plan",
+        "followups": [
+          {
+            "label": "Оплата по этапам",
+            "ref": "price:all_on_4/stages"
+          },
+          {
+            "label": "Что входит",
+            "ref": "price:all_on_4/includes"
+          }
+        ],
+        "intent": "content",
+        "matched_service_id": "all_on_4",
+        "policy_decision": {
+          "followups_before_ui_source_policy": 2,
+          "quick_replies_before_ui_source_policy": 2,
+          "ui_source_dropped": [],
+          "ui_source_family_effective": "md_navigation",
+          "ui_source_family_in": "target_fullcontext",
+          "ui_source_route": "target_fullcontext_materialized"
+        },
+        "service_route": "target_fullcontext_materialized",
+        "service_topic": "implantation",
+        "session_turn_count": 2,
+        "sid": "s62-live-dc4b1a02a42d",
+        "turn_count": 2,
+        "ui_dropped": [
+          "suggest_refs_over_limit"
+        ],
+        "ui_source_family": "md_navigation"
+      },
+      "quick_replies": [
+        {
+          "label": "Оплата по этапам",
+          "ref": "price:all_on_4/stages"
+        }
+      ],
+      "cta": null,
+      "stream_text": null,
+      "session_before": {
+        "last_service_id": "all_on_4",
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "followups": [
+          {
+            "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4",
+            "label": "Кому подходит All-on-4"
+          },
+          {
+            "ref": "implantation__service__all_on_4.md#kak-rabotaet-metod-all-on-4",
+            "label": "Как работает метод All-on-4"
+          },
+          {
+            "ref": "implantation__service__all_on_4.md#ogranicheniya-i-uhod",
+            "label": "Ограничения и уход"
+          }
+        ]
+      },
+      "session_after": {
+        "last_service_id": "all_on_4",
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "followups": [
+          {
+            "ref": "price:all_on_4/stages",
+            "label": "Оплата по этапам"
+          },
+          {
+            "ref": "price:all_on_4/includes",
+            "label": "Что входит"
+          }
+        ]
+      },
+      "gates": {
+        "flags": {
+          "http_completed": true,
+          "target_answer_path": true,
+          "no_legacy_route": true,
+          "no_terminal_error": true
+        },
+        "automated_turn_verdict": "PASS"
+      },
+      "recommended_manual_review": "PENDING"
+    },
+    {
+      "turn": 3,
+      "turn_id": "s62_turn_03_doctors",
+      "endpoint": "/ask",
+      "request": {
+        "q": "А кто делает?"
+      },
+      "followup_ref_used": false,
+      "status_code": 200,
+      "body": {
+        "answer": "Чтобы ответить точнее по вашей ситуации, лучше обсудить это на консультации с администратором клиники.",
+        "cta": null,
+        "meta": {
+          "answer_path": "target_fullcontext",
+          "client_id": "demo",
+          "intent": "content",
+          "policy_decision": {
+            "followups_before_ui_source_policy": 0,
+            "quick_replies_before_ui_source_policy": 0,
+            "ui_source_dropped": [],
+            "ui_source_family_effective": "md_navigation",
+            "ui_source_family_in": "target_fullcontext",
+            "ui_source_route": "target_fullcontext_terminal_defer"
+          },
+          "service_route": "target_fullcontext_terminal_defer",
+          "session_turn_count": 3,
+          "sid": "s62-live-dc4b1a02a42d",
+          "terminal_mode": "defer",
+          "turn_count": 3,
+          "ui_source_family": "md_navigation"
+        },
+        "offer": null,
+        "quick_replies": [],
+        "situation": {
+          "mode": "normal",
+          "show": false
+        },
+        "video": null
+      },
+      "answer_text": "Чтобы ответить точнее по вашей ситуации, лучше обсудить это на консультации с администратором клиники.",
+      "meta": {
+        "answer_path": "target_fullcontext",
+        "client_id": "demo",
+        "intent": "content",
+        "policy_decision": {
+          "followups_before_ui_source_policy": 0,
+          "quick_replies_before_ui_source_policy": 0,
+          "ui_source_dropped": [],
+          "ui_source_family_effective": "md_navigation",
+          "ui_source_family_in": "target_fullcontext",
+          "ui_source_route": "target_fullcontext_terminal_defer"
+        },
+        "service_route": "target_fullcontext_terminal_defer",
+        "session_turn_count": 3,
+        "sid": "s62-live-dc4b1a02a42d",
+        "terminal_mode": "defer",
+        "turn_count": 3,
+        "ui_source_family": "md_navigation"
+      },
+      "quick_replies": [],
+      "cta": null,
+      "stream_text": null,
+      "session_before": {
+        "last_service_id": "all_on_4",
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "followups": [
+          {
+            "ref": "price:all_on_4/stages",
+            "label": "Оплата по этапам"
+          },
+          {
+            "ref": "price:all_on_4/includes",
+            "label": "Что входит"
+          }
+        ]
+      },
+      "session_after": {
+        "last_service_id": "all_on_4",
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "followups": [
+          {
+            "ref": "price:all_on_4/stages",
+            "label": "Оплата по этапам"
+          },
+          {
+            "ref": "price:all_on_4/includes",
+            "label": "Что входит"
+          }
+        ]
+      },
+      "gates": {
+        "flags": {
+          "http_completed": true,
+          "target_answer_path": true,
+          "no_legacy_route": true,
+          "no_terminal_error": true
+        },
+        "automated_turn_verdict": "PASS"
+      },
+      "recommended_manual_review": "PENDING"
+    },
+    {
+      "turn": 4,
+      "turn_id": "s62_turn_04_lupus_stream",
+      "endpoint": "/ask/stream",
+      "request": {
+        "q": "Можно ли ставить импланты при волчанке?"
+      },
+      "followup_ref_used": false,
+      "status_code": 200,
+      "body": null,
+      "answer_text": "event: typing\ndata: {\"phase\": \"writing\"}\n\nevent: ui\ndata: {\"answer\": \"В материалах клиники нет информации об особенностях имплантации именно при системной красной волчанке.\\n\\nИмплантация возможна не во всех случаях: перед лечением врач обязательно оценивает состояние здоровья. К абсолютным противопоказаниям относятся тяжёлые заболевания иммунной системы. При наличии хронических заболеваний решение принимается после диагностики и, при необходимости, совместной работы с профильными специалистами.\\n\\nЧтобы понять, безопасна ли имплантация в вашей ситуации, нужна очная консультация. Врач изучит анамнез, оценит риски и предложит подходящий план или объяснит, почему операцию лучше отложить.\\n\\nСейчас можно пройти бесплатную консультацию по имплантации и протезированию. На приёме врач по снимкам проверит, какой протокол или конструкция подойдут именно вам.\", \"quick_replies\": [], \"cta\": null, \"video\": null, \"situation\": {\"show\": false, \"mode\": \"normal\"}, \"offer\": null, \"meta\": {\"client_id\": \"demo\", \"sid\": \"s62-live-dc4b1a02a42d\", \"intent\": \"content\", \"answer_path\": \"target_fullcontext\", \"service_route\": \"target_fullcontext_materialized\", \"ui_source_family\": \"target_fullcontext\", \"matched_service_id\": null, \"service_topic\": \"implantation\", \"followups\": [], \"turn_count\": 4, \"session_turn_count\": 4}}\n\nevent: done\ndata: {}\n\n",
+      "meta": {},
+      "quick_replies": [],
+      "cta": null,
+      "stream_text": "event: typing\ndata: {\"phase\": \"writing\"}\n\nevent: ui\ndata: {\"answer\": \"В материалах клиники нет информации об особенностях имплантации именно при системной красной волчанке.\\n\\nИмплантация возможна не во всех случаях: перед лечением врач обязательно оценивает состояние здоровья. К абсолютным противопоказаниям относятся тяжёлые заболевания иммунной системы. При наличии хронических заболеваний решение принимается после диагностики и, при необходимости, совместной работы с профильными специалистами.\\n\\nЧтобы понять, безопасна ли имплантация в вашей ситуации, нужна очная консультация. Врач изучит анамнез, оценит риски и предложит подходящий план или объяснит, почему операцию лучше отложить.\\n\\nСейчас можно пройти бесплатную консультацию по имплантации и протезированию. На приёме врач по снимкам проверит, какой протокол или конструкция подойдут именно вам.\", \"quick_replies\": [], \"cta\": null, \"video\": null, \"situation\": {\"show\": false, \"mode\": \"normal\"}, \"offer\": null, \"meta\": {\"client_id\": \"demo\", \"sid\": \"s62-live-dc4b1a02a42d\", \"intent\": \"content\", \"answer_path\": \"target_fullcontext\", \"service_route\": \"target_fullcontext_materialized\", \"ui_source_family\": \"target_fullcontext\", \"matched_service_id\": null, \"service_topic\": \"implantation\", \"followups\": [], \"turn_count\": 4, \"session_turn_count\": 4}}\n\nevent: done\ndata: {}\n\n",
+      "session_before": {
+        "last_service_id": "all_on_4",
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "followups": [
+          {
+            "ref": "price:all_on_4/stages",
+            "label": "Оплата по этапам"
+          },
+          {
+            "ref": "price:all_on_4/includes",
+            "label": "Что входит"
+          }
+        ]
+      },
+      "session_after": {
+        "last_service_id": null,
+        "shown_fact_ids": [
+          "free_implant_consult"
+        ],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "followups": []
+      },
+      "gates": {
+        "flags": {
+          "http_completed": true,
+          "target_answer_path": true,
+          "no_legacy_route": true,
+          "no_terminal_error": true,
+          "stream_ui_done": true
+        },
+        "automated_turn_verdict": "PASS"
+      },
+      "recommended_manual_review": "PENDING"
+    }
+  ]
+}

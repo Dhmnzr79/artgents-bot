@@ -107,6 +107,27 @@ def test_postgres_job_container_id_via_env_not_run_expression() -> None:
         assert "${{" not in block
 
 
+def test_g8_disposable_create_role_uses_psycopg_sql_composition() -> None:
+    disposable = _DISPOSABLE.read_text(encoding="utf-8")
+    assert "PASSWORD %s" not in disposable
+    assert "sql.Identifier" in disposable
+    assert "sql.Literal(password)" in disposable
+    grants = (
+        _REPO_ROOT / "deploy" / "postgres" / "g8_disposable_grants_post_migrate.sql"
+    ).read_text(encoding="utf-8")
+    assert "ALTER SCHEMA IF EXISTS" not in grants
+    assert "ALTER SCHEMA bot_migration OWNER TO bot_migrator;" in grants
+
+
+def test_g8_runner_failure_diagnostics_safe() -> None:
+    runner = _RUNNER.read_text(encoding="utf-8")
+    assert "g8_qualification=failed stage=" in runner
+    assert "sqlstate=" in runner
+    assert "str(exc)" not in runner
+    assert "wait_postgres" in runner
+    assert "grants_restore" in runner
+
+
 def test_g8_disposable_database_create_grants() -> None:
     disposable = _DISPOSABLE.read_text(encoding="utf-8")
     assert "_grant_database_bootstrap_privileges" in disposable
@@ -216,9 +237,9 @@ def test_runner_junit_zero_skipped_enforcement() -> None:
 
 def test_runner_g7_verify_receipt_before_restore() -> None:
     runner = _RUNNER.read_text(encoding="utf-8")
-    drill = runner.split("def _backup_restore_drill", 1)[1].split("\ndef _cleanup_work_dir", 1)[0]
+    drill = runner.split("def _backup_primary_archive", 1)[1].split("\ndef _prepare_restore_database", 1)[0]
     verify_pos = drill.find("verify_receipt_file")
-    restore_pos = drill.find("pg_restore_into_database")
+    restore_pos = runner.find("def _restore_from_archive")
     assert verify_pos != -1 and restore_pos != -1 and verify_pos < restore_pos
     assert "pgbackup-scheduled-" in runner
     assert "2026-01-01" not in runner

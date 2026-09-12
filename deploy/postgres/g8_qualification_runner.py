@@ -55,6 +55,32 @@ _INTEGRATION_RESTORE = (
     "tests/test_g8_postgres_qualification_integration.py::TestG8DisposableAfterRestore"
 )
 
+_G8_STAGES = (
+    "wait_postgres",
+    "bootstrap_primary",
+    "migrate_primary",
+    "grants_primary",
+    "test_primary",
+    "backup",
+    "prepare_restore",
+    "restore",
+    "grants_restore",
+    "test_restore",
+    "cleanup",
+)
+
+
+def _failure_sqlstate(exc: BaseException) -> str:
+    sqlstate = getattr(exc, "sqlstate", None)
+    return str(sqlstate) if sqlstate else "none"
+
+
+def _print_g8_failure(stage: str, exc: BaseException) -> None:
+    print(
+        f"g8_qualification=failed stage={stage} "
+        f"detail={exc.__class__.__name__} sqlstate={_failure_sqlstate(exc)}"
+    )
+
 
 def _load_g7():
     spec = importlib.util.spec_from_file_location("backup_postgres_g7", _G7_HELPER)
@@ -177,7 +203,7 @@ def _make_g7_backup_layout(work_dir: Path) -> tuple[Path, Path, Path]:
     return parent, archive_root, receipt_root
 
 
-def _backup_restore_drill(g7_mod, work_dir: Path) -> tuple[Path, Path]:
+def _backup_primary_archive(g7_mod, work_dir: Path) -> tuple[Path, Path]:
     validated_postgres_container_id()
     backups_parent, archive_root, receipt_root = _make_g7_backup_layout(work_dir)
 
@@ -215,7 +241,10 @@ def _backup_restore_drill(g7_mod, work_dir: Path) -> tuple[Path, Path]:
         backups_parent=backups_parent,
         enforce_root_metadata=False,
     )
+    return archive, receipt
 
+
+def _prepare_restore_database() -> None:
     import psycopg
 
     with psycopg.connect(bootstrap_superuser_dsn(G8_PRIMARY_DATABASE), autocommit=True) as conn:
@@ -225,6 +254,8 @@ def _backup_restore_drill(g7_mod, work_dir: Path) -> tuple[Path, Path]:
     with psycopg.connect(bootstrap_superuser_dsn(G8_RESTORE_DATABASE), autocommit=True) as conn:
         prepare_restore_database_schema(conn)
 
+
+def _restore_from_archive(archive: Path) -> None:
     pg_restore_into_database(
         user=G8_BOOTSTRAP_USER,
         database=G8_RESTORE_DATABASE,
@@ -232,10 +263,12 @@ def _backup_restore_drill(g7_mod, work_dir: Path) -> tuple[Path, Path]:
         role="bot_migrator",
     )
 
+
+def _grants_restore_database() -> None:
+    import psycopg
+
     with psycopg.connect(bootstrap_superuser_dsn(G8_RESTORE_DATABASE), autocommit=True) as conn:
         apply_post_migrate_grants(conn)
-
-    return archive, receipt
 
 
 def _cleanup_work_dir(work_dir: Path) -> None:
@@ -263,37 +296,58 @@ def main() -> int:
     junit_restore = work_dir / "junit-restore.xml"
     archive_path: Path | None = None
     receipt_path: Path | None = None
-    failed: BaseException | None = None
+    stage = _G8_STAGES[0]
     exit_code = 0
     try:
+        stage = "wait_postgres"
         wait_for_postgres_ready()
+
+        stage = "bootstrap_primary"
         import psycopg
 
         with psycopg.connect(bootstrap_superuser_dsn(G8_PRIMARY_DATABASE), autocommit=True) as conn:
             bootstrap_disposable_primary(conn)
 
+        stage = "migrate_primary"
         _run_migrations_twice()
 
+        stage = "grants_primary"
         with psycopg.connect(bootstrap_superuser_dsn(G8_PRIMARY_DATABASE), autocommit=True) as conn:
             apply_post_migrate_grants(conn)
 
         _verify_ledger(G8_PRIMARY_DATABASE)
         _qualify_roles(G8_PRIMARY_DATABASE)
+
+        stage = "test_primary"
         _set_runtime_env(G8_PRIMARY_DATABASE)
         _pytest_strict(_INTEGRATION_PRIMARY, junit_primary, G8_PRIMARY_SCENARIO_COUNT)
 
         _seed_restore_sentinels()
-        archive_path, receipt_path = _backup_restore_drill(g7_mod, work_dir)
+        stage = "backup"
+        archive_path, receipt_path = _backup_primary_archive(g7_mod, work_dir)
+
+        stage = "prepare_restore"
+        _prepare_restore_database()
+
+        stage = "restore"
+        assert archive_path is not None
+        _restore_from_archive(archive_path)
+
+        stage = "grants_restore"
+        _grants_restore_database()
+
         _verify_ledger(G8_RESTORE_DATABASE)
         _qualify_roles(G8_RESTORE_DATABASE)
+
+        stage = "test_restore"
         _set_runtime_env(G8_RESTORE_DATABASE)
         _pytest_strict(_INTEGRATION_RESTORE, junit_restore, G8_AFTER_RESTORE_TEST_COUNT)
         print("g8_qualification=ok")
     except BaseException as exc:
-        failed = exc
-        print(f"g8_qualification=failed detail={exc.__class__.__name__}")
+        _print_g8_failure(stage, exc)
         exit_code = 1
     finally:
+        stage = "cleanup"
         for path in (archive_path, receipt_path):
             if path is not None:
                 path.unlink(missing_ok=True)

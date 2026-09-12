@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote_plus
 
+from psycopg import sql
+
 from deploy.postgres.g8_disposable_constants import (
     G8_BOOTSTRAP_PASSWORD,
     G8_BOOTSTRAP_USER,
@@ -95,35 +97,41 @@ def wait_for_postgres_ready(
     raise RuntimeError("postgres_not_ready")
 
 
+def _role_ident(role: str) -> sql.Identifier:
+    return sql.Identifier(role)
+
+
 def _ensure_login_role(cur: Any, role: str, password: str) -> None:
     cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (role,))
     if cur.fetchone():
         return
     cur.execute(
-        f"""
-        CREATE ROLE {role} LOGIN PASSWORD %s
-          NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION
-        """,
-        (password,),
+        sql.SQL(
+            "CREATE ROLE {} LOGIN PASSWORD {} "
+            "NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION"
+        ).format(_role_ident(role), sql.Literal(password))
     )
 
 
 def _grant_database_bootstrap_privileges(cur: Any, database: str) -> None:
-    cur.execute(f"REVOKE CREATE ON DATABASE {database} FROM PUBLIC, {G8_RUNTIME_ROLE}")
-    cur.execute(f"GRANT CREATE ON DATABASE {database} TO {G8_MIGRATOR_ROLE}")
-    cur.execute(
-        f"GRANT CONNECT ON DATABASE {database} TO {G8_MIGRATOR_ROLE}, {G8_RUNTIME_ROLE}"
-    )
+    db = sql.Identifier(database)
+    migrator = _role_ident(G8_MIGRATOR_ROLE)
+    runtime = _role_ident(G8_RUNTIME_ROLE)
+    cur.execute(sql.SQL("REVOKE CREATE ON DATABASE {} FROM PUBLIC, {}").format(db, runtime))
+    cur.execute(sql.SQL("GRANT CREATE ON DATABASE {} TO {}").format(db, migrator))
+    cur.execute(sql.SQL("GRANT CONNECT ON DATABASE {} TO {}, {}").format(db, migrator, runtime))
 
 
 def _exec_bootstrap_roles(conn: Any) -> None:
+    migrator = _role_ident(G8_MIGRATOR_ROLE)
+    runtime = _role_ident(G8_RUNTIME_ROLE)
     with conn.cursor() as cur:
         _ensure_login_role(cur, G8_MIGRATOR_ROLE, G8_MIGRATOR_PASSWORD)
         _ensure_login_role(cur, G8_RUNTIME_ROLE, G8_RUNTIME_PASSWORD)
         cur.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC")
-        cur.execute(f"GRANT USAGE, CREATE ON SCHEMA public TO {G8_MIGRATOR_ROLE}")
-        cur.execute(f"GRANT USAGE ON SCHEMA public TO {G8_RUNTIME_ROLE}")
-        cur.execute(f"REVOKE CREATE ON SCHEMA public FROM {G8_RUNTIME_ROLE}")
+        cur.execute(sql.SQL("GRANT USAGE, CREATE ON SCHEMA public TO {}").format(migrator))
+        cur.execute(sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(runtime))
+        cur.execute(sql.SQL("REVOKE CREATE ON SCHEMA public FROM {}").format(runtime))
         _grant_database_bootstrap_privileges(cur, G8_PRIMARY_DATABASE)
 
 
@@ -133,11 +141,13 @@ def bootstrap_disposable_primary(conn: Any) -> None:
 
 def prepare_restore_database_schema(conn: Any) -> None:
     """Pre-restore grants on empty g8_qual_restored (connected to that database)."""
+    migrator = _role_ident(G8_MIGRATOR_ROLE)
+    runtime = _role_ident(G8_RUNTIME_ROLE)
     with conn.cursor() as cur:
         cur.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC")
-        cur.execute(f"GRANT USAGE, CREATE ON SCHEMA public TO {G8_MIGRATOR_ROLE}")
-        cur.execute(f"GRANT USAGE ON SCHEMA public TO {G8_RUNTIME_ROLE}")
-        cur.execute(f"REVOKE CREATE ON SCHEMA public FROM {G8_RUNTIME_ROLE}")
+        cur.execute(sql.SQL("GRANT USAGE, CREATE ON SCHEMA public TO {}").format(migrator))
+        cur.execute(sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(runtime))
+        cur.execute(sql.SQL("REVOKE CREATE ON SCHEMA public FROM {}").format(runtime))
 
 
 def apply_post_migrate_grants(conn: Any) -> None:
@@ -154,7 +164,7 @@ def create_restore_database(conn: Any) -> None:
         )
         if cur.fetchone():
             raise RuntimeError("restore_database_already_exists")
-        cur.execute(f'CREATE DATABASE "{G8_RESTORE_DATABASE}"')
+        cur.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(G8_RESTORE_DATABASE)))
         _grant_database_bootstrap_privileges(cur, G8_RESTORE_DATABASE)
 
 
@@ -176,7 +186,9 @@ def drop_restore_database_if_exists(conn: Any) -> None:
                 (G8_RESTORE_DATABASE,),
             )
             if cur.fetchone():
-                cur.execute(f'DROP DATABASE "{G8_RESTORE_DATABASE}"')
+                cur.execute(
+                    sql.SQL("DROP DATABASE {}").format(sql.Identifier(G8_RESTORE_DATABASE))
+                )
     finally:
         conn.autocommit = old_autocommit
 

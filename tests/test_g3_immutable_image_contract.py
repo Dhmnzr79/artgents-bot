@@ -293,6 +293,31 @@ def test_smoke_before_login_and_push_after_smoke() -> None:
     assert build_job.index("Record local image ID") < build_job.index("Smoke test exact local image")
 
 
+def _smoke_test_step_block() -> str:
+    build_job = _publish_text().split("build-test-and-publish:", 1)[-1]
+    return build_job.split("Smoke test exact local image", 1)[-1].split(
+        "docker/login-action@", 1
+    )[0]
+
+
+def test_smoke_container_import_uses_github_actions_placeholder() -> None:
+    smoke = _smoke_test_step_block()
+    assert re.search(
+        r"docker run\b[^\n]*-e\s+GITHUB_ACTIONS=true\b",
+        smoke,
+    )
+    assert 'docker exec "$CID" python -c "import app"' in smoke
+    for forbidden in (
+        "CHAT_API_KEY",
+        "DASHSCOPE_API_KEY",
+        "OPENAI_API_KEY",
+        "SMTP_PASSWORD",
+        "BOT_PG_DSN",
+        "${{ secrets.",
+    ):
+        assert forbidden not in smoke
+
+
 def test_registry_digest_hardening_and_receipt() -> None:
     text = _publish_text()
     push_step = text.split("Push verified local image", 1)[-1].split("Write publish receipt", 1)[0]

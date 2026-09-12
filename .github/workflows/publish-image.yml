@@ -195,7 +195,7 @@ jobs:
           set -euo pipefail
           IMAGE_REF="${IMAGE}:${IMAGE_TAG}"
           HOST_PORT=18080
-          CID=$(docker run -d --rm -p "127.0.0.1:${HOST_PORT}:8000" "$IMAGE_REF")
+          CID=$(docker run -d --rm -e GITHUB_ACTIONS=true -p "127.0.0.1:${HOST_PORT}:8000" "$IMAGE_REF")
           cleanup() { docker stop -t 10 "$CID" >/dev/null 2>&1 || true; }
           trap cleanup EXIT
           RUNTIME_UID=$(docker exec "$CID" id -u)

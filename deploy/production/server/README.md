@@ -52,7 +52,12 @@ Obtain the VPS host key through a **trusted out-of-band channel** (console provi
 3. Install sudoers fragment from `artgents-deploy.sudoers.example` using `visudo -cf` after substituting `DEPLOY_USER`.
 4. Ensure `/etc/artgents/production.env` exists (root-owned, not world-readable).
 5. Ensure `/opt/artgents/current` points at an extracted release tree containing `deploy/production/compose.yml`.
-6. Install G7 `/opt/artgents/bin/backup-postgres` — **G4 deploy fails without it**. Backup receipts must be regular files under `/var/lib/artgents/backups/receipts/` (canonical path containment enforced by deploy script).
+6. Install G7 backup stack (required before first deploy):
+   - `backup-postgres.sh` → `/opt/artgents/bin/backup-postgres` (root:root, `0750`)
+   - `backup_postgres_g7.py` → `/opt/artgents/bin/backup-postgres-g7.py` (root:root, `0750`, executable; invoked via `python3`)
+   - `verify-postgres-backup.sh` → `/opt/artgents/bin/verify-postgres-backup` (root:root, `0750`)
+   - Create `/var/lib/artgents/backups/postgres` and `/var/lib/artgents/backups/receipts` (root:root, `0700`)
+   - Install `artgents-postgres-backup.service` + `artgents-postgres-backup.timer` under `/etc/systemd/system/`, then `systemctl daemon-reload` and `systemctl enable --now artgents-postgres-backup.timer`
 7. Configure root-owned GHCR credential for `docker pull` of `ghcr.io/dhmnzr79/artgents-bot@sha256:…` only on the server.
 8. Add **one** SSH public key for the deploy user with forced command, for example:
 
@@ -61,6 +66,72 @@ command="/opt/artgents/bin/deploy-receiver",no-port-forwarding,no-agent-forwardi
 ```
 
 Replace the public key material with your real key **outside** this repository. Never commit private keys.
+
+## G7 — PostgreSQL backup (repository templates)
+
+**Operational status:** templates and contracts only until a real VPS backup **and** G8 disposable restore drill succeed. `pg_restore --list` proves archive structure, **not** that production can be recovered.
+
+### Layout on VPS
+
+| Path | Mode | Purpose |
+|------|------|---------|
+| `/opt/artgents/bin/backup-postgres` | `0750` | Main backup utility |
+| `/opt/artgents/bin/backup-postgres-g7.py` | `0750` | Receipt, retention, metadata helpers (executable) |
+| `/opt/artgents/bin/verify-postgres-backup` | `0750` | Read-only receipt/archive verification |
+| `/var/lib/artgents/backups/postgres/` | `0700` | Custom-format `pg_dump` archives |
+| `/var/lib/artgents/backups/receipts/` | `0700` | JSON receipts (G4/G5 deploy gate) |
+| `/var/lock/artgents-postgres-backup.lock` | — | Exclusive backup flock (separate from deploy lock) |
+
+### Invocation (fixed grammar)
+
+```text
+backup-postgres --reason pre-deploy --source-sha <40 lowercase hex>
+backup-postgres --reason pre-rollback --source-sha <40 lowercase hex>
+backup-postgres --reason scheduled
+```
+
+On success the **last line of stdout** is the absolute receipt path under `/var/lib/artgents/backups/receipts/` (stderr holds operator messages).
+
+### Receipt schema (summary)
+
+- `schema_version`: **1**
+- `status`: `success`
+- `reason`: `pre-deploy` | `pre-rollback` | `scheduled`
+- `source_sha`: 40 hex or JSON `null` for `scheduled`
+- `created_at`: UTC `…Z`
+- `archive_path`, `archive_sha256` (`sha256:<64 hex>`), `archive_size_bytes` (> 0)
+- `database_name`: PostgreSQL DB name only (no user/password/DSN)
+- `pg_restore_list_check`: `passed`
+- `backup_id`: unique id
+
+### Retention
+
+Default **7 days**. After each successful backup, the helper deletes **only** validated G7 archive+receipt pairs older than the cutoff. Unknown files, damaged receipts, symlinks, and paths outside the backup roots are never removed.
+
+### Scheduling
+
+```bash
+systemctl enable --now artgents-postgres-backup.timer
+```
+
+Manual scheduled-style run:
+
+```bash
+/opt/artgents/bin/backup-postgres --reason scheduled
+```
+
+### Verify (read-only)
+
+```bash
+/opt/artgents/bin/verify-postgres-backup /var/lib/artgents/backups/receipts/<receipt>.receipt.json
+```
+
+Does **not** restore into production PostgreSQL.
+
+### Limits (honest)
+
+- Backups on the same VPS **do not** protect against total VPS loss — configure **G10** off-host copy or provider snapshots.
+- Do not treat G7 as fully operational until real backup + **G8** disposable restore drill.
 
 ## State and receipts
 

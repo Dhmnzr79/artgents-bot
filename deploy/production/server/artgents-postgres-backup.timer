@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Artgents PostgreSQL backup timer (G7)
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=30m
+Persistent=true
+Unit=artgents-postgres-backup.service
+
+[Install]
+WantedBy=timers.target

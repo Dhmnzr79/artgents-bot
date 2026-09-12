@@ -153,7 +153,8 @@ jobs:
             tests/test_migration_002_constraint_drift.py \
             tests/test_g2_pr_ci_contract.py \
             tests/test_g4_manual_deploy_contract.py \
-            tests/test_g5_manual_rollback_contract.py
+            tests/test_g5_manual_rollback_contract.py \
+            tests/test_g7_postgres_backup_contract.py
 
   secret-scan:
     name: Secret scan

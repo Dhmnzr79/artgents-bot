@@ -273,6 +273,33 @@ def test_rollback_script_fail_closed_contract() -> None:
         assert secret not in text
 
 
+def test_rollback_uses_target_source_specific_compose_and_caddy() -> None:
+    text = _text(_ROLLBACK_SCRIPT)
+    extraction = text.split("prepare_release_assets_from_image() (", 1)[1].split("\n)", 1)[0]
+    flock_end = text.find('if ! flock -n 9')
+    main = text[flock_end:]
+
+    assert 'readonly RELEASES_ROOT="${CURRENT_ROOT}/releases"' in text
+    assert 'COMPOSE_FILE=""' in text
+    assert 'org.opencontainers.image.revision' in extraction
+    assert 'destination="${RELEASES_ROOT}/${source_sha}"' in extraction
+    assert extraction.count("docker cp") == 2
+    assert "/app/deploy/production/compose.yml" in extraction
+    assert "/app/deploy/production/Caddyfile" in extraction
+    assert "docker start" not in extraction
+    assert '[ "$state" != "created" ]' in extraction
+    assert "existing release tree differs from immutable image" in extraction
+    assert "rm -rf" not in extraction
+    assert (
+        'COMPOSE_FILE=$(prepare_release_assets_from_image "$TARGET_IMMUTABLE_REF" "$TARGET_SOURCE_SHA")'
+        in main
+    )
+    assert main.find("verify_image_digest_membership") < main.find("prepare_release_assets_from_image")
+    assert main.find("prepare_release_assets_from_image") < main.find("automatic rollback blocked")
+    assert main.find("automatic rollback blocked") < main.find("pre-rollback")
+    assert '${CURRENT_ROOT}/deploy/production/compose.yml' not in text
+
+
 def test_fingerprint_mismatch_blocks_before_backup_and_maintenance() -> None:
     text = _text(_ROLLBACK_SCRIPT)
     flock_end = text.find('if ! flock -n 9')

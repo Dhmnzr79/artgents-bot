@@ -465,6 +465,54 @@ def test_dockerignore_excludes_server_assets() -> None:
     assert "deploy/production/server/" in patterns
 
 
+def test_deploy_uses_source_specific_release_assets_from_exact_image() -> None:
+    text = _root_deploy_text()
+    extraction = text.split("prepare_release_assets_from_image() (", 1)[1].split("\n)", 1)[0]
+    main = _main_deploy_body(text)
+
+    assert 'readonly RELEASES_ROOT="${CURRENT_ROOT}/releases"' in text
+    assert 'COMPOSE_FILE=""' in text
+    assert 'org.opencontainers.image.revision' in extraction
+    assert 'if [ "$revision" != "$source_sha" ]' in extraction
+    assert 'destination="${RELEASES_ROOT}/${source_sha}"' in extraction
+    assert 'docker create "$image_ref"' in extraction
+    assert "docker start" not in extraction
+    assert "{{.State.Status}}" in extraction
+    assert '[ "$state" != "created" ]' in extraction
+    assert extraction.count("docker cp") == 2
+    assert "/app/deploy/production/compose.yml" in extraction
+    assert "/app/deploy/production/Caddyfile" in extraction
+    for forbidden in (
+        "/app/deploy/production/server",
+        "deploy-production.sh",
+        "rollback-production.sh",
+        "deploy-receiver.sh",
+        "backup-postgres.sh",
+    ):
+        assert forbidden not in extraction
+    assert "validate_release_tree" in extraction
+    assert "validate_release_tree_metadata" in extraction
+    assert "existing release tree differs from immutable image" in extraction
+    assert "rm -rf" not in extraction
+    assert 'mv -- "$staging" "$destination"' in extraction
+    assert 'COMPOSE_FILE=$(prepare_release_assets_from_image "$IMMUTABLE_REF" "$SOURCE_SHA")' in main
+    assert main.find("verify_pulled_image_digest") < main.find("prepare_release_assets_from_image")
+    assert main.find("prepare_release_assets_from_image") < main.find("compose up -d postgres")
+    assert '${CURRENT_ROOT}/deploy/production/compose.yml' not in text
+
+
+def test_current_transition_is_nondestructive_and_fail_closed() -> None:
+    text = _root_deploy_text()
+    assert 'require_trusted_release_directory "$CURRENT_ROOT"' in text
+    assert '[ -L "$RELEASES_ROOT" ]' in text
+    assert 'install -d -o root -g root -m 0755 "$RELEASES_ROOT"' in text
+    assert "existing release tree is invalid" in text
+    assert "existing release tree has unsafe ownership or permissions" in text
+    assert "1024 * 1024" in text
+    assert 'rm -rf "$CURRENT_ROOT"' not in text
+    assert 'rm -rf "$RELEASES_ROOT"' not in text
+
+
 def test_g4_contract_in_ci_and_publish_verify() -> None:
     ci = _CI_WORKFLOW.read_text(encoding="utf-8")
     publish = _PUBLISH_WORKFLOW.read_text(encoding="utf-8")

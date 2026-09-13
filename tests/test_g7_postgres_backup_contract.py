@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -87,6 +88,34 @@ def _backup_text() -> str:
 
 def _verify_text() -> str:
     return _VERIFY_SCRIPT.read_text(encoding="utf-8")
+
+
+def _server_permission_scripts() -> tuple[Path, ...]:
+    return (_BACKUP_SCRIPT, _VERIFY_SCRIPT, _DEPLOY_SCRIPT, _ROLLBACK_SCRIPT)
+
+
+def _bash_executable() -> str:
+    bash = None
+    if sys.platform == "win32":
+        for candidate in (
+            Path("C:/Program Files/Git/bin/bash.exe"),
+            Path("C:/Program Files/Git/usr/bin/bash.exe"),
+        ):
+            if candidate.is_file():
+                bash = str(candidate)
+                break
+    bash = bash or shutil.which("bash")
+    if not bash:
+        pytest.skip("bash not available")
+    probe = subprocess.run(
+        [bash, "-c", "exit 0"],
+        capture_output=True,
+        text=True,
+    )
+    if probe.returncode != 0 and "WSL" in (probe.stderr or ""):
+        pytest.skip("bash available but WSL is not installed")
+    probe.check_returncode()
+    return bash
 
 
 def parse_backup_cli(argv: list[str]) -> tuple[str, str | None]:
@@ -189,11 +218,65 @@ def test_backup_explicit_pg_dump_username_and_dbname() -> None:
 def test_backup_helper_mode_contract() -> None:
     text = _backup_text()
     assert 'backup helper must be mode 0750' in text
+    assert '[ "$perms" != "750" ]' in text
     verify = _verify_text()
     assert 'backup helper must be mode 0750' in verify
+    assert '[ "$perms" != "750" ]' in verify
     readme = (_REPO_ROOT / "deploy/production/server/README.md").read_text(encoding="utf-8")
     assert "backup-postgres-g7.py" in readme and "`0750`" in readme
     assert "0644" not in readme
+
+
+def test_shell_permission_bitmasks_parse_stat_modes_as_octal() -> None:
+    for path in _server_permission_scripts():
+        text = path.read_text(encoding="utf-8")
+        assert "10#${perms}" not in text
+    assert '8#${perms} & 077' in _backup_text()
+    assert '8#${perms} & 077' in _verify_text()
+    assert '8#${perms} & 077' in _DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    assert '8#${perms} & 077' in _ROLLBACK_SCRIPT.read_text(encoding="utf-8")
+    assert '8#${perms} & 022' in _DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    assert '8#${perms} & 022' in _ROLLBACK_SCRIPT.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_allowed"),
+    (("600", True), ("400", True), ("640", False), ("604", False), ("644", False)),
+)
+def test_production_env_permission_mask_regression(mode: str, expected_allowed: bool) -> None:
+    bash = _bash_executable()
+    proc = subprocess.run(
+        [
+            bash,
+            "-c",
+            'perms="$1"; [ "$((8#${perms} & 077))" -eq 0 ]',
+            "permission-mask-test",
+            mode,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert (proc.returncode == 0) is expected_allowed
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_allowed"),
+    (("600", True), ("640", True), ("620", False), ("602", False), ("622", False)),
+)
+def test_receipt_permission_write_mask_regression(mode: str, expected_allowed: bool) -> None:
+    bash = _bash_executable()
+    proc = subprocess.run(
+        [
+            bash,
+            "-c",
+            'perms="$1"; [ "$((8#${perms} & 022))" -eq 0 ]',
+            "permission-mask-test",
+            mode,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert (proc.returncode == 0) is expected_allowed
 
 
 def test_backup_directory_must_be_exactly_0700() -> None:
@@ -418,15 +501,9 @@ def test_parse_postgres_targets(tmp_path: Path) -> None:
 
 
 def test_shell_scripts_bash_n_if_available() -> None:
-    from shutil import which
-
-    bash = which("bash")
-    if not bash:
-        pytest.skip("bash not available")
-    for path in (_BACKUP_SCRIPT, _VERIFY_SCRIPT):
+    bash = _bash_executable()
+    for path in _server_permission_scripts():
         proc = subprocess.run([bash, "-n", str(path)], capture_output=True, text=True)
-        if proc.returncode != 0 and "WSL" in (proc.stderr or ""):
-            pytest.skip("bash available but cannot syntax-check (WSL not installed)")
         proc.check_returncode()
 
 

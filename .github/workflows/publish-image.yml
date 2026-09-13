@@ -182,6 +182,8 @@ jobs:
           push: false
           tags: ${{ env.IMAGE }}:${{ env.IMAGE_TAG }}
           platforms: linux/amd64
+          build-args: |
+            SOURCE_SHA=${{ github.sha }}
 
       - name: Record local image ID
         id: local_image

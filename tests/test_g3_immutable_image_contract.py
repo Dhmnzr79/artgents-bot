@@ -428,6 +428,18 @@ def test_dockerfile_production_lock_only_no_pip_upgrade() -> None:
     assert "requirements-ci.lock" not in docker
     assert "--require-hashes" in docker
     assert "pip install --upgrade pip" not in docker
+
+
+def test_image_revision_label_is_bound_to_github_source_sha() -> None:
+    docker = _DOCKERFILE.read_text(encoding="utf-8")
+    publish = _publish_text()
+    build = publish.split("Build production image (single load into daemon)", 1)[1].split(
+        "Record local image ID", 1
+    )[0]
+    assert re.search(r"^ARG SOURCE_SHA\s*$", docker, re.MULTILINE)
+    assert 'org.opencontainers.image.revision="${SOURCE_SHA}"' in docker
+    assert "build-args:" in build
+    assert "SOURCE_SHA=${{ github.sha }}" in build
     assert re.search(r"^USER\s+10001:10001\s*$", docker, re.MULTILINE)
 
 

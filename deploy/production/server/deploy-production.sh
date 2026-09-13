@@ -5,7 +5,7 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 readonly IMAGE_REPO=ghcr.io/dhmnzr79/artgents-bot
 readonly CURRENT_ROOT=/opt/artgents/current
-readonly COMPOSE_FILE="${CURRENT_ROOT}/deploy/production/compose.yml"
+readonly RELEASES_ROOT="${CURRENT_ROOT}/releases"
 readonly ENV_FILE=/etc/artgents/production.env
 readonly BACKUP_BIN=/opt/artgents/bin/backup-postgres
 readonly FINGERPRINT_HELPER=/opt/artgents/bin/migration-bundle-fingerprint.py
@@ -19,6 +19,7 @@ SOURCE_SHA="${1:-}"
 IMAGE_DIGEST="${2:-}"
 
 RECEIPT_TMP=""
+COMPOSE_FILE=""
 
 MIGRATION_BUNDLE_SHA256=""
 
@@ -91,6 +92,155 @@ check_env_permissions() {
     fail "production env must not be world/group readable"
   fi
 }
+
+require_trusted_release_directory() {
+  local path="$1" owner perms
+  if [ -L "$path" ] || [ ! -d "$path" ]; then
+    fail "release directory must be an ordinary directory: $path"
+  fi
+  owner=$(stat -c '%u:%g' "$path")
+  perms=$(stat -c '%a' "$path")
+  if [ "$owner" != "0:0" ]; then
+    fail "release directory must be root-owned: $path"
+  fi
+  if [ "$((8#${perms} & 022))" -ne 0 ]; then
+    fail "release directory must not be group/world writable: $path"
+  fi
+}
+
+ensure_release_root() {
+  require_trusted_release_directory "$CURRENT_ROOT"
+  if [ -L "$RELEASES_ROOT" ]; then fail "release root must not be a symlink"; fi
+  if [ ! -e "$RELEASES_ROOT" ]; then
+    install -d -o root -g root -m 0755 "$RELEASES_ROOT"
+  fi
+  require_trusted_release_directory "$RELEASES_ROOT"
+}
+
+validate_release_tree() {
+  local root="$1"
+  RELEASE_TREE="$root" python3 <<'PY'
+import os
+import stat
+import sys
+from pathlib import Path
+
+root = Path(os.environ["RELEASE_TREE"])
+expected_dirs = {"deploy", "deploy/production"}
+expected_files = {"deploy/production/compose.yml", "deploy/production/Caddyfile"}
+actual_dirs = set()
+actual_files = set()
+try:
+    for path in root.rglob("*"):
+        rel = path.relative_to(root).as_posix()
+        mode = path.lstat().st_mode
+        if stat.S_ISLNK(mode):
+            sys.exit(1)
+        if stat.S_ISDIR(mode):
+            actual_dirs.add(rel)
+        elif stat.S_ISREG(mode):
+            actual_files.add(rel)
+        else:
+            sys.exit(1)
+except OSError:
+    sys.exit(1)
+if actual_dirs != expected_dirs or actual_files != expected_files:
+    sys.exit(1)
+for rel in expected_files:
+    size = (root / rel).stat().st_size
+    if size < 1 or size > 1024 * 1024:
+        sys.exit(1)
+PY
+}
+
+validate_release_tree_metadata() {
+  local root="$1"
+  RELEASE_TREE="$root" python3 <<'PY'
+import os
+import sys
+from pathlib import Path
+
+root = Path(os.environ["RELEASE_TREE"])
+try:
+    paths = [root, *root.rglob("*")]
+    for path in paths:
+        info = path.lstat()
+        if info.st_uid != 0 or info.st_gid != 0 or info.st_mode & 0o022:
+            sys.exit(1)
+except OSError:
+    sys.exit(1)
+PY
+}
+
+prepare_release_assets_from_image() (
+  local image_ref="$1" source_sha="$2"
+  local revision="" destination="${RELEASES_ROOT}/${source_sha}"
+  local staging="" cid="" state=""
+
+  cleanup_release_extract() {
+    if [ -n "$cid" ]; then docker rm -f "$cid" >/dev/null 2>&1; fi
+    if [ -n "$staging" ] && [ -d "$staging" ]; then
+      rm -f -- "${staging}/deploy/production/compose.yml" "${staging}/deploy/production/Caddyfile"
+      if ! rmdir -- "${staging}/deploy/production" "${staging}/deploy" "$staging" 2>/dev/null; then :; fi
+    fi
+  }
+  trap cleanup_release_extract EXIT
+
+  if ! revision=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image_ref"); then
+    fail "failed to inspect image revision label"
+  fi
+  if [ "$revision" != "$source_sha" ]; then
+    fail "image revision label does not match source_sha"
+  fi
+
+  staging=$(mktemp -d "${RELEASES_ROOT}/.release-${source_sha}.XXXXXX")
+  install -d -o root -g root -m 0755 "${staging}/deploy/production"
+  if ! cid=$(docker create "$image_ref"); then
+    fail "docker create failed for release asset extraction"
+  fi
+  if ! state=$(docker inspect --format '{{.State.Status}}' "$cid"); then
+    fail "failed to inspect release extraction container"
+  fi
+  if [ "$state" != "created" ]; then
+    fail "release assets must be extracted from a stopped created container"
+  fi
+  if ! docker cp "${cid}:/app/deploy/production/compose.yml" "${staging}/deploy/production/compose.yml" >/dev/null; then
+    fail "failed to copy release compose.yml from image"
+  fi
+  if ! docker cp "${cid}:/app/deploy/production/Caddyfile" "${staging}/deploy/production/Caddyfile" >/dev/null; then
+    fail "failed to copy release Caddyfile from image"
+  fi
+  if ! validate_release_tree "$staging"; then
+    fail "release extraction contains invalid or unexpected assets"
+  fi
+  chown root:root "$staging" "${staging}/deploy" "${staging}/deploy/production" \
+    "${staging}/deploy/production/compose.yml" "${staging}/deploy/production/Caddyfile"
+  chmod 0755 "$staging" "${staging}/deploy" "${staging}/deploy/production"
+  chmod 0644 "${staging}/deploy/production/compose.yml" "${staging}/deploy/production/Caddyfile"
+  if ! validate_release_tree_metadata "$staging"; then
+    fail "release extraction has unsafe ownership or permissions"
+  fi
+
+  if [ -e "$destination" ] || [ -L "$destination" ]; then
+    require_trusted_release_directory "$destination"
+    if ! validate_release_tree "$destination"; then
+      fail "existing release tree is invalid"
+    fi
+    if ! validate_release_tree_metadata "$destination"; then
+      fail "existing release tree has unsafe ownership or permissions"
+    fi
+    if ! cmp -s "${staging}/deploy/production/compose.yml" "${destination}/deploy/production/compose.yml" || \
+       ! cmp -s "${staging}/deploy/production/Caddyfile" "${destination}/deploy/production/Caddyfile"; then
+      fail "existing release tree differs from immutable image"
+    fi
+  else
+    if ! mv -- "$staging" "$destination"; then
+      fail "failed to install source-specific release tree"
+    fi
+    staging=""
+  fi
+  printf '%s' "${destination}/deploy/production/compose.yml"
+)
 
 compose() {
   env BOT_IMAGE="$IMMUTABLE_REF" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
@@ -517,11 +667,11 @@ if ! flock -n 9; then
 fi
 
 require_file "$ENV_FILE" readable
-require_file "$COMPOSE_FILE" readable
 require_file "$CURRENT_ROOT" dir
 require_file "$BACKUP_BIN" executable
 require_file "$FINGERPRINT_HELPER" executable
 check_env_permissions
+ensure_release_root
 
 if ! command -v docker >/dev/null 2>&1; then
   fail "docker not installed"
@@ -540,6 +690,8 @@ STARTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 docker pull "$IMMUTABLE_REF"
 verify_pulled_image_digest
+COMPOSE_FILE=$(prepare_release_assets_from_image "$IMMUTABLE_REF" "$SOURCE_SHA")
+require_file "$COMPOSE_FILE" readable
 MIGRATION_BUNDLE_SHA256=$(extract_migration_bundle_fingerprint_from_image "$IMMUTABLE_REF")
 
 compose up -d postgres

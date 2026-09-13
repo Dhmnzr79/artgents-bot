@@ -7,6 +7,7 @@
 - Workflow **`Deploy production`** (`.github/workflows/deploy-production.yml`) появится в GitHub UI **только после merge в default branch `main`**.
 - Запуск **только** `workflow_dispatch` с полным `source_sha` (40 hex) и `confirm_production: true`.
 - Workflow проверяет ancestry на `main`, успешный G3 publish receipt и digest тега GHCR `<sha>` — **без** Docker build и **без** mutable tags (`latest`, `main`, `prod`).
+- Image содержит OCI revision label с тем же `source_sha`. VPS проверяет label и извлекает из exact digest только `compose.yml` + `Caddyfile` в `/opt/artgents/current/releases/<source_sha>`; deploy использует именно эту source-specific пару.
 - SSH на VPS вызывает фиксированную команду; серверные шаблоны в `deploy/production/server/` (исключены из Docker image).
 - **GitHub Free:** без `environment: production`; будущие имена secrets/variables перечислены в `deploy/production/server/README.md` — **реальные значения в G4 не создаются**.
 - **Не запускать workflow**, пока не выполнены внешние gates:
@@ -19,6 +20,7 @@
 
 - Workflow **`Rollback production`** — только `workflow_dispatch` с `expected_current_sha` + `confirm_rollback: true`; **без** выбора target SHA/digest пользователем.
 - Сервер читает **`previous.json`**, сверяет **`expected_current_sha`** с **`current.json`**, проверяет **migration bundle fingerprint** (manifest + содержимое SQL); при несовпадении — блок до остановки сервисов, текущая версия остаётся online.
+- Compose/Caddy для rollback повторно извлекаются из target immutable image и проверяются против target `source_sha`; текущие или legacy assets не подмешиваются.
 - Rollback **не** восстанавливает БД и **не** выполняет миграции/downgrade. Нужны **G7** (`backup-postgres --reason pre-rollback`), **G8**, **G10**. Workflow **не запускать** до готовности VPS.
 - Подробности: `deploy/production/server/README.md`.
 

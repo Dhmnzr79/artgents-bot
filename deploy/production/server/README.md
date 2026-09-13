@@ -14,6 +14,8 @@ These files are **templates** for future VPS installation. They are excluded fro
   - **No** `ssh-keyscan`, **no** `StrictHostKeyChecking=no`
   - **No** third-party SSH actions
 - Remote grammar is fixed: `deploy-production <40-char-sha> sha256:<64-hex>` — no paths, URLs, or extra arguments.
+- The immutable image carries OCI label `org.opencontainers.image.revision=<source_sha>`. The root deploy/rollback scripts require an exact label/SHA match before maintenance.
+- Runtime release assets are copied from a **stopped, never-started** container created from that digest. The allowlist is exactly `deploy/production/compose.yml` and `deploy/production/Caddyfile`; host control scripts are never installed from the image.
 
 ## Users and privileges
 
@@ -51,7 +53,7 @@ Obtain the VPS host key through a **trusted out-of-band channel** (console provi
 2. Copy `deploy-receiver.sh` to e.g. `/opt/artgents/bin/deploy-receiver` (`root:artgents-deploy`, `0750`; the dedicated deploy group receives read/execute only, and the deploy user may execute it via the forced-command path only). Keep `/opt/artgents` and `/opt/artgents/bin` root-owned and traversable by the deploy user (for example, `root:root` `0755`), never group/world writable.
 3. Install sudoers fragment from `artgents-deploy.sudoers.example` using `visudo -cf` after substituting `DEPLOY_USER`.
 4. Ensure `/etc/artgents/production.env` exists (root-owned, not world-readable).
-5. Ensure `/opt/artgents/current` points at an extracted release tree containing `deploy/production/compose.yml`.
+5. Create `/opt/artgents/current` as an ordinary root-owned directory (not a symlink). Do not remove its existing contents during migration. Deploy creates `/opt/artgents/current/releases/<source_sha>/` atomically from the immutable image and leaves all older releases untouched.
 6. Install G7 backup stack (required before first deploy):
    - `backup-postgres.sh` → `/opt/artgents/bin/backup-postgres` (root:root, `0750`)
    - `backup_postgres_g7.py` → `/opt/artgents/bin/backup-postgres-g7.py` (root:root, `0750`, executable; invoked via `python3`)
@@ -152,11 +154,24 @@ Deploy receipts are written under `/var/lib/artgents/deploy/`:
 
 Failed deploys do **not** update `current.json`. Rollback is **G5** (separate workflow and script).
 
+Runtime Compose/Caddy assets are source-specific:
+
+```text
+/opt/artgents/current/                         # ordinary directory; legacy contents preserved
+└── releases/<40-char-source-sha>/
+    └── deploy/production/
+        ├── compose.yml
+        └── Caddyfile
+```
+
+An existing release directory is reused only when its exact two-file allowlist, ownership, permissions, and contents match a fresh extraction from the immutable image. A mismatch fails closed; deploy never deletes or overwrites an older release.
+
 ## G5 — manual production rollback (repository only)
 
 - Workflow **`Rollback production`** (`.github/workflows/rollback-production.yml`) appears in GitHub UI only after merge to **`main`**. **Do not run** until G7 backup utility, G8 PostgreSQL qualification, and G10 VPS baseline are complete.
 - Operator supplies only **`expected_current_sha`** (from the last successful deploy receipt or deploy workflow run) and **`confirm_rollback: true`**. **No** workflow input for target SHA, digest, image, path, or DB restore.
 - Target image is chosen **only** from root-owned **`previous.json`** on the server (`current.json` → `previous.json` → immutable digest).
+- Rollback verifies the target image revision label against the target receipt and uses Compose/Caddy extracted from that same target image under `releases/<target-source-sha>`.
 - **Rollback is not DB restore** and **does not change PostgreSQL schema**. No `migrate`, no SQL downgrade, no automatic DB restore during rollback.
 - **Migration bundle fingerprint** (`migration_bundle_sha256` in schema **2** receipts) must match across current receipt, previous receipt, and a fresh extraction from the target image. Any mismatch → **`automatic rollback blocked: migration bundle differs`** **before** backup and **before** stopping Caddy/bot/admin — production keeps serving the current version.
 - Schema **1** receipts (if ever present on a VPS) block automatic rollback (fail-closed).
@@ -172,15 +187,16 @@ Order enforced by `deploy-production.sh`:
 
 1. Validate SHA/digest and root
 2. Exclusive `flock`
-3. Preflight: Docker, Compose v2, env, compose file, **backup utility executable**
-4. `docker pull` immutable digest reference
-5. PostgreSQL up + healthy
-6. **Backup gate** (`backup-postgres --reason pre-deploy --source-sha …`) — must succeed before migration
-7. Stop Caddy (public ingress down during maintenance)
-8. Explicit `docker compose run --rm migrate`
-9. Recreate bot + admin; wait Docker health
-10. Internal bot readiness `http://127.0.0.1:8000/health/ready` (HTTP 200)
-11. Start Caddy with `--profile public` only after readiness
-12. Write deploy receipt; atomically rotate `current.json` / `previous.json`
+3. Preflight: Docker, Compose v2, env, ordinary `current` directory, **backup utility executable**
+4. `docker pull` immutable digest reference and verify digest membership
+5. Verify OCI revision label; extract only Compose/Caddy from a stopped container into `releases/<source_sha>`; reject any mismatch or unsafe existing tree
+6. PostgreSQL up + healthy using that source-specific Compose
+7. **Backup gate** (`backup-postgres --reason pre-deploy --source-sha …`) — must succeed before migration
+8. Stop Caddy (public ingress down during maintenance)
+9. Explicit `docker compose run --rm migrate`
+10. Recreate bot + admin; wait Docker health
+11. Internal bot readiness `http://127.0.0.1:8000/health/ready` (HTTP 200)
+12. Start Caddy with `--profile public` only after readiness
+13. Write deploy receipt; atomically rotate `current.json` / `previous.json`
 
 Any failure leaves public ingress off after Caddy was stopped and does not publish a new successful receipt.

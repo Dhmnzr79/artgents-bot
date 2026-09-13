@@ -90,6 +90,13 @@ Client packs и KB поставляются из **Git/image**, не правя�
 | admin | `BOT_PG_DSN`, `ADMIN_DASHBOARD_TOKEN`, admin tuning — **без** migrator/Qwen/SMTP |
 | caddy | ACME email, Basic Auth user/hash, `ADMIN_DASHBOARD_TOKEN` (для `X-Admin-Dashboard-Token`) — **без** DB/Qwen/SMTP |
 
+SMTP для `bot` опционален и настраивается по принципу **all-or-none**: либо заданы
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, либо все пять
+оставлены пустыми/отсутствуют. Без SMTP production stack и readiness запускаются
+нормально, а попытка email-доставки завершается контролируемым статусом
+`email_smtp_not_configured`. Частичная или некорректная конфигурация не приводит к
+неаутентифицированной отправке; корректный полный набор сохраняет обычную SMTP-доставку.
+
 Обязательные переменные помечены `${VAR:?set VAR}` в `compose.yml`. Пароли, DSN и токены **не** хранить в Git.
 
 **BCrypt для Caddy Basic Auth:** хеш генерируется на VPS, не коммитится. В production env значение с символом `$` заключайте в **одинарные кавычки**, иначе Compose/dotenv испортят хеш, например: `CADDY_ADMIN_BASIC_AUTH_HASH='$2a$14$…'`. Реальный хеш не логировать и не вставлять в отчёты.

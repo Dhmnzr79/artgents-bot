@@ -7,6 +7,28 @@ import pytest
 from core.lead_email import normalize_recipients, send_lead_email, smtp_configured
 from lead_service import handle_lead
 
+_FULL_SMTP_ENV = {
+    "SMTP_HOST": "smtp.example.com",
+    "SMTP_PORT": "587",
+    "SMTP_USER": "bot@example.com",
+    "SMTP_PASSWORD": "secret",
+    "SMTP_FROM": "bot@example.com",
+}
+
+
+def _send_test_lead() -> tuple[bool, str]:
+    return send_lead_email(
+        client_id="demo",
+        lead_cfg={"recipients": ["admin@demo.ru"], "subject_template": "Заявка"},
+        name="Иван",
+        phone="+79001234567",
+        intent="lead",
+        situation_note="",
+        sid="s1",
+        request_id="r1",
+        captured_at="2026-01-01T00:00:00+00:00",
+    )
+
 
 def test_normalize_recipients_skips_placeholders() -> None:
     assert normalize_recipients(["admin@clinic.ru", "REPLACE_WITH_EMAIL"]) == ["admin@clinic.ru"]
@@ -69,6 +91,7 @@ def test_send_lead_email_ssl_success(mock_connect: MagicMock) -> None:
     "os.environ",
     {
         "SMTP_HOST": "smtp.example.com",
+        "SMTP_PORT": "587",
         "SMTP_FROM": "bot@example.com",
         "SMTP_USER": "bot@example.com",
         "SMTP_PASSWORD": "secret",
@@ -102,6 +125,7 @@ def test_send_lead_email_starttls_success(mock_connect: MagicMock) -> None:
     mock_smtp.send_message.assert_called_once()
 
 
+@patch.dict("os.environ", _FULL_SMTP_ENV, clear=True)
 def test_send_lead_email_no_recipients() -> None:
     ok, status = send_lead_email(
         client_id="demo",
@@ -172,6 +196,46 @@ def test_handle_lead_pg_row_has_no_pii_when_store_enabled(
     assert row["phone"] is None
 
 
-def test_smtp_configured_requires_host_and_from() -> None:
-    with patch.dict("os.environ", {"SMTP_HOST": "", "SMTP_FROM": ""}, clear=False):
+@pytest.mark.parametrize("missing", tuple(_FULL_SMTP_ENV))
+@patch("core.lead_email._connect_smtp")
+def test_partial_smtp_config_fails_closed_without_connect(
+    mock_connect: MagicMock, missing: str
+) -> None:
+    env = dict(_FULL_SMTP_ENV)
+    env.pop(missing)
+    with patch.dict("os.environ", env, clear=True):
         assert smtp_configured() is False
+        ok, status = _send_test_lead()
+    assert ok is False
+    assert status == "email_smtp_not_configured"
+    mock_connect.assert_not_called()
+
+
+@patch("core.lead_email._connect_smtp")
+def test_smtp_entirely_absent_fails_closed_without_connect(mock_connect: MagicMock) -> None:
+    with patch.dict("os.environ", {}, clear=True):
+        ok, status = _send_test_lead()
+    assert ok is False
+    assert status == "email_smtp_not_configured"
+    mock_connect.assert_not_called()
+
+
+@pytest.mark.parametrize("port", ("not-a-port", "0", "65536"))
+@patch("core.lead_email._connect_smtp")
+def test_invalid_smtp_port_fails_closed_without_connect(
+    mock_connect: MagicMock, port: str
+) -> None:
+    env = {**_FULL_SMTP_ENV, "SMTP_PORT": port}
+    with patch.dict("os.environ", env, clear=True):
+        ok, status = _send_test_lead()
+    assert ok is False
+    assert status == "email_smtp_invalid_config"
+    mock_connect.assert_not_called()
+
+
+@patch.dict("os.environ", _FULL_SMTP_ENV, clear=True)
+@patch("core.lead_email._connect_smtp", side_effect=OSError("SMTP unavailable"))
+def test_smtp_connection_failure_returns_delivery_status(_mock_connect: MagicMock) -> None:
+    ok, status = _send_test_lead()
+    assert ok is False
+    assert status == "email_failed"

@@ -3,6 +3,7 @@
 #
 # Requirements:
 # - File owner root:root, mode 0440
+# - /opt/artgents/bin/deploy-receiver owned root:artgents-deploy, mode 0750; the deploy group must not have write permission
 # - /opt/artgents/bin/deploy-production owned root:root, mode 0750, not writable by deploy user
 # - SSH forced command points at deploy-receiver.sh (see server README)
 

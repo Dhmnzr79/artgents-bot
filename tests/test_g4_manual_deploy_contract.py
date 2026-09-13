@@ -327,6 +327,23 @@ def test_receiver_forced_command_contract() -> None:
     assert "BASH_REMATCH" in text
 
 
+def test_receiver_install_metadata_allows_only_dedicated_deploy_group_execution() -> None:
+    readme = _REPO_ROOT.joinpath("deploy/production/server/README.md").read_text(
+        encoding="utf-8"
+    )
+    install_line = next(
+        line for line in readme.splitlines() if "Copy `deploy-receiver.sh`" in line
+    )
+    assert "`root:artgents-deploy`" in install_line
+    assert "`0750`" in install_line
+    assert "root:root, `0750`" not in install_line
+    assert "never group/world writable" in install_line
+
+    sudoers = _SUDOERS.read_text(encoding="utf-8")
+    assert "deploy-receiver owned root:artgents-deploy, mode 0750" in sudoers
+    assert "deploy group must not have write permission" in sudoers
+
+
 def test_root_deploy_script_staged_fail_closed() -> None:
     text = _root_deploy_text()
     assert "id -u" in text and "must run as root" in text

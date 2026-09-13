@@ -55,7 +55,7 @@ check_env_permissions() {
   if [ "$owner" != "0:0" ]; then
     fail "production env must be root-owned"
   fi
-  if [ "$((10#${perms} & 077))" -ne 0 ]; then
+  if [ "$((8#${perms} & 077))" -ne 0 ]; then
     fail "production env must not be world/group readable"
   fi
 }
@@ -213,7 +213,7 @@ validate_receipt_path_metadata() {
   owner=$(stat -c '%u:%g' "$path")
   if [ "$owner" != "0:0" ]; then fail "receipt must be root-owned"; fi
   perms=$(stat -c '%a' "$path")
-  if [ "$((10#${perms} & 022))" -ne 0 ]; then fail "receipt must not be group/world writable"; fi
+  if [ "$((8#${perms} & 022))" -ne 0 ]; then fail "receipt must not be group/world writable"; fi
 }
 
 load_receipt_fields() {
@@ -334,7 +334,7 @@ validate_backup_receipt_path() {
   owner=$(stat -c '%u:%g' "$canonical")
   if [ "$owner" != "0:0" ]; then fail "backup receipt must be root-owned"; fi
   perms=$(stat -c '%a' "$canonical")
-  if [ "$((10#${perms} & 022))" -ne 0 ]; then fail "backup receipt must not be group/world writable"; fi
+  if [ "$((8#${perms} & 022))" -ne 0 ]; then fail "backup receipt must not be group/world writable"; fi
   printf '%s' "$canonical"
 }
 

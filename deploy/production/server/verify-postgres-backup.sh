@@ -47,7 +47,7 @@ check_env_permissions() {
   if [ "$owner" != "0:0" ]; then
     fail "production env must be root-owned"
   fi
-  if [ "$((10#${perms} & 077))" -ne 0 ]; then
+  if [ "$((8#${perms} & 077))" -ne 0 ]; then
     fail "production env must not be world/group readable"
   fi
 }

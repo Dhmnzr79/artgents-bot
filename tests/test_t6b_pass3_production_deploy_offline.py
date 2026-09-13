@@ -286,6 +286,25 @@ def test_image_parameters_required_in_compose() -> None:
     assert "${CADDY_IMAGE:?set CADDY_IMAGE}" in text
 
 
+def test_smtp_is_optional_in_compose_without_weakening_other_guards() -> None:
+    text = COMPOSE.read_text(encoding="utf-8")
+    for name in ("SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM"):
+        assert f"${{{name}:-}}" in text
+        assert f"${{{name}:?" not in text
+    for required in (
+        "BOT_IMAGE",
+        "POSTGRES_IMAGE",
+        "CADDY_IMAGE",
+        "POSTGRES_PASSWORD",
+        "BOT_PG_DSN",
+        "DASHSCOPE_API_KEY",
+        "CHAT_BASE_URL",
+        "ADMIN_DASHBOARD_TOKEN",
+        "CADDY_ADMIN_BASIC_AUTH_HASH",
+    ):
+        assert f"${{{required}:?set {required}}}" in text
+
+
 def test_compose_config_validation_optional() -> None:
     if shutil.which("docker") is None:
         pytest.skip("docker CLI not available — static contracts only (UNKNOWN compose config)")
@@ -313,11 +332,6 @@ def test_compose_config_validation_optional() -> None:
         "DEFAULT_CLIENT_ID": "demo",
         "DASHSCOPE_API_KEY": "dummy",
         "CHAT_BASE_URL": "https://example.invalid/v1",
-        "SMTP_HOST": "mail.example.invalid",
-        "SMTP_PORT": "465",
-        "SMTP_USER": "bot@example.invalid",
-        "SMTP_PASSWORD": "dummy",
-        "SMTP_FROM": "bot@example.invalid",
         "ADMIN_DASHBOARD_TOKEN": "dummy-token-for-config-only",
         "CADDY_ACME_EMAIL": "ops@example.invalid",
         "CADDY_ADMIN_BASIC_AUTH_USER": "owner",

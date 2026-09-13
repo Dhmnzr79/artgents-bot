@@ -150,6 +150,17 @@ def test_recipient_routing_cache_warm_order_irrelevant(
 
 @patch("lead_service.leads_enabled", return_value=True)
 @patch("lead_service.leads_mode", return_value="email")
+@patch.dict(
+    "os.environ",
+    {
+        "SMTP_HOST": "smtp.test",
+        "SMTP_PORT": "587",
+        "SMTP_USER": "bot@test",
+        "SMTP_PASSWORD": "x",
+        "SMTP_FROM": "bot@test",
+    },
+    clear=False,
+)
 def test_no_recipients_honest_status_no_demo_fallback(
     _mode,
     _enabled,
@@ -349,7 +360,13 @@ def test_long_last_message_excerpt_truncated_not_empty() -> None:
 
 @patch.dict(
     "os.environ",
-    {"SMTP_HOST": "smtp.test", "SMTP_FROM": "bot@test", "SMTP_PASSWORD": "x"},
+    {
+        "SMTP_HOST": "smtp.test",
+        "SMTP_PORT": "587",
+        "SMTP_USER": "bot@test",
+        "SMTP_PASSWORD": "x",
+        "SMTP_FROM": "bot@test",
+    },
     clear=False,
 )
 @patch("core.lead_email._connect_smtp")
@@ -448,11 +465,21 @@ def test_mask_email_preserves_service_price_text() -> None:
     assert "a@b.co" not in line
 
 
-@patch.dict("os.environ", {"SMTP_HOST": "smtp.test", "SMTP_FROM": "bot@test"}, clear=False)
+@patch.dict(
+    "os.environ",
+    {
+        "SMTP_HOST": "smtp.test",
+        "SMTP_PORT": "587",
+        "SMTP_USER": "bot@test",
+        "SMTP_PASSWORD": "x",
+        "SMTP_FROM": "bot@test",
+    },
+    clear=False,
+)
 @patch("core.lead_email._connect_smtp", side_effect=RuntimeError("smtp down"))
 def test_smtp_failure_logs_without_message_body(mock_connect, caplog) -> None:
     secret = "UNIQUE_LEAD_BODY_SECRET_12345"
-    send_lead_email(
+    ok, status = send_lead_email(
         client_id="demo",
         lead_cfg={"recipients": ["inbox@test"]},
         name=secret,
@@ -464,6 +491,8 @@ def test_smtp_failure_logs_without_message_body(mock_connect, caplog) -> None:
         request_id="r",
         captured_at="2026-01-01T00:00:00+00:00",
     )
+    assert ok is False
+    assert status == "email_failed"
     blob = caplog.text
     assert secret not in blob
     assert "+79001234567" not in blob

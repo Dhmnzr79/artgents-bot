@@ -1,4 +1,4 @@
-"""SMTP delivery for clinic leads (M3). Secrets in .env; recipients in lead_config.yaml."""
+"""SMTP delivery for clinic leads (M3). Secrets in env; recipients in lead_config.yaml."""
 from __future__ import annotations
 
 import os
@@ -14,6 +14,14 @@ from logging_setup import get_logger
 
 logger = get_logger("bot")
 
+_SMTP_REQUIRED_ENV = (
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_USER",
+    "SMTP_PASSWORD",
+    "SMTP_FROM",
+)
+
 
 def _env_bool(name: str, default: bool = True) -> bool:
     raw = (os.getenv(name) or "").strip().lower()
@@ -23,7 +31,7 @@ def _env_bool(name: str, default: bool = True) -> bool:
 
 
 def smtp_configured() -> bool:
-    return bool((os.getenv("SMTP_HOST") or "").strip() and (os.getenv("SMTP_FROM") or "").strip())
+    return all((os.getenv(name) or "").strip() for name in _SMTP_REQUIRED_ENV)
 
 
 def normalize_recipients(raw: Any) -> list[str]:
@@ -128,20 +136,28 @@ def send_lead_email(
     captured_at: str,
 ) -> tuple[bool, str]:
     """Send lead email. Returns (ok, delivery_status for PG/admin)."""
+    if not smtp_configured():
+        logger.warning("lead_email_smtp_not_configured client_id=%s", client_id)
+        return False, "email_smtp_not_configured"
+
     recipients = normalize_recipients(lead_cfg.get("recipients"))
     if not recipients:
         logger.warning("lead_email_no_recipients client_id=%s", client_id)
         return False, "email_no_recipients"
 
-    if not smtp_configured():
-        logger.warning("lead_email_smtp_not_configured client_id=%s", client_id)
-        return False, "email_smtp_not_configured"
-
     host = (os.getenv("SMTP_HOST") or "").strip()
-    port = int((os.getenv("SMTP_PORT") or "587").strip() or "587")
+    raw_port = (os.getenv("SMTP_PORT") or "").strip()
     from_addr = (os.getenv("SMTP_FROM") or "").strip()
-    user = (os.getenv("SMTP_USER") or "").strip() or from_addr
+    user = (os.getenv("SMTP_USER") or "").strip()
     password = (os.getenv("SMTP_PASSWORD") or "").strip()
+
+    try:
+        port = int(raw_port)
+        if not 1 <= port <= 65535:
+            raise ValueError("SMTP port outside valid range")
+    except ValueError:
+        logger.warning("lead_email_smtp_invalid_config client_id=%s", client_id)
+        return False, "email_smtp_invalid_config"
 
     msg = EmailMessage()
     msg["Subject"] = _subject(lead_cfg, client_id)

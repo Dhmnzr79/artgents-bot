@@ -48,7 +48,7 @@ Obtain the VPS host key through a **trusted out-of-band channel** (console provi
 **Do not execute these steps until:** G7 backup utility exists, G8 PostgreSQL qualification is done, and G10 VPS/DNS/TLS baseline is complete. Until then, the GitHub workflow must remain unused even if merged to `main`.
 
 1. Copy `deploy-production.sh` to `/opt/artgents/bin/deploy-production` (root:root, `0750`).
-2. Copy `deploy-receiver.sh` to e.g. `/opt/artgents/bin/deploy-receiver` (root:root, `0750`; deploy user may execute via forced command path only).
+2. Copy `deploy-receiver.sh` to e.g. `/opt/artgents/bin/deploy-receiver` (`root:artgents-deploy`, `0750`; the dedicated deploy group receives read/execute only, and the deploy user may execute it via the forced-command path only). Keep `/opt/artgents` and `/opt/artgents/bin` root-owned and traversable by the deploy user (for example, `root:root` `0755`), never group/world writable.
 3. Install sudoers fragment from `artgents-deploy.sudoers.example` using `visudo -cf` after substituting `DEPLOY_USER`.
 4. Ensure `/etc/artgents/production.env` exists (root-owned, not world-readable).
 5. Ensure `/opt/artgents/current` points at an extracted release tree containing `deploy/production/compose.yml`.

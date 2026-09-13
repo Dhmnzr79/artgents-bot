@@ -257,6 +257,11 @@ def test_start_admin_uses_gunicorn_not_flask_dev() -> None:
     assert "admin_dashboard.app:app" in text
 
 
+def test_production_shell_scripts_use_lf_line_endings() -> None:
+    for script in PROD.rglob("*.sh"):
+        assert b"\r\n" not in script.read_bytes(), f"CRLF line endings: {script}"
+
+
 def test_dockerfile_chmods_admin_start() -> None:
     text = (ROOT / "Dockerfile").read_text(encoding="utf-8")
     assert "deploy/production/start_admin.sh" in text

@@ -120,6 +120,16 @@ Manual scheduled-style run:
 /opt/artgents/bin/backup-postgres --reason scheduled
 ```
 
+The scheduled backup and read-only verifier do not load or interpolate the full
+production Compose model. They discover exactly one `running` and `healthy`
+PostgreSQL container by the Compose labels `project=demo-bot-production`,
+`service=postgres`, and `oneoff=False`, revalidate those labels and states with
+`docker inspect`, and then use its immutable container ID with `docker exec`.
+Consequently G7 requires only the running healthy PostgreSQL container and the
+root-owned `/etc/artgents/production.env` (the backup reads `POSTGRES_USER` and
+`POSTGRES_DB`); it does not require SMTP, Qwen, admin, or Caddy settings. Missing,
+duplicate, stopped, unhealthy, or mismatched containers fail closed.
+
 ### Verify (read-only)
 
 ```bash

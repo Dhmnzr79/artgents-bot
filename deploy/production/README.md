@@ -72,6 +72,7 @@ Client packs и KB поставляются из **Git/image**, не правя�
 - Квитанции: `/var/lib/artgents/backups/receipts/` — путь последней строки stdout `backup-postgres` (нужен G4/G5)
 - Ежедневно: `artgents-postgres-backup.timer` → `--reason scheduled`
 - Проверка без restore: `/opt/artgents/bin/verify-postgres-backup <receipt.json>`
+- Backup/verify G7 не интерполируют полный Compose: PostgreSQL-контейнер находится по Compose labels и повторно проверяется как единственный `running+healthy`. Для scheduled backup не нужны SMTP/Qwen/admin/Caddy settings; из root-owned `/etc/artgents/production.env` читаются только PostgreSQL targets.
 - Локальный backup на VPS **не** защищает от потери всего VPS — нужен off-host copy / snapshot (**G10**)
 - Полная operational готовность — только после реального backup и **G8** disposable restore drill (не только `pg_restore --list`)
 

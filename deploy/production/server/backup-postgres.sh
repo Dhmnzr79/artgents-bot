@@ -4,8 +4,6 @@ set -Eeuo pipefail
 umask 077
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-readonly CURRENT_ROOT=/opt/artgents/current
-readonly COMPOSE_FILE="${CURRENT_ROOT}/deploy/production/compose.yml"
 readonly ENV_FILE=/etc/artgents/production.env
 readonly HELPER=/opt/artgents/bin/backup-postgres-g7.py
 readonly BACKUPS_PARENT=/var/lib/artgents/backups
@@ -13,6 +11,8 @@ readonly ARCHIVE_ROOT="${BACKUPS_PARENT}/postgres"
 readonly RECEIPT_ROOT="${BACKUPS_PARENT}/receipts"
 readonly LOCK_FILE=/var/lock/artgents-postgres-backup.lock
 readonly RETENTION_DAYS=7
+readonly COMPOSE_PROJECT=demo-bot-production
+readonly POSTGRES_SERVICE=postgres
 
 REASON=""
 SOURCE_SHA=""
@@ -252,8 +252,47 @@ check_helper_metadata() {
   fi
 }
 
-compose() {
-  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
+discover_postgres_container() {
+  local output="" cid="" project="" service="" oneoff="" running="" health=""
+  local -a ids=()
+
+  if ! output=$(docker ps -a --no-trunc \
+    --filter "label=com.docker.compose.project=${COMPOSE_PROJECT}" \
+    --filter "label=com.docker.compose.service=${POSTGRES_SERVICE}" \
+    --filter "label=com.docker.compose.oneoff=False" \
+    --format '{{.ID}}'); then
+    fail "failed to discover postgres container"
+  fi
+  while IFS= read -r cid; do
+    [ -n "$cid" ] || continue
+    if ! [[ "$cid" =~ ^[0-9a-f]{64}$ ]]; then
+      fail "invalid postgres container id"
+    fi
+    ids+=("$cid")
+  done <<< "$output"
+  if [ "${#ids[@]}" -ne 1 ]; then
+    fail "expected exactly one postgres container, found ${#ids[@]}"
+  fi
+  cid="${ids[0]}"
+
+  project=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$cid") || \
+    fail "failed to inspect postgres project label"
+  service=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$cid") || \
+    fail "failed to inspect postgres service label"
+  oneoff=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.oneoff"}}' "$cid") || \
+    fail "failed to inspect postgres oneoff label"
+  running=$(docker inspect --format '{{.State.Running}}' "$cid") || \
+    fail "failed to inspect postgres running state"
+  health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$cid") || \
+    fail "failed to inspect postgres health"
+
+  [ "$project" = "$COMPOSE_PROJECT" ] || fail "postgres container project label mismatch"
+  [ "$service" = "$POSTGRES_SERVICE" ] || fail "postgres container service label mismatch"
+  [ "$oneoff" = "False" ] || fail "postgres container must not be one-off"
+  [ "$running" = "true" ] || fail "postgres container is not running"
+  [ "$health" = "healthy" ] || fail "postgres container is not healthy"
+
+  printf '%s\n' "$cid"
 }
 
 fsync_path() {
@@ -336,34 +375,24 @@ if ! flock -n 8; then
 fi
 
 check_env_permissions
-require_regular_file "$COMPOSE_FILE" readable
-if [ -L "$CURRENT_ROOT" ]; then
-  fail "current root must not be a symlink"
-fi
-if [ ! -d "$CURRENT_ROOT" ]; then
-  fail "current root must be a directory"
-fi
 check_helper_metadata
 
 if ! command -v docker >/dev/null 2>&1; then
   fail "docker not installed"
 fi
-if ! docker compose version >/dev/null 2>&1; then
-  fail "docker compose v2 not available"
-fi
-
 ensure_trusted_dir_0700 "$BACKUPS_PARENT" "backups parent"
 ensure_trusted_dir_0700 "$ARCHIVE_ROOT" "archive root"
 ensure_trusted_dir_0700 "$RECEIPT_ROOT" "receipt root"
 
 load_postgres_targets
+POSTGRES_CONTAINER_ID=$(discover_postgres_container)
 
 WORK_DIR=$(mktemp -d "${ARCHIVE_ROOT}/.work.XXXXXX")
 verify_work_dir_containment
 ARCHIVE_TMP="${WORK_DIR}/archive.pgdump.custom"
 STDERR_TMP="${WORK_DIR}/pg_dump.stderr"
 
-if ! compose exec -T postgres pg_dump \
+if ! docker exec "$POSTGRES_CONTAINER_ID" pg_dump \
   --username "$POSTGRES_USER_NAME" \
   --dbname "$DATABASE_NAME" \
   --format=custom >"$ARCHIVE_TMP" 2>"$STDERR_TMP"; then
@@ -375,7 +404,7 @@ if [ ! -s "$ARCHIVE_TMP" ]; then
   fail "empty backup archive"
 fi
 
-if ! compose exec -T postgres pg_restore --list <"$ARCHIVE_TMP" >/dev/null 2>"$STDERR_TMP"; then
+if ! docker exec -i "$POSTGRES_CONTAINER_ID" pg_restore --list <"$ARCHIVE_TMP" >/dev/null 2>"$STDERR_TMP"; then
   fail "pg_restore --list validation failed"
 fi
 

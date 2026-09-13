@@ -90,6 +90,64 @@ def _verify_text() -> str:
     return _VERIFY_SCRIPT.read_text(encoding="utf-8")
 
 
+def _discovery_function(script: Path) -> str:
+    text = script.read_text(encoding="utf-8")
+    start = text.index("discover_postgres_container() {")
+    end = text.index("\n}\n", start) + 3
+    return text[start:end]
+
+
+def _run_discovery(
+    script: Path,
+    *,
+    ids: str,
+    project: str = "demo-bot-production",
+    service: str = "postgres",
+    oneoff: str = "False",
+    running: str = "true",
+    health: str = "healthy",
+) -> subprocess.CompletedProcess[str]:
+    bash = _bash_executable()
+    harness = f"""
+set -Eeuo pipefail
+readonly COMPOSE_PROJECT=demo-bot-production
+readonly POSTGRES_SERVICE=postgres
+fail() {{ printf '%s\\n' "$*" >&2; exit 1; }}
+docker() {{
+  if [ "$1" = "ps" ]; then
+    printf '%s' "$MOCK_IDS"
+    return 0
+  fi
+  if [ "$1" != "inspect" ]; then
+    return 99
+  fi
+  case "$3" in
+    *com.docker.compose.project*) printf '%s\\n' "$MOCK_PROJECT" ;;
+    *com.docker.compose.service*) printf '%s\\n' "$MOCK_SERVICE" ;;
+    *com.docker.compose.oneoff*) printf '%s\\n' "$MOCK_ONEOFF" ;;
+    *State.Running*) printf '%s\\n' "$MOCK_RUNNING" ;;
+    *State.Health*) printf '%s\\n' "$MOCK_HEALTH" ;;
+    *) return 98 ;;
+  esac
+}}
+{_discovery_function(script)}
+discover_postgres_container
+"""
+    return subprocess.run(
+        [bash, "-c", harness],
+        capture_output=True,
+        text=True,
+        env={
+            "MOCK_IDS": ids,
+            "MOCK_PROJECT": project,
+            "MOCK_SERVICE": service,
+            "MOCK_ONEOFF": oneoff,
+            "MOCK_RUNNING": running,
+            "MOCK_HEALTH": health,
+        },
+    )
+
+
 def _server_permission_scripts() -> tuple[Path, ...]:
     return (_BACKUP_SCRIPT, _VERIFY_SCRIPT, _DEPLOY_SCRIPT, _ROLLBACK_SCRIPT)
 
@@ -210,8 +268,8 @@ def test_backup_explicit_pg_dump_username_and_dbname() -> None:
     assert '--username "$POSTGRES_USER_NAME"' in text
     assert '--dbname "$DATABASE_NAME"' in text
     assert "--format=custom" in text
-    assert "compose exec -T postgres pg_dump" in text
-    dump_block = text.split("compose exec -T postgres pg_dump", 1)[1].split(">", 1)[0]
+    assert 'docker exec "$POSTGRES_CONTAINER_ID" pg_dump' in text
+    dump_block = text.split('docker exec "$POSTGRES_CONTAINER_ID" pg_dump', 1)[1].split(">", 1)[0]
     assert "--username" in dump_block and "--dbname" in dump_block
 
 
@@ -285,11 +343,73 @@ def test_backup_directory_must_be_exactly_0700() -> None:
     assert "BACKUPS_PARENT" in text
 
 
-def test_backup_uses_compose_exec_postgres_only() -> None:
+def test_backup_uses_discovered_postgres_container_only() -> None:
     text = _backup_text()
-    assert "compose exec -T postgres pg_dump" in text
+    assert 'docker exec "$POSTGRES_CONTAINER_ID" pg_dump' in text
+    assert 'docker exec -i "$POSTGRES_CONTAINER_ID" pg_restore --list' in text
     assert "--username" in text and "--dbname" in text
     assert "5432" not in text
+
+
+@pytest.mark.parametrize("script", (_BACKUP_SCRIPT, _VERIFY_SCRIPT), ids=lambda path: path.name)
+def test_postgres_discovery_accepts_exactly_one_running_healthy_container(script: Path) -> None:
+    cid = "a" * 64
+    proc = _run_discovery(script, ids=f"{cid}\n")
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.strip() == cid
+
+
+@pytest.mark.parametrize("script", (_BACKUP_SCRIPT, _VERIFY_SCRIPT), ids=lambda path: path.name)
+@pytest.mark.parametrize(
+    ("overrides", "error"),
+    (
+        ({"ids": ""}, "expected exactly one postgres container, found 0"),
+        ({"ids": f"{'a' * 64}\n{'b' * 64}\n"}, "expected exactly one postgres container, found 2"),
+        ({"ids": f"{'a' * 64}\n", "project": "wrong"}, "project label mismatch"),
+        ({"ids": f"{'a' * 64}\n", "service": "wrong"}, "service label mismatch"),
+        ({"ids": f"{'a' * 64}\n", "oneoff": "True"}, "must not be one-off"),
+        ({"ids": f"{'a' * 64}\n", "running": "false"}, "is not running"),
+        ({"ids": f"{'a' * 64}\n", "health": "unhealthy"}, "is not healthy"),
+    ),
+)
+def test_postgres_discovery_fails_closed(
+    script: Path, overrides: dict[str, str], error: str
+) -> None:
+    proc = _run_discovery(script, **overrides)
+    assert proc.returncode != 0
+    assert error in proc.stderr
+
+
+def test_g7_is_decoupled_from_full_production_compose_and_app_settings() -> None:
+    combined = _backup_text() + _verify_text()
+    assert "docker compose" not in combined
+    assert "COMPOSE_FILE" not in combined
+    assert "/opt/artgents/current" not in combined
+    for app_setting in (
+        "SMTP_",
+        "DASHSCOPE_API_KEY",
+        "CHAT_BASE_URL",
+        "CHAT_API_KEY",
+        "QWEN_ENABLE_THINKING",
+        "CADDY_",
+        "ADMIN_DASHBOARD_TOKEN",
+    ):
+        assert app_setting not in combined
+
+
+def test_postgres_discovery_contract_uses_labels_and_rechecks_inspect_state() -> None:
+    for text in (_backup_text(), _verify_text()):
+        assert "docker ps -a --no-trunc" in text
+        assert 'label=com.docker.compose.project=${COMPOSE_PROJECT}' in text
+        assert 'label=com.docker.compose.service=${POSTGRES_SERVICE}' in text
+        assert 'label=com.docker.compose.oneoff=False' in text
+        assert text.count("docker inspect --format") == 5
+        assert '[ "$project" = "$COMPOSE_PROJECT" ]' in text
+        assert '[ "$service" = "$POSTGRES_SERVICE" ]' in text
+        assert '[ "$oneoff" = "False" ]' in text
+        assert '[ "$running" = "true" ]' in text
+        assert '[ "$health" = "healthy" ]' in text
+        assert "demo-bot-production-postgres" not in text
 
 
 def test_backup_stdout_last_line_receipt_only() -> None:
@@ -528,7 +648,7 @@ def test_verifier_checks_env_before_docker() -> None:
     text = _verify_text()
     assert "check_env_permissions" in text
     assert "check_helper_metadata" in text
-    docker_pos = text.find("docker compose")
+    docker_pos = text.find("docker ps -a")
     env_pos = text.find("check_env_permissions")
     assert env_pos != -1 and docker_pos != -1 and env_pos < docker_pos
 

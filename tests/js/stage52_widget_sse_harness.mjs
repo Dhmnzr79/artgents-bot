@@ -132,11 +132,15 @@ function sleep(ms) {
 
 function widgetConfig() {
   return {
+    schemaVersion: 1,
     apiBase: location.origin,
     clientId: "demo",
     botName: "Тест",
     onlineLabel: "Онлайн",
+    launcherSubtitle: null,
+    launcherCtaLabel: "Задать вопрос",
     welcomeText: "Добро пожаловать",
+    videoAspect: "horizontal",
     starterPrompts: [],
     demoLauncher: false,
     launcherTeaser: false,
@@ -745,6 +749,122 @@ async function runE3b(network) {
   };
 }
 
+async function runE13(network) {
+  const pseudoAnswer =
+    "Альфа браво чарли дельта эхо фокстрот гольф отель индиа джульетта кило лима майк ноябрь.";
+  const sse = buildSse([
+    ["status", { message: "Проверяю вопрос" }],
+    ["ui", { answer: pseudoAnswer, meta: { sid: "e13-sid" } }],
+    ["done", {}],
+  ]);
+  globalThis.__stage52_fetch_mock = () => sseResponse(sse, 8);
+  const root = document.createElement("div");
+  document.body.appendChild(root);
+  resetCallbackCounts();
+  mountWidget(root, widgetConfig());
+  await openChat(root);
+  const feed = feedEl(root);
+  const t0 = performance.now();
+  await sendComposer(root, "Buffered pseudo reveal");
+  await waitUntil(() => {
+    const c = countDom(feed);
+    if (c.finalTurns < 1) return false;
+    const body = c.bodies[c.bodies.length - 1] || "";
+    return body === pseudoAnswer;
+  }, 3000);
+  const elapsedMs = Math.round(performance.now() - t0);
+  const after = countDom(feed);
+  return {
+    scenario: "E13",
+    sse_sequence: ["status", "ui", "done"],
+    callbacks: { ...callbackCounts },
+    dom: { after },
+    final_text: after.bodies[after.bodies.length - 1] || "",
+    pseudo_reveal_elapsed_ms: elapsedMs,
+    server_delta_count: callbackCounts.delta,
+    network_attempts: network.attempts,
+  };
+}
+
+async function runE14(network) {
+  const pseudoAnswer =
+    "Альфа браво чарли дельта эхо фокстрот гольф отель индиа джульетта кило лима майк ноябрь.";
+  const sse = buildSse([
+    ["ui", { answer: pseudoAnswer, meta: { sid: "e14-sid" } }],
+    ["done", {}],
+  ]);
+  globalThis.__stage52_fetch_mock = () => sseResponse(sse, 6);
+  const origMatchMedia = window.matchMedia.bind(window);
+  window.matchMedia = (query) => {
+    if (String(query).includes("prefers-reduced-motion")) {
+      return {
+        matches: true,
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      };
+    }
+    return origMatchMedia(query);
+  };
+  const root = document.createElement("div");
+  document.body.appendChild(root);
+  resetCallbackCounts();
+  mountWidget(root, widgetConfig());
+  await openChat(root);
+  const feed = feedEl(root);
+  const t0 = performance.now();
+  await sendComposer(root, "Reduced motion immediate");
+  await waitUntil(() => countDom(feed).finalTurns >= 1, 3000);
+  const elapsedMs = Math.round(performance.now() - t0);
+  const after = countDom(feed);
+  window.matchMedia = origMatchMedia;
+  return {
+    scenario: "E14",
+    callbacks: { ...callbackCounts },
+    dom: { after },
+    final_text: after.bodies[after.bodies.length - 1] || "",
+    reveal_elapsed_ms: elapsedMs,
+    server_delta_count: callbackCounts.delta,
+    network_attempts: network.attempts,
+  };
+}
+
+async function runE15(network) {
+  const sse = buildSse([
+    ["text_delta", { delta: "Часть стрима" }],
+    [
+      "ui",
+      {
+        answer: "Полностью другой финал",
+        meta: { sid: "e15-sid" },
+        cta: { action: "lead", label: "Записаться" },
+      },
+    ],
+    ["done", {}],
+  ]);
+  globalThis.__stage52_fetch_mock = () => sseResponse(sse, 6);
+  const root = document.createElement("div");
+  document.body.appendChild(root);
+  resetCallbackCounts();
+  mountWidget(root, widgetConfig());
+  await openChat(root);
+  const feed = feedEl(root);
+  await sendComposer(root, "Stream mismatch");
+  await sleep(400);
+  const errBox = root.querySelector("[data-clinic-err]");
+  const after = countDom(feed);
+  const visible = feedVisibleText(feed);
+  return {
+    scenario: "E15",
+    callbacks: { ...callbackCounts },
+    dom: { after },
+    error_visible: Boolean(errBox && !errBox.hidden),
+    final_turns: after.finalTurns,
+    final_visible_includes_ui_answer: visible.includes("Полностью другой финал"),
+    network_attempts: network.attempts,
+  };
+}
+
 async function runE9(network) {
   const sse =
     "event: text_delta\\r\\n" +
@@ -790,6 +910,9 @@ const SCENARIOS = {
   E10: runE10,
   E11: runE11,
   E12: runE12,
+  E13: runE13,
+  E14: runE14,
+  E15: runE15,
   EJson: runEJson,
 };
 
@@ -1166,7 +1289,25 @@ async function main() {
   }
   const scenarios =
     arg === "all"
-      ? ["E1", "E2", "E3", "E3b", "E4", "E5", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "EJson"]
+      ? [
+          "E1",
+          "E2",
+          "E3",
+          "E3b",
+          "E4",
+          "E5",
+          "E6",
+          "E7",
+          "E8",
+          "E9",
+          "E10",
+          "E11",
+          "E12",
+          "E13",
+          "E14",
+          "E15",
+          "EJson",
+        ]
       : [arg];
   const out = [];
   for (const sc of scenarios) {

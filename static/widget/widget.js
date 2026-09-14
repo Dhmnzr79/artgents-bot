@@ -1369,12 +1369,37 @@ export function mountWidget(root, config) {
    * @param {string} apiBase
    * @param {Record<string, unknown>} body
    */
+  const PSEUDO_STREAM_MAX_MS = 1200;
+  const PSEUDO_WORDS_PER_STEP = 5;
+
+  function shouldSkipPseudoStream() {
+    if (typeof document !== "undefined" && document.hidden) return true;
+    return (
+      typeof matchMedia !== "undefined" &&
+      matchMedia("(prefers-reduced-motion: reduce)").matches
+    );
+  }
+
+  /** @param {string} text */
+  function pseudoStreamChunks(text) {
+    const chunks = [];
+    const re = /\S+\s*/gu;
+    let match = re.exec(text);
+    while (match) {
+      chunks.push(match[0]);
+      match = re.exec(text);
+    }
+    return chunks;
+  }
+
   function runStreamAsk(feed, apiBase, body) {
     let liveBubble = null;
     let fullText = "";
     let uiData = null;
     let writingRevealTimer = 0;
+    let pseudoStreamTimer = 0;
     let turnFinalized = false;
+    let streamAborted = false;
     const liveAttributionKind = predictLiveAttributionKind(body, state.lastPayload);
 
     const clearWritingRevealTimer = () => {
@@ -1382,6 +1407,18 @@ export function mountWidget(root, config) {
         clearTimeout(writingRevealTimer);
         writingRevealTimer = 0;
       }
+    };
+
+    const clearPseudoStreamTimer = () => {
+      if (pseudoStreamTimer) {
+        clearTimeout(pseudoStreamTimer);
+        pseudoStreamTimer = 0;
+      }
+    };
+
+    const clearStreamTimers = () => {
+      clearWritingRevealTimer();
+      clearPseudoStreamTimer();
     };
 
     const revealLiveBubble = () => {
@@ -1395,20 +1432,32 @@ export function mountWidget(root, config) {
       }
     };
 
-    const finalizeTurn = () => {
+    const commitStreamMismatch = () => {
       if (turnFinalized) return;
       turnFinalized = true;
-      clearWritingRevealTimer();
+      streamAborted = true;
+      clearStreamTimers();
+      liveBubble = null;
+      fullText = "";
+      uiData = null;
+      if (typeof console !== "undefined" && console.error) {
+        console.error("[widget] stream_final_answer_mismatch");
+      }
+      setError("Не удалось отобразить ответ. Попробуйте ещё раз.");
+      endPendingRequest();
+      renderFeed();
+      syncSendState();
+    };
+
+    const commitFinalTurn = () => {
+      if (turnFinalized) return;
+      turnFinalized = true;
+      clearStreamTimers();
       const streamedText = fullText.trim();
       if (uiData) {
         if (uiData.meta && uiData.meta.sid) setSid(uiData.meta.sid);
         const turn = botTurnFromPayload(uiData);
         if (turn) {
-          // The verified final payload remains the source of truth. A blocked
-          // or corrected route must replace speculative streamed prose.
-          if (streamedText && streamedText === String(turn.text || "").trim()) {
-            turn.text = streamedText;
-          }
           state.messages.push(turn);
         }
         state.lastPayload = uiData;
@@ -1430,10 +1479,83 @@ export function mountWidget(root, config) {
           attributionKind: liveAttributionKind,
         });
       }
+      liveBubble = null;
       endPendingRequest();
       if (state.unread && !state.isOpen) unreadDot?.classList.add("is-visible");
       renderFeed();
       syncSendState();
+    };
+
+    const revealPseudoToFinal = (finalText) => {
+      if (turnFinalized || streamAborted) return;
+      if (!finalText.startsWith(fullText)) {
+        commitStreamMismatch();
+        return;
+      }
+      if (fullText === finalText || shouldSkipPseudoStream()) {
+        fullText = finalText;
+        commitFinalTurn();
+        return;
+      }
+      const suffix = finalText.slice(fullText.length);
+      const chunks = pseudoStreamChunks(suffix);
+      if (chunks.length <= 3) {
+        fullText = finalText;
+        commitFinalTurn();
+        return;
+      }
+      const steps = Math.max(1, Math.ceil(chunks.length / PSEUDO_WORDS_PER_STEP));
+      const interval = Math.min(PSEUDO_STREAM_MAX_MS / steps, 400);
+      let index = 0;
+      const prefix = fullText;
+      state.typingPhase = "writing";
+      updateTypingIndicatorText();
+      const tick = () => {
+        if (turnFinalized || streamAborted) return;
+        index = Math.min(chunks.length, index + PSEUDO_WORDS_PER_STEP);
+        fullText = prefix + chunks.slice(0, index).join("");
+        if (!liveBubble && fullText) {
+          liveBubble = _createLiveBubble(feed, config.botName, liveAttributionKind);
+        }
+        if (liveBubble) {
+          _updateLiveBubble(liveBubble, fullText, feed);
+        }
+        if (index >= chunks.length) {
+          fullText = finalText;
+          commitFinalTurn();
+          return;
+        }
+        pseudoStreamTimer = window.setTimeout(tick, interval);
+      };
+      tick();
+    };
+
+    const finalizeTurn = () => {
+      if (turnFinalized || streamAborted) return;
+      if (!uiData) {
+        commitFinalTurn();
+        return;
+      }
+      const turn = botTurnFromPayload(uiData);
+      const finalText = turn ? String(turn.text || "") : "";
+      if (!finalText) {
+        commitFinalTurn();
+        return;
+      }
+      const streamedText = fullText.trim();
+      if (!streamedText) {
+        revealPseudoToFinal(finalText);
+        return;
+      }
+      if (streamedText === finalText) {
+        commitFinalTurn();
+        return;
+      }
+      if (finalText.startsWith(streamedText)) {
+        revealPseudoToFinal(finalText);
+        return;
+      }
+      commitStreamMismatch();
     };
 
     const logFirstLocalStatusOnce = () => {
@@ -1490,7 +1612,8 @@ export function mountWidget(root, config) {
       },
       onError(msg) {
         if (turnFinalized) return;
-        clearWritingRevealTimer();
+        streamAborted = true;
+        clearStreamTimers();
         setError(msg);
         endPendingRequest();
         renderFeed();

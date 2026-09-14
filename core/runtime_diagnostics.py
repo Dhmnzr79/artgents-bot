@@ -216,6 +216,7 @@ class SseRenderDiagnosticTracker:
     )
     streamed_parts: list[str] = field(default_factory=list)
     final_text: str | None = None
+    delivery_mode: str | None = None
     emitted: bool = False
 
     def track(self, block: str) -> str:
@@ -244,15 +245,21 @@ class SseRenderDiagnosticTracker:
         final_chars, final_bytes, final_sha = utf8_text_fingerprint(final_text)
         if self.counts.get("text_delta", 0) == 0:
             stream_matches_final = None
+            prefix_matches_final = None
         else:
             stream_matches_final = streamed_text == final_text
+            prefix_matches_final = final_text.startswith(streamed_text)
         return {
             "event": "sse_render_diagnostic",
             "request_id": self.request_id,
             "client_id": self.client_id,
             "route": self.route,
             "status": self.status,
+            "delivery_mode": self.delivery_mode,
             "sse_event_counts": dict(self.counts),
+            "text_delta_count": self.counts.get("text_delta", 0),
+            "streamed_prefix_chars": streamed_chars,
+            "final_answer_chars": final_chars,
             "streamed_text_chars": streamed_chars,
             "streamed_text_utf8_bytes": streamed_bytes,
             "streamed_text_sha256": streamed_sha,
@@ -260,4 +267,5 @@ class SseRenderDiagnosticTracker:
             "final_text_utf8_bytes": final_bytes,
             "final_text_sha256": final_sha,
             "stream_matches_final": stream_matches_final,
+            "prefix_matches_final": prefix_matches_final,
         }

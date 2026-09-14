@@ -60,7 +60,7 @@ def test_parser_accepts_json_split_at_every_boundary(split_at: int) -> None:
     envelope = parser.finalize()
     assert envelope.route == "ANSWER"
     assert envelope.patient_text == "Готовый ответ"
-    assert emitted == ["Готовый ответ"]
+    assert emitted == []
 
 
 def test_parser_unicode_and_escaped_quotes_in_patient_text() -> None:
@@ -71,7 +71,7 @@ def test_parser_unicode_and_escaped_quotes_in_patient_text() -> None:
     parser.ingest(payload)
     envelope = parser.finalize()
     assert envelope.patient_text == text
-    assert emitted == [text]
+    assert emitted == []
 
 
 def test_admin_json_never_emits_patient_delta() -> None:
@@ -115,7 +115,7 @@ class _StreamBackend:
             raise RuntimeError("provider stream failed")
 
 
-def test_candidate_emits_patient_text_only_after_finalize() -> None:
+def test_candidate_never_emits_patient_text_via_on_delta() -> None:
     emitted: list[str] = []
 
     class _ObservedBackend:
@@ -135,7 +135,7 @@ def test_candidate_emits_patient_text_only_after_finalize() -> None:
 
     assert backend.calls == 1 and backend.observed_early
     assert result.patient_text == "Первая часть ответа"
-    assert emitted == ["Первая часть ответа"]
+    assert emitted == []
     assert result.interrupted is False
 
 
@@ -200,14 +200,17 @@ def test_candidate_late_provider_failure_raises_backend_failure() -> None:
     assert emitted == []
 
 
-def test_consumer_callback_error_propagates_without_becoming_handoff() -> None:
+def test_candidate_does_not_invoke_patient_delta_callback() -> None:
     backend = _StreamBackend((answer_envelope("text"),))
+    callback_calls = 0
 
-    def fail_consumer(_delta: str) -> None:
-        raise ValueError("client disconnected")
+    def mark_callback(_delta: str) -> None:
+        nonlocal callback_calls
+        callback_calls += 1
 
-    with pytest.raises(ValueError, match="client disconnected"):
-        _run_stream(backend=backend, on_delta=fail_consumer)
+    result = _run_stream(backend=backend, on_delta=mark_callback)
+    assert callback_calls == 0
+    assert result.patient_text == "text"
     assert backend.calls == 1
 
 
@@ -266,7 +269,7 @@ def test_live_adapter_streams_raw_chunks_once_with_json_format(monkeypatch) -> N
     result = _run_stream(backend=backend, on_delta=emitted.append)
 
     assert result.patient_text == "Да"
-    assert emitted == ["Да"]
+    assert emitted == []
     assert len(provider_calls) == 1 and backend.call_count == 1
     request = provider_calls[0]
     assert request["model"] == "candidate-plus" and request["stream"] is True

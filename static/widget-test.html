@@ -44,7 +44,10 @@
       <strong>Разработка:</strong> сброс сессии — кнопка <strong>DEV · сброс sid</strong> слева сверху или
       <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd>.
     </p>
-    <p>Если <code>client_id</code> не <code>default</code>, поправь JSON в <code>#clinic-widget-config</code> под свой <code>ALLOWED_CLIENTS</code>.</p>
+    <p>
+      В <code>#clinic-widget-config</code> задан явный <code>clientId</code> (сейчас <code>demo</code>).
+      Для другого tenant укажи свой <code>clientId</code> из <code>ALLOWED_CLIENTS</code> и согласуй <code>apiBase</code>.
+    </p>
     <p>
       Для наглядного <strong>сырого JSON</strong> и <strong>кандидатов retrieval</strong> (как в старом тестере) открой отдельную dev-страницу:
       <a href="debug/ask-inspector.html"><code>/static/debug/ask-inspector.html</code></a>
@@ -55,7 +58,7 @@
   <script type="application/json" id="clinic-widget-config">
   {
     "apiBase": "",
-    "clientId": "default",
+    "clientId": "demo",
     "avatarUrl": "/static/avatar.png",
     "botName": "Надежда",
     "onlineLabel": "ИИ-консультант клиники. Онлайн 24/7",
@@ -63,6 +66,7 @@
     "launcherCtaLabel": "Посмотреть демо",
     "launcherTeaser": false,
     "demoLauncher": true,
+    "schemaVersion": 1,
     "theme": {
       "brand": "#6952e8",
       "action": "#4A3BA8",
@@ -74,7 +78,7 @@
     "videoCatalog": {
       "pain-doctor-explains": {
         "title": "Комментарий врача",
-        "src": "/api/media/pain-doctor-explains?client_id=default"
+        "src": "/api/media/pain-doctor-explains?client_id=demo"
       }
     },
     "starterPrompts": [

@@ -48,6 +48,7 @@ def test_template_has_canonical_structure() -> None:
         "lead_config.yaml",
         "tone.yaml",
         "widget_config.json",
+        "widget_integration.json",
         "md/sample__service__example.md",
     ]
     for rel in required:

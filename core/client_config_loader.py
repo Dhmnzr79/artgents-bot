@@ -411,32 +411,100 @@ def widget_avatar_from_brand(client_id: str | None) -> dict[str, str]:
     return {}
 
 
-def load_widget_config(client_id: str | None) -> dict[str, Any]:
-    path = _pack_path(client_id, "widget_config.json")
+class WidgetPresentationLoadError(Exception):
+    """widget_config.json missing or invalid for tenant."""
+
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(code)
+
+
+def _read_widget_json(client_id: str | None, filename: str) -> tuple[Any | None, str | None]:
+    path = _pack_path(client_id, filename)
     if not os.path.isfile(path):
-        return {}
+        return None, None
     try:
         with open(path, "r", encoding="utf-8") as f:
-            raw = json.load(f)
+            return json.load(f), None
     except (OSError, json.JSONDecodeError):
-        return {}
-    if not isinstance(raw, dict):
-        return {}
+        return None, "json_decode_error"
+
+
+def load_widget_presentation_v1(client_id: str | None) -> dict[str, Any]:
+    """Strict v1 presentation from widget_config.json only (no brand merge)."""
+    from contracts.widget_config import (
+        WidgetConfigValidationError,
+        validate_widget_presentation_document,
+    )
+
+    pack = resolve_pack_client_id(client_id)
+    raw, read_err = _read_widget_json(pack, "widget_config.json")
+    if raw is None:
+        if read_err:
+            raise WidgetPresentationLoadError("widget_config_invalid")
+        raise WidgetPresentationLoadError("widget_config_not_found")
+    try:
+        return validate_widget_presentation_document(raw, client_id=pack)
+    except WidgetConfigValidationError:
+        raise WidgetPresentationLoadError("widget_config_invalid") from None
+
+
+def load_widget_integration_v1(client_id: str | None) -> dict[str, Any]:
+    from contracts.widget_config import (
+        WidgetIntegrationValidationError,
+        validate_widget_integration_document,
+    )
+
+    pack = resolve_pack_client_id(client_id)
+    raw, read_err = _read_widget_json(pack, "widget_integration.json")
+    if raw is None:
+        if read_err:
+            raise WidgetPresentationLoadError("widget_integration_invalid")
+        raise WidgetPresentationLoadError("widget_integration_not_found")
+    try:
+        return validate_widget_integration_document(raw, client_id=pack)
+    except WidgetIntegrationValidationError:
+        raise WidgetPresentationLoadError("widget_integration_invalid") from None
+
+
+def merge_widget_brand_presentation(
+    client_id: str | None,
+    presentation: dict[str, Any],
+) -> dict[str, Any]:
+    merged = dict(presentation)
     theme_from_brand = widget_theme_from_brand(client_id)
     if theme_from_brand:
-        existing = raw.get("theme") if isinstance(raw.get("theme"), dict) else {}
-        raw = {**raw, "theme": {**existing, **theme_from_brand}}
+        existing = merged.get("theme") if isinstance(merged.get("theme"), dict) else {}
+        merged["theme"] = {**existing, **theme_from_brand}
     brand = load_brand(client_id)
     clinic_name = brand.get("clinic_name") if isinstance(brand, dict) else None
     if isinstance(clinic_name, str) and clinic_name.strip():
-        raw = {**raw, "clinicName": clinic_name.strip()}
+        merged["clinicName"] = clinic_name.strip()
     logo = widget_logo_from_brand(client_id)
     if logo:
-        raw = {**raw, **logo}
+        merged.update(logo)
     avatar = widget_avatar_from_brand(client_id)
     if avatar:
-        raw = {**raw, **avatar}
-    return raw
+        merged.update(avatar)
+    return merged
+
+
+def load_widget_config(client_id: str | None) -> dict[str, Any]:
+    """Validated presentation merged with brand-derived widget fields (internal/API)."""
+    try:
+        presentation = load_widget_presentation_v1(client_id)
+    except WidgetPresentationLoadError:
+        return {}
+    return merge_widget_brand_presentation(client_id, presentation)
+
+
+def build_public_widget_config(client_id: str | None) -> dict[str, Any]:
+    """Presentation + brand merge + server-resolved clientId for /api/widget-config."""
+    pack = resolve_pack_client_id(client_id)
+    presentation = load_widget_presentation_v1(client_id)
+    merged = merge_widget_brand_presentation(client_id, presentation)
+    merged["clientId"] = pack
+    return merged
 
 
 def _nested_get(data: dict[str, Any], path: tuple[str, ...]) -> Any:

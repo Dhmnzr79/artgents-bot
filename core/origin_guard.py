@@ -6,7 +6,11 @@ from urllib.parse import urlparse
 
 from flask import request
 
-from core.client_config_loader import load_widget_config
+from contracts.widget_config import normalize_allowed_origin
+from core.client_config_loader import (
+    WidgetPresentationLoadError,
+    load_widget_integration_v1,
+)
 
 APP_ENV = (os.getenv("APP_ENV") or "local").strip().lower()
 
@@ -14,15 +18,7 @@ _LOCAL_DEV_HOSTS = frozenset({"localhost", "127.0.0.1"})
 
 
 def _normalize_origin(value: str) -> str:
-    v = (value or "").strip().rstrip("/")
-    if not v:
-        return ""
-    if "://" not in v:
-        v = f"https://{v}"
-    parsed = urlparse(v)
-    if not parsed.scheme or not parsed.netloc:
-        return ""
-    return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+    return normalize_allowed_origin(value)
 
 
 def _origin_from_referer(referer: str) -> str:
@@ -59,10 +55,21 @@ def _origin_is_allowed(candidate: str, allowed: set[str], local_dev_hosts: set[s
     return False
 
 
+def _integration_policy_error(client_id: str | None) -> str | None:
+    try:
+        load_widget_integration_v1(client_id)
+    except WidgetPresentationLoadError as exc:
+        return exc.code
+    return None
+
+
 def allowed_origins_for_client(client_id: str | None) -> set[str]:
-    """Normalized allowed_origins from widget_config.json."""
-    cfg = load_widget_config(client_id)
-    allowed_raw = cfg.get("allowed_origins") or []
+    """Normalized allowed origins from server-only widget_integration.json."""
+    try:
+        cfg = load_widget_integration_v1(client_id)
+    except WidgetPresentationLoadError:
+        return set()
+    allowed_raw = cfg.get("allowedOrigins") or []
     allowed = {_normalize_origin(str(x)) for x in allowed_raw if str(x).strip()}
     allowed.discard("")
     return allowed
@@ -76,6 +83,9 @@ def _request_origin_candidates() -> tuple[str, str]:
 
 def matching_widget_origin(client_id: str | None) -> str | None:
     """Return Origin/Referer value to echo in Access-Control-Allow-Origin, else None."""
+    if _integration_policy_error(client_id):
+        return None
+
     allowed = allowed_origins_for_client(client_id)
     if not allowed:
         return None
@@ -94,9 +104,13 @@ def matching_widget_origin(client_id: str | None) -> str | None:
 
 def validate_widget_origin(client_id: str | None) -> str | None:
     """Return error code if Origin/Referer is present but not allowed; else None."""
+    policy_err = _integration_policy_error(client_id)
+    if policy_err:
+        return policy_err
+
     allowed = allowed_origins_for_client(client_id)
     if not allowed:
-        return None
+        return "widget_integration_invalid"
 
     local_dev_hosts = _local_dev_hosts_from_allowed(allowed)
     origin, referer_origin = _request_origin_candidates()

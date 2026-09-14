@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "allowedOrigins": [
+    "https://artgents.ru",
+    "https://www.artgents.ru",
+    "https://demo.bot.artgents.ru",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:9000",
+    "http://127.0.0.1:9000",
+    "http://localhost:9001",
+    "http://127.0.0.1:9001"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "allowedOrigins": [
+    "https://REPLACE_CLIENT_ID.bot.artgents.ru",
+    "https://REPLACE_WITH_CLINIC_SITE_ORIGIN"
+  ]
+}

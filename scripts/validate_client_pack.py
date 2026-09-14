@@ -28,6 +28,13 @@ from core.response_schema_loader import (  # noqa: E402
     ResponseSchemaLoadError,
     load_response_schema_bundle,
 )
+from contracts.widget_config import (  # noqa: E402
+    WidgetConfigValidationError,
+    WidgetIntegrationValidationError,
+    parse_json_file,
+    validate_widget_integration_document,
+    validate_widget_presentation_document,
+)
 from core.target_contact_authority import validate_clinic_contact_section  # noqa: E402
 
 LEGACY_MIRROR_RELATIVE = (
@@ -115,9 +122,39 @@ def validate_client_pack(
     if not doctor_path.is_file():
         errors.append("doctor_catalog.json: file_missing")
 
-    for operational in ("brand.yaml", "clinic_policies.yaml", "features.yaml", "lead_config.yaml", "tone.yaml", "widget_config.json"):
+    for operational in (
+        "brand.yaml",
+        "clinic_policies.yaml",
+        "features.yaml",
+        "lead_config.yaml",
+        "tone.yaml",
+        "widget_config.json",
+        "widget_integration.json",
+    ):
         if not rel(operational).is_file():
             errors.append(f"{operational}: file_missing")
+
+    if errors:
+        return errors
+
+    tenant_id = pack_root.name
+    widget_cfg_path = rel("widget_config.json")
+    try:
+        widget_raw = parse_json_file(str(widget_cfg_path))
+        validate_widget_presentation_document(widget_raw, client_id=tenant_id)
+    except WidgetConfigValidationError as exc:
+        errors.append(str(exc))
+    except OSError as exc:
+        errors.append(f"widget_config.json: read_failed:{exc}")
+
+    integration_path = rel("widget_integration.json")
+    try:
+        integration_raw = parse_json_file(str(integration_path))
+        validate_widget_integration_document(integration_raw, client_id=tenant_id)
+    except WidgetIntegrationValidationError as exc:
+        errors.append(str(exc))
+    except OSError as exc:
+        errors.append(f"widget_integration.json: read_failed:{exc}")
 
     if errors:
         return errors

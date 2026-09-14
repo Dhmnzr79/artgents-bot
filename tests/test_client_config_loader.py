@@ -62,6 +62,12 @@ def test_widget_avatar_from_brand_demo():
 
 def test_load_widget_config_merges_demo_brand():
     cfg = load_widget_config("demo")
+    assert cfg["schemaVersion"] == 1
+    assert cfg["botName"] == "Надежда"
+    assert cfg["demoLauncher"] is True
+    assert "allowed_origins" not in cfg
+    assert "allowedOrigins" not in cfg
+    assert "clientId" not in cfg
     assert cfg["logoUrl"] == "/static/clients/demo/logo.svg"
     assert cfg["logoWidth"] == 110
     assert cfg["logoHeight"] == 28

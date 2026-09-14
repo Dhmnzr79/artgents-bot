@@ -6,9 +6,6 @@ const STORAGE_SID = "clinic_widget_sid";
 const STORAGE_LAUNCHER_TEASER = "clinic_widget_launcher_teaser_shown";
 const DEFAULT_AVATAR_URL = "/static/avatar.png";
 const LAUNCHER_TEASER_DELAY_MS = 30000;
-const DEFAULT_LAUNCHER_TEASER_TEXT =
-  "Есть вопросы? Задайте их онлайн консультанту.";
-
 const WELCOME_LEAVE_MS = 240;
 const TEXTAREA_MAX_HEIGHT = 112;
 const MOBILE_MAX_WIDTH_PX = 520;
@@ -648,9 +645,78 @@ function attachDevResetControl(onReset) {
  * @param {WidgetConfig} config
  * @returns {{ resetSession: () => void }}
  */
+/** Required presentation field: key must be present as string or null. */
+function isRequiredNullableString(value) {
+  return value === null || typeof value === "string";
+}
+
+/** Optional presentation field: may be omitted, null, or string. */
+function isOptionalNullableString(value) {
+  return value === undefined || value === null || typeof value === "string";
+}
+
+/** @param {unknown} prompts */
+function starterPromptsValid(prompts) {
+  if (!Array.isArray(prompts)) return false;
+  for (const item of prompts) {
+    if (!item || typeof item !== "object") return false;
+    const s = /** @type {Record<string, unknown>} */ (item);
+    if (typeof s.label !== "string" || !s.label.trim()) return false;
+    if (s.q !== undefined && s.q !== null && typeof s.q !== "string") return false;
+    if (s.videoKey !== undefined && s.videoKey !== null && typeof s.videoKey !== "string") {
+      return false;
+    }
+    if (s.soon !== undefined && s.soon !== null && typeof s.soon !== "boolean") return false;
+  }
+  return true;
+}
+
+function isWidgetPresentationContractValid(config) {
+  if (!config || typeof config !== "object") return false;
+  if (config.schemaVersion !== 1) return false;
+  if (typeof config.clientId !== "string" || !config.clientId.trim()) return false;
+  if (typeof config.botName !== "string" || !config.botName.trim()) return false;
+  if (typeof config.onlineLabel !== "string" || !config.onlineLabel.trim()) return false;
+  if (typeof config.launcherCtaLabel !== "string" || !config.launcherCtaLabel.trim()) {
+    return false;
+  }
+  if (!("welcomeText" in config) || !isRequiredNullableString(config.welcomeText)) {
+    return false;
+  }
+  if (!("launcherSubtitle" in config) || !isRequiredNullableString(config.launcherSubtitle)) {
+    return false;
+  }
+  if (!isOptionalNullableString(config.launcherTagline)) return false;
+  if (!isOptionalNullableString(config.launcherTeaserText)) return false;
+  if (!isOptionalNullableString(config.launcherMobileCtaLabel)) return false;
+  if (typeof config.demoLauncher !== "boolean") return false;
+  if (typeof config.launcherTeaser !== "boolean") return false;
+  if (config.videoAspect !== "horizontal" && config.videoAspect !== "vertical") return false;
+  if (!starterPromptsValid(config.starterPrompts)) return false;
+  if (config.launcherTeaser === true) {
+    if (typeof config.launcherTeaserText !== "string" || !config.launcherTeaserText.trim()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** @param {HTMLElement} root */
+function renderWidgetConfigError(root) {
+  root.innerHTML = `
+    <div class="clinic-shell clinic-shell--config-error" role="alert">
+      <p class="clinic-shell__error clinic-shell__error--config">Виджет временно недоступен.</p>
+    </div>`;
+}
+
 export function mountWidget(root, config) {
+  if (!isWidgetPresentationContractValid(config)) {
+    renderWidgetConfigError(root);
+    return { resetSession: () => {} };
+  }
+
   const apiBase = config.apiBase ?? "";
-  const clientId = config.clientId || "default";
+  const clientId = String(config.clientId).trim();
   const resolvedAvatarUrl = resolvePackAssetUrl(
     apiBase,
     (config.avatarUrl || "").trim() || DEFAULT_AVATAR_URL
@@ -730,22 +796,22 @@ export function mountWidget(root, config) {
     return catalogFetchPromise;
   }
 
-  const useDemoLauncher = config.demoLauncher !== false;
-  const launcherCtaLabel = String(config.launcherCtaLabel || "Запустить демо").trim();
+  const useDemoLauncher = config.demoLauncher === true;
+  const launcherCtaLabel = String(config.launcherCtaLabel || "").trim();
   const launcherMobileCtaLabel = String(
     config.launcherMobileCtaLabel || launcherCtaLabel
   ).trim();
   const clinicName = String(config.clinicName || "").trim();
   const launcherSubtitle = clinicName
     ? `ИИ-консультант «${clinicName}»`
-    : String(config.launcherSubtitle || "Демо ИИ-консультанта клиники").trim();
-  const launcherTagline = String(
-    config.launcherTagline || "Подскажу по лечению, ценам и записи."
-  ).trim();
-  const launcherTeaserEnabled = !useDemoLauncher && config.launcherTeaser !== false;
-  const launcherTeaserText = String(
-    config.launcherTeaserText || DEFAULT_LAUNCHER_TEASER_TEXT
-  ).trim();
+    : config.launcherSubtitle == null
+      ? ""
+      : String(config.launcherSubtitle).trim();
+  const launcherTagline =
+    config.launcherTagline == null ? "" : String(config.launcherTagline).trim();
+  const launcherTeaserEnabled = !useDemoLauncher && config.launcherTeaser === true;
+  const launcherTeaserText =
+    config.launcherTeaserText == null ? "" : String(config.launcherTeaserText).trim();
 
   const launcherHtml = useDemoLauncher
     ? `

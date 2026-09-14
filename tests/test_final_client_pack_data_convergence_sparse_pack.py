@@ -105,6 +105,7 @@ def _build_sparse_pack(tmp_path: Path) -> Path:
         "tone.yaml",
         "ui.yaml",
         "widget_config.json",
+        "widget_integration.json",
     ):
         (pack / name).write_text((template / name).read_text(encoding="utf-8"), encoding="utf-8")
     return target

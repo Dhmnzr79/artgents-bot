@@ -26,7 +26,11 @@ from core import turn_timing
 from core.client_host import resolve_request_client_id
 from core.provider_call_budget import http_provider_budget_scope
 from contracts.ask_orchestration import AskOrchestrationResult
-from core.client_config_loader import load_widget_config, tone_to_txt_dict
+from core.client_config_loader import (
+    WidgetPresentationLoadError,
+    build_public_widget_config,
+    tone_to_txt_dict,
+)
 from core.origin_guard import validate_widget_origin
 from core.planner_compute_executor import discard_planner_speculation
 from core.target_sse_worker_context import worker_execution_context
@@ -1266,9 +1270,12 @@ def api_widget_config():
     blocked = _widget_origin_forbidden(client_id)
     if blocked:
         return blocked
-    cfg = load_widget_config(client_id)
-    if not cfg:
-        return jsonify({"error": "widget_config_not_found"}), 404
+    try:
+        cfg = build_public_widget_config(client_id)
+    except WidgetPresentationLoadError as exc:
+        if exc.code == "widget_config_not_found":
+            return jsonify({"error": "widget_config_not_found"}), 404
+        return jsonify({"error": "widget_config_invalid"}), 400
     return jsonify(cfg)
 
 

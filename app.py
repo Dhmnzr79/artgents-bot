@@ -925,6 +925,7 @@ def _stream_ask_turn_response(data: dict, client_id: str):
             request_id=request_id,
             client_id=client_id,
         )
+        sse_ui_payload: dict | None = None
         try:
             # Requirement: first SSE event before orchestration starts or waits on
             # anything — this yield happens before any pipeline call whatsoever.
@@ -950,6 +951,7 @@ def _stream_ask_turn_response(data: dict, client_id: str):
                     yield tracker.track(line)
                 route = str((out.get("meta") or {}).get("service_route") or "")
                 tracker.route = route or tracker.route
+                sse_ui_payload = out
                 yield tracker.track(_sse_typing_line(_sse_typing_phase(kind="service_reply", route=route)))
                 yield tracker.track(
                     f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
@@ -1004,6 +1006,7 @@ def _stream_ask_turn_response(data: dict, client_id: str):
             out, _http_status = future.result()
             route = str((out.get("meta") or {}).get("service_route") or "")
             tracker.route = route or tracker.route
+            sse_ui_payload = out
             yield tracker.track(_sse_typing_line(_sse_typing_phase(kind="service_reply", route=route)))
             yield tracker.track(
                 f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
@@ -1017,6 +1020,12 @@ def _stream_ask_turn_response(data: dict, client_id: str):
             tracker.status = "error"
             raise
         finally:
+            from core.widget_stream_delivery import infer_widget_sse_delivery_mode
+
+            tracker.delivery_mode = infer_widget_sse_delivery_mode(
+                text_delta_count=int(tracker.counts.get("text_delta", 0) or 0),
+                ui_payload=sse_ui_payload,
+            )
             _emit_sse_render_diagnostic(tracker)
 
     return app.response_class(_gen(), mimetype="text/event-stream", headers=_SSE_HEADERS)

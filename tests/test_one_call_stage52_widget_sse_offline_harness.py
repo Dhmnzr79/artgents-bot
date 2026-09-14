@@ -508,6 +508,37 @@ def test_observed_whitening_issue_remains_not_proven(stage52_all_evidence: list[
 
 
 
+def test_t13_buffered_pseudo_reveal_within_budget() -> None:
+
+    ev = _one("E13")
+
+    assert ev["server_delta_count"] == 0
+
+    assert ev["final_text"] == ev["dom"]["after"]["bodies"][-1]
+
+    assert ev["pseudo_reveal_elapsed_ms"] <= 1200
+
+
+def test_t14_reduced_motion_shows_immediately() -> None:
+
+    ev = _one("E14")
+
+    assert ev["server_delta_count"] == 0
+
+    assert ev["reveal_elapsed_ms"] <= 400
+
+
+def test_t15_stream_final_mismatch_shows_error_not_controls() -> None:
+
+    ev = _one("E15")
+
+    assert ev["error_visible"] is True
+
+    assert ev["final_turns"] == 0
+
+    assert ev["final_visible_includes_ui_answer"] is False
+
+
 def test_terminal_idempotency_gap_fixed(stage52_all_evidence: list[dict]) -> None:
 
     e3 = next(x for x in stage52_all_evidence if x["scenario"] == "E3")

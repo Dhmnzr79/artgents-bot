@@ -538,7 +538,7 @@ def test_checkpoint_a_streamed_text_matches_final_authoritative_answer(
         on_delta=streamed,
     )
     assert backend.call_count == 1
-    assert streamed == [payload["answer"]]
+    assert streamed == []
     assert "999999" in payload["answer"].replace(" ", "")
     assert "3000" in payload["answer"].replace("\u00a0", "").replace(" ", "")
 
@@ -605,7 +605,7 @@ def test_checkpoint_a_stream_http_tomography_authoritative_price(
     assert backend.call_count == 1
     answer = str(ui.get("answer") or "")
     assert "3000" in answer.replace("\u00a0", "").replace(" ", "")
-    assert hostile in _patient_visible_text(events).replace(" ", "")
+    assert hostile not in _patient_visible_text(events).replace(" ", "")
     assert ui.get("meta", {}).get("service_route") == "sales_fast_materialized"
     offer = ui.get("offer")
     assert isinstance(offer, dict)
@@ -613,8 +613,7 @@ def test_checkpoint_a_stream_http_tomography_authoritative_price(
     assert str(offer.get("offer_id") or "").startswith("tomography")
     assert any(name == "done" for name, _ in events)
     deltas = [data.get("delta") for name, data in events if name == "text_delta"]
-    if deltas:
-        assert deltas == [answer]
+    assert deltas == []
 
 
 def test_checkpoint_a_stream_http_whitening_not_kt_and_expired_promo_hidden(

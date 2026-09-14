@@ -104,6 +104,7 @@ from core.target_spec_offline_response_package import TargetSpecBoundOfflineResp
 
 PatientDeltaCallback = Callable[[str], None]
 
+
 _TECHNICAL_ERROR_PATIENT_TEXT = (
     "Сейчас не удалось подготовить ответ. Пожалуйста, попробуйте повторить вопрос."
 )
@@ -754,15 +755,15 @@ def run_sales_fast_widget_turn(
         session_state=session_state,  # type: ignore[arg-type]
     )
     turn_timing.stage_start("sales_fast_model")
+
+    def _discard_one_call_patient_delta(_: str) -> None:
+        return None
+
     stream_on_delta: PatientDeltaCallback | None
     if on_delta is None:
         stream_on_delta = None
     else:
-
-        def _buffer_model_delta(_: str) -> None:
-            return None
-
-        stream_on_delta = _buffer_model_delta
+        stream_on_delta = _discard_one_call_patient_delta
 
     try:
         if on_delta is None:
@@ -889,7 +890,6 @@ def run_sales_fast_widget_turn(
         active_service_catalog=active_service_catalog,
         service_reference_catalog=service_reference_catalog,
         service_identity=service_identity,
-        on_patient_delta=on_delta,
         precomposer_hint_offer=precomposer_hint_offer,
     )
     turn_timing.stage_end("sales_fast", status="completed")
@@ -924,7 +924,6 @@ def _materialize_result(
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
     service_identity: SalesFastServiceIdentity,
-    on_patient_delta: PatientDeltaCallback | None = None,
     precomposer_hint_offer: object | None = None,
 ) -> SalesFastWidgetOutcome:
     if result.decision == "spam":
@@ -1204,8 +1203,4 @@ def _materialize_result(
         model_route=model_route,
         failure_kind=result.reason if result.interrupted else None,
     )
-    if on_patient_delta is not None and widget.kind == "materialized":
-        final_patient_text = str(widget.payload.get("answer") or "").strip()
-        if final_patient_text:
-            on_patient_delta(final_patient_text)
     return outcome

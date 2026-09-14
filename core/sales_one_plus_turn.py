@@ -286,7 +286,7 @@ def run_sales_one_plus_candidate_stream(
     precomposer_selected_offer: object | None = None,
     response_schema_bundle: object | None = None,
 ) -> SalesOnePlusResult:
-    """Buffer provider JSON fully, validate once, then emit patient_text only."""
+    """Buffer provider JSON fully, validate once; never emit patient_text via on_delta."""
 
     static_handoff = _require_static_handoff(static_admin_handoff_text)
     local_result = _local_terminal_result(

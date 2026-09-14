@@ -17,7 +17,7 @@ from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 
 
 class SalesOnePlusStreamParser:
-    """Accumulate raw provider JSON until finalize; no patient callback before validation."""
+    """Accumulate raw provider JSON until finalize; on_delta is never called for patient_text."""
 
     def __init__(
         self,
@@ -70,5 +70,4 @@ class SalesOnePlusStreamParser:
             patient_text = envelope.patient_text
             if patient_text is None or not patient_text.strip():
                 raise OneCallEnvelopeProtocolError("patient_text_required")
-            self._on_delta(patient_text)
         return envelope

@@ -307,7 +307,7 @@ def test_exact_commercial_values_are_not_duplicated_in_dynamic_suffix() -> None:
     assert "318000" not in user_prompt
 
 
-def test_streaming_parser_emits_only_validated_patient_text() -> None:
+def test_streaming_parser_never_emits_patient_text_before_or_after_validation() -> None:
     emitted: list[str] = []
 
     def emit(delta: str) -> None:
@@ -322,11 +322,9 @@ def test_streaming_parser_emits_only_validated_patient_text() -> None:
     payload = answer_envelope("Видимый текст")
     parser.ingest(payload)
     envelope = parser.finalize()
-    joined = "".join(emitted)
     assert envelope.route == "ANSWER"
-    assert '"route"' not in joined
-    assert "service_id" not in joined
-    assert joined == "Видимый текст"
+    assert envelope.patient_text == "Видимый текст"
+    assert emitted == []
 
 
 def test_provider_error_raises_backend_failure_without_second_call() -> None:
@@ -1896,7 +1894,7 @@ def test_widget_streaming_marketing_path_persists_session_history(
     final_answer = str(payload1.get("answer") or "")
     assert backend.stream_path_used is True
     assert backend.call_count == 1
-    assert streamed == [final_answer]
+    assert streamed == []
     assert "протокол" in final_answer.lower()
     assert "Shared service value" not in final_answer
     assert "15%" not in final_answer
@@ -2449,7 +2447,7 @@ def test_post_composer_degraded_streaming_matches_blocking_answer(
     )
     final_answer = str(payload.get("answer") or "")
     assert backend.stream_path_used is True
-    assert streamed == [final_answer]
+    assert streamed == []
     assert patient in final_answer
     assert payload.get("meta", {}).get("terminal_mode") != "admin"
 

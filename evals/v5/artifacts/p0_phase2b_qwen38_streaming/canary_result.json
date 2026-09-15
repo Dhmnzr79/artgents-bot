@@ -1,0 +1,40 @@
+{
+  "control": {
+    "model_id": "qwen3.7-plus-2026-05-26",
+    "observed_model": "qwen3.7-plus-2026-05-26",
+    "timings_ms": {
+      "request_started": 0,
+      "first_raw_chunk": 7437,
+      "patient_text_value_start": 8359,
+      "patient_text_value_end": 9139,
+      "provider_stream_completed": 9139,
+      "envelope_validated": 9187,
+      "presentation_completed": 9156,
+      "ui_answer_ready": 9156,
+      "provider_ttft": 7437,
+      "current_time_to_visible_answer": 9156,
+      "hypothetical_safe_patient_ttft": 8359,
+      "potential_streaming_gain_ms": 797,
+      "total_latency": 9156
+    }
+  },
+  "candidate": {
+    "model_id": "qwen3.8-flash",
+    "observed_model": "qwen3.8-flash",
+    "timings_ms": {
+      "request_started": 0,
+      "first_raw_chunk": 4422,
+      "patient_text_value_start": 5139,
+      "patient_text_value_end": 5812,
+      "provider_stream_completed": 5812,
+      "envelope_validated": 5844,
+      "presentation_completed": 5828,
+      "ui_answer_ready": 5828,
+      "provider_ttft": 4422,
+      "current_time_to_visible_answer": 5828,
+      "hypothetical_safe_patient_ttft": 5139,
+      "potential_streaming_gain_ms": 689,
+      "total_latency": 5828
+    }
+  }
+}

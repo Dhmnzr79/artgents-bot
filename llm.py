@@ -15,7 +15,6 @@ from config import (
     BOOKING_INTENT_LLM_ON,
     CHAT_BASE_URL,
     QWEN_ENABLE_THINKING,
-    chat_provider_is_qwen,
     CHAT_MODEL,
     COMPLAINT_CLASSIFY_MODEL,
     DIALOG_FOCUS_LLM_CLASSIFY_ON,
@@ -52,7 +51,7 @@ COMPOSER_FULLCTX_EMPATHY_REPEAT_TOUCH = (
 def _qwen_disable_thinking(*, model: str, kwargs: dict) -> dict:
     """DashScope Qwen only: thinking adds latency; off by default (QWEN_ENABLE_THINKING=0)."""
     extra_body = dict(kwargs.pop("extra_body", None) or {})
-    if not QWEN_ENABLE_THINKING and chat_provider_is_qwen():
+    if not QWEN_ENABLE_THINKING and "qwen" in model.strip().lower():
         extra_body.setdefault("enable_thinking", False)
     if extra_body:
         kwargs["extra_body"] = extra_body

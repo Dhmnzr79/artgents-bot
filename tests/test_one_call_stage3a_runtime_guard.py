@@ -184,3 +184,6 @@ def test_startup_diagnostics_always_fullcontext_one_call(monkeypatch: pytest.Mon
     run_startup_check(logging.getLogger("test"))
     assert captured
     assert captured[0]["architecture"] == "fullcontext_one_call"
+    assert captured[0]["model"] == "qwen3.8-flash"
+    assert captured[0]["single_model"] is True
+    assert captured[0]["qwen_enable_thinking"] is False

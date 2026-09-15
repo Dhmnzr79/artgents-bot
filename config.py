@@ -21,19 +21,20 @@ QWEN_ENABLE_THINKING = os.getenv("QWEN_ENABLE_THINKING", "0").lower() in (
 )
 
 
-# --- Models (Qwen pilot defaults; override via .env to revert to OpenAI) ---
-# Local speed experiment: use one Qwen Flash model across the complete bot
-# contour (Planner, Ingress, Boundary, Composer, Verifier and auxiliary
-# classifiers).  Keep environment-variable overrides intact for rollback.
-QWEN_PLUS_MODEL = "qwen3.7-flash"
-QWEN_FLASH_MODEL = "qwen3.7-flash"
+# --- Models ---------------------------------------------------------------
+# One production model for the complete bot contour. Explicit model arguments
+# remain available to offline evals/benchmarks, but environment variables must
+# not silently split production roles between different models.
+DEFAULT_LLM_MODEL = (os.getenv("DEFAULT_LLM_MODEL") or "qwen3.8-flash").strip()
+QWEN_PLUS_MODEL = DEFAULT_LLM_MODEL  # Deprecated compatibility alias.
+QWEN_FLASH_MODEL = DEFAULT_LLM_MODEL  # Deprecated compatibility alias.
 
-CHAT_MODEL = os.getenv("MODEL_CHAT", QWEN_PLUS_MODEL)
+CHAT_MODEL = DEFAULT_LLM_MODEL
 
 
 def chat_provider_is_qwen() -> bool:
     """True when chat client targets DashScope / MaaS Qwen (not OpenAI-native)."""
-    model = (os.getenv("MODEL_CHAT") or CHAT_MODEL or "").strip().lower()
+    model = (CHAT_MODEL or "").strip().lower()
     base = (CHAT_BASE_URL or "").lower()
     return (
         "qwen" in model
@@ -42,14 +43,14 @@ def chat_provider_is_qwen() -> bool:
         or "maas." in base
     )
 
-RESOLVER_MODEL = (os.getenv("MODEL_RESOLVER") or "").strip() or QWEN_PLUS_MODEL
-LEAD_NAME_CLASSIFY_MODEL = (os.getenv("MODEL_LEAD_NAME") or "").strip() or QWEN_FLASH_MODEL
+RESOLVER_MODEL = DEFAULT_LLM_MODEL
+LEAD_NAME_CLASSIFY_MODEL = DEFAULT_LLM_MODEL
 DIALOG_FOCUS_LLM_CLASSIFY_ON = os.getenv("DIALOG_FOCUS_LLM_CLASSIFY", "1").lower() in (
     "1",
     "true",
     "yes",
 )
-DIALOG_FOCUS_LLM_MODEL = (os.getenv("DIALOG_FOCUS_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
+DIALOG_FOCUS_LLM_MODEL = DEFAULT_LLM_MODEL
 
 # --- Patient situation semantic classifier ---
 PATIENT_SITUATION_LLM_ON = os.getenv("PATIENT_SITUATION_LLM_ON", "1").lower() in (
@@ -57,9 +58,7 @@ PATIENT_SITUATION_LLM_ON = os.getenv("PATIENT_SITUATION_LLM_ON", "1").lower() in
     "true",
     "yes",
 )
-PATIENT_SITUATION_LLM_MODEL = (
-    (os.getenv("PATIENT_SITUATION_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
-)
+PATIENT_SITUATION_LLM_MODEL = DEFAULT_LLM_MODEL
 
 # --- Aspect planner LLM (composite questions; composer roadmap phase 1) ---
 ASPECT_PLANNER_LLM_ON = os.getenv("ASPECT_PLANNER_LLM_ON", "0").lower() in (
@@ -67,9 +66,7 @@ ASPECT_PLANNER_LLM_ON = os.getenv("ASPECT_PLANNER_LLM_ON", "0").lower() in (
     "true",
     "yes",
 )
-ASPECT_PLANNER_LLM_MODEL = (
-    (os.getenv("ASPECT_PLANNER_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
-)
+ASPECT_PLANNER_LLM_MODEL = DEFAULT_LLM_MODEL
 
 # --- Sales-fast one-call widget path (Stage 2: default runtime invariant) ---
 # SALES_ONE_PLUS_ON is deprecated for architecture selection; kept for eval/LIVE harness only.
@@ -78,10 +75,8 @@ SALES_ONE_PLUS_ON = os.getenv("SALES_ONE_PLUS_ON", "0").lower() in (
     "true",
     "yes",
 )
-# Active sales-fast / One Call provider snapshot (override via env).
-SALES_ONE_PLUS_MODEL = (
-    (os.getenv("SALES_ONE_PLUS_MODEL") or "").strip() or "qwen3.7-plus-2026-05-26"
-)
+# Active sales-fast / One Call provider model.
+SALES_ONE_PLUS_MODEL = DEFAULT_LLM_MODEL
 SALES_ONE_PLUS_TIMEOUT_SEC = float(os.getenv("SALES_ONE_PLUS_TIMEOUT_SEC", "40"))
 # Legacy Flash snapshot — deprecated; does not control active sales-fast runtime.
 SALES_ONE_PLUS_FLASH_MODEL = "qwen3.7-flash-2026-07-15"
@@ -94,9 +89,7 @@ BOOKING_DATE_DEFER_ON = os.getenv("BOOKING_DATE_DEFER_ON", "1").lower() in (
 )
 
 # --- Booking date defer (default ON) ---
-TURN_PLANNER_LLM_MODEL = (
-    (os.getenv("TURN_PLANNER_LLM_MODEL") or "").strip() or QWEN_PLUS_MODEL
-)
+TURN_PLANNER_LLM_MODEL = DEFAULT_LLM_MODEL
 
 # --- Lead active-turn gray-zone classifier ---
 LEAD_TURN_LLM_CLASSIFY_ON = os.getenv("LEAD_TURN_LLM_CLASSIFY", "1").lower() in (
@@ -104,7 +97,7 @@ LEAD_TURN_LLM_CLASSIFY_ON = os.getenv("LEAD_TURN_LLM_CLASSIFY", "1").lower() in 
     "true",
     "yes",
 )
-LEAD_TURN_LLM_MODEL = (os.getenv("LEAD_TURN_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
+LEAD_TURN_LLM_MODEL = DEFAULT_LLM_MODEL
 
 # --- Намерение «записаться» (regex + при необходимости LLM) ---
 BOOKING_INTENT_LLM_ON = os.getenv("BOOKING_INTENT_LLM_ON", "1").lower() in (
@@ -112,17 +105,17 @@ BOOKING_INTENT_LLM_ON = os.getenv("BOOKING_INTENT_LLM_ON", "1").lower() in (
     "true",
     "yes",
 )
-BOOKING_INTENT_LLM_MODEL = (os.getenv("BOOKING_INTENT_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
+BOOKING_INTENT_LLM_MODEL = DEFAULT_LLM_MODEL
 PRICE_INTENT_LLM_ON = os.getenv("PRICE_INTENT_LLM_ON", "1").lower() in (
     "1",
     "true",
     "yes",
 )
-PRICE_INTENT_LLM_MODEL = (os.getenv("PRICE_INTENT_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
-SAFETY_CLASSIFY_MODEL = (os.getenv("MODEL_SAFETY_CLASSIFY") or "").strip() or QWEN_FLASH_MODEL
+PRICE_INTENT_LLM_MODEL = DEFAULT_LLM_MODEL
+SAFETY_CLASSIFY_MODEL = DEFAULT_LLM_MODEL
 SAFETY_RED_CONFIDENCE_THRESHOLD = float(os.getenv("SAFETY_RED_CONFIDENCE_THRESHOLD", "0.8"))
-COMPLAINT_CLASSIFY_MODEL = (os.getenv("MODEL_COMPLAINT_CLASSIFY") or "").strip() or QWEN_FLASH_MODEL
-INGRESS_CLASSIFY_MODEL = (os.getenv("MODEL_INGRESS_CLASSIFY") or "").strip() or QWEN_FLASH_MODEL
+COMPLAINT_CLASSIFY_MODEL = DEFAULT_LLM_MODEL
+INGRESS_CLASSIFY_MODEL = DEFAULT_LLM_MODEL
 
 # --- HTTP / app ---
 PORT = int(os.getenv("PORT", "9000"))

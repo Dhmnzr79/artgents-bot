@@ -17,10 +17,15 @@ _ALLOWED_EXACT_HOSTS: frozenset[str] = frozenset(
 _BLOCKED_HOST_SUFFIXES: tuple[str, ...] = (
     "openai.com",
 )
-# Singapore MaaS: exactly {workspace}.ap-southeast-1.maas.aliyuncs.com
-# workspace = one DNS label, non-empty, [a-z0-9-], no leading/trailing hyphen.
+# MaaS workspace = one DNS label: [a-z0-9-], non-empty, no leading/trailing hyphen.
+_MAAS_WORKSPACE_LABEL = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+# Singapore: {workspace}.ap-southeast-1.maas.aliyuncs.com
 _MAAS_SINGAPORE_HOST_PATTERN = re.compile(
-    r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.ap-southeast-1\.maas\.aliyuncs\.com$"
+    rf"^{_MAAS_WORKSPACE_LABEL}\.ap-southeast-1\.maas\.aliyuncs\.com$"
+)
+# Frankfurt (Model Studio Germany): {workspace}.eu-central-1.maas.aliyuncs.com
+_MAAS_FRANKFURT_HOST_PATTERN = re.compile(
+    rf"^{_MAAS_WORKSPACE_LABEL}\.eu-central-1\.maas\.aliyuncs\.com$"
 )
 
 
@@ -53,7 +58,9 @@ def _is_allowed_alibaba_host(host: str) -> bool:
             return False
     if host in _ALLOWED_EXACT_HOSTS:
         return True
-    return _MAAS_SINGAPORE_HOST_PATTERN.fullmatch(host) is not None
+    if _MAAS_SINGAPORE_HOST_PATTERN.fullmatch(host) is not None:
+        return True
+    return _MAAS_FRANKFURT_HOST_PATTERN.fullmatch(host) is not None
 
 
 def validate_alibaba_chat_base_url(base_url: str | None) -> str:
@@ -108,8 +115,10 @@ def validate_alibaba_chat_transport_config(
 def observability_from_base_url(base_url: str) -> AlibabaTransportObservability:
     host = _normalized_host(urlparse(base_url).hostname)
     region = None
-    if host and "ap-southeast-1" in host:
+    if host and host.endswith(".ap-southeast-1.maas.aliyuncs.com"):
         region = "ap-southeast-1"
+    elif host and host.endswith(".eu-central-1.maas.aliyuncs.com"):
+        region = "eu-central-1"
     elif host and "dashscope-intl" in host:
         region = "intl"
     return AlibabaTransportObservability(provider_region=region)

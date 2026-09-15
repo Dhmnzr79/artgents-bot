@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -18,13 +17,13 @@ from pydantic import ValidationError
 
 from contracts.verifier_verdict import VerifierVerdict
 from core.routing_loader import THRESHOLDS
-from config import CHAT_API_KEY, QWEN_FLASH_MODEL
+from config import CHAT_API_KEY, DEFAULT_LLM_MODEL
 from llm import chat_completions_create
 from logging_setup import emit_bot_event, get_logger, log_llm_error, log_llm_usage
 
 logger = get_logger("bot")
 
-_MODEL = (os.getenv("MODEL_VERIFIER") or "").strip() or QWEN_FLASH_MODEL
+_MODEL = DEFAULT_LLM_MODEL
 
 _SHADOW_BOOT_LOCK = threading.Lock()
 _shadow_slot_sem: threading.Semaphore | None = None

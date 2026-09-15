@@ -14,6 +14,7 @@ import llm as llm_module
 from core.alibaba_openai_transport_policy import (
     AlibabaEndpointConfigurationError,
     build_openai_compatible_client_kwargs,
+    observability_from_base_url,
     validate_alibaba_chat_base_url,
     validate_capability_live_model,
 )
@@ -82,6 +83,10 @@ SINGAPORE_ENDPOINT = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 DASHSCOPE_CN_ENDPOINT = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 MAAS_ENDPOINT = "https://ws-123.ap-southeast-1.maas.aliyuncs.com/v1"
 MAAS_HYPHEN_WORKSPACE_ENDPOINT = "https://my-workspace.ap-southeast-1.maas.aliyuncs.com/v1"
+MAAS_FRANKFURT_ENDPOINT = "https://ws-123.eu-central-1.maas.aliyuncs.com/v1"
+MAAS_FRANKFURT_HYPHEN_WORKSPACE_ENDPOINT = (
+    "https://my-workspace.eu-central-1.maas.aliyuncs.com/v1"
+)
 
 
 def _patch_live_gate(
@@ -116,10 +121,24 @@ def _ledger_events(path: Path) -> list[dict[str, object]]:
         DASHSCOPE_CN_ENDPOINT,
         MAAS_ENDPOINT,
         MAAS_HYPHEN_WORKSPACE_ENDPOINT,
+        MAAS_FRANKFURT_ENDPOINT,
+        MAAS_FRANKFURT_HYPHEN_WORKSPACE_ENDPOINT,
     ],
 )
 def test_alibaba_endpoint_allowed(base_url: str) -> None:
     assert validate_alibaba_chat_base_url(base_url).startswith("https://")
+
+
+@pytest.mark.parametrize(
+    ("base_url", "region"),
+    [
+        (MAAS_ENDPOINT, "ap-southeast-1"),
+        (MAAS_FRANKFURT_ENDPOINT, "eu-central-1"),
+    ],
+)
+def test_observability_from_maas_base_url(base_url: str, region: str) -> None:
+    obs = observability_from_base_url(validate_alibaba_chat_base_url(base_url))
+    assert obs.provider_region == region
 
 
 @pytest.mark.parametrize(
@@ -137,7 +156,16 @@ def test_alibaba_endpoint_allowed(base_url: str) -> None:
         ("https://evil.maas.aliyuncs.com/v1", "chat_base_url_host_blocked"),
         ("https://fake.ap-southeast-1.evil.maas.aliyuncs.com/v1", "chat_base_url_host_blocked"),
         ("https://a.b.ap-southeast-1.maas.aliyuncs.com/v1", "chat_base_url_host_blocked"),
-        ("https://ws-123.eu-central-1.maas.aliyuncs.com/v1", "chat_base_url_host_blocked"),
+        ("https://eu-central-1.maas.aliyuncs.com/v1", "chat_base_url_host_blocked"),
+        ("https://a.b.eu-central-1.maas.aliyuncs.com/v1", "chat_base_url_host_blocked"),
+        ("https://-bad.eu-central-1.maas.aliyuncs.com/v1", "chat_base_url_host_blocked"),
+        ("https://bad-.eu-central-1.maas.aliyuncs.com/v1", "chat_base_url_host_blocked"),
+        ("https://bad_label.eu-central-1.maas.aliyuncs.com/v1", "chat_base_url_host_blocked"),
+        (
+            "https://workspace.eu-central-1.maas.aliyuncs.com.evil.com/v1",
+            "chat_base_url_host_blocked",
+        ),
+        ("http://workspace.eu-central-1.maas.aliyuncs.com/v1", "chat_base_url_scheme_invalid"),
         ("https://ap-southeast-1.maas.aliyuncs.com/v1", "chat_base_url_host_blocked"),
         ("https://-bad.ap-southeast-1.maas.aliyuncs.com/v1", "chat_base_url_host_blocked"),
         ("https://bad-.ap-southeast-1.maas.aliyuncs.com/v1", "chat_base_url_host_blocked"),

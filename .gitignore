@@ -38,7 +38,13 @@ eval_*.txt
 
 # IDE и инструменты разработки
 .claude/
-.cursor/
+.pytest_tmp*/
+artgents-release-*.tar.gz
+
+# Shared agent rules are tracked. Other local Codex state is ignored.
+.codex/*
+!.codex/agents/
+!.codex/agents/checker.toml
 
 .DS_Store
 Thumbs.db

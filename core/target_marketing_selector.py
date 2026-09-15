@@ -852,7 +852,7 @@ def select_stage51_marketing(
     today_iso = today.isoformat()
 
     service_value_ref: str | None = None
-    if profile != "price":
+    if include_automatic_block and profile != "price":
         service_value_ref = resolve_service_value_ref(
             bundle,
             service_id=service_id,

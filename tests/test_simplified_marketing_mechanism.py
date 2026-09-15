@@ -55,6 +55,7 @@ def _marketing_bundle(
             "kind": "payment" if aid == "installment" else "benefit",
             "catalog_label": aid,
             "text_fact": f"Amplifier text {aid}.",
+            "microfact_text": f"Amplifier text {aid}.",
             "render_mode": "strict",
             "active": True,
             "allowed_service_ids": [service_id],
@@ -509,6 +510,7 @@ def test_marketing_session_isolation_via_widget_clients(
 ) -> None:
     import app as app_module
     from core.target_runtime_session import read_target_runtime_session
+    from tests.session_binding_test_support import session_client_scope
     from tests.test_sales_fast_widget_integration import (
         _run_widget_turn_with_envelope,
     )
@@ -520,15 +522,18 @@ def test_marketing_session_isolation_via_widget_clients(
         monkeypatch,
         client_id="demo",
         sid=sid_demo,
-        user_message="Расскажите про All-on-4",
+        user_message="Сколько стоит All-on-4 на нижнюю челюсть?",
         envelope_json=answer_envelope(
-            "All-on-4 — протокол.",
+            "All-on-4 на нижнюю челюсть — 368 000 ₽.",
+            commercial_intent="price",
             service_id="all_on_4",
-            commercial_intent="none",
+            extent="full_arch",
+            jaw="lower",
         ),
         flask_app=app_module.app,
     )
-    demo_session = read_target_runtime_session(sid_demo)
+    with session_client_scope("demo"):
+        demo_session = read_target_runtime_session(sid_demo)
     assert demo_session.shown_fact_ids
 
     _run_widget_turn_with_envelope(
@@ -543,7 +548,8 @@ def test_marketing_session_isolation_via_widget_clients(
         ),
         flask_app=app_module.app,
     )
-    nika_session = read_target_runtime_session(sid_nika)
+    with session_client_scope("nikadent"):
+        nika_session = read_target_runtime_session(sid_nika)
     assert not set(demo_session.shown_fact_ids).intersection(nika_session.shown_fact_ids)
 
 
@@ -559,6 +565,8 @@ def test_orchestrate_ask_resets_demo_session_after_nikadent_bind(
         _orchestrate_ask,
     )
     from tests.test_sales_one_plus_turn import answer_envelope
+
+    from tests.session_binding_test_support import session_client_scope
 
     sid = "orchestrate-demo-bind-regression"
     monkeypatch.setattr(
@@ -587,7 +595,8 @@ def test_orchestrate_ask_resets_demo_session_after_nikadent_bind(
     assert "скидк" in first_answer.lower()
     assert "консультац" in first_answer.lower()
     assert "рассроч" in first_answer.lower()
-    demo_session = read_target_runtime_session(sid)
+    with session_client_scope("demo"):
+        demo_session = read_target_runtime_session(sid)
     assert demo_session.shown_fact_ids
 
     bind_session_client("nikadent")
@@ -827,7 +836,7 @@ def test_presentation_formats_amplifiers_as_bulleted_list() -> None:
     from contracts.response_schema import TargetCommercialFact
     from core.sales_fast_presentation import (
         AUTOMATIC_AMPLIFIER_LIST_HEADER,
-        supplement_sales_fast_patient_text_with_marketing,
+        append_automatic_marketing_blocks,
     )
     from core.target_marketing_selector import TargetMarketingSelection
 
@@ -847,11 +856,11 @@ def test_presentation_formats_amplifiers_as_bulleted_list() -> None:
         ),
     )
     bound = SimpleNamespace(package=SimpleNamespace(materials=materials))
-    text = supplement_sales_fast_patient_text_with_marketing(
-        patient_text="Основной ответ.",
+    text = append_automatic_marketing_blocks(
+        "Основной ответ.",
         bound_package=bound,
         bundle=bundle,
-    )
+    ).text
     assert AUTOMATIC_AMPLIFIER_LIST_HEADER in text
     assert "- Amplifier text installment." in text
     assert "- Amplifier text tax." in text

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date
 
 from contracts.response_schema import ResponseSchemaBundle
@@ -40,13 +41,49 @@ from core.target_session_selection import extract_target_session_selection
 AUTOMATIC_AMPLIFIER_LIST_HEADER = "Также мы предлагаем:"
 
 
-def supplement_sales_fast_patient_text_with_marketing(
-    *,
+def approved_microfact_display_text(fact: object) -> str | None:
+    """Non-empty approved microfact only — never fall back to full text_fact."""
+
+    micro = getattr(fact, "microfact_text", None)
+    if micro is None:
+        return None
+    token = str(micro).strip()
+    return token or None
+
+
+def record_automatic_microfact_skip(fact_id: str) -> None:
+    try:
+        from core import turn_timing
+
+        prior = turn_timing.summary_for_turn_complete().get(
+            "automatic_microfact_skipped_fact_ids"
+        )
+        skipped: list[str] = list(prior) if isinstance(prior, list) else []
+        if fact_id not in skipped:
+            skipped.append(fact_id)
+        turn_timing.set_flag("automatic_microfact_skipped_fact_ids", skipped)
+    except Exception:
+        pass
+
+
+@dataclass(frozen=True, slots=True)
+class AutomaticMarketingAppendResult:
+    text: str
+    rendered_promo_fact_ids: tuple[str, ...]
+    rendered_amplifier_refs: tuple[str, ...]
+
+
+def append_automatic_marketing_blocks(
     patient_text: str,
+    *,
     bound_package: TargetSpecBoundOfflineResponsePackage,
-    bundle: ResponseSchemaBundle | None = None,
-) -> str:
-    """Append service_value, promo paragraphs, and amplifier list once."""
+    bundle: ResponseSchemaBundle,
+    exclude_fact_ids: frozenset[str] = frozenset(),
+    include_service_value: bool = True,
+    include_promos: bool = True,
+    include_amplifiers: bool = True,
+) -> AutomaticMarketingAppendResult:
+    """Append code-owned short promos and/or amplifiers from marketing_selection."""
 
     facts_by_id = {
         fact.id: fact for fact in bound_package.package.materials.commercial_facts
@@ -54,54 +91,71 @@ def supplement_sales_fast_patient_text_with_marketing(
     selection = bound_package.package.materials.marketing_selection
     text = patient_text
     amplifier_ref_set = frozenset(selection.amplifier_refs)
+    rendered_promo_ids: list[str] = []
+    rendered_amp_refs: list[str] = []
 
-    if selection.service_value_ref and selection.service_value_ref.startswith("fact:"):
+    if include_service_value and selection.service_value_ref and selection.service_value_ref.startswith(
+        "fact:"
+    ):
         sv_id = selection.service_value_ref.removeprefix("fact:")
-        sv_fact = facts_by_id.get(sv_id)
-        if sv_fact is None and bundle is not None:
-            sv_fact = bundle.facts.get(sv_id)
+        sv_fact = facts_by_id.get(sv_id) or bundle.facts.get(sv_id)
         if sv_fact is not None:
             sv_text = str(sv_fact.text_fact).strip()
             if sv_text and sv_text not in text:
                 separator = "\n\n" if text.strip() else ""
                 text = f"{text.rstrip()}{separator}{sv_text}"
 
-    for ref in selection.selected_refs:
-        if not ref.startswith("fact:") or ref in amplifier_ref_set:
-            continue
-        fact_id = ref.removeprefix("fact:")
-        fact = facts_by_id.get(fact_id)
-        if fact is None:
-            continue
-        fact_text = str(fact.text_fact).strip()
-        if not fact_text or fact_text in text:
-            continue
-        separator = "\n\n" if text.strip() else ""
-        text = f"{text.rstrip()}{separator}{fact_text}"
+    if include_promos:
+        for ref in selection.selected_refs:
+            if not ref.startswith("fact:") or ref in amplifier_ref_set:
+                continue
+            fact_id = ref.removeprefix("fact:")
+            if fact_id in exclude_fact_ids:
+                continue
+            fact = facts_by_id.get(fact_id) or bundle.facts.get(fact_id)
+            if fact is None:
+                continue
+            fact_text = approved_microfact_display_text(fact)
+            if fact_text is None:
+                record_automatic_microfact_skip(fact_id)
+                continue
+            if fact_text in text:
+                continue
+            separator = "\n\n" if text.strip() else ""
+            text = f"{text.rstrip()}{separator}{fact_text}"
+            rendered_promo_ids.append(fact_id)
 
-    bullet_lines: list[str] = []
-    for ref in selection.amplifier_refs:
-        if not ref.startswith("fact:"):
-            continue
-        fact_id = ref.removeprefix("fact:")
-        fact = facts_by_id.get(fact_id)
-        if fact is None and bundle is not None:
-            fact = bundle.facts.get(fact_id)
-        if fact is None:
-            continue
-        fact_text = str(fact.text_fact).strip()
-        if not fact_text or fact_text in text:
-            continue
-        bullet_lines.append(fact_text)
+    if include_amplifiers:
+        bullet_lines: list[str] = []
+        for ref in selection.amplifier_refs:
+            if not ref.startswith("fact:"):
+                continue
+            fact_id = ref.removeprefix("fact:")
+            if fact_id in exclude_fact_ids:
+                continue
+            fact = facts_by_id.get(fact_id) or bundle.facts.get(fact_id)
+            if fact is None:
+                continue
+            fact_text = approved_microfact_display_text(fact)
+            if fact_text is None:
+                record_automatic_microfact_skip(fact_id)
+                continue
+            if fact_text in text:
+                continue
+            bullet_lines.append(fact_text)
+            rendered_amp_refs.append(ref)
+        if bullet_lines:
+            list_block = AUTOMATIC_AMPLIFIER_LIST_HEADER + "\n" + "\n".join(
+                f"- {line}" for line in bullet_lines
+            )
+            separator = "\n\n" if text.strip() else ""
+            text = f"{text.rstrip()}{separator}{list_block}"
 
-    if bullet_lines:
-        list_block = AUTOMATIC_AMPLIFIER_LIST_HEADER + "\n" + "\n".join(
-            f"- {line}" for line in bullet_lines
-        )
-        separator = "\n\n" if text.strip() else ""
-        text = f"{text.rstrip()}{separator}{list_block}"
-
-    return text
+    return AutomaticMarketingAppendResult(
+        text=text,
+        rendered_promo_fact_ids=tuple(dict.fromkeys(rendered_promo_ids)),
+        rendered_amplifier_refs=tuple(dict.fromkeys(rendered_amp_refs)),
+    )
 
 
 def build_direct_promotion_patient_text(
@@ -117,7 +171,9 @@ def build_direct_promotion_patient_text(
         if not ref.startswith("fact:"):
             continue
         fact = facts_by_id.get(ref.removeprefix("fact:"))
-        if fact is None or str(fact.kind) != "promo":
+        if fact is None:
+            continue
+        if str(fact.kind) not in {"promo", "payment"}:
             continue
         fact_text = str(fact.text_fact).strip()
         if fact_text and fact_text not in texts:
@@ -438,7 +494,7 @@ def materialize_sales_fast_from_presentation_result(
         "followup_source": "quick_replies",
         "presentation_channel": presentation.presentation_channel,
     }
-    if presentation.reason_code:
+    if presentation.reason_code and presentation.status == "fail_closed":
         meta["presentation_fail_closed"] = presentation.reason_code
     cta = build_target_runtime_widget_cta(
         client_id=context.client_id,
@@ -576,11 +632,11 @@ def materialize_sales_fast_answer_payload(
     if turn_frame.needs_clarification:
         supplemented_text = patient_text
     else:
-        supplemented_text = supplement_sales_fast_patient_text_with_marketing(
-            patient_text=patient_text,
+        supplemented_text = append_automatic_marketing_blocks(
+            patient_text,
             bound_package=bound_package,
             bundle=context.bundle,
-        )
+        ).text
     final_patient_text = supplemented_text
     if commerce_result is not None:
         final_patient_text = apply_authoritative_commerce_to_patient_text(

@@ -124,6 +124,7 @@ def build_marketing_price_profile_pack(tmp_path: Path) -> Path:
 
 
 def patch_isolated_marketing_price_repo(monkeypatch: pytest.MonkeyPatch, repo: Path) -> None:
+    monkeypatch.setattr("core.client_config_loader._REPO_ROOT", str(repo))
     monkeypatch.setattr("core.target_runtime_client_context._REPO_ROOT", repo)
     monkeypatch.setattr("core.one_call_client_pack_identity._REPO_ROOT", repo)
     monkeypatch.setattr("core.target_client_data._REPO_ROOT", repo)

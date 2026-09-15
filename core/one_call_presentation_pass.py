@@ -14,12 +14,13 @@ from contracts.one_call_presentation_result import (
     PresentationSessionDelta,
 )
 from contracts.precomposer_selected_offer import PrecomposerSelectedOfferResult, ResolvedPriceText
-from contracts.response_schema import TargetStrategyMatch
+from contracts.response_schema import ResponseSchemaBundle, TargetStrategyMatch
 from contracts.service_reference import AvailabilityStatus
 from contracts.turn_frame import TurnFrame
 from core.one_call_direct_commercial import (
     DirectCommercialMaterialization,
     append_direct_commercial_without_duplicates,
+    direct_fact_ids_block_installment_context,
     materialize_direct_commercial,
 )
 from core.sales_fast_authoritative_commerce import (
@@ -125,8 +126,13 @@ from core.target_composer_request import (
 from core.target_scoped_response_evidence import TargetScopedResponseEvidenceError
 from core.sales_fast_presentation import (
     AUTOMATIC_AMPLIFIER_LIST_HEADER,
+    append_automatic_marketing_blocks,
+    approved_microfact_display_text,
     build_direct_promotion_patient_text,
-    supplement_sales_fast_patient_text_with_marketing,
+)
+
+_SOFT_PROMOTION_UNAVAILABLE_REASONS = frozenset(
+    {"promotion_no_eligible_facts", "promotion_shown_ambiguous"}
 )
 
 _FAIL_CLOSED_TEXT: dict[str, str] = {
@@ -165,48 +171,41 @@ def _price_marketing_suffix_without_service_value(
     bound_package: TargetSpecBoundOfflineResponsePackage,
     bundle: TargetRuntimeClientContext,
 ) -> str:
-    facts_by_id = {
-        fact.id: fact for fact in bound_package.package.materials.commercial_facts
-    }
-    selection = bound_package.package.materials.marketing_selection
-    text = ""
-    amplifier_ref_set = frozenset(selection.amplifier_refs)
+    return append_automatic_marketing_blocks(
+        "",
+        bound_package=bound_package,
+        bundle=bundle.bundle,
+        include_service_value=False,
+    ).text
 
-    for ref in selection.selected_refs:
+
+def _marketing_promo_ids_rendered_in_text(
+    *,
+    bound_package: TargetSpecBoundOfflineResponsePackage,
+    bundle: ResponseSchemaBundle,
+    rendered_text: str,
+) -> tuple[str, ...]:
+    facts_by_id = {fact.id: fact for fact in bound_package.package.materials.commercial_facts}
+    amplifier_ref_set = frozenset(
+        bound_package.package.materials.marketing_selection.amplifier_refs
+    )
+    promo_ids: list[str] = []
+    for ref in bound_package.package.materials.marketing_selection.selected_refs:
         if not ref.startswith("fact:") or ref in amplifier_ref_set:
             continue
         fact_id = ref.removeprefix("fact:")
-        fact = facts_by_id.get(fact_id)
+        fact = facts_by_id.get(fact_id) or bundle.facts.get(fact_id)
         if fact is None:
             continue
-        fact_text = str(fact.text_fact).strip()
-        if not fact_text or fact_text in text:
-            continue
-        separator = "\n\n" if text.strip() else ""
-        text = f"{text.rstrip()}{separator}{fact_text}"
-
-    bullet_lines: list[str] = []
-    for ref in selection.amplifier_refs:
-        if not ref.startswith("fact:"):
-            continue
-        fact_id = ref.removeprefix("fact:")
-        fact = facts_by_id.get(fact_id)
-        if fact is None:
-            fact = bundle.bundle.facts.get(fact_id)
-        if fact is None:
-            continue
-        fact_text = str(fact.text_fact).strip()
-        if not fact_text or fact_text in text:
-            continue
-        bullet_lines.append(fact_text)
-
-    if bullet_lines:
-        list_block = AUTOMATIC_AMPLIFIER_LIST_HEADER + "\n" + "\n".join(
-            f"- {line}" for line in bullet_lines
-        )
-        separator = "\n\n" if text.strip() else ""
-        text = f"{text.rstrip()}{separator}{list_block}"
-    return text
+        rendered_variants = {
+            str(fact.text_fact).strip(),
+        }
+        micro = approved_microfact_display_text(fact)
+        if micro:
+            rendered_variants.add(micro)
+        if any(token and token in rendered_text for token in rendered_variants):
+            promo_ids.append(fact_id)
+    return tuple(dict.fromkeys(promo_ids))
 
 
 def _precomposer_multi_unsafe_block_legacy(
@@ -542,8 +541,12 @@ def _append_installment_12_if_eligible(
     authoritative_service_id: str | None,
     materialized_public_price: bool,
     today: date,
+    direct_fact_ids: tuple[str, ...] = (),
 ) -> tuple[str, tuple[str, ...]]:
     from contracts.response_schema import TargetOffer
+
+    if direct_fact_ids_block_installment_context(bundle.bundle, direct_fact_ids):
+        return text, ()
 
     offers = tuple(
         offer for offer in displayed_offers if isinstance(offer, TargetOffer)
@@ -698,7 +701,13 @@ def _apply_stage51_marketing(
     include_automatic_block: bool = True,
     required_promotion_satisfied: bool = False,
 ) -> tuple[TargetSpecBoundOfflineResponsePackage, str | None]:
-    commercial_intent = presentation_commercial_intent(semantic)
+    if semantic.commercial_intent == "promotion":
+        marketing_commercial_intent = "promotion"
+        marketing_promotion_scope = semantic.promotion_scope
+    else:
+        marketing_commercial_intent = presentation_commercial_intent(semantic)
+        marketing_promotion_scope = presentation_promotion_scope(semantic)
+    commercial_intent = marketing_commercial_intent
     semantic_context = resolve_target_semantic_context(
         turn_frame,
         bound_package.spec,
@@ -717,8 +726,8 @@ def _apply_stage51_marketing(
             context.doctor_catalog,
             context.external_index,
             route=semantic.route,
-            commercial_intent=presentation_commercial_intent(semantic),
-            promotion_scope=presentation_promotion_scope(semantic),
+            commercial_intent=marketing_commercial_intent,
+            promotion_scope=marketing_promotion_scope,
             semantic_context=semantic_context,
             service_id=presentation_active_service_id(semantic),
             today=today,
@@ -1020,9 +1029,85 @@ def build_one_call_presentation_result(
                     )
                     commercial_intent = "none"
 
-    skip_marketing = True
+    skip_marketing = (
+        turn_frame.needs_clarification
+        or _availability_blocks_commerce(availability_status)
+    )
+    direct_materialization: DirectCommercialMaterialization | None = None
+    direct_request_present = (
+        bool(semantic.direct_fact_ids)
+        and original_commercial_intent != "promotion"
+    )
+    if bool(semantic.direct_fact_ids) and not skip_marketing:
+        direct_materialization = materialize_direct_commercial(
+            bundle=context.bundle,
+            direct_fact_ids=semantic.direct_fact_ids,
+            authoritative_service_id=presentation_active_service_id(semantic),
+            today=today,
+        )
+    direct_commercial_text = (
+        direct_materialization.rendered_text if direct_materialization is not None else ""
+    )
+    direct_eligible_texts = (
+        direct_materialization.eligible_texts if direct_materialization is not None else ()
+    )
     bound_with_marketing = bound_package
     fail_reason = None
+    include_automatic_block = (
+        not skip_marketing
+        and should_include_automatic_marketing_block(
+            turn_frame,
+            bound_package.spec,
+            price_coverage_kind=price_coverage_kind,
+        )
+        and (
+            turn_frame.primary_aspect == "price"
+            or original_commercial_intent == "price"
+        )
+    )
+    extra_present_fact_ids: tuple[str, ...] = ()
+    if direct_request_present and direct_materialization is not None:
+        eligible_texts = frozenset(direct_materialization.eligible_texts)
+        extra_present_fact_ids = tuple(
+            fact_id
+            for fact_id in semantic.direct_fact_ids
+            if (fact := context.bundle.facts.get(fact_id)) is not None
+            and str(fact.text_fact).strip() in eligible_texts
+        )
+    if (
+        not skip_marketing
+        and original_commercial_intent == "price"
+        and price_coverage_kind != "family_context"
+    ):
+        extra_present_fact_ids = tuple(
+            dict.fromkeys((*extra_present_fact_ids, INSTALLMENT_12_FACT_ID))
+        )
+    if not skip_marketing:
+        promotion_scope_for_marketing = (
+            semantic.promotion_scope
+            if original_commercial_intent == "promotion"
+            else promotion_scope
+        )
+        required_promotion_satisfied = (
+            original_commercial_intent == "promotion"
+            and promotion_scope_for_marketing in {"general", "service", "shown"}
+        )
+        bound_with_marketing, fail_reason = _apply_stage51_marketing(
+            bound_package,
+            context=context,
+            semantic=semantic,
+            turn_frame=turn_frame,
+            shown_fact_ids=shown_fact_ids,
+            shown_amplifier_refs=shown_amplifier_refs,
+            shown_service_value_ids=shown_service_value_ids,
+            last_rendered_promo_fact_id=last_rendered_promo_fact_id,
+            last_turn_rendered_promo_fact_ids=last_turn_rendered_promo_fact_ids,
+            patient_text=patient_text,
+            extra_present_fact_ids=extra_present_fact_ids,
+            today=today,
+            include_automatic_block=include_automatic_block,
+            required_promotion_satisfied=required_promotion_satisfied,
+        )
     show_family_price_surface = (
         price_coverage_kind == "family_context"
         and original_commercial_intent == "price"
@@ -1050,39 +1135,44 @@ def build_one_call_presentation_result(
             client_id=context.client_id,
         )
     if fail_reason is not None and not semantic.direct_fact_ids:
-        safe_text = _fail_closed_text(fail_reason)
-        empty_decision = TargetPresentationDecision(
-            quick_replies=(),
-            video=None,
-            situation={"show": False, "mode": "normal"},
-            dropped=(),
-            cadence_update=TargetPresentationCadenceUpdate(),
-            channel="none",
+        soft_promotion_unavailable = (
+            original_commercial_intent == "promotion"
+            and fail_reason in _SOFT_PROMOTION_UNAVAILABLE_REASONS
         )
-        return OneCallPresentationResult(
-            status="fail_closed",
-            reason_code=fail_reason,
-            final_patient_text=safe_text,
-            authoritative_commerce=None,
-            rendered_marketing_fact_ids=(),
-            rendered_promo_fact_ids=(),
-            rendered_amplifier_refs=(),
-            selected_cta_key=None,
-            quick_replies=(),
-            secondary_content_slots=(),
-            video=None,
-            situation={"show": False, "mode": "normal"},
-            presentation_channel="none",
-            rendered_ids=PresentationRenderedIds(
-                marketing_fact_ids=(),
-                promo_fact_ids=(),
-                amplifier_refs=(),
-                followup_refs=(),
-                video_id=None,
-                situation_shown=False,
-            ),
-            pending_session_delta=None,
-        )
+        if not soft_promotion_unavailable:
+            safe_text = _fail_closed_text(fail_reason)
+            empty_decision = TargetPresentationDecision(
+                quick_replies=(),
+                video=None,
+                situation={"show": False, "mode": "normal"},
+                dropped=(),
+                cadence_update=TargetPresentationCadenceUpdate(),
+                channel="none",
+            )
+            return OneCallPresentationResult(
+                status="fail_closed",
+                reason_code=fail_reason,
+                final_patient_text=safe_text,
+                authoritative_commerce=None,
+                rendered_marketing_fact_ids=(),
+                rendered_promo_fact_ids=(),
+                rendered_amplifier_refs=(),
+                selected_cta_key=None,
+                quick_replies=(),
+                secondary_content_slots=(),
+                video=None,
+                situation={"show": False, "mode": "normal"},
+                presentation_channel="none",
+                rendered_ids=PresentationRenderedIds(
+                    marketing_fact_ids=(),
+                    promo_fact_ids=(),
+                    amplifier_refs=(),
+                    followup_refs=(),
+                    video_id=None,
+                    situation_shown=False,
+                ),
+                pending_session_delta=None,
+            )
 
     commerce_result: AuthoritativeCommerceResult | None = None
     effective_scope = _presentation_effective_scope(semantic)
@@ -1220,25 +1310,109 @@ def build_one_call_presentation_result(
             nav_ref=nav_ref,
             no_public_price_line_turn=no_public_price_line_turn,
         )
+    installment_rendered_fact_ids: tuple[str, ...] = ()
+    marketing_rendered_promo_ids: tuple[str, ...] = ()
+    marketing_rendered_amplifier_refs: tuple[str, ...] = ()
     if _availability_blocks_commerce(availability_status):
         final_patient_text = _merge_availability_patient_text(
             availability_status=availability_status,
             overlay=availability_overlay,
             alternative_price_lines=alternative_price_lines,
         )
-        installment_rendered_fact_ids: tuple[str, ...] = ()
+        installment_rendered_fact_ids = ()
     else:
         price_line: str | None = None
-        if scoped_family_code_price_turn:
+        if (
+            original_commercial_intent == "promotion"
+            and not turn_frame.needs_clarification
+        ):
+            if promotion_scope == "shown":
+                if fail_reason == "promotion_shown_ambiguous":
+                    final_patient_text = _fail_closed_text(fail_reason)
+                    marketing_rendered_promo_ids = ()
+                elif semantic.direct_fact_ids and direct_materialization is not None:
+                    base_text = _sanitize_patient_text_for_render(
+                        patient_text=patient_text,
+                        bound_package=presentation_bound,
+                        commerce_result=commerce_result,
+                        commercial_intent=commercial_intent,
+                        direct_eligible_texts=direct_materialization.eligible_texts,
+                    )
+                    if direct_materialization.eligible_texts:
+                        direct_text = "\n\n".join(direct_materialization.eligible_texts)
+                        final_patient_text = append_direct_commercial_without_duplicates(
+                            base_text,
+                            direct_text,
+                        )
+                    else:
+                        final_patient_text = base_text
+                    marketing_rendered_promo_ids = ()
+                else:
+                    base_text = _sanitize_patient_text_for_render(
+                        patient_text=patient_text,
+                        bound_package=presentation_bound,
+                        commerce_result=commerce_result,
+                        commercial_intent=commercial_intent,
+                    )
+                    promo_text = build_direct_promotion_patient_text(bound_with_marketing)
+                    if promo_text.strip():
+                        final_patient_text = append_direct_commercial_without_duplicates(
+                            base_text,
+                            promo_text,
+                        )
+                        marketing_rendered_promo_ids = _marketing_promo_ids_rendered_in_text(
+                            bound_package=bound_with_marketing,
+                            bundle=context.bundle,
+                            rendered_text=final_patient_text,
+                        )
+                    else:
+                        final_patient_text = base_text
+                        marketing_rendered_promo_ids = ()
+            elif (
+                semantic.direct_fact_ids
+                and direct_materialization is not None
+                and direct_materialization.rendered_text.strip()
+                and not build_direct_promotion_patient_text(bound_with_marketing).strip()
+            ):
+                base_text = _sanitize_patient_text_for_render(
+                    patient_text=patient_text,
+                    bound_package=presentation_bound,
+                    commerce_result=commerce_result,
+                    commercial_intent=commercial_intent,
+                    direct_eligible_texts=direct_materialization.eligible_texts,
+                )
+                final_patient_text = append_direct_commercial_without_duplicates(
+                    base_text,
+                    direct_materialization.rendered_text,
+                )
+                marketing_rendered_promo_ids = ()
+            elif fail_reason in _SOFT_PROMOTION_UNAVAILABLE_REASONS:
+                final_patient_text = _fail_closed_text(str(fail_reason))
+                marketing_rendered_promo_ids = ()
+            elif not build_direct_promotion_patient_text(bound_with_marketing).strip():
+                final_patient_text = _fail_closed_text("promotion_no_eligible_facts")
+                marketing_rendered_promo_ids = ()
+            else:
+                final_patient_text = build_direct_promotion_patient_text(
+                    bound_with_marketing
+                )
+                marketing_rendered_promo_ids = _marketing_promo_ids_rendered_in_text(
+                    bound_package=bound_with_marketing,
+                    bundle=context.bundle,
+                    rendered_text=final_patient_text,
+                )
+        elif scoped_family_code_price_turn:
             supplemented_text = apply_authoritative_commerce_to_patient_text(
                 SCOPED_FAMILY_PRICE_NEUTRAL_INTRO,
                 commerce_result,
             )
+            final_patient_text = supplemented_text
         elif turn_frame.needs_clarification and broad_family_code_price_turn:
             supplemented_text = apply_authoritative_commerce_to_patient_text(
                 BROAD_FAMILY_PRICE_NEUTRAL_INTRO,
                 commerce_result,
             )
+            final_patient_text = supplemented_text
         elif (
             (precomposer_price_turn or precomposer_multi_price_turn or ambiguous_no_public_price_turn)
             and resolved_price_text is not None
@@ -1250,45 +1424,127 @@ def build_one_call_presentation_result(
                     displayed_offers,
                 )
             patient_body = dedupe_price_line_from_patient_text(patient_body, price_line)
+            if precomposer_multi_price_turn:
+                marketing_only = _price_marketing_suffix_without_service_value(
+                    bound_package=bound_with_marketing,
+                    bundle=context,
+                )
+            else:
+                marketing_only = ""
             supplemented_text = assemble_price_turn_visible_text(
                 price_line=price_line,
                 patient_text=patient_body,
-                marketing_suffix="",
+                marketing_suffix=marketing_only,
             )
+            final_patient_text = supplemented_text
         elif commerce_result is not None and commerce_result.patient_price_block:
             supplemented_text = apply_authoritative_commerce_to_patient_text(
                 patient_body,
                 commerce_result,
             )
+            final_patient_text = supplemented_text
         elif turn_frame.needs_clarification:
-            supplemented_text = patient_body
+            final_patient_text = patient_body
         else:
-            supplemented_text = patient_body
-        final_patient_text = supplemented_text
-        selected_brand_id = str(
-            bound_with_marketing.package.materials.selected_brand_id or ""
-        ).strip() or None
-        final_patient_text = _append_payment_stages_if_requested(
-            final_patient_text,
-            semantic=semantic,
-            user_message=user_message,
-            displayed_offers=displayed_offers,
-            commerce_result=commerce_result,
-            precomposer_selected_offer=precomposer_selected_offer,
-            selected_brand_id=selected_brand_id,
-            bundle=context,
-            nav_ref=nav_ref,
-        )
-        authoritative_service_id = presentation_active_service_id(semantic)
-        final_patient_text, installment_rendered_fact_ids = _append_installment_12_if_eligible(
-            final_patient_text,
-            semantic=semantic,
-            displayed_offers=displayed_offers,
-            bundle=context,
-            authoritative_service_id=authoritative_service_id,
-            materialized_public_price=materialized_public_price,
-            today=today,
-        )
+            base_text = _sanitize_patient_text_for_render(
+                patient_text=patient_body,
+                bound_package=presentation_bound,
+                commerce_result=commerce_result,
+                commercial_intent=commercial_intent,
+                direct_eligible_texts=direct_eligible_texts,
+            )
+            if not skip_marketing and include_automatic_block:
+                final_patient_text = append_automatic_marketing_blocks(
+                    base_text,
+                    bound_package=presentation_bound,
+                    bundle=context.bundle,
+                ).text
+            else:
+                final_patient_text = base_text
+        if original_commercial_intent != "promotion" or turn_frame.needs_clarification:
+            selected_brand_id = str(
+                bound_with_marketing.package.materials.selected_brand_id or ""
+            ).strip() or None
+            final_patient_text = _append_payment_stages_if_requested(
+                final_patient_text,
+                semantic=semantic,
+                user_message=user_message,
+                displayed_offers=displayed_offers,
+                commerce_result=commerce_result,
+                precomposer_selected_offer=precomposer_selected_offer,
+                selected_brand_id=selected_brand_id,
+                bundle=context,
+                nav_ref=nav_ref,
+            )
+            authoritative_service_id = presentation_active_service_id(semantic)
+            if (
+                not skip_marketing
+                and include_automatic_block
+                and materialized_public_price
+                and original_commercial_intent == "price"
+                and not precomposer_multi_price_turn
+            ):
+                promo_block = append_automatic_marketing_blocks(
+                    final_patient_text,
+                    bound_package=presentation_bound,
+                    bundle=context.bundle,
+                    exclude_fact_ids=frozenset({INSTALLMENT_12_FACT_ID}),
+                    include_service_value=False,
+                    include_amplifiers=False,
+                )
+                final_patient_text = promo_block.text
+                marketing_rendered_promo_ids = promo_block.rendered_promo_fact_ids
+            final_patient_text, installment_rendered_fact_ids = _append_installment_12_if_eligible(
+                final_patient_text,
+                semantic=semantic,
+                displayed_offers=displayed_offers,
+                bundle=context,
+                authoritative_service_id=authoritative_service_id,
+                materialized_public_price=materialized_public_price,
+                today=today,
+                direct_fact_ids=tuple(semantic.direct_fact_ids or ()),
+            )
+            if (
+                not skip_marketing
+                and include_automatic_block
+                and materialized_public_price
+                and original_commercial_intent == "price"
+                and not precomposer_multi_price_turn
+            ):
+                amp_block = append_automatic_marketing_blocks(
+                    final_patient_text,
+                    bound_package=presentation_bound,
+                    bundle=context.bundle,
+                    exclude_fact_ids=frozenset(
+                        (*installment_rendered_fact_ids, INSTALLMENT_12_FACT_ID)
+                    ),
+                    include_service_value=False,
+                    include_promos=False,
+                )
+                final_patient_text = amp_block.text
+                marketing_rendered_amplifier_refs = amp_block.rendered_amplifier_refs
+            elif (
+                not skip_marketing
+                and include_automatic_block
+                and original_commercial_intent == "price"
+                and (precomposer_price_turn or precomposer_multi_price_turn)
+                and not materialized_public_price
+            ):
+                auto_block = append_automatic_marketing_blocks(
+                    final_patient_text,
+                    bound_package=presentation_bound,
+                    bundle=context.bundle,
+                    exclude_fact_ids=frozenset(installment_rendered_fact_ids),
+                    include_service_value=False,
+                )
+                final_patient_text = auto_block.text
+                marketing_rendered_promo_ids = auto_block.rendered_promo_fact_ids
+                marketing_rendered_amplifier_refs = auto_block.rendered_amplifier_refs
+            if direct_commercial_text.strip():
+                final_patient_text = append_direct_commercial_without_duplicates(
+                    final_patient_text,
+                    direct_commercial_text,
+                )
         final_patient_text = _merge_availability_patient_text(
             availability_status=availability_status,
             overlay=None,
@@ -1303,6 +1559,23 @@ def build_one_call_presentation_result(
             and not str(final_patient_text or "").strip()
         ):
             final_patient_text = PAYMENT_STAGES_UNAVAILABLE_TEXT
+
+    if not marketing_rendered_promo_ids and not skip_marketing:
+        if (
+            original_commercial_intent == "promotion"
+            and promotion_scope in {"general", "service"}
+        ):
+            marketing_rendered_promo_ids = _marketing_promo_ids_rendered_in_text(
+                bound_package=bound_with_marketing,
+                bundle=context.bundle,
+                rendered_text=final_patient_text,
+            )
+        elif include_automatic_block:
+            marketing_rendered_promo_ids = _marketing_promo_ids_rendered_in_text(
+                bound_package=presentation_bound,
+                bundle=context.bundle,
+                rendered_text=final_patient_text,
+            )
 
     verified = _build_verified(
         bound_package=presentation_bound,
@@ -1326,18 +1599,65 @@ def build_one_call_presentation_result(
         alternative_secondary_override=alternative_secondary_slots or None,
     )
 
-    code_owned_rendered_fact_ids = installment_rendered_fact_ids
+    code_owned_rendered_fact_ids = tuple(
+        dict.fromkeys(
+            (
+                *installment_rendered_fact_ids,
+                *marketing_rendered_promo_ids,
+            )
+        )
+    )
+    if direct_materialization is not None and semantic.direct_fact_ids:
+        for fact_id in semantic.direct_fact_ids:
+            fact = context.bundle.facts.get(fact_id)
+            if fact is None:
+                continue
+            if str(fact.text_fact).strip() in final_patient_text:
+                code_owned_rendered_fact_ids = tuple(
+                    dict.fromkeys((*code_owned_rendered_fact_ids, fact_id))
+                )
     rendered_fact_ids = code_owned_rendered_fact_ids
+    direct_fact_id_set = frozenset(semantic.direct_fact_ids or ())
+    promo_tracking_fact_ids = (
+        marketing_rendered_promo_ids
+        if marketing_rendered_promo_ids
+        else tuple(
+            fact_id
+            for fact_id in rendered_fact_ids
+            if fact_id not in direct_fact_id_set
+        )
+    )
     rendered_promo_ids = _promo_fact_ids(
         bound_package=bound_with_marketing,
-        rendered_fact_ids=rendered_fact_ids,
+        rendered_fact_ids=promo_tracking_fact_ids,
         bundle=context.bundle,
     )
     facts_by_id = {f.id: f for f in bound_with_marketing.package.materials.commercial_facts}
     doctors_by_id = {d.doctor_id: d for d in bound_with_marketing.package.materials.doctors}
     used_refs = frozenset(str(r).strip() for r in verified.used_content_refs)
-    proven_amplifiers: list[str] = []
-    rendered_amplifier_refs: tuple[str, ...] = ()
+    proven_amplifiers: list[str] = list(marketing_rendered_amplifier_refs)
+    for ref in bound_with_marketing.package.materials.marketing_selection.amplifier_refs:
+        if ref in proven_amplifiers:
+            continue
+        if ref.startswith("fact:"):
+            fact_id = ref.removeprefix("fact:")
+            fact = facts_by_id.get(fact_id)
+            if fact is not None:
+                micro = approved_microfact_display_text(fact)
+                if micro and micro in final_patient_text:
+                    proven_amplifiers.append(ref)
+        elif ref.startswith("kb:"):
+            doc = ref.removeprefix("kb:").split("#", 1)[0]
+            if doc in used_refs:
+                proven_amplifiers.append(ref)
+        elif ref.startswith("doctor:"):
+            doctor = doctors_by_id.get(ref.removeprefix("doctor:"))
+            if doctor is not None and (
+                doctor.profile_ref.removeprefix("kb:").split("#", 1)[0] in used_refs
+                or doctor.name.casefold() in final_patient_text.casefold()
+            ):
+                proven_amplifiers.append(ref)
+    rendered_amplifier_refs: tuple[str, ...] = tuple(dict.fromkeys(proven_amplifiers))
 
     followup_refs = tuple(qr.ref for qr in _presentation_quick_replies(presentation))
     video_id = None
@@ -1350,20 +1670,44 @@ def build_one_call_presentation_result(
         ).strip() or None
     situation_shown = bool(presentation.situation.get("show"))
 
-    last_promo = rendered_promo_ids[0] if len(rendered_promo_ids) == 1 else None
-    last_turn_promo_ids = rendered_promo_ids
-    offer_fact_refs_tuple: tuple[str, ...] = ()
+    if marketing_rendered_promo_ids:
+        if len(marketing_rendered_promo_ids) == 1 or turn_frame.marketing_scenarios:
+            last_turn_promo_ids = marketing_rendered_promo_ids
+        else:
+            last_turn_promo_ids = (marketing_rendered_promo_ids[0],)
+    elif original_commercial_intent == "promotion" and rendered_promo_ids:
+        last_turn_promo_ids = (
+            rendered_promo_ids
+            if len(rendered_promo_ids) == 1
+            else (rendered_promo_ids[0],)
+        )
+    else:
+        last_turn_promo_ids = ()
+    last_promo = last_turn_promo_ids[0] if len(last_turn_promo_ids) == 1 else None
+    offer_fact_refs_tuple: tuple[str, ...] = tuple(
+        f"fact:{fact_id}"
+        for fact_id in rendered_promo_ids
+    )
     cadence_delta = PresentationCadenceDelta(
         shown_video_ids=presentation.cadence_update.shown_video_ids,
         shown_content_followup_refs=presentation.cadence_update.shown_content_followup_refs,
         shown_price_followup_refs=presentation.cadence_update.shown_price_followup_refs,
         situation_offered=presentation.cadence_update.situation_offered,
     )
+    service_value_selection = (
+        bound_with_marketing.package.materials.marketing_selection.service_value_ref
+    )
+    rendered_service_value_ids: tuple[str, ...] = ()
+    if service_value_selection and service_value_selection.startswith("fact:"):
+        fact_id = service_value_selection.removeprefix("fact:")
+        sv_text = service_value_text_for_ref(context.bundle, service_value_selection)
+        if sv_text and sv_text in final_patient_text:
+            rendered_service_value_ids = (fact_id,)
     session_delta = PresentationSessionDelta(
         shown_fact_ids=rendered_fact_ids,
         shown_amplifier_refs=rendered_amplifier_refs,
-        shown_consultation_value_refs=(),
-        shown_service_value_ids=(),
+        shown_consultation_value_refs=shown_consultation_value_refs,
+        shown_service_value_ids=rendered_service_value_ids,
         last_rendered_promo_fact_id=last_promo,
         rendered_promo_fact_ids=rendered_promo_ids,
         last_turn_rendered_promo_fact_ids=last_turn_promo_ids,

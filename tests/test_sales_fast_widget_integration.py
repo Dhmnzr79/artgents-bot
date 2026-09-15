@@ -707,12 +707,12 @@ def test_widget_path_price_all_on_4_includes_two_promos_not_installment(
     )
     answer = payload["answer"]
     answer_lower = answer.lower()
-    assert "368" in answer or "318" in answer
-    assert "скидка до 15% при оплате в день обращения." not in answer_lower
+    assert "368 000" in answer.replace("\u00a0", " ")
+    assert "скидка до 15% при оплате в день обращения." in answer_lower
     assert "рассрочка до 12 месяцев" in answer_lower
-    assert "при оплате в день обращения — скидка до 15% на имплантацию." not in answer_lower
-    assert "бесплатная консультация по имплантации" not in answer_lower
-    assert "также мы предлагаем" not in answer_lower
+    assert answer_lower.count("рассрочка до 12 месяцев") == 1
+    assert "бесплатная консультация до 31.12.2026." in answer_lower
+    assert "также мы предлагаем" in answer_lower
     assert backend.call_count == 1
 
 
@@ -968,7 +968,12 @@ def _run_widget_turn_keep_session(
     active_backend = backend or _CountingBackend(envelope_json)
     _install_sales_fast_transport(monkeypatch, active_backend)
     if client_id != "demo":
-        monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
+        prior_allowed = getattr(config, "ALLOWED_CLIENTS", frozenset())
+        monkeypatch.setattr(
+            config,
+            "ALLOWED_CLIENTS",
+            frozenset(set(prior_allowed) | {"demo", "nikadent", client_id}),
+        )
     bind_session_client(client_id)
     with session_client_scope(client_id):
         with flask_app.test_request_context(
@@ -1092,11 +1097,11 @@ def test_widget_path_demo_general_promotion_overview_materializes_and_persists_s
     answer = payload["answer"]
     assert backend.call_count == 1
     assert payload["meta"]["service_route"] == "sales_fast_materialized"
-    assert "Расскажу об актуальных акциях клиники." in answer
+    assert "Расскажу об актуальных акциях клиники." not in answer
     for text in expected_texts:
-        assert text not in answer
+        assert text in answer
     session = read_target_runtime_session(sid)
-    assert session.shown_fact_ids == ()
+    assert set(session.shown_fact_ids) >= set(expected_ids)
 
 
 def test_widget_path_exact_price_offer_card_preserved(
@@ -1211,6 +1216,45 @@ def test_widget_path_promo_cadence_suppresses_repeat_and_shown_scope_repeats_las
         assert session1.last_rendered_promo_fact_id is None
         assert session1.last_turn_rendered_promo_fact_ids == ()
 
+    backend2 = _CountingBackend(
+        answer_envelope(
+            "All-on-4 на нижнюю челюсть — 368 000 ₽.",
+            commercial_intent="price",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+        )
+    )
+    with session_client_scope("demo"):
+        with flask_app.test_request_context(
+            "/ask",
+            method="POST",
+            json={
+                "q": "Сколько стоит All-on-4 на нижнюю челюсть?",
+                "sid": sid,
+                "client_id": "demo",
+            },
+        ):
+            from flask import request
+
+            request.ctx = _offline_widget_request_ctx()
+            _install_sales_fast_transport(monkeypatch, backend2)
+            outcome2 = run_sales_fast_widget_turn(
+                client_id="demo",
+                sid=sid,
+                user_message="Сколько стоит All-on-4 на нижнюю челюсть?",
+                backend=backend2,
+            )
+        answer2 = str(outcome2.widget.payload.get("answer") or "")
+        assert "15%" in answer2
+        session2 = read_target_runtime_session_for(sid)
+        assert session2.last_turn_rendered_promo_fact_ids
+
+    from core.target_client_data import load_target_client_data
+
+    _shown_promo_full = str(
+        load_target_client_data("demo").bundle.facts["implant_same_day_discount"].text_fact
+    )
     backend3 = _CountingBackend(
         answer_envelope(
             "Повторю акцию.",
@@ -1238,8 +1282,8 @@ def test_widget_path_promo_cadence_suppresses_repeat_and_shown_scope_repeats_las
                 user_message="Повторите акцию, которую только что показывали",
                 backend=backend3,
             )
-        answer3 = str(outcome3.widget.payload.get("answer") or "").lower()
-    assert "повторю акцию" in answer3
+        answer3 = str(outcome3.widget.payload.get("answer") or "")
+    assert _shown_promo_full in answer3
     assert outcome3.widget.payload.get("meta", {}).get("presentation_fail_closed") is None
 
 

@@ -15,7 +15,7 @@ from core.sales_fast_authoritative_commerce import (
     build_authoritative_commerce_result,
     resolve_authoritative_commerce,
 )
-from core.sales_fast_presentation import supplement_sales_fast_patient_text_with_marketing
+from core.sales_fast_presentation import append_automatic_marketing_blocks
 from core.target_client_data import load_target_client_data
 from core.target_strategy_context import strategy_match_from_effective_scope
 
@@ -161,6 +161,7 @@ def test_wrong_flash_price_removed_narrative_marketing_cta_preserved() -> None:
         id="installment_12",
         kind="payment",
         text_fact="Доступна рассрочка на имплантацию и протезирование до 12 месяцев.",
+        microfact_text="Рассрочка до 12 месяцев.",
         render_mode="strict",
     )
     bound = _fake_bound_package(
@@ -176,18 +177,20 @@ def test_wrong_flash_price_removed_narrative_marketing_cta_preserved() -> None:
         bundle=bundle,
         strategy_context=_strategy_context(),
     )
-    supplemented = supplement_sales_fast_patient_text_with_marketing(
-        patient_text=(
+    supplemented = append_automatic_marketing_blocks(
+        (
             "Классическая имплантация одного зуба под ключ стоит 99 999 ₽. "
             "Мы используем современные материалы. Запишитесь на консультацию."
         ),
         bound_package=bound,
-    )
+        bundle=bundle,
+    ).text
     final = apply_authoritative_commerce_to_patient_text(supplemented, result)
     assert "99 999" not in final and "99999" not in final.replace(" ", "")
     assert "современные материалы" in final
     assert "консультац" in final.lower()
-    assert marketing_fact.text_fact in final
+    assert marketing_fact.microfact_text in final
+    assert marketing_fact.text_fact not in final
     assert "от 76" in final and "200" in final
 
 

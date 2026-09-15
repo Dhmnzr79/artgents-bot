@@ -42,6 +42,43 @@ def _fact_is_eligible(
     return True
 
 
+def _direct_commercial_fact_is_eligible(
+    *,
+    bundle: ResponseSchemaBundle,
+    fact_id: str,
+    authoritative_service_id: str | None,
+    today: date,
+    selected_fact_ids: set[str],
+) -> bool:
+    from core.target_marketing_selector import _promo_fact_runtime_eligible
+
+    if fact_id not in bundle.facts:
+        return False
+    return _promo_fact_runtime_eligible(
+        bundle,
+        f"fact:{fact_id}",
+        service_id=authoritative_service_id,
+        turn_topic=None,
+        today_iso=today.isoformat(),
+        selected_fact_ids=selected_fact_ids,
+        apply_service_applicability=True,
+        apply_topic_applicability=False,
+    )
+
+
+def direct_fact_ids_block_installment_context(
+    bundle: ResponseSchemaBundle,
+    direct_fact_ids: tuple[str, ...],
+) -> bool:
+    for fact_id in direct_fact_ids:
+        fact = bundle.facts.get(fact_id)
+        if fact is None:
+            continue
+        if "installment_12" in fact.incompatible_with:
+            return True
+    return False
+
+
 def materialize_direct_commercial(
     *,
     bundle: ResponseSchemaBundle,
@@ -56,25 +93,41 @@ def materialize_direct_commercial(
 
     eligible_texts: list[str] = []
     saw_ineligible = False
+    selected_fact_ids: set[str] = set()
     for fact_id in direct_fact_ids:
-        if not _fact_is_eligible(
+        fact = bundle.facts.get(fact_id)
+        if fact is None:
+            saw_ineligible = True
+            continue
+        if "installment_12" in fact.incompatible_with:
+            saw_ineligible = True
+            continue
+        if not _direct_commercial_fact_is_eligible(
             bundle=bundle,
             fact_id=fact_id,
             authoritative_service_id=authoritative_service_id,
             today=today,
+            selected_fact_ids=selected_fact_ids,
         ):
             saw_ineligible = True
             continue
-        fact = bundle.facts[fact_id]
+        if str(fact.kind) == "service_value":
+            saw_ineligible = True
+            continue
         text = str(fact.text_fact).strip()
         if text and text not in eligible_texts:
             eligible_texts.append(text)
+            selected_fact_ids.add(fact_id)
 
     eligible_tuple = tuple(eligible_texts)
-    if eligible_tuple and saw_ineligible:
-        rendered = "\n\n".join([*eligible_tuple, DIRECT_COMMERCIAL_INELIGIBLE_PHRASE])
-    elif eligible_tuple:
+    if eligible_tuple:
         rendered = "\n\n".join(eligible_tuple)
+    elif not any(
+        fact_id in bundle.facts
+        and str(bundle.facts[fact_id].kind) != "service_value"
+        for fact_id in direct_fact_ids
+    ):
+        rendered = ""
     else:
         rendered = DIRECT_COMMERCIAL_INELIGIBLE_PHRASE
 

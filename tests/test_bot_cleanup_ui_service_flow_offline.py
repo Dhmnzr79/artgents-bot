@@ -979,24 +979,24 @@ def test_ask_and_stream_payload_parity_for_general_price(
     )
 
 
-def test_active_runtime_defaults_to_plus_model() -> None:
-    assert config.SALES_ONE_PLUS_MODEL == "qwen3.7-plus-2026-05-26"
+def test_active_runtime_defaults_to_single_model() -> None:
+    assert config.SALES_ONE_PLUS_MODEL == "qwen3.8-flash"
     assert sales_one_plus_model() == config.SALES_ONE_PLUS_MODEL
     assert ONE_CALL_MODEL_SNAPSHOT == config.SALES_ONE_PLUS_MODEL
 
 
-def test_active_runtime_model_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_active_runtime_default_model_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     import importlib
 
     import config as config_module
     import core.sales_one_plus_live_backend as backend_module
 
-    monkeypatch.setenv("SALES_ONE_PLUS_MODEL", "qwen3.7-plus-custom-test")
+    monkeypatch.setenv("DEFAULT_LLM_MODEL", "qwen-test-model")
     importlib.reload(config_module)
     importlib.reload(backend_module)
-    assert config_module.SALES_ONE_PLUS_MODEL == "qwen3.7-plus-custom-test"
-    assert backend_module.sales_one_plus_model() == "qwen3.7-plus-custom-test"
-    monkeypatch.delenv("SALES_ONE_PLUS_MODEL", raising=False)
+    assert config_module.SALES_ONE_PLUS_MODEL == "qwen-test-model"
+    assert backend_module.sales_one_plus_model() == "qwen-test-model"
+    monkeypatch.delenv("DEFAULT_LLM_MODEL", raising=False)
     importlib.reload(config_module)
     importlib.reload(backend_module)
 

@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import json
-import os
-
-from config import QWEN_PLUS_MODEL
+from config import DEFAULT_LLM_MODEL
 from core.target_composer_executor import TargetComposerInvocation
 from core.target_composer_json_stream import TargetComposerJsonStream
 from core.target_medical_boundary import (
@@ -40,27 +38,15 @@ class TargetRuntimeBackendTransportError(RuntimeError):
 
 
 def target_fullcontext_composer_model() -> str:
-    return (
-        (os.getenv("TARGET_FULLCONTEXT_COMPOSER_MODEL") or "").strip()
-        or (os.getenv("FULLCONTEXT_RESPONSE_EVAL_LLM_MODEL") or "").strip()
-        or QWEN_PLUS_MODEL
-    )
+    return DEFAULT_LLM_MODEL
 
 
 def target_fullcontext_verifier_model() -> str:
-    return (
-        (os.getenv("TARGET_FULLCONTEXT_VERIFIER_MODEL") or "").strip()
-        or (os.getenv("FULLCONTEXT_RESPONSE_EVAL_LLM_MODEL") or "").strip()
-        or QWEN_PLUS_MODEL
-    )
+    return DEFAULT_LLM_MODEL
 
 
 def target_fullcontext_boundary_model() -> str:
-    return (
-        (os.getenv("TARGET_FULLCONTEXT_BOUNDARY_MODEL") or "").strip()
-        or (os.getenv("MEDICAL_BOUNDARY_EVAL_LLM_MODEL") or "").strip()
-        or QWEN_PLUS_MODEL
-    )
+    return DEFAULT_LLM_MODEL
 
 
 class TargetRuntimeLiveComposerBackend:

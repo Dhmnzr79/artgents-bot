@@ -16,17 +16,17 @@ from tests.test_ac3_scope_price_flow_offline import test_w1b_snapshot_checksums_
 from tests.test_patient_scope_a9r_matrix_v3_contract import test_a9r_v3_matrix_blob_frozen
 
 
-def test_runtime_planner_default_model_is_plus() -> None:
-    prior = os.environ.get("TURN_PLANNER_LLM_MODEL")
+def test_runtime_planner_uses_single_default_model() -> None:
+    prior = os.environ.get("DEFAULT_LLM_MODEL")
     try:
-        os.environ.pop("TURN_PLANNER_LLM_MODEL", None)
+        os.environ["DEFAULT_LLM_MODEL"] = "qwen3.8-flash"
         importlib.reload(config)
-        assert config.TURN_PLANNER_LLM_MODEL == config.QWEN_PLUS_MODEL == "qwen3.7-plus"
+        assert config.TURN_PLANNER_LLM_MODEL == config.DEFAULT_LLM_MODEL == "qwen3.8-flash"
     finally:
         if prior is None:
-            os.environ.pop("TURN_PLANNER_LLM_MODEL", None)
+            os.environ.pop("DEFAULT_LLM_MODEL", None)
         else:
-            os.environ["TURN_PLANNER_LLM_MODEL"] = prior
+            os.environ["DEFAULT_LLM_MODEL"] = prior
         importlib.reload(config)
 
 

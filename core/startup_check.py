@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 
-from config import ALLOWED_CLIENTS, APP_ENV, SALES_ONE_PLUS_MODEL
+from config import ALLOWED_CLIENTS, APP_ENV, DEFAULT_LLM_MODEL, QWEN_ENABLE_THINKING
 from core.client_runtime import client_md_dir, list_buildable_client_ids
 from core.prod_readiness import evaluate_allowed_client_registry
 from core.one_call_prompt_contract import ONE_CALL_PROMPT_CONTRACT_VERSION
@@ -71,6 +71,8 @@ def run_startup_check(logger: logging.Logger) -> None:
         logger,
         "runtime_provenance_startup",
         architecture="fullcontext_one_call",
-        model=SALES_ONE_PLUS_MODEL,
+        model=DEFAULT_LLM_MODEL,
+        single_model=True,
+        qwen_enable_thinking=QWEN_ENABLE_THINKING,
         prompt_contract=ONE_CALL_PROMPT_CONTRACT_VERSION,
     )

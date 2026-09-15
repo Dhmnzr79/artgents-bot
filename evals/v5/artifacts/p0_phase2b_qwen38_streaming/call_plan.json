@@ -1,0 +1,271 @@
+{
+  "control_model": "qwen3.7-plus-2026-05-26",
+  "candidate_model": "qwen3.8-flash",
+  "call_count": 44,
+  "plan": [
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "canary_control",
+      "client_id": "demo",
+      "attempt": 0
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "canary_candidate",
+      "client_id": "demo",
+      "attempt": 0
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d01_parking",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d01_parking",
+      "client_id": "demo",
+      "attempt": 2
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d01_parking",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d01_parking",
+      "client_id": "demo",
+      "attempt": 2
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d02_implant_service",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d02_implant_service",
+      "client_id": "demo",
+      "attempt": 2
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d02_implant_service",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d02_implant_service",
+      "client_id": "demo",
+      "attempt": 2
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d03_implant_price",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d03_implant_price",
+      "client_id": "demo",
+      "attempt": 2
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d03_implant_price",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d03_implant_price",
+      "client_id": "demo",
+      "attempt": 2
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d04_payment",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d04_payment",
+      "client_id": "demo",
+      "attempt": 2
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d04_payment",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d04_payment",
+      "client_id": "demo",
+      "attempt": 2
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d05_contacts",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d05_contacts",
+      "client_id": "demo",
+      "attempt": 2
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d05_contacts",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d05_contacts",
+      "client_id": "demo",
+      "attempt": 2
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d06_doctors",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d06_doctors",
+      "client_id": "demo",
+      "attempt": 2
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d06_doctors",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d06_doctors",
+      "client_id": "demo",
+      "attempt": 2
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d07_ambiguous",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d07_ambiguous",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d08_admin_like",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d08_admin_like",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d09_follow_up",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d09_follow_up",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d10_pain",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "d10_pain",
+      "client_id": "demo",
+      "attempt": 2
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d10_pain",
+      "client_id": "demo",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "d10_pain",
+      "client_id": "demo",
+      "attempt": 2
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "n01_allon4_price",
+      "client_id": "nikadent",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "n01_allon4_price",
+      "client_id": "nikadent",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "n02_aprf",
+      "client_id": "nikadent",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "n02_aprf",
+      "client_id": "nikadent",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "n03_doctors",
+      "client_id": "nikadent",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "n03_doctors",
+      "client_id": "nikadent",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.7-plus-2026-05-26",
+      "case_id": "n04_installment",
+      "client_id": "nikadent",
+      "attempt": 1
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "case_id": "n04_installment",
+      "client_id": "nikadent",
+      "attempt": 1
+    }
+  ]
+}

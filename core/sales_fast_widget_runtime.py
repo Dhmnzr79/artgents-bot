@@ -12,7 +12,7 @@ from contracts.local_problem_gate import LocalProblemGateResult
 from contracts.precomposer_selected_offer import PrecomposerSelectedOfferResult
 from contracts.sales_one_plus_semantic import SalesOnePlusSemanticFrame
 from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundTerminalResponse
-from contracts.turn_frame import TurnFrame
+from contracts.turn_frame import FieldMeta, TurnFrame
 from contracts.ui_scope_action import UiScopeAction
 from contracts.ui_service_action import UiServiceAction
 from contracts.ui_stage_action import UiStageAction
@@ -56,7 +56,6 @@ from core.resolve_precomposer_selected_offer import (
 from core.sales_fast_strict_evidence import (
     assemble_sales_fast_bound_package,
     build_pre_flash_prompt_hints,
-    effective_scope_from_semantic_frame,
     exact_sales_resolution_from_semantic_frame,
     resolve_sales_fast_bound_package,
 )
@@ -458,6 +457,103 @@ def _maybe_pre_flash_terminal(
     )
 
 
+def _hydrate_turn_frame_topic_from_session_scope(
+    turn_frame: TurnFrame,
+    *,
+    session_state: object,
+    effective_scope: object,
+    commercial_intent: str | None,
+) -> TurnFrame:
+    """Scoped price follow-up without service name keeps session topic (e.g. «А сколько?»)."""
+
+    if turn_frame.topic is not None:
+        return turn_frame
+    if commercial_intent != "price":
+        return turn_frame
+    extent = getattr(effective_scope, "extent", None)
+    if extent in {None, "unknown"}:
+        return turn_frame
+    topic = getattr(effective_scope, "topic", None)
+    if not topic:
+        facts = getattr(session_state, "patient_facts", None)
+        if facts is not None:
+            topic = facts.topic
+    if not topic:
+        last_topic = getattr(session_state, "last_topic", None)
+        topic = str(last_topic or "").strip() or None
+    if not topic:
+        return turn_frame
+    valid = FieldMeta(
+        confidence=1.0,
+        provenance="sales_fast.session_scope_price_followup",
+        status="valid",
+    )
+    return turn_frame.model_copy(
+        update={
+            "topic": topic,
+            "field_meta": turn_frame.field_meta.model_copy(update={"topic": valid}),
+        }
+    )
+
+
+def _topic_for_effective_scope_merge(
+    *,
+    turn_frame: TurnFrame,
+    session_state: object,
+    commercial_intent: str | None,
+) -> str | None:
+    """Elliptic price follow-ups inherit session topic so fresh UI scope can merge."""
+
+    if turn_frame.topic is not None:
+        return turn_frame.topic
+    if commercial_intent != "price":
+        return None
+    facts = getattr(session_state, "patient_facts", None)
+    if facts is not None:
+        ref = str(getattr(facts, "ref", "") or "").strip()
+        provenance = str(getattr(facts, "provenance", "") or "").strip()
+        if provenance == "ui_scope_ref" or ref.startswith("target:ui_scope/"):
+            topic = str(getattr(facts, "topic", "") or "").strip().lower()
+            if topic:
+                return topic
+    return None
+
+
+def _authoritative_effective_scope_for_turn(
+    *,
+    session_state: object,
+    user_message: str,
+    turn_frame: TurnFrame,
+    scope_action: UiScopeAction | None,
+    stage_action: UiStageAction | None,
+    commercial_intent: str | None,
+) -> object:
+    """Session + message scope for bound-package dispatch and patient_facts persist."""
+
+    if scope_action is not None or stage_action is not None:
+        return resolve_effective_scope(
+            current_ui_action=scope_action,
+            current_ui_stage_action=stage_action,
+            session_facts=None,
+            current_topic=turn_frame.topic,
+            session_turn_count=int(session_state.session_turn_count),  # type: ignore[attr-defined]
+            projected_turn_scope=None,
+        )
+    merge_topic = _topic_for_effective_scope_merge(
+        turn_frame=turn_frame,
+        session_state=session_state,
+        commercial_intent=commercial_intent,
+    )
+    return resolve_effective_scope(
+        current_ui_action=None,
+        current_ui_stage_action=None,
+        session_facts=session_state.patient_facts,  # type: ignore[attr-defined]
+        current_topic=merge_topic,
+        session_turn_count=int(session_state.session_turn_count),  # type: ignore[attr-defined]
+        projected_turn_scope=project_sales_fast_scope_from_message(user_message),
+    )
+
+
 def _rebuild_authoritative_context(
     *,
     result: SalesOnePlusResult,
@@ -514,13 +610,34 @@ def _rebuild_authoritative_context(
         session_service_id=bound_identity.session_service_id,
     )
     semantic = _apply_governed_scope_stage_commercial_intent(semantic)
-    effective_scope = effective_scope_from_semantic_frame(
-        semantic,
-        current_ui_action=_current_ui_scope_action(),
-        current_ui_stage_action=_current_ui_stage_action(),
-    )
     scope_action = _current_ui_scope_action()
     stage_action = _current_ui_stage_action()
+
+    def _turn_frame_for(semantic_frame: SalesOnePlusSemanticFrame) -> TurnFrame:
+        if scope_action is not None or stage_action is not None:
+            return build_effective_provisional_turn_frame(
+                resolution=resolution,
+                user_message=user_message,
+                client_id=client_id,
+                bundle=context.bundle,
+                scope_action=scope_action,
+                stage_action=stage_action,
+            )
+        return build_turn_frame_from_semantic_frame(
+            semantic=semantic_frame,
+            user_message=user_message,
+            bundle=context.bundle,
+        )
+
+    turn_frame_for_scope = _turn_frame_for(semantic)
+    effective_scope = _authoritative_effective_scope_for_turn(
+        session_state=session_state,
+        user_message=user_message,
+        turn_frame=turn_frame_for_scope,
+        scope_action=scope_action,
+        stage_action=stage_action,
+        commercial_intent=semantic.commercial_intent,
+    )
     if not (
         _current_ui_service_action() is None
         and (scope_action is not None or stage_action is not None)
@@ -528,29 +645,25 @@ def _rebuild_authoritative_context(
         semantic = apply_clinic_strategy_service_selection(
             semantic,
             bundle=context.bundle,
-            effective_scope=effective_scope,
+            effective_scope=effective_scope,  # type: ignore[arg-type]
             allowed_topics=context.allowed_topics,
             governed_ui_service_id=governed_ui.service_id,
         )
-    if scope_action is not None or stage_action is not None:
-        turn_frame = build_effective_provisional_turn_frame(
-            resolution=resolution,
+    turn_frame = _turn_frame_for(semantic)
+    if turn_frame is not turn_frame_for_scope:
+        effective_scope = _authoritative_effective_scope_for_turn(
+            session_state=session_state,
             user_message=user_message,
-            client_id=client_id,
-            bundle=context.bundle,
+            turn_frame=turn_frame,
             scope_action=scope_action,
             stage_action=stage_action,
+            commercial_intent=semantic.commercial_intent,
         )
-    else:
-        turn_frame = build_turn_frame_from_semantic_frame(
-            semantic=semantic,
-            user_message=user_message,
-            bundle=context.bundle,
-        )
-    effective_scope = effective_scope_from_semantic_frame(
-        semantic,
-        current_ui_action=_current_ui_scope_action(),
-        current_ui_stage_action=_current_ui_stage_action(),
+    turn_frame = _hydrate_turn_frame_topic_from_session_scope(
+        turn_frame,
+        session_state=session_state,
+        effective_scope=effective_scope,
+        commercial_intent=semantic.commercial_intent,
     )
     strategy_context = strategy_match_from_effective_scope(
         effective_scope,  # type: ignore[arg-type]
@@ -1126,6 +1239,7 @@ def _materialize_result(
         if isinstance(precomposer_selected_offer, PrecomposerSelectedOfferResult)
         else None,
         resolved_price_text=resolved_price_text,
+        authoritative_effective_scope=effective_scope,
     )
     widget = materialize_sales_fast_answer_payload(
         bound_package=bound,

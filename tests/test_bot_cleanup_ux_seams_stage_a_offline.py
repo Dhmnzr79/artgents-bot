@@ -14,7 +14,7 @@ import app as app_module
 from contracts.ui_scope_action import build_ui_scope_ref
 from contracts.ui_stage_action import build_ui_stage_ref
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
-from session import bind_session_client, mem_get, mem_reset
+from session import bind_session_client, mem_get, mem_reset, session_client_scope
 from tests.test_sales_one_plus_turn import answer_envelope
 
 _REPO = Path(__file__).resolve().parents[1]
@@ -127,8 +127,9 @@ def _run_ask(
     reset_session: bool = True,
 ) -> dict:
     _install_sales_fast(monkeypatch, backend)
-    if reset_session:
-        mem_reset(sid)
+    with session_client_scope("demo"):
+        if reset_session:
+            mem_reset(sid, client_id="demo")
     client = app_module.app.test_client()
     payload = {"q": user_message, "sid": sid, "client_id": "demo"}
     if ref:
@@ -151,8 +152,9 @@ def _run_stream(
     reset_session: bool = True,
 ) -> dict:
     _install_sales_fast(monkeypatch, backend)
-    if reset_session:
-        mem_reset(sid)
+    with session_client_scope("demo"):
+        if reset_session:
+            mem_reset(sid, client_id="demo")
     client = app_module.app.test_client()
     payload = {"q": user_message, "sid": sid, "client_id": "demo"}
     if ref:
@@ -172,11 +174,12 @@ def _norm_digits(text: str) -> str:
 
 
 def _user_history(sid: str) -> list[str]:
-    return [
-        str(item.get("content") or "")
-        for item in mem_get(sid).get("hist") or []
-        if item.get("role") == "user"
-    ]
+    with session_client_scope("demo"):
+        return [
+            str(item.get("content") or "")
+            for item in mem_get(sid).get("hist") or []
+            if item.get("role") == "user"
+        ]
 
 
 def _scope_ref_from_payload(payload: dict, *, extent_token: str) -> tuple[str, str]:
@@ -213,15 +216,16 @@ def _visible_snapshot(payload: dict) -> dict:
 
 
 def _session_snapshot(sid: str) -> dict:
-    state = mem_get(sid)
-    return {
-        "history_user": _user_history(sid),
-        "patient_facts": state.get("patient_facts") or {},
-        "last_displayed_offer_ids": state.get("last_displayed_offer_ids"),
-        "last_selected_offer_id": state.get("last_selected_offer_id"),
-        "last_service_id": state.get("last_service_id"),
-        "last_primary_aspect": state.get("last_primary_aspect"),
-    }
+    with session_client_scope("demo"):
+        state = mem_get(sid)
+        return {
+            "history_user": _user_history(sid),
+            "patient_facts": state.get("patient_facts") or {},
+            "last_displayed_offer_ids": state.get("last_displayed_offer_ids"),
+            "last_selected_offer_id": state.get("last_selected_offer_id"),
+            "last_service_id": state.get("last_service_id"),
+            "last_primary_aspect": state.get("last_primary_aspect"),
+        }
 
 
 def _parity_snapshot(payload: dict, sid: str) -> dict:
@@ -244,7 +248,7 @@ def _pick_scope_ref(payload: dict, extent_token: str) -> tuple[str, str]:
 def _seed_followups(sid: str, *items: TargetRuntimeFollowupItem) -> None:
     from session import _lock, _persist_unlocked
 
-    with _lock:
+    with _lock, session_client_scope("demo"):
         st = mem_get(sid)
         st["target_runtime_followups"] = [
             {
@@ -491,7 +495,8 @@ def test_unshown_scope_ref_fail_closed(
     isolated_demo_sqlite,
 ) -> None:
     sid = f"stage-a-bad-ref-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    with session_client_scope("demo"):
+        mem_reset(sid, client_id="demo")
     ref = build_ui_scope_ref(topic="implantation", extent="full_arch")
     payload = _run_ask(
         monkeypatch,
@@ -510,7 +515,8 @@ def test_stage_click_records_visible_label_in_history(
     isolated_demo_sqlite,
 ) -> None:
     sid = f"stage-a-stage-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    with session_client_scope("demo"):
+        mem_reset(sid, client_id="demo")
     _seed_followups(
         sid,
         TargetRuntimeFollowupItem(ref=UI_STAGE_REF, label=UI_STAGE_LABEL),
@@ -528,7 +534,8 @@ def test_stage_click_records_visible_label_in_history(
     )
     assert UI_STAGE_LABEL in _user_history(sid)
     assert "продолжить" not in _user_history(sid)
-    facts = mem_get(sid).get("patient_facts") or {}
+    with session_client_scope("demo"):
+        facts = mem_get(sid).get("patient_facts") or {}
     assert facts.get("stage") == "implant_placed"
     assert facts.get("topic") == "prosthetics"
     assert (payload.get("meta") or {}).get("service_route") != "sales_fast_followup_unknown"
@@ -540,7 +547,8 @@ def test_unshown_stage_ref_fail_closed(
     isolated_demo_sqlite,
 ) -> None:
     sid = f"stage-a-bad-stage-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    with session_client_scope("demo"):
+        mem_reset(sid, client_id="demo")
     payload = _run_ask(
         monkeypatch,
         sid=sid,

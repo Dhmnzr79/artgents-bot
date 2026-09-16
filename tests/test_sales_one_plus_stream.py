@@ -239,6 +239,7 @@ def test_result_contract_marks_only_partial_backend_answers_interrupted() -> Non
         service_reference_status="none",
         requested_service_id=None,
         references=OneCallEnvelopeReferences(direct_fact_ids=()),
+        request_understanding={"subjects": [], "requests": [{"request_id": "r1", "kind": "other", "subject_id": None, "context": "general_information"}]},
     )
     with pytest.raises(ValidationError):
         SalesOnePlusResult(

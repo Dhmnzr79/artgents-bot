@@ -104,10 +104,6 @@ def _normalize_production_payload(
         payload["price_text"] = None
         keys.add("price_text")
         codes.append(ENVELOPE_NORMALIZED_MISSING_PRICE_TEXT)
-    if "request_understanding" not in keys:
-        payload = dict(payload)
-        payload["request_understanding"] = None
-        keys.add("request_understanding")
     if "primary_price_request_id" not in keys:
         payload = dict(payload)
         payload["primary_price_request_id"] = None
@@ -395,8 +391,8 @@ def _validate_structure(
         has_understanding = (
             request_understanding is not None and len(request_understanding.requests) >= 1
         )
-        if (patient_text is None or not patient_text.strip()) and not has_understanding:
-            raise OneCallEnvelopeProtocolError("patient_text_required")
+        if not has_understanding:
+            raise OneCallEnvelopeProtocolError("request_understanding_required")
         if clarify_axis is not None:
             raise OneCallEnvelopeProtocolError("clarify_axis_forbidden_for_answer")
         if clarify_service_options is not None:
@@ -409,6 +405,8 @@ def _validate_structure(
         if clarify_service_options is not None:
             raise OneCallEnvelopeProtocolError("clarify_service_options_forbidden_for_admin")
     elif route == "CLARIFY":
+        if request_understanding is None or not request_understanding.requests:
+            raise OneCallEnvelopeProtocolError("request_understanding_required")
         if patient_text is None or not patient_text.strip():
             raise OneCallEnvelopeProtocolError("patient_text_required")
         if clarify_axis is None:
@@ -604,7 +602,7 @@ def production_envelope_template(**overrides: object) -> dict[str, object]:
         "service_reference_status": "none",
         "requested_service_id": None,
         "references": {"direct_fact_ids": []},
-        "request_understanding": None,
+        "request_understanding": {"subjects": [], "requests": [{"request_id": "r1", "kind": "other", "subject_id": None, "context": "general_information", "policy_ids": [], "payment_scheme": "unspecified", "payment_scheme_intent": "unspecified", "contact_fields": [], "content_text": None}]},
         "primary_price_request_id": None,
     }
     base.update(overrides)
@@ -613,10 +611,11 @@ def production_envelope_template(**overrides: object) -> dict[str, object]:
 
 def dumps_production_envelope(**overrides: object) -> str:
     merged = production_envelope_template(**overrides)
-    if merged.get("request_understanding") is None and merged.get("route") == "ANSWER":
+    if "request_understanding" not in overrides and merged.get("route") == "ANSWER":
         from contracts.request_understanding import minimal_content_understanding
 
         probe = str(merged.get("patient_text") or "").strip() or "Probe text."
-        merged["request_understanding"] = minimal_content_understanding(probe).model_dump()
-        merged["patient_text"] = None
+        if len(probe) <= 4000:
+            merged["request_understanding"] = minimal_content_understanding(probe).model_dump()
+            merged["patient_text"] = None
     return json.dumps(merged, ensure_ascii=False, separators=(",", ":"))

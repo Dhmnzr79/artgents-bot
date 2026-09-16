@@ -126,6 +126,7 @@ def test_blocking_valid_answer_and_clarify_routes(route: str, decision: str, rea
         patient_text="Уточните, пожалуйста.",
         clarify_axis="extent" if route == "CLARIFY" else None,
         clarify_service_options=None,
+        request_understanding=production_envelope_template()["request_understanding"],
     )
     result = _run_blocking(payload)
     assert result.decision == decision
@@ -155,9 +156,9 @@ def test_blocking_accepts_all_commercial_intent_values(commercial_intent: str) -
     assert result.envelope.promotion_scope == scope
 
 
-def test_exact_fifteen_key_contract() -> None:
+def test_exact_seventeen_key_contract() -> None:
     assert required_envelope_field_names() == frozenset(production_envelope_template().keys())
-    assert len(production_envelope_template()) == 15
+    assert len(production_envelope_template()) == 17
 
 
 @pytest.mark.parametrize(
@@ -338,7 +339,7 @@ def test_non_service_clarify_forbids_options() -> None:
 
 
 def test_streaming_splits_json_at_every_boundary() -> None:
-    payload = answer_envelope('Текст с "кавычками" и {скобками}.')
+    payload = json.dumps(production_envelope_template(patient_text='Текст с "кавычками" и {скобками}.'), ensure_ascii=False)
     for split_at in range(1, len(payload)):
         emitted: list[str] = []
         parser = SalesOnePlusStreamParser(
@@ -351,7 +352,7 @@ def test_streaming_splits_json_at_every_boundary() -> None:
         parser.ingest(payload[split_at:])
         envelope = parser.finalize()
         assert envelope.patient_text == 'Текст с "кавычками" и {скобками}.'
-        assert emitted == [envelope.patient_text]
+        assert emitted == []
 
 
 def test_invalid_stream_emits_zero_patient_delta() -> None:
@@ -366,11 +367,10 @@ def test_interrupted_stream_emits_zero_patient_delta() -> None:
 
 
 def test_valid_stream_emits_only_patient_text_once() -> None:
-    payload = answer_envelope("Видимый текст")
+    payload = json.dumps(production_envelope_template(patient_text="Видимый текст"), ensure_ascii=False)
     result, emitted = _run_stream((payload,))
     assert result.patient_text == "Видимый текст"
-    assert emitted == ["Видимый текст"]
-    assert '"route"' not in emitted[0]
+    assert emitted == []
 
 
 def test_admin_stream_emits_zero_patient_delta() -> None:
@@ -389,11 +389,11 @@ def test_oversized_blocking_and_streaming_rejected() -> None:
 
 
 def test_blocking_and_streaming_share_one_parser() -> None:
-    payload = answer_envelope("Shared parser")
+    payload = json.dumps(production_envelope_template(patient_text="Shared parser"), ensure_ascii=False)
     blocking = _run_blocking(payload)
     streaming, emitted = _run_stream((payload,))
     assert blocking.patient_text == streaming.patient_text == "Shared parser"
-    assert emitted == ["Shared parser"]
+    assert emitted == []
 
 
 def test_invalid_envelope_does_not_retry() -> None:
@@ -413,8 +413,8 @@ def test_invalid_envelope_does_not_retry() -> None:
     assert backend.calls == 1
 
 
-def test_prompt_contract_version_is_five() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 13
+def test_prompt_contract_version_is_fourteen() -> None:
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 14
     assert "commercial_intent" in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
     assert "@ANSWER" not in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
 
@@ -487,6 +487,7 @@ def test_sales_one_plus_result_rejects_answer_route_mismatch() -> None:
             service_reference_status="none",
             requested_service_id=None,
             references=OneCallEnvelopeReferences(direct_fact_ids=()),
+            request_understanding=production_envelope_template()["request_understanding"],
         )
     with pytest.raises(ValueError, match="sales_one_plus_answer_envelope_required"):
         from contracts.sales_one_plus import SalesOnePlusResult
@@ -516,6 +517,7 @@ def test_sales_one_plus_result_rejects_patient_text_mismatch() -> None:
             service_reference_status="none",
             requested_service_id=None,
             references=OneCallEnvelopeReferences(direct_fact_ids=()),
+            request_understanding=production_envelope_template()["request_understanding"],
         )
     with pytest.raises(ValueError, match="sales_one_plus_answer_patient_text_mismatch"):
         from contracts.sales_one_plus import SalesOnePlusResult
@@ -615,11 +617,11 @@ def test_prompt_policy_separates_code_owned_prices_from_md_commercial_answers() 
     policy = SALES_ONE_PLUS_SYSTEM_POLICY
     assert "Marketing promotions" not in policy
     assert "A price for several teeth" not in policy
-    assert "must not contain exact offer prices or payment-stage amounts" in policy
+    assert "No text field may contain exact offer prices or payment-stage amounts" in policy
     assert "code renders visible offer prices" in policy
     assert "Exact offer prices and payment-stage amounts are code-owned" in policy
     assert (
-        "For direct questions about payment, installment, promotions, warranty, or tax deduction"
+        "For direct informational questions about payment, installment, promotions, warranty, or tax deduction"
         in policy
     )
     assert (

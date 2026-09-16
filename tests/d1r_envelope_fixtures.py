@@ -51,7 +51,7 @@ def envelope_content_only(text: str) -> str:
 
 def envelope_pediatric_policy_plus_contact(hostile: str) -> str:
     return dumps_production_envelope(
-        patient_text=None,
+        patient_text=hostile,
         request_understanding={
             "subjects": [],
             "requests": [

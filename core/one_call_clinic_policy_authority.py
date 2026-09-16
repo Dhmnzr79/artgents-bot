@@ -10,6 +10,7 @@ from core.clinic_policies_loader import (
     ClinicPoliciesBundle,
     load_clinic_policies,
     policy_answer,
+    validate_raw_clinic_business_policies,
 )
 from core.client_config_loader import resolve_pack_client_id
 from core.one_call_response_composition import compose_response_from_understanding
@@ -46,6 +47,10 @@ def _policy_keys_for_pack(bundle: ClinicPoliciesBundle) -> frozenset[str]:
 
 
 def validate_connectable_business_policies(client_id: str) -> None:
+    try:
+        validate_raw_clinic_business_policies(client_id)
+    except ValueError as exc:
+        raise ClinicBusinessPolicyLoadError("clinic_business_policies_unusable") from exc
     bundle = _policy_bundle(client_id)
     if bundle is None:
         return
@@ -159,7 +164,9 @@ def apply_clinic_business_policy_authority(
         primary_price_request_id=primary_price_request_id,
         user_message=user_message,
     )
-    policy_keys = _policy_keys_from_understanding(request_understanding)
+    policy_keys = tuple(dict.fromkeys(
+        decision.policy_key for decision in composed.resolution.decisions if decision.policy_key
+    ))
     enforced = bool(policy_keys) or composed.suppress_forbidden_booking_cta or composed.used_model_patient_text
     if composed.patient_text != model_patient_text.strip():
         enforced = True

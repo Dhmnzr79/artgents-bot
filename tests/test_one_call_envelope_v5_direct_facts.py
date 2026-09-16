@@ -73,7 +73,7 @@ def _parse_envelope_in_request_context(raw: str) -> OneCallEnvelope:
 
 
 def test_exact_fifteen_key_top_level_closure() -> None:
-    assert len(required_envelope_field_names()) == 15
+    assert len(required_envelope_field_names()) == 17
     assert required_envelope_field_names() == frozenset(production_envelope_template().keys())
     assert "references" in required_envelope_field_names()
 
@@ -301,7 +301,7 @@ def test_envelope_size_limit_unchanged() -> None:
 
 
 def test_prompt_contract_version_is_six() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 13
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 14
 
 
 def test_prefix_contains_exact_commercial_catalog_with_full_fields() -> None:
@@ -401,6 +401,7 @@ def test_one_call_envelope_direct_construction_requires_references() -> None:
         service_reference_status="none",
         requested_service_id=None,
         references=OneCallEnvelopeReferences(direct_fact_ids=()),
+        request_understanding={"subjects": [], "requests": [{"request_id": "r1", "kind": "other", "subject_id": None, "context": "general_information"}]},
     )
     assert env.references.direct_fact_ids == ()
 

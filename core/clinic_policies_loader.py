@@ -48,6 +48,36 @@ def _policies_path(client_id: str) -> str:
     return os.path.join(root, "clients", client_id, "clinic_policies.yaml")
 
 
+def validate_raw_clinic_business_policies(client_id: str) -> None:
+    """Validate authored policy rows before the permissive legacy loader filters them."""
+    path = _policies_path(resolve_pack_client_id(client_id))
+    if not os.path.isfile(path):
+        return
+    try:
+        with open(path, "r", encoding="utf-8") as stream:
+            raw = yaml.safe_load(stream)
+    except (OSError, yaml.YAMLError) as exc:
+        raise ValueError("clinic_business_policies_malformed") from exc
+    if not isinstance(raw, dict):
+        raise ValueError("clinic_business_policies_malformed")
+    if "policies" not in raw:
+        return
+    policies = raw["policies"]
+    if not isinstance(policies, dict) or not policies:
+        raise ValueError("clinic_business_policies_malformed")
+    for key, body in policies.items():
+        if not isinstance(key, str) or not key.strip() or not isinstance(body, dict):
+            raise ValueError("clinic_business_policies_malformed")
+        answer = body.get("answer")
+        triggers = body.get("triggers")
+        if not isinstance(answer, str) or not answer.strip():
+            raise ValueError("clinic_business_policies_malformed")
+        if not isinstance(triggers, list) or not triggers or any(
+            not isinstance(trigger, str) or not trigger.strip() for trigger in triggers
+        ):
+            raise ValueError("clinic_business_policies_malformed")
+
+
 def load_clinic_policies(client_id: str) -> ClinicPoliciesBundle | None:
     cid = resolve_pack_client_id(client_id)
     with _LOCK:

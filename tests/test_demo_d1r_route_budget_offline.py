@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from session import mem_get, session_client_scope
+from session import mem_get, session_client_scope, set_pending_lead_offer
 from tests.d1r_envelope_fixtures import (
     envelope_adult_booking_only,
     envelope_clinic_policy_only,
@@ -66,3 +66,17 @@ def test_content_only_single_model_call_no_lead(
     assert backend.call_count == 1
     with session_client_scope("demo"):
         assert mem_get(sid).get("lead_intent") in (None, "", "none")
+
+
+def test_pending_offer_yes_requires_model_booking_decision(monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable_demo_nikadent(monkeypatch)
+    sid = f"d1r-budget-yes-{uuid.uuid4().hex[:8]}"
+    with session_client_scope("demo"):
+        set_pending_lead_offer(sid)
+    _, backend = _post_ask(
+        monkeypatch, sid=sid, user_message="Да",
+        envelope_json=envelope_content_only("Уточните, пожалуйста, вопрос."), client_id="demo",
+    )
+    assert backend.call_count == 1
+    with session_client_scope("demo"):
+        assert mem_get(sid).get("lead_intent") != "collecting_name"

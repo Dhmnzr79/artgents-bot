@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from contracts.authored_service_alternative import AuthoredServiceAlternative
+from contracts.clinic_policy_resolution import ClinicPolicyResolutionResult
 from contracts.service_reference import AvailabilityStatus, PriceCoverageKind
 
 if TYPE_CHECKING:
@@ -77,3 +78,4 @@ class OneCallPresentationResult:
     alternative_price_lines: tuple[str, ...] = ()
     rendered_alternative_service_ids: tuple[str, ...] = ()
     rendered_alternative_refs: tuple[str, ...] = ()
+    composition_resolution: ClinicPolicyResolutionResult | None = None

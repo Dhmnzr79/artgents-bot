@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from contracts.clinic_policy_resolution import ClinicPolicyResolutionResult
+from contracts.clinic_policy_resolution import ClinicPolicyResolutionResult, RequestLedgerEntry
 from contracts.request_understanding import RequestUnderstanding
 from core.clinic_policies_loader import policy_answer
 from core.clinic_policy_resolver import resolve_clinic_policies
@@ -57,10 +57,13 @@ def _contact_segment(
     return text or None
 
 
-def _blocked_pediatric_segment(client_id: str) -> str | None:
-    pack = resolve_pack_client_id(client_id)
-    text = policy_answer(pack, "no_pediatric_dentistry")
-    return text.strip() if text and text.strip() else None
+_UNCONFIRMED_POLICY_TEXT = (
+    "Не могу подтвердить это условие по правилам клиники. "
+    "Пожалуйста, уточните его у администратора."
+)
+_SECONDARY_PRICE_TEXT = "Стоимость остальных услуг уточним отдельно — укажите, какая услуга вас интересует."
+_MISSING_CONTACT_TEXT = "Не могу подтвердить эти контактные данные. Пожалуйста, уточните их у администратора."
+_MISSING_CONTENT_TEXT = "Не могу надёжно ответить на эту часть вопроса. Пожалуйста, уточните её."
 
 
 def compose_response_from_understanding(
@@ -76,50 +79,95 @@ def compose_response_from_understanding(
 
     resolution = resolve_clinic_policies(client_id=client_id, understanding=understanding)
     segments: list[str] = []
+    final_ledger: list[RequestLedgerEntry] = []
     used_model = False
-    blocked_request_ids = {
-        entry.request_id
-        for entry in resolution.ledger
-        if entry.status == "blocked"
+    policy_keys_by_request: dict[str, list[str]] = {}
+    blocked_request_ids = {entry.request_id for entry in resolution.ledger if entry.status == "blocked"}
+    for decision in resolution.decisions:
+        if decision.policy_key and decision.outcome in {"blocked", "allowed_by_known_rules"}:
+            keys = policy_keys_by_request.setdefault(decision.request_id, [])
+            if decision.policy_key not in keys:
+                keys.append(decision.policy_key)
+    unconfirmed_request_ids = {
+        decision.request_id for decision in resolution.decisions
+        if decision.outcome in {"no_applicable_rule", "needs_clarification"}
     }
+    original_ledger = {entry.request_id: entry for entry in resolution.ledger}
+
+    def record(req, status: str, text: str | None = None) -> None:
+        original = original_ledger[req.request_id]
+        final_ledger.append(original.model_copy(update={"status": status, "text": text}))
 
     for req in understanding.requests:
         if req.request_id in blocked_request_ids:
-            block_text = _blocked_pediatric_segment(client_id)
-            if block_text and block_text not in segments:
-                segments.append(block_text)
+            block_parts = _policy_segments(client_id, tuple(policy_keys_by_request.get(req.request_id, ())))
+            for block_text in block_parts:
+                if block_text not in segments:
+                    segments.append(block_text)
+            record(req, "blocked", "\n\n".join(block_parts) or None)
             continue
 
-        if req.kind == "clinic_policy" and req.policy_ids:
-            for part in _policy_segments(client_id, req.policy_ids):
+        if req.request_id in unconfirmed_request_ids and req.kind in {"price", "booking"}:
+            if _UNCONFIRMED_POLICY_TEXT not in segments:
+                segments.append(_UNCONFIRMED_POLICY_TEXT)
+            record(req, "clarification_needed", _UNCONFIRMED_POLICY_TEXT)
+            continue
+
+        if req.kind == "clinic_policy":
+            parts = _policy_segments(client_id, tuple(policy_keys_by_request.get(req.request_id, ())))
+            for part in parts:
                 if part not in segments:
                     segments.append(part)
+            if req.request_id in unconfirmed_request_ids or not parts:
+                if _UNCONFIRMED_POLICY_TEXT not in segments:
+                    segments.append(_UNCONFIRMED_POLICY_TEXT)
+                parts.append(_UNCONFIRMED_POLICY_TEXT)
+            record(req, "answered" if req.request_id not in unconfirmed_request_ids and len(parts) > 0 else "clarification_needed", "\n\n".join(parts))
             continue
 
-        if req.kind == "contact" and req.contact_fields:
+        if req.kind == "contact":
             contact = _contact_segment(
                 client_id=client_id,
                 contact_fields=req.contact_fields,
                 branch_hint=user_message,
-            )
+            ) if req.contact_fields else None
             if contact:
                 segments.append(contact)
+                record(req, "answered", contact)
+            else:
+                segments.append(_MISSING_CONTACT_TEXT)
+                record(req, "clarification_needed", _MISSING_CONTACT_TEXT)
             continue
 
-        if req.kind in {"content", "other"} and req.content_text and req.content_text.strip():
-            segments.append(req.content_text.strip())
+        if req.kind in {"content", "other"}:
+            content = (req.content_text or "").strip()
+            if content:
+                segments.append(content)
+                record(req, "answered", content)
+            else:
+                segments.append(_MISSING_CONTENT_TEXT)
+                record(req, "clarification_needed", _MISSING_CONTENT_TEXT)
             continue
 
-        if req.kind == "price" and primary_price_request_id == req.request_id:
-            # Only the canonical commerce renderer supplies this block.
-            supplement = primary_price_text.strip()
-            if supplement:
-                segments.append(supplement)
+        if req.kind == "price":
+            if primary_price_request_id == req.request_id:
+                # Only the canonical commerce renderer supplies this block.
+                supplement = primary_price_text.strip()
+                if supplement:
+                    segments.append(supplement)
+                record(req, "answered" if supplement else "deferred", supplement or None)
+            else:
+                if _SECONDARY_PRICE_TEXT not in segments:
+                    segments.append(_SECONDARY_PRICE_TEXT)
+                record(req, "clarification_needed", _SECONDARY_PRICE_TEXT)
+            continue
+
+        record(req, original_ledger[req.request_id].status)
 
     patient_text = "\n\n".join(segments).strip()
     return ResponseCompositionResult(
         patient_text=patient_text,
-        resolution=resolution,
+        resolution=resolution.model_copy(update={"ledger": tuple(final_ledger)}),
         suppress_forbidden_booking_cta=resolution.suppress_forbidden_booking_cta,
         used_model_patient_text=used_model,
     )

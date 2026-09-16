@@ -547,16 +547,17 @@ def _maybe_apply_d1r_semantic_booking_lead(
     client_txt: Callable[[str | None], dict[str, str]],
     service_payload: Callable[..., dict],
     data: dict,
+    source_turn: int,
 ) -> AskOrchestrationResult:
     if result.kind != "service_reply" or not isinstance(result.service_payload, dict):
         return result
-    from core.target_runtime_session import read_validated_understanding_snapshot
+    from core.target_runtime_session import authorized_booking_request_id
     from session import mem_get
 
-    snapshot = read_validated_understanding_snapshot(mem_get(sid))
-    if snapshot is None:
-        return result
-    booking_id = str(snapshot.get("active_booking_request_id") or "").strip()
+    booking_id = authorized_booking_request_id(
+        mem_get(sid), client_id=client_id, expected_source_turn=source_turn,
+        require_booking_request=True,
+    )
     if not booking_id:
         return result
     payload = begin_semantic_authorized_booking_lead(
@@ -693,6 +694,12 @@ def orchestrate_sales_one_plus_ask_turn(
     if flow_reply is not None:
         return flow_reply
 
+    from core.target_runtime_session import clear_validated_understanding_snapshot
+
+    source_turn = int(mem_get(sid).get("session_turn_count") or 0)
+    if q:
+        clear_validated_understanding_snapshot(sid)
+
     provider_q = take_lead_provider_question()
     if provider_q:
         q = provider_q
@@ -753,6 +760,8 @@ def orchestrate_sales_one_plus_ask_turn(
         validate_connectable_business_policies,
     )
 
+    clear_validated_understanding_snapshot(sid)
+
     try:
         validate_connectable_business_policies(client_id)
     except ClinicBusinessPolicyLoadError:
@@ -787,4 +796,5 @@ def orchestrate_sales_one_plus_ask_turn(
         client_txt=client_txt,
         service_payload=service_payload,
         data=data,
+        source_turn=source_turn,
     )

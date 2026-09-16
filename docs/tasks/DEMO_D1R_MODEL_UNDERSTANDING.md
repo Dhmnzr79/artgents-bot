@@ -389,3 +389,78 @@ Additional result/stream contract suites: `test_sales_one_plus_turn.py` and
 Independent read-only Checker: **PASS for these two stages only**, independently
 re-ran the new suite **16/16 passed**; no blocking checkpoint findings. No new failures
 in the executed suites. Previously reported caplog failures outside this set were not rerun.
+
+## B completion correction: R4–R6 and partial composition
+
+Correction baseline: `38031522ebc4652038cd7771b0361f82cde84520`;
+main/merge baseline remains `70696ca80d9a1c9f3a15a3472cccb800215a06bf`.
+Same worktree and `codex/demo-d1-clinic-policy` branch.
+
+- R4: structured payment, age, and context facts drive per-request authored policy
+  decisions. Requested OMS/DMS blocks only the affected request; an independent
+  self-pay request remains eligible. Unknown payment conditions require confirmation,
+  without an invented prohibition or a rendered offer. Raw policy YAML is validated
+  before the legacy loader can discard malformed rows.
+- R5: a new semantic turn invalidates prior booking permission. Post-model entry
+  requires the current successful snapshot, tenant, request, and permission. Typed
+  booking uses the current server-emitted action; substantive text accompanying an
+  old action goes through understanding. Pending-offer free-text acceptance also
+  goes through the single model call. Existing active name/phone and privacy paths
+  remain local. UI-only eligibility does not auto-start booking.
+- R6: every production ANSWER/CLARIFY requires nonempty understanding, including raw
+  null/empty/missing-field cases. ADMIN remains a safe terminal. Model instructions
+  expose enums, subject/request identifiers, references, and per-request text rules.
+- One canonical primary price is rendered; additional price requests receive an
+  explicit clarification, without a D2 basket. Partial price clarification preserves
+  policy/contact/content answers. The validated envelope's `patient_text` supplies
+  a full-route CLARIFY question; a code-generated scope defer uses its existing
+  question. The stored ledger records final composition outcomes rather than
+  marking price answered before rendering.
+
+The presentation contract additionally carries `composition_resolution` in
+`contracts/one_call_presentation_result.py`; this allowlist extension is necessary
+to pass final per-request outcomes into session state. Existing v4/v5 test files
+from §7.2 were migrated to the actual v14 field count and constructor requirements.
+The hostile-policy fixture now really supplies hostile model text, and the
+content-plus-policy regression contains both requests.
+
+Output budget remains **1024 completion tokens** in both live backend methods;
+the envelope limit remains **64 KiB**, aggregate content text **4000 code points**.
+These are ceilings, not a promise that 4000 characters fit in the provider budget.
+Streaming buffers the complete JSON before validation. Truncated/malformed JSON
+fails closed with no retry or second provider call; semantic correctness of an
+otherwise valid model output still requires the separately authorized model eval.
+
+Verification is offline with fake backends, isolated temporary tenant databases
+and logs, and real transport blocked: **315 passed** in the 16-file set below.
+The completion report records the reviewed SHA and independent Checker verdict. Full repository CI is
+still required before any owner-authorized merge; this correction performs no
+merge, deploy, live-model validation, or worktree removal.
+
+Baseline comparison of the v4/v5 suites on an exported clean `3803152` snapshot:
+48 passed, four pre-existing failures (old field-count/version expectations and
+the oversized-envelope helper hitting the content-text cap before parser entry).
+The current fixtures exercise the intended v14/parser boundary. Previously noted
+caplog failures outside the executed suites were not rerun.
+
+Exact final suite selection (run with the isolated offline runner, which invokes
+pytest with `-q -p no:cacheprovider --basetemp <fresh-temp> --tb=short`):
+
+```text
+tests/test_request_understanding_schema_offline.py
+tests/test_clinic_policy_resolver_offline.py
+tests/test_demo_d1r_http_offline.py
+tests/test_demo_d1r_composition_offline.py
+tests/test_demo_d1r_route_budget_offline.py
+tests/test_demo_clinic_policy_authority_offline.py
+tests/test_tenant_lead_pending_question_offline.py
+tests/test_clinic_policies_loader.py
+tests/test_demo_implant_volume_scope_offline.py
+tests/test_one_call_stage4_3_contacts_specific.py
+tests/test_one_call_tenant_isolation_offline.py
+tests/test_sales_one_plus_turn.py
+tests/test_sales_one_plus_stream.py
+tests/test_one_call_stage4_2_closed_envelope_production.py
+tests/test_one_call_envelope_v4_service_reference.py
+tests/test_one_call_envelope_v5_direct_facts.py
+```

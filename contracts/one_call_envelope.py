@@ -171,6 +171,8 @@ class OneCallEnvelope(BaseModel):
         if self.route in {"CLARIFY", "ADMIN"} and self.references.direct_fact_ids:
             raise ValueError("direct_fact_ids_forbidden_for_route")
 
+        if self.primary_price_request_id is not None and self.request_understanding is None:
+            raise ValueError("primary_price_request_id_invalid")
         if self.request_understanding is not None:
             if total_content_text_codepoints(self.request_understanding) > 4000:
                 raise ValueError("content_text_too_long")
@@ -192,9 +194,8 @@ class OneCallEnvelope(BaseModel):
                 self.request_understanding is not None
                 and len(self.request_understanding.requests) >= 1
             )
-            has_patient_text = bool(self.patient_text and self.patient_text.strip())
-            if not has_patient_text and not has_understanding:
-                raise ValueError("patient_text_required")
+            if not has_understanding:
+                raise ValueError("request_understanding_required")
             if self.clarify_axis is not None:
                 raise ValueError("clarify_axis_forbidden_for_answer")
             if self.clarify_service_options is not None:
@@ -209,6 +210,8 @@ class OneCallEnvelope(BaseModel):
             if self.promotion_scope != "none":
                 raise ValueError("promotion_scope_forbidden")
         elif self.route == "CLARIFY":
+            if self.request_understanding is None or not self.request_understanding.requests:
+                raise ValueError("request_understanding_required")
             if not self.patient_text or not self.patient_text.strip():
                 raise ValueError("patient_text_required")
             if self.clarify_axis is None:

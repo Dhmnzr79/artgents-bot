@@ -998,6 +998,7 @@ def build_one_call_presentation_result(
     # Keep structured requests out of the legacy price-prose pipeline. Their
     # policy/contact/content blocks are assembled once, after canonical pricing.
     understanding = semantic.request_understanding
+    composition_resolution = None
     ledger_price_turn = bool(
         understanding is not None
         and semantic.primary_price_request_id is not None
@@ -1014,12 +1015,13 @@ def build_one_call_presentation_result(
             user_message=user_message,
         )
         primary_blocked = any(
-            entry.request_id == semantic.primary_price_request_id and entry.status == "blocked"
+            entry.request_id == semantic.primary_price_request_id
+            and entry.status in {"blocked", "clarification_needed", "unsupported"}
             for entry in composed.resolution.ledger
         )
         if primary_blocked:
-            # Stop before commerce/marketing/UI materialization, but retain all
-            # other visible requests and the verified snapshot for this turn.
+            # Denied or unconfirmed payment conditions must stop commerce before
+            # rendering. Retain the other requests and this turn's snapshot.
             verified = _build_verified(
                 bound_package=bound_package, context=context, turn_frame=turn_frame,
                 patient_text=composed.patient_text, user_message=user_message,
@@ -1036,6 +1038,7 @@ def build_one_call_presentation_result(
                     (), (), (), (), None, (), (), PresentationCadenceDelta(),
                 ),
                 verified_for_session=verified,
+                composition_resolution=composed.resolution,
             )
         patient_text = ""
 
@@ -1667,13 +1670,23 @@ def build_one_call_presentation_result(
             )
 
     if ledger_price_turn:
-        final_patient_text = compose_response_from_understanding(
+        final_composition = compose_response_from_understanding(
             client_id=context.client_id,
             understanding=understanding,
             primary_price_request_id=semantic.primary_price_request_id,
             primary_price_text=final_patient_text,
             user_message=user_message,
-        ).patient_text
+        )
+        final_patient_text = final_composition.patient_text
+        composition_resolution = final_composition.resolution
+    elif understanding is not None:
+        from core.one_call_response_composition import compose_response_from_understanding
+
+        composition_resolution = compose_response_from_understanding(
+            client_id=context.client_id, understanding=understanding,
+            primary_price_request_id=semantic.primary_price_request_id,
+            user_message=user_message,
+        ).resolution
 
     verified = _build_verified(
         bound_package=presentation_bound,
@@ -1817,6 +1830,7 @@ def build_one_call_presentation_result(
         reason_code=None,
         final_patient_text=final_patient_text,
         authoritative_commerce=commerce_result,
+        composition_resolution=composition_resolution,
         rendered_marketing_fact_ids=rendered_fact_ids,
         rendered_promo_fact_ids=rendered_promo_ids,
         rendered_amplifier_refs=rendered_amplifier_refs,

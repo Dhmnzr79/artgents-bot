@@ -662,6 +662,7 @@ def build_validated_understanding_snapshot(
     source_turn: int,
     understanding: object,
     resolution: object,
+    ui_booking_action: bool = False,
 ) -> dict[str, object]:
     from contracts.clinic_policy_resolution import ClinicPolicyResolutionResult
     from contracts.request_understanding import RequestUnderstanding
@@ -695,12 +696,42 @@ def build_validated_understanding_snapshot(
         }
         for d in resolution.decisions
     )
+    ledger = tuple(
+        {
+            "request_id": entry.request_id,
+            "kind": entry.kind,
+            "status": entry.status,
+            "subject_id": entry.subject_id,
+        }
+        for entry in resolution.ledger
+    )
     permissions: list[tuple[int, str, str]] = []
     for entry in resolution.ledger:
         if entry.status == "blocked":
             permissions.append((source_turn, entry.request_id, "deny"))
         elif entry.status == "answered":
             permissions.append((source_turn, entry.request_id, "allow"))
+    # Booking is deferred to the lead flow, so an allowed booking request does
+    # not appear as an answered ledger entry.
+    booking_id = resolution.active_booking_request_id
+    if booking_id and any(r["request_id"] == booking_id and r["kind"] == "booking" for r in requests):
+        if not any(row[1] == booking_id and row[2] == "deny" for row in permissions):
+            permissions.append((source_turn, booking_id, "allow"))
+    ui_request_id = None
+    if ui_booking_action:
+        blocked_ids = {row[1] for row in permissions if row[2] == "deny"}
+        eligible_ids = {
+            entry.request_id for entry in resolution.ledger
+            if entry.status == "answered" or (entry.kind == "booking" and entry.request_id == booking_id)
+        }
+        ui_request_id = next(
+            (r["request_id"] for r in requests if r["request_id"] in eligible_ids and r["request_id"] not in blocked_ids
+             and r["kind"] in {"price", "content", "booking"}
+             and not any(s["subject_id"] == r["subject_id"] and s["age_group"] == "child" for s in subjects)),
+            None,
+        )
+        if ui_request_id and not any(row[1] == ui_request_id and row[2] == "allow" for row in permissions):
+            permissions.append((source_turn, ui_request_id, "allow"))
     return {
         "schema_version": 1,
         "source_turn": source_turn,
@@ -708,7 +739,9 @@ def build_validated_understanding_snapshot(
         "subjects": list(subjects),
         "requests": list(requests),
         "decisions": list(decisions),
-        "active_booking_request_id": resolution.active_booking_request_id,
+        "ledger": list(ledger),
+        "active_booking_request_id": booking_id,
+        "ui_booking_request_id": ui_request_id,
         "permissions": [list(row) for row in permissions],
     }
 
@@ -725,3 +758,39 @@ def write_validated_understanding_snapshot(sid: str, snapshot: dict[str, object]
 def read_validated_understanding_snapshot(st: dict[str, Any]) -> dict[str, object] | None:
     raw = st.get(_VALIDATED_UNDERSTANDING_KEY)
     return raw if isinstance(raw, dict) else None
+
+
+def clear_validated_understanding_snapshot(sid: str) -> None:
+    from session import _lock, _persist_unlocked, mem_get
+
+    with _lock:
+        st = mem_get(sid)
+        st.pop(_VALIDATED_UNDERSTANDING_KEY, None)
+        _persist_unlocked(sid, st)
+
+
+def authorized_booking_request_id(
+    st: dict[str, Any], *, client_id: str, expected_source_turn: int | None = None,
+    require_booking_request: bool = False,
+) -> str | None:
+    snapshot = read_validated_understanding_snapshot(st)
+    if snapshot is None or snapshot.get("schema_version") != 1 or snapshot.get("client_id") != client_id:
+        return None
+    source_turn = snapshot.get("source_turn")
+    current_turn = int(st.get("session_turn_count") or 0)
+    if type(source_turn) is not int or source_turn != (current_turn - 1 if expected_source_turn is None else expected_source_turn):
+        return None
+    request_id = snapshot.get("active_booking_request_id") if require_booking_request else (
+        snapshot.get("ui_booking_request_id") or snapshot.get("active_booking_request_id")
+    )
+    if not isinstance(request_id, str) or not request_id:
+        return None
+    is_booking_request = any(
+        isinstance(row, dict) and row.get("request_id") == request_id and row.get("kind") == "booking"
+        for row in snapshot.get("requests", [])
+    )
+    if not is_booking_request and (require_booking_request or snapshot.get("ui_booking_request_id") != request_id):
+        return None
+    if [source_turn, request_id, "allow"] not in snapshot.get("permissions", []):
+        return None
+    return request_id

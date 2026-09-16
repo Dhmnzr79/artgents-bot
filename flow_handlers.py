@@ -60,6 +60,38 @@ LEAD_BOOKING_REF = "lead:booking"
 LEAD_BOOKING_CTA_KEY = "booking"
 
 
+def _booking_action_allowed(st: dict, client_id: str | None) -> bool:
+    from core.target_runtime_session import authorized_booking_request_id
+
+    return bool(client_id and authorized_booking_request_id(st, client_id=client_id))
+
+
+def _booking_action_label_only(st: dict, data: dict, q: str) -> bool:
+    if not q.strip():
+        return True
+    ref = str(data.get("ref") or "").strip()
+    labels = [
+        str(button.get("label") or "").strip()
+        for button in st.get("last_presented_buttons") or []
+        if isinstance(button, dict) and button.get("ref") == ref
+    ] if ref else []
+    if data.get("cta_action") == "lead":
+        cta = (st.get("last_content_ui_payload") or {}).get("cta")
+        if isinstance(cta, dict):
+            labels.extend(str(cta.get(key) or "").strip() for key in ("label", "text", "title"))
+    return q.strip().casefold() in {label.casefold() for label in labels if label}
+
+
+def _booking_action_rejected(sid: str, client_id: str | None, service_payload) -> dict:
+    return {
+        "payload": service_payload(
+            "Уточните, пожалуйста, кого хотите записать и на какую услугу.", sid, client_id,
+        ),
+        "doc_id": None,
+        "service_route": "booking_context_required",
+    }
+
+
 def _lead_entry_name_prompt(
     client_id: str | None,
     txt: dict,
@@ -1122,6 +1154,8 @@ def handle_flows(
     defer_free_text_booking_entry: bool = False,
 ) -> dict | None:
     """Return {'payload': dict, 'doc_id': str|None} when flow handled."""
+    if (data.get("ref") == LEAD_BOOKING_REF or data.get("cta_action") == "lead") and not _booking_action_label_only(st, data, q):
+        data = {key: value for key, value in data.items() if key not in {"ref", "cta_action"}}
     if data.get("situation_action") == "back":
         set_situation_pending(sid, False)
         snap = get_last_content_ui_payload(sid)
@@ -1160,6 +1194,8 @@ def handle_flows(
         }
 
     if (data.get("ref") or "").strip() == LEAD_BOOKING_REF:
+        if not _booking_action_allowed(st, client_id):
+            return _booking_action_rejected(sid, client_id, service_payload)
         return _begin_lead_collecting_name(
             q=q,
             sid=sid,
@@ -1200,6 +1236,10 @@ def handle_flows(
     if pending_lead and q:
         if parse_lead_offer_yes(q):
             clear_pending_lead_offer(sid)
+            if defer_free_text_booking_entry:
+                return None
+            if not _booking_action_allowed(st, client_id):
+                return _booking_action_rejected(sid, client_id, service_payload)
             result = _begin_lead_collecting_name(
                 q=q,
                 sid=sid,
@@ -1300,6 +1340,8 @@ def handle_flows(
         }
 
     if data.get("cta_action") == "lead":
+        if not _booking_action_allowed(st, client_id):
+            return _booking_action_rejected(sid, client_id, service_payload)
         return _begin_lead_collecting_name(
             q=q,
             sid=sid,

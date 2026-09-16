@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import config
+import pytest
 
+from core import clinic_policies_loader as loader
 from core.clinic_policies_loader import (
     clinic_business_policy_keys,
     find_service_alternative,
@@ -42,3 +44,23 @@ def test_demo_business_policy_keys_include_oms_dms_pediatric() -> None:
     assert "no_pediatric_dentistry" in keys
     assert "no_oms" in keys
     assert "no_dms" in keys
+
+
+@pytest.mark.parametrize("body", [
+    "policies: []\n",
+    "policies: {}\n",
+    "policies:\n  no_oms: null\n",
+    "policies:\n  no_oms:\n    triggers: [омс]\n    answer: ''\n",
+    "policies:\n  no_oms:\n    triggers: []\n    answer: Нет ОМС\n",
+    "policies:\n  no_oms:\n    triggers: [омс]\n    answer: Нет ОМС\n  no_dms: null\n",
+    "policies:\n  no_oms:\n    triggers: [12]\n    answer: Нет ОМС\n",
+    "policies: [unterminated\n",
+])
+def test_d1r_boundary_rejects_raw_malformed_policy_rows(tmp_path, monkeypatch, body) -> None:
+    path = tmp_path / "clinic_policies.yaml"
+    path.write_text(body, encoding="utf-8")
+    monkeypatch.setattr(loader, "_policies_path", lambda _cid: str(path))
+    loader._CACHE.pop("demo", None)
+    with pytest.raises(ValueError):
+        loader.validate_raw_clinic_business_policies("demo")
+    loader._CACHE.pop("demo", None)

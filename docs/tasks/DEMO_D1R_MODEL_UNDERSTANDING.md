@@ -1,21 +1,20 @@
 # D1R — model understanding + code-owned clinic rules (integration design)
 
-Checkpoint **A** (design only). Baseline `70696ca80d9a1c9f3a15a3472cccb800215a06bf`. Branch `codex/demo-d1-clinic-policy`. Prior implementation checkpoint `aaf9eaa` is **rejected** as product approach (regex/heuristic policy authority); it remains in Git as evidence until checkpoint B replaces it.
+Checkpoint **A1** (design correction). Prior checkpoint **A:** `5a28fb0`. Baseline `70696ca80d9a1c9f3a15a3472cccb800215a06bf`. Branch `codex/demo-d1-clinic-policy`. Implementation `aaf9eaa` (regex D1) remains as evidence until checkpoint **B** replaces it.
 
-Architect decision (fixed): one existing model call; structured `request_understanding` in the envelope; code applies authored clinic policies and owns price/contact/policy blocks. No second LLM, no regex/substring business classifier, no contradiction filtering of model prose for policy facts.
+Architect decision (fixed): one model call; `request_understanding` in envelope; code applies clinic policies and owns policy/price/contact/booking blocks. No second LLM, no regex/substring classifiers for services, patient, clinic rules, or mixed business requests.
 
 ---
 
 ## 1. Typed contract: `request_understanding`
 
-Single new top-level envelope field (checkpoint B). Provenance: model JSON only → validated → copied into `SalesOnePlusSemanticFrame` by `bind_semantic_frame`. Never re-parsed from `patient_text` or user message in code.
+Single new top-level envelope field (checkpoint B). Provenance: model JSON → validated → copied into `SalesOnePlusSemanticFrame` by `bind_semantic_frame` (and any `from_envelope_only` / result adapters updated in B). Never re-parsed from `patient_text` or raw user message.
 
 ### 1.1 Pydantic types (final for B)
 
-New module `contracts/request_understanding.py` (recommended) imported by envelope and semantic frame.
+New module `contracts/request_understanding.py` (recommended).
 
 ```python
-# Literal unions — program contract, not user phrase tables
 SubjectRelation = Literal["self", "other", "unknown"]
 AgeGroup = Literal["adult", "child", "unknown"]
 RequestKind = Literal["clinic_policy", "booking", "price", "contact", "content", "other"]
@@ -24,57 +23,60 @@ PaymentScheme = Literal["oms", "dms", "self_pay", "unspecified"]
 PaymentSchemeIntent = Literal[
     "eligibility_question", "requested_payment", "not_requested", "unspecified"
 ]
-# contact_fields: reuse existing contact aspect ids, e.g.
-# "contact_phone" | "contact_whatsapp" | "contact_address" | "contact_hours"
-# | "contact_parking" | "contacts"  (same set as turn contact contract)
 ```
 
-**`RequestUnderstandingSubject`** (frozen, extra=forbid)
+**`RequestUnderstandingSubject`**
 
 | Field | Type | Invariants |
 |---|---|---|
 | `subject_id` | `str` | Non-blank, unique within turn; pattern `s[1-9][0-9]*` |
-| `relation` | `SubjectRelation` | Who the subject is relative to speaker |
-| `age_group` | `AgeGroup` | No numeric age; `unknown` ≠ denial |
+| `relation` | `SubjectRelation` | `unknown` allowed; no forced `self` |
+| `age_group` | `AgeGroup` | No numeric age; `unknown` ≠ denial; past_history alone must not imply `child` |
 
-**`RequestUnderstandingRequest`** (frozen, extra=forbid)
+**`RequestUnderstandingRequest`**
 
 | Field | Type | When required / notes |
 |---|---|---|
-| `request_id` | `str` | Unique; pattern `r[1-9][0-9]*`; stable order in list |
-| `kind` | `RequestKind` | Drives resolver routing |
-| `subject_id` | `str \| None` | Required for `booking`, `price`; optional for policy/contact |
-| `context` | `RequestContext` | `past_history` must not set subject `age_group=child` alone |
-| `policy_ids` | `tuple[str, ...]` | Only for `clinic_policy`; IDs must exist in pack or be empty (code may still apply rules from patient facts) |
-| `payment_scheme` | `PaymentScheme` | For payment-related requests; default `unspecified` |
-| `payment_scheme_intent` | `PaymentSchemeIntent` | OMS mention alone → not `requested_payment` |
-| `contact_fields` | `tuple[str, ...]` | Only for `contact`; subset of allowed contact aspects |
-| `content_text` | `str \| None` | Only for `content` / `other`; max length TBD same as patient_text budget |
-| `primary_service_id` | `str \| None` | For `price` only; links to existing `service_id` authority (one primary service per price request; no multi-basket in D1R) |
+| `request_id` | `str` | Unique within turn; pattern `r[1-9][0-9]*`; order preserved |
+| `kind` | `RequestKind` | Resolver routing |
+| `subject_id` | `str \| None` | **Optional** for `clinic_policy`, `contact`, `content`, general `price` (no named patient). Required only when a request explicitly names a patient subject. For `booking`, `null` = patient identity not yet determined (valid JSON, not schema error) |
+| `context` | `RequestContext` | See age_group rules above |
+| `policy_ids` | `tuple[str, ...]` | `clinic_policy` only; may be empty — code may still apply rules from subject facts |
+| `payment_scheme` / `payment_scheme_intent` | | OMS mention alone ≠ `requested_payment` |
+| `contact_fields` | `tuple[str, ...]` | `contact` only; existing aspect ids |
+| `content_text` | `str \| None` | `content` / `other` only; see §3.2 size limits |
 
-**`RequestUnderstanding`** (frozen, extra=forbid)
+**No `primary_service_id` on requests** — service identity stays in existing envelope authority (`service_id`, `requested_service_id`, precomposer).
+
+**`RequestUnderstanding`**
 
 | Field | Type | Invariants |
 |---|---|---|
-| `subjects` | `tuple[RequestUnderstandingSubject, ...]` | ≥1; at least one `relation=self` or explicit `other` child/adult |
-| `requests` | `tuple[RequestUnderstandingRequest, ...]` | ≥1; ordered; every `subject_id` ref resolves |
+| `subjects` | `tuple[..., ...]` | **May be empty** when no patient is implied («Ваш адрес?», «Работаете по ОМС?», general FAQ) |
+| `requests` | `tuple[..., ...]` | ≥1 for ANSWER/CLARIFY with substantive understanding; every non-null `subject_id` must resolve |
 
-**Envelope / frame**
+**Envelope-level link (not a second service definition)**
 
-- `OneCallEnvelope.request_understanding: RequestUnderstanding` — required on all production routes after contract v14.
-- `SalesOnePlusSemanticFrame.request_understanding: RequestUnderstanding` — copied in `bind_semantic_frame` (provenance `"envelope"`).
-- **Primary commerce service** for the turn remains existing `service_id` / `requested_service_id` / precomposer path; price requests must set `primary_service_id` on the price request row and align with envelope `service_id` when a single price is rendered (validator: at most one active price request with resolvable service, or route=CLARIFY).
+| Field | Type | Invariants |
+|---|---|---|
+| `primary_price_request_id` | `str \| None` | Points to one `kind=price` request id that drives **existing** primary price/commerce authority for this turn. Null when no price block is rendered via that path. Does not duplicate `service_id` semantics |
 
-No confidence field. `unknown` is explicit and distinct from negation.
+**`OneCallEnvelope.request_understanding`** — required on production ANSWER/CLARIFY after v14 (see §3 for ADMIN/invalid).
 
-### 1.2 Example envelope JSON (mixed OMS + adult CT price)
+**`SalesOnePlusSemanticFrame.request_understanding`** — copy from envelope in `bind_semantic_frame`; update `from_envelope_only` and any frame constructors used in tests/runtime.
+
+No confidence field.
+
+### 1.2 Example envelope JSON (mixed OMS + adult tomography price)
 
 User: «По ОМС работаете? Если нет, сколько стоит КТ взрослому?»
+
+Demo catalog service id: **`tomography`** (not `ct`).
 
 ```json
 {
   "route": "ANSWER",
-  "service_id": "ct",
+  "service_id": "tomography",
   "extent": null,
   "jaw": null,
   "stage": null,
@@ -86,24 +88,24 @@ User: «По ОМС работаете? Если нет, сколько стои
   "patient_text": null,
   "price_text": null,
   "service_reference_status": "resolved",
-  "requested_service_id": "ct",
+  "requested_service_id": "tomography",
   "references": { "direct_fact_ids": [] },
+  "primary_price_request_id": "r2",
   "request_understanding": {
     "subjects": [
-      { "subject_id": "s1", "relation": "self", "age_group": "adult" }
+      { "subject_id": "s1", "relation": "unknown", "age_group": "adult" }
     ],
     "requests": [
       {
         "request_id": "r1",
         "kind": "clinic_policy",
-        "subject_id": "s1",
+        "subject_id": null,
         "context": "general_information",
         "policy_ids": ["no_oms"],
         "payment_scheme": "oms",
         "payment_scheme_intent": "eligibility_question",
         "contact_fields": [],
-        "content_text": null,
-        "primary_service_id": null
+        "content_text": null
       },
       {
         "request_id": "r2",
@@ -114,203 +116,238 @@ User: «По ОМС работаете? Если нет, сколько стои
         "payment_scheme": "unspecified",
         "payment_scheme_intent": "not_requested",
         "contact_fields": [],
-        "content_text": null,
-        "primary_service_id": "ct"
+        "content_text": null
       }
     ]
   }
 }
 ```
 
-Code produces policy block for `r1` and code-owned price surface for `r2`; `patient_text` is not a fallback source for either block.
+**Patient-free policy/contact examples (sketch):**
+
+- «Работаете по ОМС?» — `subjects: []`, one `clinic_policy` request, `subject_id: null`.
+- «Ваш адрес?» — `subjects: []`, one `contact` request with `contact_fields: ["contact_address"]`.
+
+### 1.3 Multi-price behavior (D1R, not D2 basket)
+
+- If runtime already supports only **one** primary price surface per turn, set `primary_price_request_id` to the best-supported price request; other price requests → ledger `unsupported` or `clarification_needed` **per request**, not global `route=CLARIFY` that drops policy/contact answers.
+- Do **not** assign one `service_id` to answer unrelated price requests.
+- Do **not** implement multi-service price basket in D1R; D2 remains owner of full service/scope alignment.
 
 ---
 
-## 2. End-to-end call flow (free-text `/ask` and `/ask/stream`)
+## 2. End-to-end call flow
 
 ```mermaid
 flowchart TD
-  HTTP[HTTP /ask or /ask/stream] --> PRE[Pre-model: tenant bind, rate limit, privacy, typed UI ref, lead field capture]
-  PRE -->|substantive free text| ONE[Single one-call backend]
-  PRE -->|unambiguous typed contact ref only| DET0[Optional 0-call typed contact terminal]
-  ONE --> VAL[Envelope + request_understanding validation]
+  HTTP[HTTP /ask or /ask/stream] --> PRE[Pre-model: tenant, rate limit, lead slots, pending choices]
+  PRE -->|active name/phone slot| LEADLOCAL[Existing local lead path — no provider]
+  PRE -->|pending choice ref| CHOICE[_handle_pending_choice_ref → prepare_lead_pending_provider_question]
+  PRE -->|substantive free text, no slot capture| ONE[Single one-call backend]
+  PRE -->|typed contact ref only| DET0[0-call contact terminal]
+  ONE --> VAL[v14 envelope + request_understanding]
   VAL --> BIND[bind_semantic_frame]
-  BIND --> POL[pure clinic_policy_resolver]
+  BIND --> POL[clinic_policy_resolver]
   POL --> COMP[response_composition_pass]
-  COMP --> MAT[JSON/SSE materialization + session delta]
+  COMP --> MAT[JSON/SSE + validated_understanding snapshot]
 ```
 
-**Before model (unchanged scope + D1R removals in B)**
+**Remove in B:** free-text `_try_deterministic_clinic_policy_terminal` and regex business authority in `core/one_call_clinic_policy_authority.py` (replace file body with pure resolver adapter — see §7).
 
-- Keep: session/client binding, rate limits, reset, privacy redaction, governed typed UI (scope/stage/service refs).
-- **Remove in B:** `_try_deterministic_clinic_policy_terminal` and regex applicability in `one_call_clinic_policy_authority` on free-text path.
-- **Lead:** if lead flow expects name/phone step, accept field via existing `handle_flows` / `lead_flow` without provider call (technical format checks only). If user sends a **new substantive question** while lead is open, do not classify via provider; either pause lead and run one-call, or complete lead step only when message matches expected field slot (documented in §5).
-- **Contacts:** deterministic `_try_deterministic_contacts_terminal` **only** for unambiguous typed UI / explicit contact ref clicks — not for free-text address questions (those go through one-call).
+**New booking intent (free text):** one-call → policy resolver → if allowed, enter lead via existing flow; typed booking actions reuse session snapshot + UI freshness guards.
 
-**After model**
-
-1. Parse + validate closed envelope including `request_understanding`.
-2. `bind_semantic_frame` → semantic frame (+ understanding copy).
-3. **`clinic_policy_resolver`** (new, pure): inputs = validated understanding + validated authored policies for tenant; outputs = per-`request_id` decision: `allowed_by_known_rules | blocked | needs_clarification | no_applicable_rule`.
-4. **`build_one_call_presentation_result`** (extended): composition ledger per request; code-owned blocks for policy, price, contact; content slots from corpus via existing commerce/content paths tied to `request_id`; forbidden booking suppresses **all** CTA/quick-reply/lead transitions for blocked booking requests only.
-5. Session write: store minimal **`VerifiedTurnUnderstanding`** snapshot (see §4) for follow-up turns — not full F1 memory.
-
-**One-call budget**
-
-- Free-text mixed policy/contact/price: **1** provider call (same as today).
-- Typed UI contact click: **0** calls (unchanged).
-- Lead name/phone step: **0** calls (unchanged).
-- Invalid envelope: fail closed — no permission implied.
-
-### 2.1 Mandatory interpretation scenarios (model output targets)
-
-| User input (paraphrase) | Neutral `request_understanding` |
-|---|---|
-| Я взрослый, но хочу записать ребёнка | `other` subject `age_group=child`; `booking` for child; speaker adult does not cancel patient age |
-| В детстве лечили зуб, теперь нужна коронка | `past_history` context; current child age not asserted |
-| По ОМС работаете? Если нет, сколько стоит КТ взрослому? | `clinic_policy` OMS eligibility + `price` for adult + `primary_service_id=ct` |
-| ОМС мне не нужен, сколько стоит КТ? | `payment_scheme_intent=not_requested` for OMS; price only |
-| Принимаете детей и где находитесь? | `clinic_policy` pediatric + `contact` address |
-| Сколько стоит лечение ребёнка? | `price` with child subject; code blocks offer, does not treat as bookable care |
+**Contacts:** free-text address → one-call; typed UI contact → existing 0-call terminal only.
 
 ---
 
-## 3. Policy resolver and block ownership
+### 2.1 Mandatory interpretation scenarios
 
-**Input validation (D1R boundary on policies YAML)**
-
-- At resolver entry: validate raw business policies; malformed authored rule → controlled error or safe answer without unconfirmed promise (distinct from missing optional policy).
-
-**Resolver rules (pure, no regex on user text)**
-
-- Map authored policy keys to structured checks (e.g. `no_pediatric_dentistry` + subject `age_group=child` + `booking|price` with child subject → `blocked` with authored text).
-- Model may omit `policy_ids`; code still blocks child booking/price when subject facts require it.
-- Absence of block does **not** prove service exists or OMS accepted — price/contact paths use catalog and payment data separately.
-- Tenant without policy key: `no_applicable_rule` for that id; never inject Demo policies.
-
-**Composition ledger** (per `request_id`)
-
-| Status | Meaning |
+| User input (paraphrase) | Neutral understanding |
 |---|---|
-| `answered` | Code block rendered |
-| `blocked_with_explanation` | Authored or safe text |
-| `clarification_needed` | Explicit ask (subject ambiguity) |
-| `unsupported` | Honest limit (e.g. multi-service price basket) |
-
-**Ownership**
-
-| Block | Owner |
-|---|---|
-| Clinic policy answers | Resolver + authored YAML |
-| Price / payment stages | Existing authoritative commerce |
-| Contact lines | `target_contact_authority` |
-| Content / FAQ prose | Model+corpus for `content` requests only |
-| Booking CTA / lead | Gated by resolver booking decisions |
-
-Policy blocks survive price replacement and appear identically in JSON, SSE final UI, and session history. No regex scan of model `patient_text` for “contradictions”.
+| Я взрослый, но хочу записать ребёнка | subject `s1` child/other; `booking` → `s1`; speaker adult does not cancel child patient |
+| В детстве лечили зуб, теперь нужна коронка | `past_history`; no current child age |
+| По ОМС работаете? Если нет, сколько стоит КТ взрослому? | policy OMS + price `r2` + `primary_price_request_id=r2`, `service_id=tomography` |
+| ОМС мне не нужен, сколько стоит КТ? | OMS `not_requested`; price only |
+| Принимаете детей и где находитесь? | pediatric policy + contact address |
+| Сколько стоит лечение ребёнка? | price + child subject; resolver blocks as offer/booking, not hidden CLARIFY |
+| Ваш адрес? / Работаете по ОМС? | `subjects: []`; contact or policy request with `subject_id: null` |
+| Что такое имплантация? | `content` request; prose in `content_text` for that request only |
 
 ---
 
-## 4. Session: minimal verified understanding (D1R only)
+## 3. v14 route, text, and validation (production path)
 
-Store in target runtime session (checkpoint B — likely extend `TargetRuntimeSessionState`):
+Changes required in **`contracts/one_call_envelope.py`**, **`core/one_call_envelope_protocol.py`**, **`core/one_call_prompt_contract.py`**, and **`tests/test_sales_one_plus_turn.answer_envelope`** / **`dumps_production_envelope`** helpers — not example-only.
 
-- `last_verified_subjects: tuple[SubjectSnapshot, ...]` — relation + age_group only, no PII.
-- `last_policy_decisions: tuple[PolicyDecisionSnapshot, ...]` — `request_id`, policy key, decision, turn_number.
-- **Invalidation:** new turn with conflicting subject facts replaces prior subject snapshot; adult self price request clears stale pediatric booking block for follow-up «запишите меня, взрослого».
-- **Not in D1R:** full topic memory, response_plan_* migration (F1/F2).
-
-Typed UI actions carry their own governed refs; lead transitions consult resolver output for the active booking `request_id`, not global turn regex.
-
----
-
-## 5. Lead flow and privacy
-
-- **Expected field capture** (name, phone): existing lead state machine + technical validators; message not sent to provider for classification.
-- **New intent while lead open:** if `provider_message_has_substance` and not matching current lead step expectation → route through one-call (may cancel/pause lead per existing refs); **never** treat «записать ребёнка» as lead name step.
-- **Privacy:** no regression; pre-model redaction unchanged; understanding must not contain names, phone, email in subjects/requests.
-
-If `flow_handlers` cannot distinguish field fill vs new intent without new regex dictionary, checkpoint B documents adapter change in `orchestration/sales_one_plus_ask_turn.py` + `flow_handlers.py` using lead step enum only (allowlisted in B).
-
----
-
-## 6. Contract migration and fixtures
-
-| Item | Action |
+| Route | v14 rules |
 |---|---|
-| `ONE_CALL_PROMPT_CONTRACT_VERSION` | **13 → 14** |
-| Prompt instructions | Describe `request_understanding` semantics (neutral facts, no verdicts) |
-| `ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS` | Closed field spec + §2.1 scenario targets |
-| Fake backend tests | Fixtures supply **correct** `request_understanding`; separate cases with hostile `patient_text` only to prove code-owned blocks |
-| Hostile understanding errors | Deferred to D5 model-eval matrix (synthetic paraphrase list prepared in B, not live) |
+| **ANSWER** | `patient_text` **nullable** when materialization uses request ledger. Code-owned policy/price/contact/booking blocks ignore hostile legacy `patient_text` in fixtures. Content prose only in per-request `content_text`; **do not** duplicate into global `patient_text`. Content-only turns still produce visible answer from content ledger + existing content path. |
+| **CLARIFY** | May carry partial `request_understanding`; ledger marks `clarification_needed` on specific requests while other requests may still `answered` under ANSWER composition rules. Do not use `clarify_axis=service` to disambiguate unnamed patients — use request-level clarification. Full-route CLARIFY: document question source (which `request_id` or global handoff text). |
+| **ADMIN** | Terminal; `patient_text` null; `request_understanding` may be **empty** (`subjects: []`, `requests: []`) if safe terminal already defined. |
+| **Invalid envelope** | Fail closed; no implied permission to treat or book. |
 
-**Revert/replace from D1 (B)**
+**Size limits**
 
-- Gut regex/heuristic enforcement in `core/one_call_clinic_policy_authority.py` → resolver + composition or delete file after move.
-- Remove early clinic policy terminal from `orchestration/sales_one_plus_ask_turn.py`.
-- Replace presentation hook that regex-filters prose with composition ledger.
+- Keep `MAX_ENVELOPE_UTF8_BYTES = 64 KiB` for full envelope.
+- Sum of all `content_text` strings in a turn: **≤ 4000 Unicode code points** (validation cap, not target answer length).
+- Do not duplicate the same prose in `patient_text` and `content_text`.
+- Do not raise output token budget or add provider calls automatically; document existing model output limits and truncation behavior in B if composition approaches cap.
+
+**`core/one_call_closed_envelope_validation.py`:** capability-probe / sample JSON for evals only — **out of B scope** unless a callsite audit proves production dependency (current grep: stage3a/3b offline tests + eval probes only).
 
 ---
 
-## 7. Checkpoint B — exact file allowlist (planned)
+## 4. Policy resolver and composition (unchanged intent)
 
-| Path | Reason |
+Pure **`clinic_policy_resolver`**: validated understanding + validated pack policies → per-`request_id` decision (`allowed_by_known_rules | blocked | needs_clarification | no_applicable_rule | unsupported`).
+
+Composition ledger drives final text/UI/session; no regex contradiction filter on model prose for code-owned blocks.
+
+---
+
+## 5. Lead, privacy, and existing local mechanism (preserve)
+
+**Do not replace** the connected chain. No new UX; no mandatory “repeat your question” unless existing privacy fallback already does.
+
+| Step | Code (existing) |
 |---|---|
-| `contracts/request_understanding.py` | New typed contract |
-| `contracts/one_call_envelope.py` | Add field + validators |
-| `contracts/sales_one_plus_semantic.py` | Carry understanding on frame |
-| `contracts/clinic_policy_resolution.py` | Resolver decisions (new) |
-| `core/one_call_envelope_protocol.py` | Parse/normalize v14 |
-| `core/one_call_closed_envelope_validation.py` | Closed schema |
+| Name slot | `core/lead_name_slot.py` — pymorphy3 via `alias_lexical.morph_analyzer`, local name checks |
+| Unrecognized PII slot input | `core/lead_turn_classifier.py` → `pending_interrupt` |
+| Pending choice UI | `flow_handlers.py` — `_pending_name_choice_payload`, `_pending_phone_choice_payload` |
+| User chooses “answer question” | `_handle_pending_choice_ref` → `prepare_lead_pending_provider_question` (`core/lead_provider_input_privacy.py`) → `bind_lead_provider_question` |
+| No safe question extractable | Existing privacy fallback asks to rephrase |
+| Safe extract | Stored pending provider question; **one** model call after cleanup without re-capture by early business terminal |
+
+`provider_message_has_substance` remains part of this privacy chain — **not** a standalone semantic classifier for D1R business routing.
+
+**D1R boundary additions only**
+
+- New free-text **booking intent** → one-call → policy → then existing lead entry if allowed.
+- Typed booking actions: use **`validated_understanding` snapshot** + existing UI freshness/session guards.
+- Active name/phone slots and pending choices: unchanged local servicing (`tests/test_tenant_lead_pending_question_offline.py` must keep passing behavior).
+
+Local phone/name format checks and pymorphy3 stay. Do not expand word lists for clinic/service/policy understanding.
+
+**Still undefined for B (name if integration conflict appears):** exact hook point when one-call must preempt an open lead slot without breaking pending choice refs.
+
+---
+
+## 6. Session snapshot: `validated_understanding`
+
+Name **`validated_understanding`**: code validated structure and applied rules — not proof of model semantic correctness.
+
+**Minimal snapshot (single object, versioned)**
+
+| Field | Purpose |
+|---|---|
+| `schema_version` | e.g. `1` |
+| `source_turn` | Monotonic turn counter at write |
+| `client_id` / session binding | Tenant isolation |
+| `subjects` | Local `subject_id`, `relation`, `age_group` (no PII) |
+| `requests` | `request_id`, `kind`, `subject_id` ref |
+| `decisions` | Applied policy/booking decisions: `request_id`, `policy_key`, outcome, **`subject_id`** |
+| `active_booking_request_id` | Nullable; links lead/booking CTAs |
+| `permissions` | Action allow/deny keyed by **`(source_turn, request_id)`**, not bare `r1` |
+
+**Producer:** composition pass after resolver (writer in **`core/target_runtime_session.py`** on `TargetRuntimeSessionState`).
+
+**Reader:** lead transitions, typed booking actions, UI materialization — **after** existing UI freshness / session guards; never trust client-sent allow/blocked.
+
+**Invalidation:** session reset; client/tenant mismatch; stale UI ref (existing guards); new turn supersedes `source_turn`; conflicting subject facts for same `subject_id`; new topic — not only “conflicting message”. Stale button → safe clarification, not stale permission.
+
+**Non-goals:** do not globalize one child block to later adult self request; do not wipe unrelated concurrent valid requests.
+
+---
+
+## 7. Checkpoint B — file allowlist (A1 refined)
+
+### 7.1 Production / contracts (create or modify)
+
+| Path | Change |
+|---|---|
+| `contracts/request_understanding.py` | **New** types |
+| `contracts/clinic_policy_resolution.py` | **New** resolver result types |
+| `contracts/one_call_envelope.py` | `request_understanding`, `primary_price_request_id`; v14 validators |
+| `contracts/sales_one_plus_semantic.py` | Carry understanding; update **`from_envelope_only`** |
+| `core/one_call_envelope_protocol.py` | Parse/normalize v14 ANSWER nullable `patient_text` |
 | `core/one_call_prompt_contract.py` | v14 instructions |
 | `core/sales_one_plus_protocol.py` | System policy wording |
-| `core/one_call_fullcontext_messages.py` | Policy catalog in prefix (keep authored block) |
-| `core/sales_one_plus_semantic_authority.py` | Bind understanding |
-| `core/clinic_policies_loader.py` | Strict validation at D1R boundary |
-| `core/clinic_policy_resolver.py` | Pure resolver (new) |
-| `core/one_call_response_composition.py` | Mixed assembly (new) |
-| `core/one_call_presentation_pass.py` | Integrate composition; remove D1 regex hook |
-| `core/sales_fast_widget_runtime.py` | Wire resolver before presentation |
-| `orchestration/sales_one_plus_ask_turn.py` | Remove D1 terminal; lead routing |
-| `flow_handlers.py` | Lead vs new intent (if required) |
-| `tests/test_request_understanding_schema_offline.py` | Schema/protocol layer |
-| `tests/test_clinic_policy_resolver_offline.py` | Pure resolver matrix |
-| `tests/test_demo_d1r_http_offline.py` | JSON/SSE HTTP matrix |
-| `tests/test_demo_d1r_route_budget_offline.py` | No early business terminal |
-| `tests/fixtures/d1r_request_understanding/*.json` | Neutral + hostile prose fixtures |
-| `.github/workflows/ci.yml` | D1R regression job (replace D1 job) |
-| `docs/DEMO_READINESS_ROADMAP.md` | Status after B |
-| `docs/tasks/DEMO_D1R_MODEL_UNDERSTANDING.md` | Evidence section after B |
+| `core/one_call_fullcontext_messages.py` | Keep authored policies block |
+| `core/sales_one_plus_semantic_authority.py` | Bind understanding in **`bind_semantic_frame`** |
+| `core/clinic_policies_loader.py` | Strict validate at D1R boundary |
+| `core/one_call_clinic_policy_authority.py` | **Replace** regex/heuristic body with pure resolver + thin adapter (or delegate to `clinic_policy_resolver.py`); no second rule source |
+| `core/clinic_policy_resolver.py` | **New** pure resolver |
+| `core/one_call_response_composition.py` | **New** mixed ledger assembly |
+| `core/one_call_presentation_pass.py` | Composition integration; remove D1 regex hook |
+| `core/sales_fast_widget_runtime.py` | Wire resolver → composition |
+| `core/target_runtime_session.py` | **`validated_understanding`** read/write/invalidation |
+| `orchestration/sales_one_plus_ask_turn.py` | Remove D1 free-text policy terminal; lead/one-call ordering |
+| `flow_handlers.py` | Only if proven integration gap (document in PR) |
+| `core/sales_one_plus_turn.py` | Update **`_model_result_from_envelope`** / adapters if understanding affects result surface |
 
-Out of scope for B unless architect extends: `app.py`, broad `response_plan_*`, ingress, second provider call.
+**Explicitly out of B unless audit proves need:** `core/one_call_closed_envelope_validation.py` (probe/eval only today).
+
+### 7.2 Tests and fixtures (exact paths)
+
+| Path | Change |
+|---|---|
+| `tests/test_sales_one_plus_turn.py` | `answer_envelope` / helpers — default v14 `request_understanding` |
+| `tests/test_one_call_stage4_2_closed_envelope_production.py` | Constructors — v14 ANSWER nullable text rules |
+| `tests/test_one_call_envelope_v5_direct_facts.py` | Envelope builders |
+| `tests/test_one_call_envelope_v4_service_reference.py` | Envelope builders |
+| `tests/test_sales_one_plus_stream.py` | `OneCallEnvelope(...)` direct builds |
+| `tests/test_demo_clinic_policy_authority_offline.py` | **Replace** with D1R HTTP suites or delete after port |
+| `tests/test_request_understanding_schema_offline.py` | **New** |
+| `tests/test_clinic_policy_resolver_offline.py` | **New** |
+| `tests/test_demo_d1r_http_offline.py` | **New** JSON/SSE |
+| `tests/test_demo_d1r_route_budget_offline.py` | **New** routing |
+| `tests/fixtures/d1r_envelope_mixed_oms_tomography.json` | **New** neutral fixture (§1.2) |
+| `tests/fixtures/d1r_envelope_hostile_patient_text.json` | **New** hostile `patient_text` + correct understanding |
+| `tests/fixtures/d1r_envelope_no_subjects_contact.json` | **New** address-only |
+| `tests/fixtures/one_call_stage2_cases.json` | Update only if stage2 harness still used with v14 defaults |
+| `tests/test_tenant_lead_pending_question_offline.py` | **Keep behavior** — regression guard for §5 |
+| `tests/test_clinic_policies_loader.py` | Keep + loader strict tests |
+| `tests/test_demo_implant_volume_scope_offline.py` | Keep in CI regression |
+| `tests/test_one_call_stage4_3_contacts_specific.py` | Keep |
+| `tests/test_one_call_tenant_isolation_offline.py` | Keep |
+| `.github/workflows/ci.yml` | Rename job to D1R suites; retain useful regressions above |
+
+### 7.3 Existing test migration notes (contract → expectation)
+
+| Test area | Contract change | Preserved behavior |
+|---|---|---|
+| `answer_envelope(...)` callers | Default includes minimal valid `request_understanding`; ANSWER may use `patient_text=null` when ledger owns output | HTTP still 200; fake backend still once per free-text turn |
+| Stage4.2 envelope unit tests | v14 nullable ANSWER text when understanding present | Route invariants, commercial fields |
+| D1 policy HTTP tests | Replaced by D1R fixtures supplying understanding, not regex terminal | Same user-visible policy facts from YAML |
+| Tenant lead pending | None if lead chain untouched | Pending choice → sanitized question → one model call |
 
 ---
 
 ## 8. Test matrix (offline)
 
-| Layer | Scope |
-|---|---|
-| 1 Schema | Required fields, bad IDs, orphan subject refs, incompatible payment fields, envelope budget |
-| 2 Resolver | All Demo policy keys × subject/booking/price combinations; missing vs broken YAML; tenant isolation |
-| 3 HTTP JSON/SSE | Scenarios in §2.1 + follow-up adult booking; UI/session parity; no forbidden text in SSE deltas |
-| 4 Route | Free text hits exactly one fake backend; typed contact 0-call; lead phone 0-call |
-| 5 Model understanding | JSON matrix file only — **not** executed live until D5 |
-
-Update legacy tests only where contract or 0-call path intentionally changes; document old vs new expectation in PR.
+Layers 1–4 unchanged in intent; layer 5 model paraphrase matrix file-only until D5. Layer 3 must include no-subject contact/policy cases and partial multi-request ledger.
 
 ---
 
-## 9. Remaining scope / open questions for architect
+## 9. Remaining undefined (honest)
 
-1. Exact max `content_text` length and whether `route=CLARIFY` may carry partial understanding.
-2. Whether lead pause requires new user-visible copy or existing refs suffice.
-3. Multi-price in one message: confirm CLARIFY-only until D2 (recommended yes).
-4. CI: replace `demo-d1-clinic-policy-regression` job name/suites in B.
+1. Exact B hook if one-call and open lead slot conflict (§5).
+2. Full-route CLARIFY copy source when multiple requests partially answered.
+3. Truncation behavior when composition nears model output limits (audit in B, no budget change by default).
+4. Whether `flow_handlers.py` needs a one-line ordering change beyond documented lead chain.
+
+**Closed from architect A1 review:** content_text 4000 cap; lead copy reuses existing UI; multi-price uses per-request ledger not global CLARIFY-only; CI job rename in B.
 
 ---
 
-## 10. Checkpoint A evidence
+## 10. Checkpoint evidence
 
-- Production code: **unchanged** in this commit.
-- Provider calls: **0**.
-- Reviewed for Checker: this file + `docs/DEMO_READINESS_ROADMAP.md` (Checker design PASS on scope; commit SHA recorded after push).
+| Checkpoint | Scope | Production code |
+|---|---|---|
+| A | Initial design | Unchanged |
+| **A1** | Architect review corrections (§1–7, §5 lead chain) | **Unchanged** |
+| B | Implementation | Pending approval after A1 |
+
+Provider calls: **0** for A/A1 documentation work.
+
+Checker: focused recheck on A1 six points (see commit message / PR).

@@ -180,7 +180,49 @@ def _admin_result(
     )
 
 
-def _model_result_from_envelope(envelope: OneCallEnvelope) -> SalesOnePlusResult:
+def _ledger_patient_text(
+    envelope: OneCallEnvelope,
+    *,
+    client_id: str | None = None,
+    user_message: str = "",
+) -> str | None:
+    if envelope.patient_text and envelope.patient_text.strip():
+        return envelope.patient_text
+    understanding = envelope.request_understanding
+    if understanding is not None and client_id:
+        from core.one_call_response_composition import compose_response_from_understanding
+
+        composed = compose_response_from_understanding(
+            client_id=client_id,
+            understanding=understanding,
+            model_patient_text="",
+            primary_price_request_id=envelope.primary_price_request_id,
+            user_message=user_message,
+        )
+        if composed.patient_text.strip():
+            return composed.patient_text
+        if any(req.kind == "booking" for req in understanding.requests):
+            return ""
+    if understanding is None:
+        return envelope.patient_text
+    parts = [
+        req.content_text.strip()
+        for req in understanding.requests
+        if req.content_text and req.content_text.strip()
+    ]
+    if parts:
+        return "\n\n".join(parts)
+    if any(req.kind == "booking" for req in understanding.requests):
+        return ""
+    return envelope.patient_text
+
+
+def _model_result_from_envelope(
+    envelope: OneCallEnvelope,
+    *,
+    client_id: str | None = None,
+    user_message: str = "",
+) -> SalesOnePlusResult:
     if envelope.route == "ADMIN":
         raise ValueError("admin_envelope_requires_static_handoff")
     if envelope.route == "CLARIFY":
@@ -195,7 +237,11 @@ def _model_result_from_envelope(envelope: OneCallEnvelope) -> SalesOnePlusResult
         decision="answer",
         source="model",
         reason="model_answer",
-        patient_text=envelope.patient_text,
+        patient_text=_ledger_patient_text(
+            envelope,
+            client_id=client_id,
+            user_message=user_message,
+        ),
         envelope=envelope,
     )
 
@@ -263,7 +309,11 @@ def run_sales_one_plus_candidate(
             static_handoff=static_handoff,
             envelope=envelope,
         )
-    return _model_result_from_envelope(envelope)
+    return _model_result_from_envelope(
+        envelope,
+        client_id=pack_identity.client_id,
+        user_message=user_message,
+    )
 
 
 def run_sales_one_plus_candidate_stream(
@@ -344,4 +394,8 @@ def run_sales_one_plus_candidate_stream(
             static_handoff=static_handoff,
             envelope=envelope,
         )
-    return _model_result_from_envelope(envelope)
+    return _model_result_from_envelope(
+        envelope,
+        client_id=pack_identity.client_id,
+        user_message=user_message,
+    )

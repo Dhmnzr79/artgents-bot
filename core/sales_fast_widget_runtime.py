@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Protocol
 
 import config
@@ -1022,6 +1022,48 @@ def run_sales_fast_widget_turn(
     return outcome
 
 
+def _compose_understanding_clarification(
+    widget: TargetRuntimeWidgetPayload, *, result: SalesOnePlusResult,
+    client_id: str, sid: str, user_message: str,
+) -> TargetRuntimeWidgetPayload:
+    """Keep independent answers when only the price/service scope needs a question."""
+    envelope = result.envelope
+    if envelope is None or envelope.request_understanding is None:
+        return widget
+    from core.one_call_response_composition import compose_response_from_understanding
+    from core.target_runtime_session import (
+        build_validated_understanding_snapshot, write_validated_understanding_snapshot,
+    )
+    from session import mem_get
+
+    composed = compose_response_from_understanding(
+        client_id=client_id, understanding=envelope.request_understanding,
+        primary_price_request_id=envelope.primary_price_request_id,
+        user_message=user_message,
+    )
+    # A full-route CLARIFY question comes from the validated envelope. A code
+    # scope-defer uses the existing deterministic widget question instead.
+    question = (result.patient_text if result.decision == "clarify" else widget.payload.get("answer")) or ""
+    parts = [composed.patient_text] if composed.patient_text else []
+    unresolved = any(entry.status in {"deferred", "clarification_needed"} for entry in composed.resolution.ledger)
+    if question.strip() and (unresolved or not parts) and question.strip() not in parts:
+        parts.append(question.strip())
+    payload = dict(widget.payload)
+    payload["answer"] = "\n\n".join(parts)
+    final_resolution = composed.resolution.model_copy(update={
+        "ledger": tuple(
+            entry.model_copy(update={"status": "clarification_needed"})
+            if entry.kind == "price" and entry.status == "deferred" else entry
+            for entry in composed.resolution.ledger
+        ),
+    })
+    write_validated_understanding_snapshot(sid, build_validated_understanding_snapshot(
+        client_id=client_id, source_turn=int(mem_get(sid).get("session_turn_count") or 0),
+        understanding=envelope.request_understanding, resolution=final_resolution,
+    ))
+    return replace(widget, payload=payload)
+
+
 def _materialize_result(
     *,
     result: SalesOnePlusResult,
@@ -1126,26 +1168,26 @@ def _materialize_result(
             and result.decision == "answer"
         ):
             return SalesFastWidgetOutcome(
-                widget=materialize_dialogue_price_clarify_payload(
+                widget=_compose_understanding_clarification(materialize_dialogue_price_clarify_payload(
                     client_id=client_id,
                     sid=sid,
                     clarify_service_options=semantic.clarify_service_options,
                     bundle=context.bundle,
-                ),
+                ), result=result, client_id=client_id, sid=sid, user_message=user_message),
                 provider_calls=provider_calls,
                 model_route="clarify",
                 failure_kind="dialogue_price_scope_unresolved",
             )
         if result.decision == "clarify":
             return SalesFastWidgetOutcome(
-                widget=materialize_dialogue_price_clarify_payload(
+                widget=_compose_understanding_clarification(materialize_dialogue_price_clarify_payload(
                     client_id=client_id,
                     sid=sid,
                     clarify_service_options=semantic.clarify_service_options
                     if semantic.clarify_axis == "service"
                     else None,
                     bundle=context.bundle,
-                ),
+                ), result=result, client_id=client_id, sid=sid, user_message=user_message),
                 provider_calls=provider_calls,
                 model_route="clarify",
                 failure_kind=result.reason,
@@ -1287,6 +1329,7 @@ def _materialize_result(
         displayed_offer_ids, selected_offer_id = _session_offer_context_from_widget(widget)
         if (
             selected_offer_id is None
+            and presentation.reason_code != "primary_price_blocked_by_policy"
             and isinstance(precomposer_selected_offer, PrecomposerSelectedOfferResult)
             and precomposer_selected_offer.availability == "selected"
             and precomposer_selected_offer.offer is not None
@@ -1294,11 +1337,52 @@ def _materialize_result(
             selected_offer_id = precomposer_selected_offer.offer.offer_id
             if not displayed_offer_ids:
                 displayed_offer_ids = (selected_offer_id,)
+        if semantic.request_understanding is not None:
+            from core.clinic_policy_resolver import resolve_clinic_policies
+            from core.target_runtime_session import (
+                build_validated_understanding_snapshot,
+                write_validated_understanding_snapshot,
+            )
+
+            resolution = getattr(presentation, "composition_resolution", None) or resolve_clinic_policies(
+                client_id=client_id,
+                understanding=semantic.request_understanding,
+            )
+            from session import mem_get as _mem_get
+
+            turn_count = int(_mem_get(sid).get("session_turn_count") or 0)
+            write_validated_understanding_snapshot(
+                sid,
+                build_validated_understanding_snapshot(
+                    client_id=client_id,
+                    source_turn=turn_count,
+                    understanding=semantic.request_understanding,
+                    resolution=resolution,
+                    ui_booking_action=bool(
+                        widget.payload.get("cta")
+                        and (widget.payload.get("meta") or {}).get("cta_action") == "lead"
+                    ) or any(
+                        isinstance(reply, dict) and reply.get("ref") == "lead:booking"
+                        for reply in widget.payload.get("quick_replies") or []
+                    ),
+                    ui_situation_action=bool(
+                        isinstance(widget.payload.get("situation"), dict)
+                        and widget.payload["situation"].get("show")
+                        and widget.payload["situation"].get("mode") == "normal"
+                    ),
+                ),
+            )
+        session_prior = session_state
+        if presentation.reason_code == "primary_price_blocked_by_policy":
+            # A denied request must not inherit an earlier patient's offer.
+            session_prior = replace(
+                session_state, last_displayed_offer_ids=(), last_selected_offer_id=None,
+            )
         write_target_runtime_session_after_materialized(
             sid,
             turn_frame=authoritative_turn_frame,
             verified=verified,
-            prior=session_state,  # type: ignore[arg-type]
+            prior=session_prior,  # type: ignore[arg-type]
             current_selection=selection,
             followups=_followups_from_widget(widget),
             effective_scope=effective_scope,  # type: ignore[arg-type]

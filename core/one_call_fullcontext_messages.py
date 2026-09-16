@@ -56,7 +56,10 @@ def build_one_call_stable_prefix(
 ) -> str:
     """Byte-stable prefix: contract, envelope instructions, catalogs, corpus, pack identity."""
 
+    from core.one_call_clinic_policy_authority import serialize_clinic_business_policies_block
+
     corpus = cached_full_context.model_corpus_text
+    policy_block = serialize_clinic_business_policies_block(identity.client_id)
     sections = (
         one_call_contract_header(),
         "=== SYSTEM_POLICY ===\n" + SALES_ONE_PLUS_SYSTEM_POLICY,
@@ -65,6 +68,11 @@ def build_one_call_stable_prefix(
         service_reference_catalog.block_text(),
         active_service_catalog.block_text(),
         exact_commercial_catalog.block_text(),
+    )
+    if policy_block:
+        sections = (*sections, policy_block)
+    sections = (
+        *sections,
         "=== APPROVED_MD_CORPUS ===\n" + corpus,
         "=== DOCUMENT_INDEX ===\n" + "\n".join(cached_full_context.document_paths),
     )

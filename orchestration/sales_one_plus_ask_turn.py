@@ -19,7 +19,7 @@ from core.sales_fast_widget_runtime import (
     sales_fast_widget_outcome_from_local_gate,
 )
 from core.lead_context import take_lead_provider_question
-from flow_handlers import handle_flows
+from flow_handlers import begin_semantic_authorized_booking_lead, handle_flows
 from lead_interrupt import (
     LEAD_CANCEL_REF,
     LEAD_PENDING_ANSWER_REF,
@@ -526,6 +526,7 @@ def _post_gate_flows(
         service_payload=service_payload,
         get_last_content_ui_payload=get_last_content_ui_payload,
         get_topic_state=get_topic_state,
+        defer_free_text_booking_entry=True,
     )
     if flow_result is not None:
         return lead_flow_orchestration_result(
@@ -536,6 +537,49 @@ def _post_gate_flows(
             decision=None,
         )
     return None
+
+
+def _maybe_apply_d1r_semantic_booking_lead(
+    result: AskOrchestrationResult,
+    *,
+    sid: str,
+    client_id: str,
+    client_txt: Callable[[str | None], dict[str, str]],
+    service_payload: Callable[..., dict],
+    data: dict,
+    source_turn: int,
+) -> AskOrchestrationResult:
+    if result.kind != "service_reply" or not isinstance(result.service_payload, dict):
+        return result
+    from core.target_runtime_session import authorized_booking_request_id
+    from session import mem_get
+
+    booking_id = authorized_booking_request_id(
+        mem_get(sid), client_id=client_id, expected_source_turn=source_turn,
+        require_booking_request=True,
+    )
+    if not booking_id:
+        return result
+    payload = begin_semantic_authorized_booking_lead(
+        sid=sid,
+        client_id=client_id,
+        txt=client_txt(client_id),
+        service_payload=service_payload,
+        existing_payload=result.service_payload,
+        booking_request_id=booking_id,
+        data=data,
+    )
+    return AskOrchestrationResult(
+        kind=result.kind,
+        q=result.q,
+        sid=result.sid,
+        client_id=result.client_id,
+        service_payload=payload,
+        service_doc_id=result.service_doc_id,
+        service_track_user=result.service_track_user,
+        service_route=str((payload.get("meta") or {}).get("service_route") or result.service_route),
+        http_status=result.http_status,
+    )
 
 
 def orchestrate_sales_one_plus_ask_turn(
@@ -650,6 +694,12 @@ def orchestrate_sales_one_plus_ask_turn(
     if flow_reply is not None:
         return flow_reply
 
+    from core.target_runtime_session import clear_validated_understanding_snapshot
+
+    source_turn = int(mem_get(sid).get("session_turn_count") or 0)
+    if q:
+        clear_validated_understanding_snapshot(sid)
+
     provider_q = take_lead_provider_question()
     if provider_q:
         q = provider_q
@@ -690,14 +740,8 @@ def orchestrate_sales_one_plus_ask_turn(
                 client_id=client_id,
             )
 
-        contacts = _try_deterministic_contacts_terminal(
-            q=q,
-            sid=sid,
-            client_id=client_id,
-            service_payload=service_payload,
-        )
-        if contacts is not None:
-            return contacts
+        # Free text may contain several requests. Let the single model call
+        # identify them before the code-owned contact answer is composed.
 
     if not q:
         return AskOrchestrationResult(
@@ -711,11 +755,46 @@ def orchestrate_sales_one_plus_ask_turn(
             service_route="error",
         )
 
-    return orchestrate_sales_fast_widget_turn(
+    from core.one_call_clinic_policy_authority import (
+        ClinicBusinessPolicyLoadError,
+        validate_connectable_business_policies,
+    )
+
+    clear_validated_understanding_snapshot(sid)
+
+    try:
+        validate_connectable_business_policies(client_id)
+    except ClinicBusinessPolicyLoadError:
+        return AskOrchestrationResult(
+            kind="service_reply",
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            service_payload=service_payload(
+                "Сейчас не могу надёжно ответить по правилам клиники по этому вопросу. "
+                "Администратор поможет уточнить детали.",
+                sid,
+                client_id,
+            ),
+            service_doc_id=None,
+            service_track_user=True,
+            service_route="sales_fast",
+        )
+
+    result = orchestrate_sales_fast_widget_turn(
         q=q,
         sid=sid,
         client_id=client_id,
         data=data,
         local_gate_result=local_gate_result,
         on_delta=on_delta,
+    )
+    return _maybe_apply_d1r_semantic_booking_lead(
+        result,
+        sid=sid,
+        client_id=client_id,
+        client_txt=client_txt,
+        service_payload=service_payload,
+        data=data,
+        source_turn=source_turn,
     )

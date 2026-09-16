@@ -244,6 +244,8 @@ def bind_semantic_frame(
         requested_service_id=envelope.requested_service_id,
         availability_status=availability_status,
         direct_fact_ids=envelope.references.direct_fact_ids,
+        request_understanding=envelope.request_understanding,
+        primary_price_request_id=envelope.primary_price_request_id,
     )
 
 

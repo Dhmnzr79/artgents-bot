@@ -30,7 +30,7 @@ from tests.test_sales_one_plus_turn import (
 def test_v4_required_field_count_and_defaults() -> None:
     template = production_envelope_template()
     assert required_envelope_field_names() == frozenset(template.keys())
-    assert len(template) == 14
+    assert len(template) == 17
     assert template["service_reference_status"] == "none"
     assert template["requested_service_id"] is None
 

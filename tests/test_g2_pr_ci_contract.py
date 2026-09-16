@@ -82,6 +82,7 @@ _EXCLUDED_INTEGRATION = "tests/test_pg_tenant_rls_integration.py"
 _REQUIRED_JOB_NAMES = (
     "Lint and validate",
     "Offline unit and contracts",
+    "Demo D1 clinic policy regression",
     "PostgreSQL qualification",
     "Secret scan",
 )
@@ -158,7 +159,8 @@ def test_stable_job_display_names_exactly_once() -> None:
 def test_all_uses_pins_are_full_sha() -> None:
     text = _workflow_text()
     uses_entries = _SHA_USES_RE.findall(text)
-    assert len(uses_entries) == 8, f"expected 8 pinned uses, got {uses_entries}"
+    assert len(uses_entries) == 10, f"expected 10 pinned uses, got {uses_entries}"
+    assert len(re.findall(r"^\s*-\s*uses:", text, re.MULTILINE)) == len(uses_entries)
     for action, sha in uses_entries:
         assert len(sha) == 40, action
         assert not action.endswith("@v"), action
@@ -176,7 +178,7 @@ def test_expected_action_shas_present() -> None:
 
 def test_checkout_persist_credentials_false_on_all_jobs() -> None:
     text = _workflow_text()
-    assert text.count("persist-credentials: false") == 4
+    assert text.count("persist-credentials: false") == 5
 
 
 def test_secret_scan_full_history_and_gitleaks_safeguards() -> None:

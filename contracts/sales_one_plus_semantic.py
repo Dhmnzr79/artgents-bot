@@ -6,6 +6,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from contracts.request_understanding import RequestUnderstanding
 from contracts.one_call_envelope import (
     OneCallClarifyAxis,
     OneCallCommercialIntent,
@@ -53,6 +54,8 @@ class SalesOnePlusSemanticFrame(BaseModel):
     requested_service_id: str | None
     availability_status: AvailabilityStatus
     direct_fact_ids: tuple[str, ...]
+    request_understanding: RequestUnderstanding | None = None
+    primary_price_request_id: str | None = None
     rebind_kind: SemanticRebindKind = "full_rebuild"
 
     @model_validator(mode="after")
@@ -96,4 +99,6 @@ class SalesOnePlusSemanticFrame(BaseModel):
             requested_service_id=envelope.requested_service_id,
             availability_status="none",
             direct_fact_ids=envelope.references.direct_fact_ids,
+            request_understanding=envelope.request_understanding,
+            primary_price_request_id=envelope.primary_price_request_id,
         )

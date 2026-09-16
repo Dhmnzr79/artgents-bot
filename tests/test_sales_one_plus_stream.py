@@ -25,6 +25,15 @@ from tests.test_sales_one_plus_turn import (
 )
 
 
+def _model_content_text(envelope: OneCallEnvelope) -> str | None:
+    understanding = envelope.request_understanding
+    if understanding is not None:
+        for req in understanding.requests:
+            if req.content_text and req.content_text.strip():
+                return req.content_text
+    return envelope.patient_text
+
+
 def _run_stream(*, backend, on_delta: Callable[[str], None]):
     return run_sales_one_plus_candidate_stream(
         user_message="Есть парковка?",
@@ -59,7 +68,7 @@ def test_parser_accepts_json_split_at_every_boundary(split_at: int) -> None:
 
     envelope = parser.finalize()
     assert envelope.route == "ANSWER"
-    assert envelope.patient_text == "Готовый ответ"
+    assert _model_content_text(envelope) == "Готовый ответ"
     assert emitted == []
 
 
@@ -70,7 +79,7 @@ def test_parser_unicode_and_escaped_quotes_in_patient_text() -> None:
     parser = _parser(emitted.append)
     parser.ingest(payload)
     envelope = parser.finalize()
-    assert envelope.patient_text == text
+    assert _model_content_text(envelope) == text
     assert emitted == []
 
 
@@ -230,6 +239,7 @@ def test_result_contract_marks_only_partial_backend_answers_interrupted() -> Non
         service_reference_status="none",
         requested_service_id=None,
         references=OneCallEnvelopeReferences(direct_fact_ids=()),
+        request_understanding={"subjects": [], "requests": [{"request_id": "r1", "kind": "other", "subject_id": None, "context": "general_information"}]},
     )
     with pytest.raises(ValidationError):
         SalesOnePlusResult(

@@ -66,8 +66,16 @@ class SalesOnePlusStreamParser:
             commercial_fact_catalog=self._commercial_fact_catalog,
         )
         self._validated_envelope = envelope
-        if envelope.route in {"ANSWER", "CLARIFY"}:
+        if envelope.route == "CLARIFY":
             patient_text = envelope.patient_text
             if patient_text is None or not patient_text.strip():
+                raise OneCallEnvelopeProtocolError("patient_text_required")
+        elif envelope.route == "ANSWER":
+            has_understanding = (
+                envelope.request_understanding is not None
+                and len(envelope.request_understanding.requests) >= 1
+            )
+            patient_text = envelope.patient_text
+            if (patient_text is None or not patient_text.strip()) and not has_understanding:
                 raise OneCallEnvelopeProtocolError("patient_text_required")
         return envelope

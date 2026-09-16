@@ -17,6 +17,21 @@ SalesOnePlusDecision = Literal["answer", "admin", "spam", "clarify"]
 SalesOnePlusSource = Literal["local_gate", "model", "backend", "protocol"]
 
 
+def answer_allows_empty_patient_text(envelope: OneCallEnvelope | None) -> bool:
+    """Code-owned price/booking text is materialized after the model result."""
+
+    if envelope is None or envelope.route != "ANSWER":
+        return False
+    understanding = envelope.request_understanding
+    if understanding is None or not understanding.requests:
+        return False
+    return all(
+        req.kind == "booking"
+        or (req.kind == "price" and req.request_id == envelope.primary_price_request_id)
+        for req in understanding.requests
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class SalesOnePlusStrictFact:
     """Already-authoritative compact evidence, including scoped offer/package data."""
@@ -72,10 +87,11 @@ class SalesOnePlusResult(BaseModel):
         if not self.reason.strip():
             raise ValueError("sales_one_plus_reason_empty")
         if self.decision == "answer":
+            allow_empty = answer_allows_empty_patient_text(self.envelope)
+            has_text = bool(self.patient_text and self.patient_text.strip())
             if (
                 self.source not in {"model", "backend"}
-                or not self.patient_text
-                or not self.patient_text.strip()
+                or (not has_text and not allow_empty)
                 or self.handoff_text is not None
                 or self.interrupted != (self.source == "backend")
             ):
@@ -83,7 +99,11 @@ class SalesOnePlusResult(BaseModel):
             if self.source == "model":
                 if self.envelope is None or self.envelope.route != "ANSWER":
                     raise ValueError("sales_one_plus_answer_envelope_required")
-                if self.patient_text != self.envelope.patient_text:
+                env_text = self.envelope.patient_text
+                if env_text is not None and env_text.strip():
+                    if self.patient_text != env_text:
+                        raise ValueError("sales_one_plus_answer_patient_text_mismatch")
+                elif self.envelope.request_understanding is None and not allow_empty:
                     raise ValueError("sales_one_plus_answer_patient_text_mismatch")
         elif self.decision == "clarify":
             if (

@@ -1669,6 +1669,18 @@ def build_one_call_presentation_result(
                 rendered_text=final_patient_text,
             )
 
+    if (
+        original_commercial_intent == "price"
+        and resolution.jaw == "both"
+        and has_code_owned_monetary_surface
+        and displayed_offers
+        and all(offer.price.billing_unit == "jaw" for offer in displayed_offers)
+    ):
+        final_patient_text = (
+            final_patient_text.rstrip()
+            + "\n\nЕсли нужны обе челюсти, общую стоимость лечения уточним после консультации."
+        )
+
     if ledger_price_turn:
         final_composition = compose_response_from_understanding(
             client_id=context.client_id,

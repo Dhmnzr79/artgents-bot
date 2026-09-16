@@ -513,6 +513,45 @@ def test_explicit_all_on_4_not_priced_as_single_tooth_overview(
     assert build_ui_scope_ref(topic="implantation", extent="one_tooth") not in quick_refs
 
 
+@pytest.mark.parametrize("runner", (_run_ask, _run_stream))
+def test_all_on_4_both_jaws_quotes_one_jaw_unit_without_total(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+    isolated_demo_sqlite,
+    runner,
+) -> None:
+    monkeypatch.setattr(
+        "core.target_runtime_client_context.runtime_today",
+        lambda: date(2026, 8, 10),
+    )
+    env = answer_envelope(
+        "Стоимость All-on-4 для обеих челюстей.",
+        commercial_intent="price",
+        service_id="all_on_4",
+        extent="full_arch",
+        jaw="both",
+        service_reference_status="resolved",
+        requested_service_id="all_on_4",
+    )
+    sid = f"demo-vol-both-{uuid.uuid4().hex[:8]}"
+    payload = runner(
+        monkeypatch,
+        sid=sid,
+        backend=_Backend(env),
+        user_message="Сколько стоит All-on-4 на обе челюсти?",
+        envelope_json=env,
+    )
+    answer = str(payload.get("answer") or "").casefold()
+    digits = _norm_digits(answer)
+    assert "318000" in digits
+    assert "за одну челюсть" in answer
+    assert "обе челюсти" in answer
+    assert "636000" not in digits
+    session = read_target_runtime_session_for(sid)
+    assert session.patient_facts is not None
+    assert session.patient_facts.jaw == "both"
+
+
 def test_broad_overview_ask_and_stream_ui_parity(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,

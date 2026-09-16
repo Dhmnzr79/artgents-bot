@@ -25,7 +25,7 @@ from core.sales_one_plus_protocol import SALES_ONE_PLUS_SYSTEM_POLICY
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
 from core.target_runtime_session import read_target_runtime_session
 from evals.v5.run_bot_cleanup_live import compare_ask_stream_payloads
-from session import bind_session_client, mem_get, mem_reset
+from session import bind_session_client, mem_get, mem_reset, session_client_scope
 from tests.test_sales_one_plus_turn import answer_envelope
 
 _REPO = Path(__file__).resolve().parents[1]
@@ -100,8 +100,9 @@ def _run_ask(
 ) -> dict:
     be = backend or _Backend(envelope_json or answer_envelope("ok"))
     _install_sales_fast(monkeypatch, be)
-    if reset_session:
-        mem_reset(sid)
+    with session_client_scope("demo"):
+        if reset_session:
+            mem_reset(sid, client_id="demo")
     client = app_module.app.test_client()
     payload = {"q": user_message, "sid": sid, "client_id": "demo"}
     if ref:
@@ -128,8 +129,9 @@ def _run_stream(
 ) -> dict:
     backend = _Backend(envelope_json)
     _install_sales_fast(monkeypatch, backend)
-    if reset_session:
-        mem_reset(sid)
+    with session_client_scope("demo"):
+        if reset_session:
+            mem_reset(sid, client_id="demo")
     client = app_module.app.test_client()
     payload = {"q": user_message, "sid": sid, "client_id": "demo"}
     if ref:
@@ -158,7 +160,7 @@ def _scope_ref(payload: dict, extent_token: str) -> tuple[str, str]:
 def _seed_followups(sid: str, *items: TargetRuntimeFollowupItem) -> None:
     from session import _lock, _persist_unlocked, mem_get
 
-    with _lock:
+    with _lock, session_client_scope("demo"):
         st = mem_get(sid)
         st["target_runtime_followups"] = [
             {
@@ -172,11 +174,12 @@ def _seed_followups(sid: str, *items: TargetRuntimeFollowupItem) -> None:
 
 
 def _user_history(sid: str) -> list[str]:
-    return [
-        str(item.get("content") or "")
-        for item in mem_get(sid).get("hist") or []
-        if item.get("role") == "user"
-    ]
+    with session_client_scope("demo"):
+        return [
+            str(item.get("content") or "")
+            for item in mem_get(sid).get("hist") or []
+            if item.get("role") == "user"
+        ]
 
 
 def test_cta_lead_flow_starts_before_empty_question_guard(
@@ -194,7 +197,8 @@ def test_cta_lead_flow_starts_before_empty_question_guard(
     assert payload["_backend_calls"] == 0
     assert (payload.get("meta") or {}).get("lead_flow") is True
     assert (payload.get("meta") or {}).get("lead_step") == "name"
-    assert mem_get(sid).get("lead_intent") == "collecting_name"
+    with session_client_scope("demo"):
+        assert mem_get(sid).get("lead_intent") == "collecting_name"
 
 
 def test_empty_q_without_managed_action_fail_closed(
@@ -374,7 +378,8 @@ def test_pure_zygomatic_price_without_auto_commercial_facts(
     assert "акци" not in answer
     assert "гарант" not in answer
     assert "бесплатн" not in answer
-    session = read_target_runtime_session(sid)
+    with session_client_scope("demo"):
+        session = read_target_runtime_session(sid)
     assert "implant_same_day_discount" not in (session.shown_fact_ids or ())
 
 

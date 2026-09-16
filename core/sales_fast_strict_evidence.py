@@ -17,6 +17,7 @@ from contracts.ui_scope_action import UiScopeAction
 from contracts.ui_stage_action import UiStageAction
 from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundTerminalResponse
 from contracts.target_turn_frame_policy_envelope import TargetTurnFramePolicyEnvelope
+from contracts.target_response_policy import TargetResponsePolicyRequest
 from contracts.turn_frame import TurnFrame
 from core.target_policy_bound_verified_response_pipeline import _assemble_bound_package
 from core.target_presentation_turn_projection import (
@@ -27,6 +28,22 @@ from core.target_presentation_turn_projection import (
 from core.target_response_policy import build_target_response_spec
 from core.target_spec_offline_response_package import TargetSpecBoundOfflineResponsePackage
 from core.target_turn_frame_dispatch import dispatch_target_turn_frame_response
+
+
+def _sales_fast_scope_price_policy_request(
+    policy_request: TargetResponsePolicyRequest,
+    *,
+    effective_scope: EffectiveScope,
+) -> TargetResponsePolicyRequest:
+    """Sales-fast only: known session/UI extent needs scoped_family_price for presentation."""
+
+    if (
+        policy_request.scope_price_topic is not None
+        and effective_scope.extent != "unknown"
+        and policy_request.response_stage is None
+    ):
+        return policy_request.model_copy(update={"response_stage": "scoped_family_price"})
+    return policy_request
 
 
 def _rubles(amount: int) -> str:
@@ -204,7 +221,11 @@ def assemble_sales_fast_bound_package(
     )
     if dispatch.kind == "terminal":
         return TargetTurnFrameBoundTerminalResponse(kind="terminal", dispatch=dispatch)
-    bound_spec = build_target_response_spec(dispatch.policy_request)
+    policy_request = _sales_fast_scope_price_policy_request(
+        dispatch.policy_request,
+        effective_scope=effective_scope,
+    )
+    bound_spec = build_target_response_spec(policy_request)
     semantic_context = resolve_target_semantic_context(turn_frame, bound_spec)
     scenario_intent = marketing_scenarios_from_turn_frame(turn_frame)
     include_initial_block, resolved_scenarios, brand_term = resolve_bound_marketing_flags(
@@ -215,7 +236,7 @@ def assemble_sales_fast_bound_package(
         marketing_scenarios=scenario_intent,
     )
     return _assemble_bound_package(
-        dispatch.policy_request,
+        policy_request,
         bundle,
         doctor_catalog,  # type: ignore[arg-type]
         external_index,  # type: ignore[arg-type]

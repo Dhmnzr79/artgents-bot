@@ -356,7 +356,13 @@ def _current_ui_stage_action() -> object | None:
     return None
 
 
-def _presentation_effective_scope(semantic: object) -> object:
+def _presentation_effective_scope(
+    semantic: object,
+    *,
+    authoritative_effective_scope: object | None = None,
+) -> object:
+    if authoritative_effective_scope is not None:
+        return authoritative_effective_scope
     return effective_scope_from_semantic_frame(
         semantic,
         current_ui_action=_current_ui_scope_action(),
@@ -959,6 +965,7 @@ def build_one_call_presentation_result(
     today: date,
     precomposer_selected_offer: PrecomposerSelectedOfferResult | None = None,
     resolved_price_text: ResolvedPriceText | None = None,
+    authoritative_effective_scope: object | None = None,
 ) -> OneCallPresentationResult:
     """Run exactly one presentation pass for sales-fast widget materialization."""
 
@@ -1120,7 +1127,10 @@ def build_one_call_presentation_result(
     ):
         from core.sales_fast_strict_evidence import assemble_stage51b_availability_bound_package
 
-        effective_scope = _presentation_effective_scope(semantic)
+        effective_scope = _presentation_effective_scope(
+            semantic,
+            authoritative_effective_scope=authoritative_effective_scope,
+        )
         presentation_bound = assemble_stage51b_availability_bound_package(
             turn_frame=turn_frame,
             bundle=context.bundle,
@@ -1175,7 +1185,10 @@ def build_one_call_presentation_result(
             )
 
     commerce_result: AuthoritativeCommerceResult | None = None
-    effective_scope = _presentation_effective_scope(semantic)
+    effective_scope = _presentation_effective_scope(
+        semantic,
+        authoritative_effective_scope=authoritative_effective_scope,
+    )
     nav_ref = _current_nav_ref()
     payment_stages_requested = payment_stages_materialization_allowed(
         semantic=semantic,
@@ -1241,7 +1254,10 @@ def build_one_call_presentation_result(
                 strategy_context=strategy_context,
             )
         elif broad_family_price_turn:
-            broad_scope = _presentation_effective_scope(semantic)
+            broad_scope = _presentation_effective_scope(
+                semantic,
+                authoritative_effective_scope=authoritative_effective_scope,
+            )
             commerce_result = build_broad_family_price_commerce_result(
                 bound_package=bound_with_marketing,
                 bundle=context.bundle,
@@ -1249,7 +1265,10 @@ def build_one_call_presentation_result(
                 effective_scope=broad_scope,
             )
         elif scoped_family_price_turn:
-            scoped_scope = _presentation_effective_scope(semantic)
+            scoped_scope = _presentation_effective_scope(
+                semantic,
+                authoritative_effective_scope=authoritative_effective_scope,
+            )
             commerce_result = build_scoped_family_price_commerce_result(
                 bound_package=bound_with_marketing,
                 bundle=context.bundle,

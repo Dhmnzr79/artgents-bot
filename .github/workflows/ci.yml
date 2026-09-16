@@ -157,6 +157,40 @@ jobs:
             tests/test_g7_postgres_backup_contract.py \
             tests/test_g8_postgres_qualification_contract.py
 
+  demo-d1-clinic-policy-regression:
+    name: Demo D1 clinic policy regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-ci.lock
+
+      - name: Install dependencies
+        run: pip install --require-hashes -r requirements-ci.lock
+
+      - name: Demo D1 offline regression suites
+        env:
+          BASETEMP: ${{ runner.temp }}/pytest-basetemp-d1
+        run: |
+          unset DASHSCOPE_API_KEY CHAT_API_KEY OPENAI_API_KEY SMTP_PASSWORD SMTP_USER BOT_PG_DSN BOT_MIGRATOR_PG_DSN BOT_TEST_PG_DSN ADMIN_DASHBOARD_TOKEN || true
+          mkdir -p "$BASETEMP"
+          python -m pytest -p no:cacheprovider --basetemp "$BASETEMP" --tb=short -q \
+            tests/test_demo_clinic_policy_authority_offline.py \
+            tests/test_clinic_policies_loader.py \
+            tests/test_demo_implant_volume_scope_offline.py \
+            tests/test_one_call_stage4_3_contacts_specific.py \
+            tests/test_one_call_tenant_isolation_offline.py \
+            tests/test_one_call_provider_call_budget_stage1.py
+
   postgres-qualification:
     name: PostgreSQL qualification
     runs-on: ubuntu-latest

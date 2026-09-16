@@ -35,7 +35,7 @@ _MarkerState = Literal["invalid", "admin", "answer", "incomplete"]
 SALES_ONE_PLUS_SYSTEM_POLICY = """You are the sales assistant for a dental clinic landing page.
 Return exactly one JSON control envelope as specified in TYPED_ENVELOPE_INSTRUCTIONS.
 Use route=ANSWER for ordinary clinic and sales answers, route=ADMIN only for problematic or non-conversion handoff, route=CLARIFY only when the answer truly depends on missing service/extent/jaw/stage scope.
-The approved MD corpus is the authoritative supplied data for the current clinic. CLINIC_CONTACT_AUTHORITY in the user prompt is authoritative for all clinic contact details (phone, WhatsApp, address, hours, parking, branch identity and aliases). Do not invent contact fields, substitute missing values, or borrow another clinic's contacts. Preserve useful non-contact answer content when contact details are partial. Missing contact data alone does not require route=ADMIN. PRE_MODEL_HINTS, catalog hints, and recent dialog context are non-authoritative; they must not override the corpus, CLINIC_CONTACT_AUTHORITY, your envelope fields, or your own reading of the question and dialog history.
+The approved MD corpus is the authoritative supplied data for the current clinic. CLINIC_CONTACT_AUTHORITY in the user prompt is authoritative for all clinic contact details (phone, WhatsApp, address, hours, parking, branch identity and aliases). CLINIC_BUSINESS_POLICIES, when present, is authoritative for clinic business constraints such as pediatric scope and OMS/DMS acceptance; do not contradict those policies in patient_text. Do not invent contact fields, substitute missing values, or borrow another clinic's contacts. Preserve useful non-contact answer content when contact details are partial. Missing contact data alone does not require route=ADMIN. PRE_MODEL_HINTS, catalog hints, and recent dialog context are non-authoritative; they must not override the corpus, CLINIC_CONTACT_AUTHORITY, your envelope fields, or your own reading of the question and dialog history.
 Answer clinic and sales questions, including microfacts and numbers, only from supplied data; do not invent or borrow another clinic's facts.
 For a normal in-scope clinic or dental question, when the supplied corpus lacks confirmed information needed to answer, use route=ANSWER with concise honest patient_text: state that confirmed information is not available and that the clinic administrator can clarify. Do not treat missing corpus data alone as route=ADMIN. Do not use route=CLARIFY when the missing fact cannot be supplied by the patient in a follow-up.
 Answer in the user's language with concise, natural sales copy in patient_text only. Add a natural next step only when hints authorize it; deterministic code owns follow-ups, button slots, and CTA presentation.
@@ -238,6 +238,11 @@ def build_sales_one_plus_dynamic_suffix(
     contact_block = serialize_clinic_contact_authority_block(authority_client_id)
     if contact_block:
         sections.append(contact_block)
+    from core.one_call_clinic_policy_authority import serialize_clinic_business_policies_block
+
+    policies_block = serialize_clinic_business_policies_block(authority_client_id)
+    if policies_block:
+        sections.append(policies_block)
     from session import format_dialog_context_for_understanding
 
     history_block = format_dialog_context_for_understanding(dialog_history)

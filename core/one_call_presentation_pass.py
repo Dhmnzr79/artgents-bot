@@ -969,6 +969,30 @@ def build_one_call_presentation_result(
 ) -> OneCallPresentationResult:
     """Run exactly one presentation pass for sales-fast widget materialization."""
 
+    from core.one_call_clinic_policy_authority import (
+        apply_clinic_business_policy_authority,
+        read_dialog_history_for_policy,
+    )
+
+    dialog_history = ""
+    try:
+        from flask import has_request_context, request
+
+        if has_request_context():
+            sid = str(request.ctx.get("sid") or "").strip()
+            dialog_history = read_dialog_history_for_policy(sid)
+    except Exception:
+        dialog_history = ""
+    clinic_policy = apply_clinic_business_policy_authority(
+        client_id=context.client_id,
+        user_message=user_message,
+        dialog_history=dialog_history,
+        model_patient_text=patient_text,
+    )
+    if clinic_policy.enforced:
+        patient_text = clinic_policy.patient_text
+    clinic_policy_suppress_cta = clinic_policy.suppress_forbidden_booking_cta
+
     commercial_intent = presentation_commercial_intent(semantic)
     promotion_scope = presentation_promotion_scope(semantic)
     original_commercial_intent = semantic.commercial_intent
@@ -1741,7 +1765,7 @@ def build_one_call_presentation_result(
         rendered_marketing_fact_ids=rendered_fact_ids,
         rendered_promo_fact_ids=rendered_promo_ids,
         rendered_amplifier_refs=rendered_amplifier_refs,
-        selected_cta_key=verified.selected_cta_key,
+        selected_cta_key=None if clinic_policy_suppress_cta else verified.selected_cta_key,
         quick_replies=_presentation_quick_replies(presentation),
         secondary_content_slots=(
             alternative_secondary_slots

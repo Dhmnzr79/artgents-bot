@@ -205,6 +205,15 @@ def policy_answer(client_id: str, policy_key: str) -> str | None:
     return None
 
 
+def clinic_business_policy_keys(client_id: str) -> tuple[str, ...]:
+    """Ordered policy keys declared for a client pack (empty when no bundle)."""
+
+    bundle = load_clinic_policies(client_id)
+    if bundle is None:
+        return ()
+    return tuple(pol.key for pol in bundle.policies)
+
+
 def find_service_alternative(text: str, client_id: str) -> ServiceAlternative | None:
     bundle = load_clinic_policies(client_id)
     if bundle is None:

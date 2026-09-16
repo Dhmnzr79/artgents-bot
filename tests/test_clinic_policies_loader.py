@@ -5,6 +5,7 @@ from __future__ import annotations
 import config
 
 from core.clinic_policies_loader import (
+    clinic_business_policy_keys,
     find_service_alternative,
     load_authored_service_alternatives,
     load_clinic_policies,
@@ -34,3 +35,10 @@ def test_legacy_keyword_helper_still_works_with_sales_one_plus_off() -> None:
     alt = find_service_alternative("ставите брекеты?", "demo")
     assert alt is not None
     assert alt.suggest_ref
+
+
+def test_demo_business_policy_keys_include_oms_dms_pediatric() -> None:
+    keys = clinic_business_policy_keys("demo")
+    assert "no_pediatric_dentistry" in keys
+    assert "no_oms" in keys
+    assert "no_dms" in keys

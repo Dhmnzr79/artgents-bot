@@ -505,6 +505,47 @@ def _run_local_problem_gate(q: str) -> LocalProblemGateResult:
     return gate
 
 
+def _try_deterministic_clinic_policy_terminal(
+    *,
+    q: str,
+    sid: str,
+    client_id: str,
+    service_payload: Callable[..., dict],
+) -> AskOrchestrationResult | None:
+    from core.one_call_clinic_policy_authority import (
+        assess_applicable_clinic_policies,
+        clinic_policy_turn_prefers_model,
+        compose_clinic_policy_patient_text,
+    )
+
+    policy_keys = assess_applicable_clinic_policies(user_message=q, client_id=client_id)
+    if not policy_keys:
+        return None
+    if clinic_policy_turn_prefers_model(q, policy_keys):
+        return None
+    answer = compose_clinic_policy_patient_text(
+        client_id=client_id,
+        user_message=q,
+        policy_keys=policy_keys,
+        model_patient_text="",
+    )
+    if not answer.strip():
+        return None
+    payload = service_payload(answer, sid, client_id)
+    if isinstance(payload.get("meta"), dict):
+        payload["meta"]["service_route"] = "sales_fast_clinic_policy"
+    return AskOrchestrationResult(
+        kind="service_reply",
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        service_payload=payload,
+        service_doc_id=None,
+        service_track_user=True,
+        service_route="sales_fast_clinic_policy",
+    )
+
+
 def _post_gate_flows(
     *,
     data: dict,
@@ -638,6 +679,15 @@ def orchestrate_sales_one_plus_ask_turn(
             return ref_outcome
         q = ref_outcome
 
+    clinic_policy = _try_deterministic_clinic_policy_terminal(
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        service_payload=service_payload,
+    )
+    if clinic_policy is not None:
+        return clinic_policy
+
     flow_reply = _post_gate_flows(
         data=data,
         q=q,
@@ -709,6 +759,30 @@ def orchestrate_sales_one_plus_ask_turn(
             service_doc_id=None,
             service_track_user=False,
             service_route="error",
+        )
+
+    from core.one_call_clinic_policy_authority import (
+        ClinicBusinessPolicyLoadError,
+        validate_connectable_business_policies,
+    )
+
+    try:
+        validate_connectable_business_policies(client_id)
+    except ClinicBusinessPolicyLoadError:
+        return AskOrchestrationResult(
+            kind="service_reply",
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            service_payload=service_payload(
+                "Сейчас не могу надёжно ответить по правилам клиники по этому вопросу. "
+                "Администратор поможет уточнить детали.",
+                sid,
+                client_id,
+            ),
+            service_doc_id=None,
+            service_track_user=True,
+            service_route="sales_fast",
         )
 
     return orchestrate_sales_fast_widget_turn(

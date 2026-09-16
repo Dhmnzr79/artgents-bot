@@ -97,6 +97,12 @@ def _scoped_model_envelope(prose: str) -> str:
     )
 
 
+def _with_scope_commitment(envelope_json: str, commitment: str) -> str:
+    payload = json.loads(envelope_json)
+    payload["request_understanding"]["scope_commitment"] = commitment
+    return json.dumps(payload, ensure_ascii=False)
+
+
 def _run_ask(
     monkeypatch: pytest.MonkeyPatch,
     *,
@@ -384,14 +390,14 @@ def test_correction_one_tooth_after_full_arch_scope_click(
         ref=ref,
         reset_session=False,
     )
-    correction_env = answer_envelope(
+    correction_env = _with_scope_commitment(answer_envelope(
         "Классическая имплантация одного зуба.",
         commercial_intent="price",
         service_id="classic",
         extent="one_tooth",
         service_reference_status="resolved",
         requested_service_id="classic",
-    )
+    ), "correction")
     payload = _run_ask(
         monkeypatch,
         sid=sid,
@@ -439,14 +445,14 @@ def test_correction_one_tooth_persists_on_next_turn(
         ref=ref,
         reset_session=False,
     )
-    correction_env = answer_envelope(
+    correction_env = _with_scope_commitment(answer_envelope(
         "Классическая имплантация одного зуба.",
         commercial_intent="price",
         service_id="classic",
         extent="one_tooth",
         service_reference_status="resolved",
         requested_service_id="classic",
-    )
+    ), "correction")
     _run_ask(
         monkeypatch,
         sid=sid,
@@ -547,9 +553,50 @@ def test_all_on_4_both_jaws_quotes_one_jaw_unit_without_total(
     assert "за одну челюсть" in answer
     assert "обе челюсти" in answer
     assert "636000" not in digits
-    session = read_target_runtime_session_for(sid)
-    assert session.patient_facts is not None
-    assert session.patient_facts.jaw == "both"
+    # Asking for a quote does not confirm the patient's treatment need.
+    assert read_target_runtime_session_for(sid).patient_facts is None
+
+
+def test_hypothetical_full_jaw_quote_does_not_replace_reported_one_tooth(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+    isolated_demo_sqlite,
+) -> None:
+    monkeypatch.setattr(
+        "core.target_runtime_client_context.runtime_today",
+        lambda: date(2026, 8, 10),
+    )
+    sid = f"demo-vol-hypothetical-{uuid.uuid4().hex[:8]}"
+    reported = _with_scope_commitment(answer_envelope(
+        "Стоимость одного зуба.",
+        commercial_intent="price",
+        service_id="classic",
+        extent="one_tooth",
+        service_reference_status="resolved",
+        requested_service_id="classic",
+    ), "reported")
+    _run_ask(
+        monkeypatch, sid=sid, backend=_Backend(reported),
+        user_message="У меня нет одного зуба. Сколько стоит восстановить?",
+        envelope_json=reported,
+    )
+    assert read_target_runtime_session_for(sid).patient_facts.extent == "one_tooth"
+
+    hypothetical = _with_scope_commitment(answer_envelope(
+        "Стоимость восстановления челюсти.",
+        commercial_intent="price",
+        service_id="all_on_4",
+        extent="full_arch",
+        service_reference_status="resolved",
+        requested_service_id="all_on_4",
+    ), "hypothetical")
+    payload = _run_ask(
+        monkeypatch, sid=sid, backend=_Backend(hypothetical),
+        user_message="А если всю челюсть?",
+        envelope_json=hypothetical, reset_session=False,
+    )
+    assert "318000" in _norm_digits(str(payload.get("answer") or ""))
+    assert read_target_runtime_session_for(sid).patient_facts.extent == "one_tooth"
 
 
 def test_broad_overview_ask_and_stream_ui_parity(

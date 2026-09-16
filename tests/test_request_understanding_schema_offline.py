@@ -28,6 +28,17 @@ def test_minimal_content_understanding_valid() -> None:
     assert len(u.requests) == 1
     assert u.requests[0].kind == "content"
     assert u.requests[0].content_text == "Привет."
+    assert u.scope_commitment == "unknown"
+
+
+@pytest.mark.parametrize("status", ["none", "reported", "correction", "hypothetical"])
+def test_scope_commitment_is_typed(status: str) -> None:
+    payload = minimal_content_understanding("Ответ.").model_dump()
+    payload["scope_commitment"] = status
+    assert RequestUnderstanding.model_validate(payload).scope_commitment == status
+    payload["scope_commitment"] = "guessed"
+    with pytest.raises(ValueError):
+        RequestUnderstanding.model_validate(payload)
 
 
 def test_subject_id_pattern() -> None:

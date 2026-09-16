@@ -31,6 +31,7 @@ primary_price_request_id: string or null (one kind=price request_id for code-own
 
 request_understanding (when non-null):
 subjects: array of {subject_id, relation, age_group} — may be empty
+scope_commitment: unknown | none | reported | correction | hypothetical. Use reported only when the patient states their own current treatment scope; correction when they explicitly replace a previously stated scope; hypothetical for “а если” comparisons; none for service questions without a stated patient need. Use unknown if the distinction is unclear. This field controls session memory, not whether a price question may be answered.
 subjects[].subject_id: unique s1, s2, ... (pattern s[1-9][0-9]*); relation: self | other | unknown; age_group: adult | child | unknown. Never infer current child age from childhood history.
 requests: ordered array (>=1 for ANSWER/CLARIFY) of {request_id, kind, subject_id, context, policy_ids, payment_scheme, payment_scheme_intent, contact_fields, content_text}
 requests[].request_id: unique r1, r2, ... (pattern r[1-9][0-9]*); subject_id: matching subject ID or null when no patient is named, including general policy/contact/price. Booking may use null if patient identity is unknown.
@@ -42,6 +43,7 @@ payment_scheme_intent: eligibility_question | requested_payment | not_requested 
 contact_fields: contact_address | contact_phone | contact_whatsapp | contact_hours | contact_parking | contacts, only on contact requests; otherwise [].
 content_text: string or null; use prose only for content/other requests. All content_text strings together must stay within 4000 Unicode characters. Keep content_text null on policy/booking/price/contact requests.
 Every non-null subject_id must match a declared subject. primary_price_request_id must name one kind=price request; otherwise null. One service_id governs only the selected primary price; do not imply it answers other price requests.
+Keep discussed service and quoted scope separate from the patient's reported need. “Сколько стоит имплантация?” does not establish missing teeth; scope_commitment=none. “У меня нет двух зубов” reports a need; “нет, трёх” corrects it. “А если три?” is hypothetical and must not change memory. Never infer a treatment plan or number of implants from missing teeth. For another patient, do not carry the current patient's scope forward.
 Examples: "Ваш адрес?" -> subjects=[], r1 contact, subject_id=null, contact_fields=["contact_address"]. "Я взрослый, но запишите ребёнка" -> child subject s1 relation=other; r1 booking subject_id=s1. "По ОМС работаете? Если нет, сколько стоит КТ взрослому?" -> r1 clinic_policy with oms/eligibility_question, r2 price with adult subject s1, primary_price_request_id=r2, service_id=tomography.
 For code-owned policy/contact/price surfaces use request_understanding; patient_text may be null on ANSWER when the ledger owns materialization. Put informational prose in per-request content_text only (not duplicated in patient_text).
 

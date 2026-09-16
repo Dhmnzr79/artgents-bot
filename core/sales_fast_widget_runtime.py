@@ -9,6 +9,7 @@ from typing import Protocol
 import config
 from contracts.exact_sales_resolution import ExactSalesResolution
 from contracts.local_problem_gate import LocalProblemGateResult
+from contracts.patient_scope_projection import ProjectedPatientScope, ProjectedScopeAxis
 from contracts.precomposer_selected_offer import PrecomposerSelectedOfferResult
 from contracts.sales_one_plus_semantic import SalesOnePlusSemanticFrame
 from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundTerminalResponse
@@ -528,7 +529,7 @@ def _authoritative_effective_scope_for_turn(
     stage_action: UiStageAction | None,
     commercial_intent: str | None,
 ) -> object:
-    """Session + message scope for bound-package dispatch and patient_facts persist."""
+    """Session + validated model scope for dispatch; UI controls remain authoritative."""
 
     if scope_action is not None or stage_action is not None:
         return resolve_effective_scope(
@@ -544,13 +545,26 @@ def _authoritative_effective_scope_for_turn(
         session_state=session_state,
         commercial_intent=commercial_intent,
     )
+    patient_scope = turn_frame.patient_scope
+    def axis(value: str) -> ProjectedScopeAxis:
+        return ProjectedScopeAxis(
+            value=value if value != "unknown" else None,
+            provenance="one_call_envelope.patient_scope",
+            usable=value != "unknown",
+        )
+
     return resolve_effective_scope(
         current_ui_action=None,
         current_ui_stage_action=None,
         session_facts=session_state.patient_facts,  # type: ignore[attr-defined]
         current_topic=merge_topic,
         session_turn_count=int(session_state.session_turn_count),  # type: ignore[attr-defined]
-        projected_turn_scope=project_sales_fast_scope_from_message(user_message),
+        projected_turn_scope=ProjectedPatientScope(
+            extent=axis(patient_scope.extent),
+            jaw=axis(patient_scope.jaw),
+            stage=axis(patient_scope.stage),
+            reported_context=axis("unknown"),
+        ),
     )
 
 
@@ -1385,7 +1399,15 @@ def _materialize_result(
             prior=session_prior,  # type: ignore[arg-type]
             current_selection=selection,
             followups=_followups_from_widget(widget),
-            effective_scope=effective_scope,  # type: ignore[arg-type]
+            effective_scope=effective_scope if (
+                _current_ui_scope_action() is not None
+                or _current_ui_stage_action() is not None
+                or (
+                    semantic.request_understanding is not None
+                    and semantic.request_understanding.scope_commitment
+                    in {"reported", "correction"}
+                )
+            ) else None,  # type: ignore[arg-type]
             presentation_cadence_update=widget.presentation_cadence_update,
             availability_status=semantic.availability_status,
             displayed_offer_ids=displayed_offer_ids,

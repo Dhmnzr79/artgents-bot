@@ -18,6 +18,7 @@ PaymentSchemeIntent = Literal[
     "not_requested",
     "unspecified",
 ]
+ScopeCommitment = Literal["unknown", "none", "reported", "correction", "hypothetical"]
 
 _SUBJECT_ID_RE = re.compile(r"^s[1-9][0-9]*$")
 _REQUEST_ID_RE = re.compile(r"^r[1-9][0-9]*$")
@@ -105,6 +106,7 @@ class RequestUnderstanding(BaseModel):
 
     subjects: tuple[RequestUnderstandingSubject, ...]
     requests: tuple[RequestUnderstandingRequest, ...]
+    scope_commitment: ScopeCommitment = "unknown"
 
     @field_validator("subjects", "requests", mode="before")
     @classmethod

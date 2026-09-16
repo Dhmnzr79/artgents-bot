@@ -2,11 +2,14 @@
 
 | Stage | Goal | Status |
 |---|---|---|
-| D1 Clinic business policies | Pediatric / OMS / DMS facts on active `/ask` path; model cannot contradict authored policy | In progress — checkpoint on branch `codex/demo-d1-clinic-policy`, pending Checker and merge |
-| D2 Service and volume authority | Unified service / extent decision | Planned |
-| D3 Full mixed answers | Mixed questions without loss; finance vs auto-add-ons | Planned |
-| D4 Offline acceptance | HTTP invariants in CI | Planned |
-| D5 Live rehearsal | Real model + widget | Planned (owner approval) |
-| F1–F3 Post-demo | Session memory, response plan, legacy removal | Planned |
+| D1 Clinic business policies (regex/heuristic path) | Pediatric / OMS / DMS on `/ask` | **Rejected** — approach superseded by D1R; evidence commit `aaf9eaa` |
+| **D1R** Model understanding + code-owned rules | `request_understanding` in one-call envelope; pure policy resolver; mixed composition | **Design checkpoint A** on `codex/demo-d1-clinic-policy` — implementation checkpoint B pending architect approval |
+| D2 Service and volume authority | Unified service / extent / scope on same understanding | Planned — not started |
+| D3 Full mixed answers | Commerce composition, response plan alignment | Planned — not started |
+| D4 Offline acceptance | Current CI gate for demo path | Planned |
+| D5 Live rehearsal | Model + widget with owner budget | Planned (owner approval) |
+| F1–F3 Post-demo | Session memory, unified plan, legacy removal | Planned |
 
-D1 boundaries (not in this PR): full semantic policy classifier, global YAML migration, second model call, restoring legacy ingress.
+**Note:** A small **model-understanding + composition** slice was moved ahead of D2/D3 because clinic rules must bind to structured facts, not substring classifiers. D2/D3 are not complete until their PRs merge.
+
+Documents: `docs/tasks/DEMO_D1R_MODEL_UNDERSTANDING.md` (integration design). Historical `docs/tasks/DEMO_D1_CLINIC_POLICY.md` remains as D1 attempt record only.

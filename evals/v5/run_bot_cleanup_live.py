@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import msvcrt
 import os
 import re
 import shutil
@@ -221,6 +220,8 @@ def _read_json(path: Path) -> dict[str, Any]:
 def _acquire_file_lock(file_obj) -> None:
     file_obj.seek(0)
     if sys.platform == "win32":
+        import msvcrt
+
         try:
             msvcrt.locking(file_obj.fileno(), msvcrt.LK_NBLCK, 1)
         except OSError as exc:
@@ -243,6 +244,8 @@ def _acquire_file_lock(file_obj) -> None:
 def _release_file_lock(file_obj) -> None:
     file_obj.seek(0)
     if sys.platform == "win32":
+        import msvcrt
+
         try:
             msvcrt.locking(file_obj.fileno(), msvcrt.LK_UNLCK, 1)
         except OSError:

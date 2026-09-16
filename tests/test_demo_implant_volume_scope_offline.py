@@ -103,6 +103,23 @@ def _with_scope_commitment(envelope_json: str, commitment: str) -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 
+def _scope_clarify_envelope(axis: str = "extent") -> str:
+    return answer_envelope(
+        "Какая челюсть?" if axis == "jaw" else "Сколько зубов нужно восстановить?",
+        route="CLARIFY", commercial_intent="price",
+        service_id="classic", extent=None,
+        service_reference_status="resolved", requested_service_id="classic",
+        clarify_axis=axis, clarify_service_options=None,
+        request_understanding={
+            "subjects": [],
+            "requests": [{"request_id": "r1", "kind": "price", "subject_id": None,
+                          "context": "current_care"}],
+            "scope_commitment": "unknown",
+        },
+        primary_price_request_id="r1",
+    )
+
+
 def _run_ask(
     monkeypatch: pytest.MonkeyPatch,
     *,
@@ -598,6 +615,147 @@ def test_hypothetical_full_jaw_quote_does_not_replace_reported_one_tooth(
     assert "318000" in _norm_digits(str(payload.get("answer") or ""))
     assert read_target_runtime_session_for(sid).patient_facts.extent == "one_tooth"
 
+
+@pytest.mark.parametrize("runner", (_run_ask, _run_stream))
+@pytest.mark.parametrize("axis,labels", [
+    ("extent", {"Один зуб", "Несколько зубов", "Вся челюсть", "Не знаю"}),
+    ("jaw", {"Верхняя", "Нижняя", "Обе", "Не знаю"}),
+])
+def test_extent_clarification_unknown_button_exits_without_scope(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+    isolated_demo_sqlite,
+    runner,
+    axis,
+    labels,
+) -> None:
+    from core.sales_fast_presentation import D2_SCOPE_DESCRIBE_REF, D2_SCOPE_UNKNOWN_REF
+
+    sid = f"demo-vol-unknown-{uuid.uuid4().hex[:8]}"
+    clarify = _scope_clarify_envelope(axis)
+    first = runner(
+        monkeypatch, sid=sid, backend=_Backend(clarify),
+        user_message="Сколько будет стоить восстановление?",
+        envelope_json=clarify,
+    )
+    choices = {item["label"]: item["ref"] for item in first.get("quick_replies") or []}
+    assert set(choices) == labels
+    assert choices["Не знаю"] == D2_SCOPE_UNKNOWN_REF
+
+    unknown = runner(
+        monkeypatch, sid=sid, backend=_Backend("invalid"),
+        user_message="", envelope_json="invalid", ref=D2_SCOPE_UNKNOWN_REF,
+        reset_session=False,
+    )
+    assert "Ничего страшного" in str(unknown.get("answer") or "")
+    assert "Сколько зубов" not in str(unknown.get("answer") or "")
+    assert read_target_runtime_session_for(sid).patient_facts is None
+    next_choices = {item["label"]: item["ref"] for item in unknown.get("quick_replies") or []}
+    assert set(next_choices) == {"Описать ситуацию", "Записаться на консультацию"}
+
+    describe = runner(
+        monkeypatch, sid=sid, backend=_Backend("invalid"),
+        user_message="", envelope_json="invalid", ref=D2_SCOPE_DESCRIBE_REF,
+        reset_session=False,
+    )
+    assert "Опишите" in str(describe.get("answer") or "")
+    assert read_target_runtime_session_for(sid).patient_facts is None
+
+    stale = runner(
+        monkeypatch, sid=sid, backend=_Backend("invalid"),
+        user_message="", envelope_json="invalid", ref=D2_SCOPE_UNKNOWN_REF,
+        reset_session=False,
+    )
+    assert (stale.get("meta") or {}).get("service_route") == "sales_fast_followup_unknown"
+
+
+@pytest.mark.parametrize("runner", (_run_ask, _run_stream))
+def test_extent_clarification_choice_enters_single_model_path(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+    isolated_demo_sqlite,
+    runner,
+) -> None:
+    sid = f"demo-vol-choice-{uuid.uuid4().hex[:8]}"
+    clarify = _scope_clarify_envelope()
+    first = runner(
+        monkeypatch, sid=sid, backend=_Backend(clarify),
+        user_message="Сколько будет стоить восстановление?",
+        envelope_json=clarify,
+    )
+    choice = next(
+        item["ref"] for item in first.get("quick_replies") or []
+        if item["label"] == "Один зуб"
+    )
+    reported = _with_scope_commitment(answer_envelope(
+        "Стоимость одного зуба.", commercial_intent="price",
+        service_id="classic", extent="one_tooth",
+        service_reference_status="resolved", requested_service_id="classic",
+    ), "reported")
+    selected = runner(
+        monkeypatch, sid=sid, backend=_Backend(reported),
+        user_message="", envelope_json=reported, ref=choice, reset_session=False,
+    )
+    assert "76200" in _norm_digits(str(selected.get("answer") or ""))
+    assert read_target_runtime_session_for(sid).patient_facts.extent == "one_tooth"
+
+
+@pytest.mark.parametrize("axis,question", [
+    ("extent", "Сколько зубов нужно восстановить"),
+    ("jaw", "Какую челюсть нужно восстановить"),
+])
+def test_code_deferred_scope_question_matches_buttons_and_clears_stale_refs(
+    isolated_demo_sqlite,
+    axis,
+    question,
+) -> None:
+    from core.sales_fast_presentation import materialize_dialogue_price_clarify_payload
+
+    sid = f"demo-vol-defer-{uuid.uuid4().hex[:8]}"
+    scope = materialize_dialogue_price_clarify_payload(
+        client_id="demo", sid=sid, clarify_axis=axis,
+    )
+    assert question in str(scope.payload["answer"])
+    assert scope.payload["quick_replies"]
+    old_ref = scope.payload["quick_replies"][0]["ref"]
+    assert old_ref in {item.ref for item in read_target_runtime_session_for(sid).followups}
+
+    generic = materialize_dialogue_price_clarify_payload(client_id="demo", sid=sid)
+    assert generic.payload["quick_replies"] == []
+    assert old_ref not in {item.ref for item in read_target_runtime_session_for(sid).followups}
+
+
+def test_unknown_scope_consultation_button_requires_model_booking_decision(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+    isolated_demo_sqlite,
+) -> None:
+    from core.sales_fast_presentation import D2_SCOPE_BOOK_REF, D2_SCOPE_UNKNOWN_REF
+
+    sid = f"demo-vol-book-{uuid.uuid4().hex[:8]}"
+    clarify = _scope_clarify_envelope()
+    _run_ask(
+        monkeypatch, sid=sid, backend=_Backend(clarify),
+        user_message="Сколько будет стоить восстановление?",
+        envelope_json=clarify,
+    )
+    unknown = _run_ask(
+        monkeypatch, sid=sid, backend=_Backend("invalid"),
+        user_message="", envelope_json="invalid", ref=D2_SCOPE_UNKNOWN_REF,
+        reset_session=False,
+    )
+    assert D2_SCOPE_BOOK_REF in {
+        item["ref"] for item in unknown.get("quick_replies") or []
+    }
+    no_booking_request = answer_envelope("Запись обсудим после уточнения.")
+    clicked = _run_ask(
+        monkeypatch, sid=sid, backend=_Backend(no_booking_request),
+        user_message="", envelope_json=no_booking_request, ref=D2_SCOPE_BOOK_REF,
+        reset_session=False,
+    )
+    assert (clicked.get("meta") or {}).get("service_route") == "sales_fast_materialized"
+    assert (clicked.get("meta") or {}).get("lead_step") != "name"
+    assert read_target_runtime_session_for(sid).patient_facts is None
 
 def test_broad_overview_ask_and_stream_ui_parity(
     monkeypatch: pytest.MonkeyPatch,

@@ -1186,6 +1186,7 @@ def _materialize_result(
                     client_id=client_id,
                     sid=sid,
                     clarify_service_options=semantic.clarify_service_options,
+                    clarify_axis=semantic.clarify_axis,
                     bundle=context.bundle,
                 ), result=result, client_id=client_id, sid=sid, user_message=user_message),
                 provider_calls=provider_calls,
@@ -1200,6 +1201,7 @@ def _materialize_result(
                     clarify_service_options=semantic.clarify_service_options
                     if semantic.clarify_axis == "service"
                     else None,
+                    clarify_axis=semantic.clarify_axis,
                     bundle=context.bundle,
                 ), result=result, client_id=client_id, sid=sid, user_message=user_message),
                 provider_calls=provider_calls,

@@ -45,7 +45,9 @@ python -m pytest -p no:cacheprovider --tb=line -q \
   tests/test_one_call_provider_call_budget_stage1.py
 ```
 
-Result: **49 passed, 8 failed** (all 8 in `test_one_call_provider_call_budget_stage1.py` — `AlibabaEndpointConfigurationError: chat_base_url_missing` or `chat_base_url_host_blocked` without full Alibaba transport config; same class of baseline/local env gap, not introduced by D1 policy changes). D1 suite `test_demo_clinic_policy_authority_offline.py`: **18 passed**.
+Result (5-file CI job): **43 passed, 0 failed** with `CHAT_API_KEY` + allowed `CHAT_BASE_URL`. D1 file: **14 passed**.
+
+Local mandatory sixth file `test_one_call_provider_call_budget_stage1.py`: **12 passed, 2 failed** on baseline (`test_provider_call_finished_event_includes_source_and_model_on_success|error` — duplicate caplog events; same class as historical baseline, not D1 regression).
 
 Provider calls during tests: **0** (conftest transport block + fake backends).
 

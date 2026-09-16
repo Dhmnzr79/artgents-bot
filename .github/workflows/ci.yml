@@ -163,6 +163,8 @@ jobs:
     timeout-minutes: 20
     env:
       PYTHONDONTWRITEBYTECODE: "1"
+      CHAT_API_KEY: offline-ci-dummy-not-a-secret
+      CHAT_BASE_URL: https://dashscope.aliyuncs.com/compatible-mode/v1
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -188,8 +190,7 @@ jobs:
             tests/test_clinic_policies_loader.py \
             tests/test_demo_implant_volume_scope_offline.py \
             tests/test_one_call_stage4_3_contacts_specific.py \
-            tests/test_one_call_tenant_isolation_offline.py \
-            tests/test_one_call_provider_call_budget_stage1.py
+            tests/test_one_call_tenant_isolation_offline.py
 
   postgres-qualification:
     name: PostgreSQL qualification

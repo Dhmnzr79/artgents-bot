@@ -1,12 +1,11 @@
 # Git and workspace workflow
 
-## Permanent folders
+## Permanent folder
 
-- `C:\Cursor Projects\artgents-bot` — standalone clean clone on `main`; do not develop here.
-- `C:\Cursor Projects\artgents-bot-<task>` — one temporary worktree per active task.
-- `C:\Cursor Projects\artgents-workspace-recovery-YYYY-MM-DD` — local recovery only; never commit.
+- `C:\Cursor Projects\artgents-bot` — the single active checkout. Keep `main` clean; develop on a task branch here.
+- Old registered worktrees are historical state. Leave them untouched until a separate verified cleanup.
 
-Open exactly one task folder in each Cursor window and Codex task.
+Use one active task and one editor window for this folder.
 
 ## Start a task
 
@@ -17,8 +16,7 @@ cd "C:\Cursor Projects\artgents-bot"
 git fetch --prune origin
 git switch main
 git pull --ff-only
-git worktree add -b codex/<task> "C:\Cursor Projects\artgents-bot-<task>" origin/main
-cd "C:\Cursor Projects\artgents-bot-<task>"
+git switch -c codex/<task> origin/main
 git status --short --branch
 ```
 
@@ -43,23 +41,22 @@ Merge only after the task is complete, Checker passes, CI is green, and the owne
 ## Pause safely
 
 If useful work must pause, make a clearly named WIP checkpoint and push it. Do not leave the
-only copy as uncommitted files in a folder. Never mix a second task into that worktree.
+only copy as uncommitted files in the folder. Never switch tasks with a dirty checkout.
 
 ## Finish after merge
 
-From the standalone clone:
+From a clean task checkout:
 
 ```powershell
 git fetch --prune origin
 git switch main
 git pull --ff-only
-git worktree remove "C:\Cursor Projects\artgents-bot-<task>"
 git branch -d codex/<task>
 ```
 
 Delete the remote topic branch after merge, or enable GitHub's automatic head-branch deletion.
-Never remove a dirty worktree with `--force` until its patch, untracked files, and `.env` have
-been backed up and verified.
+Never remove an old registered worktree manually. Verify its patch, untracked files, and `.env`
+before any separately authorized cleanup with `git worktree remove`.
 
 ## Daily five-line check
 

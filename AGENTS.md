@@ -5,11 +5,10 @@ Task-specific acceptance criteria belong in the current task or PR, not here.
 
 ## Workspace model
 
-- One task equals one `codex/<slug>` branch, one Git worktree folder, and one editor window.
-- Keep the standalone `main` checkout clean and read-only for development.
+- One active task equals one `codex/<slug>` branch in the permanent repository folder and one editor window.
+- Keep `main` clean and read-only for development; switch to the task branch in the same folder before editing.
 - Create every task from a freshly fetched `origin/main`.
-- Never switch a dirty worktree to another task or reuse it after its PR is merged.
-- Never delete a registered worktree manually. Use `git worktree remove` after verification.
+- Never switch a dirty checkout to another task. Preserve old registered worktrees until separately verified and removed with `git worktree remove`.
 
 ## Mandatory preflight
 

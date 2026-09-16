@@ -189,6 +189,7 @@ jobs:
             tests/test_request_understanding_schema_offline.py \
             tests/test_clinic_policy_resolver_offline.py \
             tests/test_demo_d1r_http_offline.py \
+            tests/test_demo_d1r_composition_offline.py \
             tests/test_demo_d1r_route_budget_offline.py \
             tests/test_demo_clinic_policy_authority_offline.py \
             tests/test_tenant_lead_pending_question_offline.py \

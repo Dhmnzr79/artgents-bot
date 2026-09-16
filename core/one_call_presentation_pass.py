@@ -995,6 +995,50 @@ def build_one_call_presentation_result(
         patient_text = clinic_policy.patient_text
     clinic_policy_suppress_cta = clinic_policy.suppress_forbidden_booking_cta
 
+    # Keep structured requests out of the legacy price-prose pipeline. Their
+    # policy/contact/content blocks are assembled once, after canonical pricing.
+    understanding = semantic.request_understanding
+    ledger_price_turn = bool(
+        understanding is not None
+        and semantic.primary_price_request_id is not None
+        and semantic.commercial_intent == "price"
+        and not turn_frame.needs_clarification
+    )
+    if ledger_price_turn:
+        from core.one_call_response_composition import compose_response_from_understanding
+
+        composed = compose_response_from_understanding(
+            client_id=context.client_id,
+            understanding=understanding,
+            primary_price_request_id=semantic.primary_price_request_id,
+            user_message=user_message,
+        )
+        primary_blocked = any(
+            entry.request_id == semantic.primary_price_request_id and entry.status == "blocked"
+            for entry in composed.resolution.ledger
+        )
+        if primary_blocked:
+            # Stop before commerce/marketing/UI materialization, but retain all
+            # other visible requests and the verified snapshot for this turn.
+            verified = _build_verified(
+                bound_package=bound_package, context=context, turn_frame=turn_frame,
+                patient_text=composed.patient_text, user_message=user_message,
+            )
+            return OneCallPresentationResult(
+                status="ok", reason_code="primary_price_blocked_by_policy",
+                final_patient_text=composed.patient_text, authoritative_commerce=None,
+                rendered_marketing_fact_ids=(), rendered_promo_fact_ids=(),
+                rendered_amplifier_refs=(), selected_cta_key=None, quick_replies=(),
+                secondary_content_slots=(), video=None,
+                situation={"show": False, "mode": "normal"}, presentation_channel="content",
+                rendered_ids=PresentationRenderedIds((), (), (), (), None, False),
+                pending_session_delta=PresentationSessionDelta(
+                    (), (), (), (), None, (), (), PresentationCadenceDelta(),
+                ),
+                verified_for_session=verified,
+            )
+        patient_text = ""
+
     commercial_intent = presentation_commercial_intent(semantic)
     promotion_scope = presentation_promotion_scope(semantic)
     original_commercial_intent = semantic.commercial_intent
@@ -1621,6 +1665,15 @@ def build_one_call_presentation_result(
                 bundle=context.bundle,
                 rendered_text=final_patient_text,
             )
+
+    if ledger_price_turn:
+        final_patient_text = compose_response_from_understanding(
+            client_id=context.client_id,
+            understanding=understanding,
+            primary_price_request_id=semantic.primary_price_request_id,
+            primary_price_text=final_patient_text,
+            user_message=user_message,
+        ).patient_text
 
     verified = _build_verified(
         bound_package=presentation_bound,

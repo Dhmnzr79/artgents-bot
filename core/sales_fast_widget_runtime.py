@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Protocol
 
 import config
@@ -1287,6 +1287,7 @@ def _materialize_result(
         displayed_offer_ids, selected_offer_id = _session_offer_context_from_widget(widget)
         if (
             selected_offer_id is None
+            and presentation.reason_code != "primary_price_blocked_by_policy"
             and isinstance(precomposer_selected_offer, PrecomposerSelectedOfferResult)
             and precomposer_selected_offer.availability == "selected"
             and precomposer_selected_offer.offer is not None
@@ -1317,11 +1318,17 @@ def _materialize_result(
                     resolution=resolution,
                 ),
             )
+        session_prior = session_state
+        if presentation.reason_code == "primary_price_blocked_by_policy":
+            # A denied request must not inherit an earlier patient's offer.
+            session_prior = replace(
+                session_state, last_displayed_offer_ids=(), last_selected_offer_id=None,
+            )
         write_target_runtime_session_after_materialized(
             sid,
             turn_frame=authoritative_turn_frame,
             verified=verified,
-            prior=session_state,  # type: ignore[arg-type]
+            prior=session_prior,  # type: ignore[arg-type]
             current_selection=selection,
             followups=_followups_from_widget(widget),
             effective_scope=effective_scope,  # type: ignore[arg-type]

@@ -351,3 +351,41 @@ Layers 1–4 unchanged in intent; layer 5 model paraphrase matrix file-only unti
 Provider calls: **0** for A/A1 documentation work.
 
 Checker: focused recheck on A1 six points (see commit message / PR).
+
+
+## B focused correction: price composition and free-text contacts
+
+Baseline: `e524f0e51745cac539232479334e5429e03c4d83`; same branch/worktree.
+This checkpoint covers two bounded stages, not acceptance of all D1R B.
+
+- A price-only ANSWER can reach code-owned materialization without invented model prose.
+- The final price composer preserves authored policy, structured contact, and content slots.
+  Model patient_text is not a source of the primary price block.
+- A blocked primary price stops before commerce/marketing/UI rendering; its other requests
+  remain visible. Neither the selected offer nor a previous patient's offer is retained as
+  the current selection for this denied price turn.
+- Free-text contacts go through the single model call, including ordinary mixed questions.
+  Tenant-specific phone rendering remains code-owned; its existing isolation test now supplies
+  explicit contact understanding and expects one call per turn.
+
+New regression suite: `tests/test_demo_d1r_composition_offline.py`, JSON and SSE.
+Offline only, isolated temporary sessions/logs, real provider transport blocked by the runner.
+No merge, deploy, D2, or live-model validation is included.
+
+Still open from B review: requested OMS/DMS payment semantics and malformed policy data (R4),
+freshness/authorization of all booking entry paths (R5), strict production v14 validation and
+complete model-facing schema (R6). Multi-price ledger completion and broader clarification /
+failure composition are not declared complete by these bounded fixes. B is not ready to merge.
+
+
+Verification: the 11-file `demo-d1-clinic-policy-regression` set (the existing ten files
+plus the new suite) passed **118/118** offline: 102 existing and 16 new cases. Initial
+regressions were reproduced on the original implementation; the phone test was migrated
+from the deliberately removed 0-call route without relaxing tenant isolation assertions.
+Provider calls: **0**. Independent checkpoint review is recorded in the completion report.
+
+Additional result/stream contract suites: `test_sales_one_plus_turn.py` and
+`test_sales_one_plus_stream.py`, **41/41 passed** (159 total root checks).
+Independent read-only Checker: **PASS for these two stages only**, independently
+re-ran the new suite **16/16 passed**; no blocking checkpoint findings. No new failures
+in the executed suites. Previously reported caplog failures outside this set were not rerun.

@@ -70,6 +70,7 @@ def compose_response_from_understanding(
     model_patient_text: str = "",
     primary_price_request_id: str | None = None,
     user_message: str = "",
+    primary_price_text: str = "",
 ) -> ResponseCompositionResult:
     """Assemble visible patient text from ledger; ignore hostile model prose for code-owned blocks."""
 
@@ -110,16 +111,10 @@ def compose_response_from_understanding(
             continue
 
         if req.kind == "price" and primary_price_request_id == req.request_id:
-            supplement = (model_patient_text or "").strip()
+            # Only the canonical commerce renderer supplies this block.
+            supplement = primary_price_text.strip()
             if supplement:
                 segments.append(supplement)
-                used_model = True
-
-    if not segments:
-        fallback = (model_patient_text or "").strip()
-        if fallback:
-            segments.append(fallback)
-            used_model = True
 
     patient_text = "\n\n".join(segments).strip()
     return ResponseCompositionResult(

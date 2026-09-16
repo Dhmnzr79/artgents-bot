@@ -733,14 +733,8 @@ def orchestrate_sales_one_plus_ask_turn(
                 client_id=client_id,
             )
 
-        contacts = _try_deterministic_contacts_terminal(
-            q=q,
-            sid=sid,
-            client_id=client_id,
-            service_payload=service_payload,
-        )
-        if contacts is not None:
-            return contacts
+        # Free text may contain several requests. Let the single model call
+        # identify them before the code-owned contact answer is composed.
 
     if not q:
         return AskOrchestrationResult(

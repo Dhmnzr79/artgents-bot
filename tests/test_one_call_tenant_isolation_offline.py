@@ -146,7 +146,17 @@ def test_code_owned_phone_route_uses_bound_client_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _enable_demo_nikadent(monkeypatch)
-    backend = _CountingBackend(answer_envelope("must not be used"))
+    from core.one_call_envelope_protocol import dumps_production_envelope
+
+    backend = _CountingBackend(dumps_production_envelope(
+        patient_text=None,
+        request_understanding={"subjects": [], "requests": [{
+            "request_id": "r1", "kind": "contact", "subject_id": None,
+            "context": "general_information", "policy_ids": [],
+            "payment_scheme": "unspecified", "payment_scheme_intent": "not_requested",
+            "contact_fields": ["contact_phone"], "content_text": None,
+        }]},
+    ))
     _install_sales_fast_transport(monkeypatch, backend)
     client = app_module.app.test_client()
     question = "Какой у вас телефон?"
@@ -179,7 +189,7 @@ def test_code_owned_phone_route_uses_bound_client_only(
 
         for payload in (ask_payload, stream_payload):
             assert payload["meta"]["client_id"] == client_id
-            assert payload["meta"]["service_route"] == "sales_fast_contacts"
+            assert payload["meta"]["service_route"] == "sales_fast_materialized"
             answer = str(payload.get("answer") or "")
             assert answer.strip()
             assert _norm_digits(expected_phone) in _norm_digits(answer)
@@ -192,7 +202,7 @@ def test_code_owned_phone_route_uses_bound_client_only(
             == stream_payload["meta"]["service_route"]
         )
 
-    assert backend.call_count == 0
+    assert backend.call_count == 4
 
 
 def test_code_owned_prices_stay_tenant_specific_after_cache_warmup(

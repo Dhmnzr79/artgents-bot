@@ -18,25 +18,18 @@ SalesOnePlusSource = Literal["local_gate", "model", "backend", "protocol"]
 
 
 def answer_allows_empty_patient_text(envelope: OneCallEnvelope | None) -> bool:
-    """Booking-only ANSWER may materialize visible text in presentation + lead overlay."""
+    """Code-owned price/booking text is materialized after the model result."""
 
     if envelope is None or envelope.route != "ANSWER":
         return False
     understanding = envelope.request_understanding
     if understanding is None or not understanding.requests:
         return False
-    has_visible_segment = False
-    for req in understanding.requests:
-        if req.kind in {"content", "other"} and req.content_text and req.content_text.strip():
-            has_visible_segment = True
-        elif req.kind == "clinic_policy" and req.policy_ids:
-            has_visible_segment = True
-        elif req.kind == "contact" and req.contact_fields:
-            has_visible_segment = True
-        elif req.kind == "price":
-            has_visible_segment = True
-    has_booking = any(req.kind == "booking" for req in understanding.requests)
-    return has_booking and not has_visible_segment
+    return all(
+        req.kind == "booking"
+        or (req.kind == "price" and req.request_id == envelope.primary_price_request_id)
+        for req in understanding.requests
+    )
 
 
 @dataclass(frozen=True, slots=True)

@@ -3,7 +3,7 @@
 | Stage | Goal | Status |
 |---|---|---|
 | D1 Clinic business policies (regex/heuristic path) | Pediatric / OMS / DMS on `/ask` | **Rejected** — superseded by D1R; evidence `aaf9eaa` |
-| **D1R** Model understanding + code-owned rules | `request_understanding`, resolver, composition | **Design A1** — architect review applied in docs; **B not started** |
+| **D1R** Model understanding + code-owned rules | `request_understanding`, resolver, composition | **B implemented** on `codex/demo-d1-clinic-policy` (pending architect sign-off) |
 | D2 Service and volume authority | Service/family/scope on same understanding | Planned — not started |
 | D3 Full mixed answers | Commerce + response plan alignment | Planned — not started |
 | D4 Offline acceptance | CI gate for demo path | Planned |
@@ -16,4 +16,4 @@
 
 **Lead/privacy:** D1R design **preserves** existing local name/phone → pending choice → `prepare_lead_pending_provider_question` chain; no new repeat-question UX.
 
-**Next gate:** architect approval of A1 design → checkpoint **B** implementation on `codex/demo-d1-clinic-policy`.
+**Next gate:** architect review of checkpoint **B** on `codex/demo-d1-clinic-policy`; D2 not started.

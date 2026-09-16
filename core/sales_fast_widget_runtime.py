@@ -1294,6 +1294,29 @@ def _materialize_result(
             selected_offer_id = precomposer_selected_offer.offer.offer_id
             if not displayed_offer_ids:
                 displayed_offer_ids = (selected_offer_id,)
+        if semantic.request_understanding is not None:
+            from core.clinic_policy_resolver import resolve_clinic_policies
+            from core.target_runtime_session import (
+                build_validated_understanding_snapshot,
+                write_validated_understanding_snapshot,
+            )
+
+            resolution = resolve_clinic_policies(
+                client_id=client_id,
+                understanding=semantic.request_understanding,
+            )
+            from session import mem_get as _mem_get
+
+            turn_count = int(_mem_get(sid).get("session_turn_count") or 0)
+            write_validated_understanding_snapshot(
+                sid,
+                build_validated_understanding_snapshot(
+                    client_id=client_id,
+                    source_turn=turn_count,
+                    understanding=semantic.request_understanding,
+                    resolution=resolution,
+                ),
+            )
         write_target_runtime_session_after_materialized(
             sid,
             turn_frame=authoritative_turn_frame,

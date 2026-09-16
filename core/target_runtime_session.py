@@ -25,6 +25,7 @@ from core.target_session_selection import TargetMaterializedSessionSelection
 from session import mem_get
 
 _TARGET_SESSION_KEY = "target_runtime_state"
+_VALIDATED_UNDERSTANDING_KEY = "validated_understanding"
 _TARGET_FOLLOWUPS_KEY = "target_runtime_followups"
 _PATIENT_FACTS_KEY = "patient_facts"
 _SERVICE_FOCUS_KEYS = frozenset(
@@ -115,6 +116,20 @@ def clear_target_service_focus(session_id: str) -> None:
         else:
             st.pop(_TARGET_SESSION_KEY, None)
         _persist_unlocked(session_id, st)
+
+
+@dataclass(frozen=True, slots=True)
+class ValidatedUnderstandingSnapshot:
+    """Code-validated understanding snapshot (not model correctness proof)."""
+
+    schema_version: int
+    source_turn: int
+    client_id: str
+    subjects: tuple[dict[str, str], ...]
+    requests: tuple[dict[str, str | None], ...]
+    decisions: tuple[dict[str, str | None], ...]
+    active_booking_request_id: str | None
+    permissions: tuple[tuple[int, str, str], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -639,3 +654,74 @@ def write_target_runtime_session_after_materialized(
                 current_topic=turn_frame.topic,
             )
         _persist_unlocked(sid, st)
+
+
+def build_validated_understanding_snapshot(
+    *,
+    client_id: str,
+    source_turn: int,
+    understanding: object,
+    resolution: object,
+) -> dict[str, object]:
+    from contracts.clinic_policy_resolution import ClinicPolicyResolutionResult
+    from contracts.request_understanding import RequestUnderstanding
+
+    if not isinstance(understanding, RequestUnderstanding):
+        raise TypeError("understanding_invalid")
+    if not isinstance(resolution, ClinicPolicyResolutionResult):
+        raise TypeError("resolution_invalid")
+    subjects = tuple(
+        {
+            "subject_id": s.subject_id,
+            "relation": s.relation,
+            "age_group": s.age_group,
+        }
+        for s in understanding.subjects
+    )
+    requests = tuple(
+        {
+            "request_id": r.request_id,
+            "kind": r.kind,
+            "subject_id": r.subject_id,
+        }
+        for r in understanding.requests
+    )
+    decisions = tuple(
+        {
+            "request_id": d.request_id,
+            "policy_key": d.policy_key,
+            "outcome": d.outcome,
+            "subject_id": d.subject_id,
+        }
+        for d in resolution.decisions
+    )
+    permissions: list[tuple[int, str, str]] = []
+    for entry in resolution.ledger:
+        if entry.status == "blocked":
+            permissions.append((source_turn, entry.request_id, "deny"))
+        elif entry.status == "answered":
+            permissions.append((source_turn, entry.request_id, "allow"))
+    return {
+        "schema_version": 1,
+        "source_turn": source_turn,
+        "client_id": client_id,
+        "subjects": list(subjects),
+        "requests": list(requests),
+        "decisions": list(decisions),
+        "active_booking_request_id": resolution.active_booking_request_id,
+        "permissions": [list(row) for row in permissions],
+    }
+
+
+def write_validated_understanding_snapshot(sid: str, snapshot: dict[str, object]) -> None:
+    from session import _lock, _persist_unlocked, mem_get
+
+    with _lock:
+        st = mem_get(sid)
+        st[_VALIDATED_UNDERSTANDING_KEY] = snapshot
+        _persist_unlocked(sid, st)
+
+
+def read_validated_understanding_snapshot(st: dict[str, Any]) -> dict[str, object] | None:
+    raw = st.get(_VALIDATED_UNDERSTANDING_KEY)
+    return raw if isinstance(raw, dict) else None

@@ -6,6 +6,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
+from contracts.request_understanding import RequestUnderstanding, total_content_text_codepoints
 from contracts.service_reference import ServiceReferenceStatus
 
 OneCallRoute = Literal["ANSWER", "ADMIN", "CLARIFY"]
@@ -47,6 +48,8 @@ _REQUIRED_FIELD_NAMES = frozenset(
         "service_reference_status",
         "requested_service_id",
         "references",
+        "request_understanding",
+        "primary_price_request_id",
     }
 )
 
@@ -118,7 +121,7 @@ class OneCallEnvelopeReferences(BaseModel):
 
 
 class OneCallEnvelope(BaseModel):
-    """Exactly fifteen model-returned control fields — no extras."""
+    """Production v14 model control envelope (D1R request_understanding)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
@@ -137,6 +140,8 @@ class OneCallEnvelope(BaseModel):
     service_reference_status: ServiceReferenceStatus
     requested_service_id: str | None
     references: OneCallEnvelopeReferences
+    request_understanding: RequestUnderstanding | None = None
+    primary_price_request_id: str | None = None
 
     @model_validator(mode="after")
     def _field_and_route_invariants(self) -> Self:
@@ -166,8 +171,29 @@ class OneCallEnvelope(BaseModel):
         if self.route in {"CLARIFY", "ADMIN"} and self.references.direct_fact_ids:
             raise ValueError("direct_fact_ids_forbidden_for_route")
 
+        if self.request_understanding is not None:
+            if total_content_text_codepoints(self.request_understanding) > 4000:
+                raise ValueError("content_text_too_long")
+            if self.primary_price_request_id is not None:
+                price_ids = {
+                    r.request_id
+                    for r in self.request_understanding.requests
+                    if r.kind == "price"
+                }
+                if self.primary_price_request_id not in price_ids:
+                    raise ValueError("primary_price_request_id_invalid")
+            patient_body = (self.patient_text or "").strip()
+            for req in self.request_understanding.requests:
+                if req.content_text and patient_body and req.content_text.strip() == patient_body:
+                    raise ValueError("patient_text_duplicates_content_text")
+
         if self.route == "ANSWER":
-            if not self.patient_text or not self.patient_text.strip():
+            has_understanding = (
+                self.request_understanding is not None
+                and len(self.request_understanding.requests) >= 1
+            )
+            has_patient_text = bool(self.patient_text and self.patient_text.strip())
+            if not has_patient_text and not has_understanding:
                 raise ValueError("patient_text_required")
             if self.clarify_axis is not None:
                 raise ValueError("clarify_axis_forbidden_for_answer")

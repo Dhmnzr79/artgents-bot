@@ -988,6 +988,8 @@ def build_one_call_presentation_result(
         user_message=user_message,
         dialog_history=dialog_history,
         model_patient_text=patient_text,
+        request_understanding=semantic.request_understanding,
+        primary_price_request_id=semantic.primary_price_request_id,
     )
     if clinic_policy.enforced:
         patient_text = clinic_policy.patient_text

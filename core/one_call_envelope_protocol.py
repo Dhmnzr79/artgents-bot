@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from contracts.request_understanding import RequestUnderstanding
 from contracts.one_call_envelope import (
     ENVELOPE_NORMALIZED_ANSWER_CLARIFY_FIELDS_CLEARED,
     ENVELOPE_NORMALIZED_DIRECT_FACT_ID_DEDUPED,
@@ -103,6 +104,14 @@ def _normalize_production_payload(
         payload["price_text"] = None
         keys.add("price_text")
         codes.append(ENVELOPE_NORMALIZED_MISSING_PRICE_TEXT)
+    if "request_understanding" not in keys:
+        payload = dict(payload)
+        payload["request_understanding"] = None
+        keys.add("request_understanding")
+    if "primary_price_request_id" not in keys:
+        payload = dict(payload)
+        payload["primary_price_request_id"] = None
+        keys.add("primary_price_request_id")
     missing = required - keys
     if missing:
         raise OneCallEnvelopeProtocolError(f"missing_fields:{sorted(missing)}")
@@ -349,6 +358,28 @@ def _validate_structure(
         commercial_fact_catalog=commercial_fact_catalog,
     )
 
+    understanding_raw = payload.get("request_understanding")
+    request_understanding: RequestUnderstanding | None
+    if understanding_raw is None:
+        request_understanding = None
+    elif not isinstance(understanding_raw, dict):
+        raise OneCallEnvelopeProtocolError("request_understanding_invalid")
+    else:
+        try:
+            request_understanding = RequestUnderstanding.model_validate(understanding_raw)
+        except ValueError as exc:
+            message = str(exc)
+            if "Value error, " in message:
+                message = message.split("Value error, ", 1)[1]
+            raise OneCallEnvelopeProtocolError(
+                message if message else "request_understanding_invalid"
+            ) from exc
+
+    primary_price_request_id = _optional_nonblank_string(
+        payload.get("primary_price_request_id"),
+        code="primary_price_request_id_invalid",
+    )
+
     if service_reference_status == "none" and requested_service_id is not None:
         raise OneCallEnvelopeProtocolError("requested_service_id_forbidden_for_none")
     if service_reference_status == "unresolved" and requested_service_id is not None:
@@ -361,7 +392,10 @@ def _validate_structure(
             raise OneCallEnvelopeProtocolError("clarify_service_options_invalid")
 
     if route == "ANSWER":
-        if patient_text is None or not patient_text.strip():
+        has_understanding = (
+            request_understanding is not None and len(request_understanding.requests) >= 1
+        )
+        if (patient_text is None or not patient_text.strip()) and not has_understanding:
             raise OneCallEnvelopeProtocolError("patient_text_required")
         if clarify_axis is not None:
             raise OneCallEnvelopeProtocolError("clarify_axis_forbidden_for_answer")
@@ -397,6 +431,8 @@ def _validate_structure(
             service_reference_status=service_reference_status,  # type: ignore[arg-type]
             requested_service_id=requested_service_id,
             references=references,
+            request_understanding=request_understanding,
+            primary_price_request_id=primary_price_request_id,
         )
     except ValueError as exc:
         message = str(exc)
@@ -500,9 +536,8 @@ def _raw_size_exceeded(raw: str) -> bool:
 
 
 def _loads_strict_json_object(raw: str) -> dict[str, Any]:
-    seen: set[str] = set()
-
     def pairs_hook(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        seen: set[str] = set()
         obj: dict[str, Any] = {}
         for key, value in pairs:
             if not isinstance(key, str):
@@ -569,14 +604,19 @@ def production_envelope_template(**overrides: object) -> dict[str, object]:
         "service_reference_status": "none",
         "requested_service_id": None,
         "references": {"direct_fact_ids": []},
+        "request_understanding": None,
+        "primary_price_request_id": None,
     }
     base.update(overrides)
     return base
 
 
 def dumps_production_envelope(**overrides: object) -> str:
-    return json.dumps(
-        production_envelope_template(**overrides),
-        ensure_ascii=False,
-        separators=(",", ":"),
-    )
+    merged = production_envelope_template(**overrides)
+    if merged.get("request_understanding") is None and merged.get("route") == "ANSWER":
+        from contracts.request_understanding import minimal_content_understanding
+
+        probe = str(merged.get("patient_text") or "").strip() or "Probe text."
+        merged["request_understanding"] = minimal_content_understanding(probe).model_dump()
+        merged["patient_text"] = None
+    return json.dumps(merged, ensure_ascii=False, separators=(",", ":"))

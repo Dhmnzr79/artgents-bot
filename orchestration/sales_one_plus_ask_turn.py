@@ -19,7 +19,7 @@ from core.sales_fast_widget_runtime import (
     sales_fast_widget_outcome_from_local_gate,
 )
 from core.lead_context import take_lead_provider_question
-from flow_handlers import handle_flows
+from flow_handlers import begin_semantic_authorized_booking_lead, handle_flows
 from lead_interrupt import (
     LEAD_CANCEL_REF,
     LEAD_PENDING_ANSWER_REF,
@@ -505,47 +505,6 @@ def _run_local_problem_gate(q: str) -> LocalProblemGateResult:
     return gate
 
 
-def _try_deterministic_clinic_policy_terminal(
-    *,
-    q: str,
-    sid: str,
-    client_id: str,
-    service_payload: Callable[..., dict],
-) -> AskOrchestrationResult | None:
-    from core.one_call_clinic_policy_authority import (
-        assess_applicable_clinic_policies,
-        clinic_policy_turn_prefers_model,
-        compose_clinic_policy_patient_text,
-    )
-
-    policy_keys = assess_applicable_clinic_policies(user_message=q, client_id=client_id)
-    if not policy_keys:
-        return None
-    if clinic_policy_turn_prefers_model(q, policy_keys):
-        return None
-    answer = compose_clinic_policy_patient_text(
-        client_id=client_id,
-        user_message=q,
-        policy_keys=policy_keys,
-        model_patient_text="",
-    )
-    if not answer.strip():
-        return None
-    payload = service_payload(answer, sid, client_id)
-    if isinstance(payload.get("meta"), dict):
-        payload["meta"]["service_route"] = "sales_fast_clinic_policy"
-    return AskOrchestrationResult(
-        kind="service_reply",
-        q=q,
-        sid=sid,
-        client_id=client_id,
-        service_payload=payload,
-        service_doc_id=None,
-        service_track_user=True,
-        service_route="sales_fast_clinic_policy",
-    )
-
-
 def _post_gate_flows(
     *,
     data: dict,
@@ -567,6 +526,7 @@ def _post_gate_flows(
         service_payload=service_payload,
         get_last_content_ui_payload=get_last_content_ui_payload,
         get_topic_state=get_topic_state,
+        defer_free_text_booking_entry=True,
     )
     if flow_result is not None:
         return lead_flow_orchestration_result(
@@ -577,6 +537,48 @@ def _post_gate_flows(
             decision=None,
         )
     return None
+
+
+def _maybe_apply_d1r_semantic_booking_lead(
+    result: AskOrchestrationResult,
+    *,
+    sid: str,
+    client_id: str,
+    client_txt: Callable[[str | None], dict[str, str]],
+    service_payload: Callable[..., dict],
+    data: dict,
+) -> AskOrchestrationResult:
+    if result.kind != "service_reply" or not isinstance(result.service_payload, dict):
+        return result
+    from core.target_runtime_session import read_validated_understanding_snapshot
+    from session import mem_get
+
+    snapshot = read_validated_understanding_snapshot(mem_get(sid))
+    if snapshot is None:
+        return result
+    booking_id = str(snapshot.get("active_booking_request_id") or "").strip()
+    if not booking_id:
+        return result
+    payload = begin_semantic_authorized_booking_lead(
+        sid=sid,
+        client_id=client_id,
+        txt=client_txt(client_id),
+        service_payload=service_payload,
+        existing_payload=result.service_payload,
+        booking_request_id=booking_id,
+        data=data,
+    )
+    return AskOrchestrationResult(
+        kind=result.kind,
+        q=result.q,
+        sid=result.sid,
+        client_id=result.client_id,
+        service_payload=payload,
+        service_doc_id=result.service_doc_id,
+        service_track_user=result.service_track_user,
+        service_route=str((payload.get("meta") or {}).get("service_route") or result.service_route),
+        http_status=result.http_status,
+    )
 
 
 def orchestrate_sales_one_plus_ask_turn(
@@ -679,15 +681,6 @@ def orchestrate_sales_one_plus_ask_turn(
             return ref_outcome
         q = ref_outcome
 
-    clinic_policy = _try_deterministic_clinic_policy_terminal(
-        q=q,
-        sid=sid,
-        client_id=client_id,
-        service_payload=service_payload,
-    )
-    if clinic_policy is not None:
-        return clinic_policy
-
     flow_reply = _post_gate_flows(
         data=data,
         q=q,
@@ -785,11 +778,19 @@ def orchestrate_sales_one_plus_ask_turn(
             service_route="sales_fast",
         )
 
-    return orchestrate_sales_fast_widget_turn(
+    result = orchestrate_sales_fast_widget_turn(
         q=q,
         sid=sid,
         client_id=client_id,
         data=data,
         local_gate_result=local_gate_result,
         on_delta=on_delta,
+    )
+    return _maybe_apply_d1r_semantic_booking_lead(
+        result,
+        sid=sid,
+        client_id=client_id,
+        client_txt=client_txt,
+        service_payload=service_payload,
+        data=data,
     )

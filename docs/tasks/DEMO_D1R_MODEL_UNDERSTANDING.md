@@ -8,7 +8,7 @@ Architect decision (fixed): one model call; `request_understanding` in envelope;
 
 ## 1. Typed contract: `request_understanding`
 
-Single new top-level envelope field (checkpoint B). Provenance: model JSON → validated → copied into `SalesOnePlusSemanticFrame` by `bind_semantic_frame` (and any `from_envelope_only` / result adapters updated in B). Never re-parsed from `patient_text` or raw user message.
+Two new top-level envelope fields at checkpoint B: `request_understanding` and `primary_price_request_id`. Provenance: model JSON → validated → copied into `SalesOnePlusSemanticFrame` by `bind_semantic_frame` (and any `from_envelope_only` / result adapters updated in B). Never re-parsed from `patient_text` or raw user message.
 
 ### 1.1 Pydantic types (final for B)
 
@@ -346,7 +346,7 @@ Layers 1–4 unchanged in intent; layer 5 model paraphrase matrix file-only unti
 |---|---|---|
 | A | Initial design | Unchanged |
 | **A1** | Architect review corrections (§1–7, §5 lead chain) | **Unchanged** |
-| B | Implementation | Pending approval after A1 |
+| **B** | D1R implementation (checkpoint fde818c+) | `request_understanding`, resolver, composition, v14 envelope |
 
 Provider calls: **0** for A/A1 documentation work.
 

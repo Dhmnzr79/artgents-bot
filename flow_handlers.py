@@ -1064,6 +1064,50 @@ def resume_active_lead_flow(
     }
 
 
+def begin_semantic_authorized_booking_lead(
+    *,
+    sid: str,
+    client_id: str | None,
+    txt: dict,
+    service_payload,
+    existing_payload: dict,
+    booking_request_id: str,
+    data: dict | None = None,
+) -> dict:
+    """After one-call policy, enter lead name collection without re-parsing user text (D1R)."""
+
+    st = mem_get(sid)
+    if is_active_lead_flow(st):
+        return existing_payload
+    if not booking_request_id.strip():
+        return existing_payload
+
+    mark_booking_intent_ever(sid)
+    set_lead_intent(sid, "collecting_name")
+    name_prompt = _lead_entry_name_prompt(
+        client_id,
+        txt,
+        data,
+        cta_key=LEAD_BOOKING_CTA_KEY,
+    )
+    prior_answer = str(existing_payload.get("answer") or "").strip()
+    body = f"{prior_answer}\n\n{name_prompt}" if prior_answer else name_prompt
+    lead_payload = service_payload(
+        body,
+        sid,
+        client_id,
+        lead_flow=True,
+        lead_step="name",
+        booking_intent_flag=True,
+    )
+    merged = dict(existing_payload)
+    merged.update(lead_payload)
+    meta = dict(merged.get("meta") or {})
+    meta["d1r_booking_request_id"] = booking_request_id
+    merged["meta"] = meta
+    return merged
+
+
 def handle_flows(
     *,
     data: dict,
@@ -1075,6 +1119,7 @@ def handle_flows(
     service_payload,
     get_last_content_ui_payload,
     get_topic_state,
+    defer_free_text_booking_entry: bool = False,
 ) -> dict | None:
     """Return {'payload': dict, 'doc_id': str|None} when flow handled."""
     if data.get("situation_action") == "back":
@@ -1134,7 +1179,12 @@ def handle_flows(
             service_payload=service_payload,
         )
 
-    if q and explicit_booking_intent(q) and not is_active_lead_flow(st):
+    if (
+        q
+        and explicit_booking_intent(q)
+        and not is_active_lead_flow(st)
+        and not defer_free_text_booking_entry
+    ):
         clear_pending_lead_offer(sid)
         return _begin_lead_collecting_name(
             q=q,

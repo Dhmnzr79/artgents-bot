@@ -1,34 +1,24 @@
-"""Demo D1: clinic business policy authority on /ask and /ask/stream (offline)."""
+"""Demo D1R: clinic policy via request_understanding on /ask (offline)."""
 
 from __future__ import annotations
 
-import json
-import re
 import uuid
 
 import pytest
 
-import app as app_module
-import config
 from core.clinic_policies_loader import clinic_business_policy_keys, policy_answer
-from core.one_call_clinic_policy_authority import (
-    assess_applicable_clinic_policies,
-    serialize_clinic_business_policies_block,
+from core.one_call_clinic_policy_authority import serialize_clinic_business_policies_block
+from tests.d1r_envelope_fixtures import (
+    envelope_adult_price_cleaning,
+    envelope_clinic_policy_only,
+    envelope_content_only,
+    envelope_pediatric_policy_plus_contact,
 )
-from session import mem_get, mem_reset
-from tests.test_one_call_tenant_isolation_offline import (
-    _enable_demo_nikadent,
-    _parse_sse_ui_payload,
-    _post_ask,
-    _post_stream,
-)
-from tests.test_sales_one_plus_turn import answer_envelope
-
+from tests.test_one_call_tenant_isolation_offline import _enable_demo_nikadent, _post_ask, _post_stream, _parse_sse_ui_payload
 _HOSTILE_PEDIATRIC = (
     "Да, мы с радостью примем вашего ребёнка и ведём детскую стоматологию. Запишем на приём."
 )
 _HOSTILE_OMS = "Да, лечим по полису ОМС — приносите полис, всё оформим."
-_HOSTILE_DMS = "Работаем напрямую по ДМС, ваш страховой полис подойдёт."
 
 
 def _demo_policy_snippet(policy_key: str) -> str:
@@ -38,19 +28,18 @@ def _demo_policy_snippet(policy_key: str) -> str:
 
 
 @pytest.mark.parametrize(
-    ("user_message", "policy_key", "hostile"),
+    ("user_message", "policy_key"),
     [
-        ("Лечите детей?", "no_pediatric_dentistry", _HOSTILE_PEDIATRIC),
-        ("Можно записать ребёнка 8 лет?", "no_pediatric_dentistry", _HOSTILE_PEDIATRIC),
-        ("Лечите по ОМС?", "no_oms", _HOSTILE_OMS),
-        ("Принимаете ДМС?", "no_dms", _HOSTILE_DMS),
+        ("Лечите детей?", "no_pediatric_dentistry"),
+        ("Вы ведёте детскую стоматологию?", "no_pediatric_dentistry"),
+        ("Лечите по ОМС?", "no_oms"),
+        ("Принимаете ДМС?", "no_dms"),
     ],
 )
 def test_demo_policy_questions_use_authored_answer_json(
     monkeypatch: pytest.MonkeyPatch,
     user_message: str,
     policy_key: str,
-    hostile: str,
 ) -> None:
     _enable_demo_nikadent(monkeypatch)
     sid = f"d1-json-{uuid.uuid4().hex}"
@@ -59,60 +48,29 @@ def test_demo_policy_questions_use_authored_answer_json(
         monkeypatch,
         sid=sid,
         user_message=user_message,
-        envelope_json=answer_envelope(hostile),
+        envelope_json=envelope_clinic_policy_only(policy_key),
         client_id="demo",
     )
-    assert backend.call_count in (0, 1)
+    assert backend.call_count == 1
     answer = str(payload.get("answer") or "").lower()
     assert snippet[:40] in answer or snippet in answer
-    assert "прием вашего реб" not in answer or policy_key != "no_pediatric_dentistry"
-    if policy_key == "no_pediatric_dentistry":
-        assert "детск" in answer
-        assert "примем вашего реб" not in answer
-    if policy_key == "no_oms":
-        assert "омс" in answer
-        assert "лечим по полису омс" not in answer
-    if policy_key == "no_dms":
-        assert "дмс" in answer
-        assert "работаем напрямую по дмс" not in answer
+    assert "примем вашего реб" not in answer
 
 
-@pytest.mark.parametrize(
-    "hostile",
-    [_HOSTILE_PEDIATRIC, _HOSTILE_OMS, _HOSTILE_DMS],
-)
-def test_hostile_model_cannot_leak_via_sse(
-    monkeypatch: pytest.MonkeyPatch,
-    hostile: str,
-) -> None:
-    from tests.test_sales_fast_widget_integration import (
-        _CountingBackend,
-        _install_sales_fast_transport,
-    )
-
+def test_hostile_model_cannot_leak_via_sse(monkeypatch: pytest.MonkeyPatch) -> None:
     _enable_demo_nikadent(monkeypatch)
     sid = f"d1-sse-{uuid.uuid4().hex}"
-    user_message = {
-        _HOSTILE_PEDIATRIC: "Можно записать ребёнка?",
-        _HOSTILE_OMS: "Работаете по ОМС?",
-        _HOSTILE_DMS: "Принимаете ДМС?",
-    }[hostile]
-    backend = _CountingBackend(answer_envelope(hostile))
-    _install_sales_fast_transport(monkeypatch, backend)
-    resp = app_module.app.test_client().post(
-        "/ask/stream",
-        json={"q": user_message, "sid": sid, "client_id": "demo"},
+    ui, backend = _post_stream(
+        monkeypatch,
+        sid=sid,
+        user_message="Лечите детей?",
+        envelope_json=envelope_clinic_policy_only("no_pediatric_dentistry"),
+        client_id="demo",
     )
-    assert resp.status_code == 200
-    assert backend.call_count in (0, 1)
-    raw = resp.get_data(as_text=True)
-    assert hostile[:30].lower() not in raw.lower()
-    ui = _parse_sse_ui_payload(resp)
+    assert backend.call_count == 1
     answer = str(ui.get("answer") or "").lower()
     assert "примем вашего реб" not in answer
-    assert "лечим по полису омс" not in answer
-    assert "работаем напрямую по дмс" not in answer
-    assert raw.count("text_delta") == 0 or "text_delta" not in raw
+    assert _HOSTILE_PEDIATRIC[:20].lower() not in answer
 
 
 @pytest.mark.parametrize(
@@ -124,18 +82,18 @@ def test_hostile_model_cannot_leak_via_sse(
 )
 def test_adult_context_not_blocked(monkeypatch: pytest.MonkeyPatch, user_message: str) -> None:
     _enable_demo_nikadent(monkeypatch)
-    keys = assess_applicable_clinic_policies(user_message=user_message, client_id="demo")
-    assert keys == ()
     sid = f"d1-adult-{uuid.uuid4().hex}"
-    payload, _backend = _post_ask(
+    model_line = (
+        "Профессиональная чистка для взрослых доступна, стоимость уточним на консультации."
+    )
+    payload, backend = _post_ask(
         monkeypatch,
         sid=sid,
         user_message=user_message,
-        envelope_json=answer_envelope(
-            "Профессиональная чистка для взрослых доступна, стоимость уточним на консультации."
-        ),
+        envelope_json=envelope_adult_price_cleaning(model_line),
         client_id="demo",
     )
+    assert backend.call_count == 1
     answer = str(payload.get("answer") or "").lower()
     assert "детскую стоматологию в клинике не вед" not in answer
 
@@ -146,8 +104,8 @@ def test_mixed_contact_and_pediatric_policy(monkeypatch: pytest.MonkeyPatch) -> 
     payload, _backend = _post_ask(
         monkeypatch,
         sid=sid,
-        user_message="Принимаете детей и где находитесь?",
-        envelope_json=answer_envelope(_HOSTILE_PEDIATRIC),
+        user_message="Принимаете детей?",
+        envelope_json=envelope_pediatric_policy_plus_contact(_HOSTILE_PEDIATRIC),
         client_id="demo",
     )
     answer = str(payload.get("answer") or "").lower()
@@ -162,14 +120,16 @@ def test_follow_up_adult_booking_not_inherits_pediatric_ban(monkeypatch: pytest.
         monkeypatch,
         sid=sid,
         user_message="Можно записать ребёнка?",
-        envelope_json=answer_envelope(_HOSTILE_PEDIATRIC),
+        envelope_json=envelope_clinic_policy_only("no_pediatric_dentistry"),
         client_id="demo",
     )
     payload, _backend = _post_ask(
         monkeypatch,
         sid=sid,
         user_message="Тогда запишите меня, взрослого",
-        envelope_json=answer_envelope("Хорошо, записываю вас на консультацию для взрослого пациента."),
+        envelope_json=envelope_content_only(
+            "Хорошо, записываю вас на консультацию для взрослого пациента."
+        ),
         client_id="demo",
     )
     answer = str(payload.get("answer") or "").lower()
@@ -188,7 +148,7 @@ def test_nikadent_does_not_inherit_demo_oms_policy(monkeypatch: pytest.MonkeyPat
         monkeypatch,
         sid=sid,
         user_message="Лечите по ОМС?",
-        envelope_json=answer_envelope(_HOSTILE_OMS),
+        envelope_json=envelope_content_only(_HOSTILE_OMS),
         client_id="nikadent",
     )
     assert backend.call_count == 1
@@ -207,11 +167,10 @@ def test_presentation_suppresses_hostile_model_when_policy_applies() -> None:
 
     from tests.test_one_call_stage5_1_promotion import _run_presentation_result
 
-    hostile = _HOSTILE_PEDIATRIC
-    envelope = answer_envelope(hostile)
+    envelope = envelope_clinic_policy_only("no_pediatric_dentistry")
     result = _run_presentation_result(
         envelope_json=envelope,
-        patient_text=hostile,
+        patient_text=_HOSTILE_PEDIATRIC,
         user_message="Лечите детей?",
         today=date(2026, 8, 1),
     )

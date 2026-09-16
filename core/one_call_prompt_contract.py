@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from config import SALES_ONE_PLUS_MODEL
 
-ONE_CALL_PROMPT_CONTRACT_VERSION = 13
+ONE_CALL_PROMPT_CONTRACT_VERSION = 14
 ONE_CALL_MODEL_SNAPSHOT = SALES_ONE_PLUS_MODEL
 
 ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS = """Return exactly one JSON object and nothing else.
@@ -26,12 +26,20 @@ price_text: string or null
 service_reference_status: none | resolved | unresolved
 requested_service_id: canonical service_id from SERVICE_REFERENCE_CATALOG or null
 references: object with closed nested key direct_fact_ids only
+request_understanding: object or null (required for substantive ANSWER/CLARIFY in v14)
+primary_price_request_id: string or null (one kind=price request_id for code-owned primary price)
+
+request_understanding (when non-null):
+subjects: array of {subject_id, relation, age_group} — may be empty
+requests: array (>=1 for substantive ANSWER) of {request_id, kind, subject_id, context, policy_ids, payment_scheme, payment_scheme_intent, contact_fields, content_text}
+kind: clinic_policy | booking | price | contact | content | other
+For code-owned policy/contact/price surfaces use request_understanding; patient_text may be null on ANSWER when the ledger owns materialization. Put informational prose in per-request content_text only (not duplicated in patient_text).
 
 Closed nested references:
 references.direct_fact_ids: JSON array (never null) of unique nonblank catalog fact_id strings from EXACT_COMMERCIAL_CATALOG; empty array when no direct commercial fact applies.
 
 Route invariants:
-ANSWER — nonblank patient_text; clarify_axis=null; clarify_service_options=null; direct_fact_ids=[] or valid non-empty catalog IDs.
+ANSWER — patient_text nonblank OR request_understanding.requests>=1 with ledger-owned blocks; clarify_axis=null; clarify_service_options=null; direct_fact_ids=[] or valid non-empty catalog IDs.
 price_text must be null on all turns. Exact visible prices, billing units, package amounts, and payment-stage amounts are always code-owned after the model response.
 When SELECTED_EXACT_OFFER.availability=multiple and commercial_intent=price, patient_text may contain a short grounded explanation and transition without exact amounts.
 ADMIN — patient_text=null; price_text=null; clarify_axis=null; clarify_service_options=null; promotion_scope=none; direct_fact_ids=[].

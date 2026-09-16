@@ -663,6 +663,7 @@ def build_validated_understanding_snapshot(
     understanding: object,
     resolution: object,
     ui_booking_action: bool = False,
+    ui_situation_action: bool = False,
 ) -> dict[str, object]:
     from contracts.clinic_policy_resolution import ClinicPolicyResolutionResult
     from contracts.request_understanding import RequestUnderstanding
@@ -718,7 +719,7 @@ def build_validated_understanding_snapshot(
         if not any(row[1] == booking_id and row[2] == "deny" for row in permissions):
             permissions.append((source_turn, booking_id, "allow"))
     ui_request_id = None
-    if ui_booking_action:
+    if ui_booking_action or ui_situation_action:
         blocked_ids = {row[1] for row in permissions if row[2] == "deny"}
         eligible_ids = {
             entry.request_id for entry in resolution.ledger
@@ -741,7 +742,8 @@ def build_validated_understanding_snapshot(
         "decisions": list(decisions),
         "ledger": list(ledger),
         "active_booking_request_id": booking_id,
-        "ui_booking_request_id": ui_request_id,
+        "ui_booking_request_id": ui_request_id if ui_booking_action else None,
+        "ui_situation_request_id": ui_request_id if ui_situation_action else None,
         "permissions": [list(row) for row in permissions],
     }
 
@@ -790,6 +792,21 @@ def authorized_booking_request_id(
         for row in snapshot.get("requests", [])
     )
     if not is_booking_request and (require_booking_request or snapshot.get("ui_booking_request_id") != request_id):
+        return None
+    if [source_turn, request_id, "allow"] not in snapshot.get("permissions", []):
+        return None
+    return request_id
+
+
+def authorized_situation_request_id(st: dict[str, Any], *, client_id: str) -> str | None:
+    snapshot = read_validated_understanding_snapshot(st)
+    if snapshot is None or snapshot.get("schema_version") != 1 or snapshot.get("client_id") != client_id:
+        return None
+    source_turn = snapshot.get("source_turn")
+    if type(source_turn) is not int or source_turn != int(st.get("session_turn_count") or 0) - 1:
+        return None
+    request_id = snapshot.get("ui_situation_request_id")
+    if not isinstance(request_id, str) or not request_id:
         return None
     if [source_turn, request_id, "allow"] not in snapshot.get("permissions", []):
         return None

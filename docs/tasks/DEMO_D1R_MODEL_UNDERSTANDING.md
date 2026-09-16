@@ -464,3 +464,21 @@ tests/test_one_call_stage4_2_closed_envelope_production.py
 tests/test_one_call_envelope_v4_service_reference.py
 tests/test_one_call_envelope_v5_direct_facts.py
 ```
+
+### Focused Checker correction: situation intake
+
+The independent Checker reviewed `1a68796` and found one remaining R5 bypass:
+after a child-booking denial, `situation_action=start` followed by a situation note
+could enter name collection without another policy decision. The follow-up gates
+the start on a current server-emitted situation permission. Submitting a substantive
+note now uses the existing pending-question privacy preparation and the single
+model/policy path; it cannot directly grant booking. Name/phone-only notes stay
+local, and raw situation notes remain in their existing local storage.
+Only this finding and affected situation/lead/privacy transitions are rechecked;
+the preceding review found no other blocking R4/R6/composition issue.
+Follow-up verification: **79 passed** across `test_demo_d1r_http_offline.py`,
+`test_situation_intake_http_offline.py`, and `test_tenant_lead_pending_question_offline.py`
+using the same isolated offline runner; real provider calls and transport attempts
+both zero. The positive situation test joins the real authored-content renderer
+and snapshot builder with the HTTP intake path, alongside denied/stale/forged and
+PII-only/mixed-note cases.

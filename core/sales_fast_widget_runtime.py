@@ -1365,6 +1365,11 @@ def _materialize_result(
                         isinstance(reply, dict) and reply.get("ref") == "lead:booking"
                         for reply in widget.payload.get("quick_replies") or []
                     ),
+                    ui_situation_action=bool(
+                        isinstance(widget.payload.get("situation"), dict)
+                        and widget.payload["situation"].get("show")
+                        and widget.payload["situation"].get("mode") == "normal"
+                    ),
                 ),
             )
         session_prior = session_state

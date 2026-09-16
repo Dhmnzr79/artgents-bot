@@ -1325,16 +1325,30 @@ def handle_flows(
                 ),
                 "doc_id": None,
             }
+        if defer_free_text_booking_entry:
+            profile = st.get("profile") or {}
+            safe_q = prepare_lead_pending_provider_question(
+                q, profile_name=str(profile.get("name") or "").strip(),
+            )
+            if not safe_q:
+                return {
+                    "payload": service_payload(
+                        txt["situation_retry_short"], sid, client_id,
+                        situation_mode="pending", situation_collect=True,
+                    ),
+                    "doc_id": None,
+                }
+            set_situation_note(sid, q)
+            set_situation_pending(sid, False)
+            bind_lead_provider_question(safe_q)
+            return None
         set_situation_note(sid, q)
         set_situation_pending(sid, False)
         set_lead_intent(sid, "collecting_name")
         return {
             "payload": service_payload(
-                txt["situation_to_lead_name"],
-                sid,
-                client_id,
-                lead_flow=True,
-                lead_step="name",
+                txt["situation_to_lead_name"], sid, client_id,
+                lead_flow=True, lead_step="name",
             ),
             "doc_id": None,
         }
@@ -1354,6 +1368,13 @@ def handle_flows(
     if data.get("situation_action") == "start" or data.get("action") == "situation":
         if not situation_enabled(client_id):
             return None
+        if defer_free_text_booking_entry:
+            from core.target_runtime_session import authorized_situation_request_id
+
+            if q.strip():
+                return None
+            if not client_id or not authorized_situation_request_id(st, client_id=client_id):
+                return _booking_action_rejected(sid, client_id, service_payload)
         set_situation_pending(sid, True)
         return {
             "payload": service_payload(

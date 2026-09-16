@@ -120,6 +120,13 @@ def test_d1r_old_booking_cannot_restart_after_failed_turn(monkeypatch: pytest.Mo
     assert (payload.get("meta") or {}).get("lead_step") != "name"
     with session_client_scope("demo"):
         assert mem_get(sid).get("lead_intent") != "collecting_name"
+    from app import app
+    from tests.test_one_call_tenant_isolation_offline import _parse_sse_ui_payload
+    route = "/ask/stream" if stream else "/ask"
+    start = app.test_client().post(route, json={"sid": sid, "client_id": "demo", "situation_action": "start"})
+    assert start.status_code == 200
+    start_payload = _parse_sse_ui_payload(start) if stream else start.get_json()
+    assert not (start_payload.get("meta") or {}).get("situation_collect")
 
 
 @pytest.mark.parametrize("entry", [{"ref": "lead:booking"}, {"cta_action": "lead"}])
@@ -133,6 +140,126 @@ def test_d1r_child_denial_rejects_booking_entry(monkeypatch: pytest.MonkeyPatch,
     assert (response.get_json().get("meta") or {}).get("lead_step") != "name"
     with session_client_scope("demo"):
         assert mem_get(sid).get("lead_intent") != "collecting_name"
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_d1r_child_denial_cannot_enter_lead_through_situation(monkeypatch: pytest.MonkeyPatch, stream: bool) -> None:
+    _enable_demo_nikadent(monkeypatch)
+    sid = f"d1r-child-situation-{uuid.uuid4().hex}"
+    post = _post_stream if stream else _post_ask
+    post(monkeypatch, sid=sid, user_message="Запишите ребёнка", envelope_json=envelope_child_booking_blocked(), client_id="demo")
+    from app import app
+    route = "/ask/stream" if stream else "/ask"
+    from tests.test_one_call_tenant_isolation_offline import _parse_sse_ui_payload
+    start = app.test_client().post(route, json={"sid": sid, "client_id": "demo", "situation_action": "start"})
+    assert start.status_code == 200
+    start_payload = _parse_sse_ui_payload(start) if stream else start.get_json()
+    assert not (start_payload.get("meta") or {}).get("situation_collect")
+    followup = app.test_client().post(route, json={"sid": sid, "client_id": "demo", "q": "Нужно лечение ребёнку"})
+    assert followup.status_code == 200
+    followup_payload = _parse_sse_ui_payload(followup) if stream else followup.get_json()
+    assert (followup_payload.get("meta") or {}).get("lead_step") != "name"
+    with session_client_scope("demo"):
+        assert mem_get(sid).get("lead_intent") != "collecting_name"
+
+
+@pytest.mark.parametrize("child_note", [False, True])
+def test_d1r_emitted_situation_note_uses_fresh_booking_decision(monkeypatch: pytest.MonkeyPatch, child_note: bool) -> None:
+    _enable_demo_nikadent(monkeypatch)
+    sid = f"d1r-valid-situation-{uuid.uuid4().hex}"
+    from pathlib import Path
+    from contracts.request_understanding import RequestUnderstanding
+    from contracts.target_response_spec import TargetResponseSpec
+    from core.target_response_followup_policy import TargetResponseFollowupSelection
+    from core.clinic_policy_resolver import resolve_clinic_policies
+    from core.target_presentation_decision import TargetPresentationCadenceState, decide_target_presentation
+    from core.target_runtime_session import build_validated_understanding_snapshot, write_validated_understanding_snapshot
+    from session import mem_add_user
+
+    decision = decide_target_presentation(
+        client_id="demo", md_root=Path(__file__).resolve().parents[1] / "clients" / "demo" / "md",
+        spec=TargetResponseSpec(response_mode="answer", service_id="bone_graft", tone_key="commercial_warm",
+                                allowed_topics=("implantation",), required_components=("content",)),
+        navigation_followups=(), selected_followups=TargetResponseFollowupSelection(source="content", content=(), price=()),
+        primary_content_ref="implantation__service__bone_graft.md", cadence=TargetPresentationCadenceState(), allow_situation=True,
+    )
+    if not decision.situation.get("show"):
+        decision = decide_target_presentation(
+            client_id="demo", md_root=Path(__file__).resolve().parents[1] / "clients" / "demo" / "md",
+            spec=TargetResponseSpec(response_mode="answer", service_id="bone_graft", tone_key="commercial_warm",
+                                    allowed_topics=("implantation",), required_components=("content",)),
+            navigation_followups=(), selected_followups=TargetResponseFollowupSelection(source="content", content=(), price=()),
+            primary_content_ref="implantation__service__bone_graft.md",
+            cadence=TargetPresentationCadenceState(
+                shown_content_followup_refs=frozenset(item["ref"] for item in decision.quick_replies),
+            ), allow_situation=True,
+        )
+    assert decision.situation.get("show") is True
+    understanding = RequestUnderstanding.model_validate(json.loads(envelope_content_only("Костная пластика помогает подготовить кость к имплантации."))["request_understanding"])
+    resolution = resolve_clinic_policies(client_id="demo", understanding=understanding)
+    with session_client_scope("demo"):
+        mem_add_user(sid, "Что такое костная пластика?")
+        write_validated_understanding_snapshot(sid, build_validated_understanding_snapshot(
+            client_id="demo", source_turn=0, understanding=understanding, resolution=resolution,
+            ui_situation_action=True,
+        ))
+    from app import app
+    from tests.test_one_call_tenant_isolation_offline import _CountingBackend, _install_sales_fast_transport
+    start = app.test_client().post("/ask", json={"sid": sid, "client_id": "demo", "situation_action": "start"})
+    assert start.status_code == 200
+    assert (start.get_json().get("meta") or {}).get("situation_collect")
+    backend = _CountingBackend(envelope_child_booking_blocked() if child_note else envelope_adult_booking_only())
+    _install_sales_fast_transport(monkeypatch, backend)
+    note = "Нужно записать ребёнка на лечение" if child_note else "Мне нужна консультация по костной пластике"
+    response = app.test_client().post("/ask", json={"sid": sid, "client_id": "demo", "q": note})
+    assert response.status_code == 200
+    assert backend.call_count == 1
+    assert ((response.get_json().get("meta") or {}).get("lead_step") == "name") is not child_note
+
+
+@pytest.mark.parametrize("note", ["Иван", "+79991234567"])
+def test_d1r_situation_note_only_pii_stays_local(monkeypatch: pytest.MonkeyPatch, note: str) -> None:
+    _enable_demo_nikadent(monkeypatch)
+    from session import set_situation_pending
+    sid = f"d1r-situation-pii-{uuid.uuid4().hex}"
+    with session_client_scope("demo"):
+        set_situation_pending(sid, True)
+    payload, backend = _post_ask(monkeypatch, sid=sid, user_message=note, envelope_json=envelope_adult_booking_only(), client_id="demo")
+    assert backend.call_count == 0
+    assert (payload.get("meta") or {}).get("lead_step") != "name"
+    with session_client_scope("demo"):
+        assert mem_get(sid).get("situation_pending") is True
+
+
+def test_d1r_situation_note_strips_phone_before_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable_demo_nikadent(monkeypatch)
+    from session import set_situation_pending
+    sid = f"d1r-situation-mixed-{uuid.uuid4().hex}"
+    with session_client_scope("demo"):
+        set_situation_pending(sid, True)
+    payload, backend = _post_ask(
+        monkeypatch, sid=sid, user_message="Нужна консультация по имплантации, +79991234567",
+        envelope_json=envelope_adult_booking_only(), client_id="demo",
+    )
+    assert backend.call_count == 1
+    assert backend.invocation is not None
+    assert "+79991234567" not in str(backend.invocation.user_prompt)
+    assert (payload.get("meta") or {}).get("lead_step") == "name"
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_d1r_forged_situation_start_requires_server_ui(monkeypatch: pytest.MonkeyPatch, stream: bool) -> None:
+    _enable_demo_nikadent(monkeypatch)
+    from app import app
+    from tests.test_one_call_tenant_isolation_offline import _parse_sse_ui_payload
+    sid = f"d1r-forged-situation-{uuid.uuid4().hex}"
+    route = "/ask/stream" if stream else "/ask"
+    response = app.test_client().post(route, json={"sid": sid, "client_id": "demo", "situation_action": "start"})
+    assert response.status_code == 200
+    payload = _parse_sse_ui_payload(response) if stream else response.get_json()
+    assert not (payload.get("meta") or {}).get("situation_collect")
+    with session_client_scope("demo"):
+        assert not mem_get(sid).get("situation_pending")
 
 
 def test_d1r_emitted_booking_cta_accepts_current_click(monkeypatch: pytest.MonkeyPatch) -> None:

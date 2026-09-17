@@ -41,6 +41,46 @@ def test_scope_commitment_is_typed(status: str) -> None:
         RequestUnderstanding.model_validate(payload)
 
 
+def test_tooth_count_accepts_only_explicit_positive_integer() -> None:
+    payload = minimal_content_understanding("Ответ.").model_dump()
+    payload["tooth_count"] = 3
+    assert RequestUnderstanding.model_validate(payload).tooth_count == 3
+    for invalid in (0, -1, True, 2.5, "3"):
+        payload["tooth_count"] = invalid
+        with pytest.raises(ValueError):
+            RequestUnderstanding.model_validate(payload)
+
+
+@pytest.mark.parametrize("count,extent", [(2, "one_tooth"), (1, "few_teeth")])
+def test_tooth_count_conflicting_with_extent_is_rejected(count: int, extent: str) -> None:
+    understanding = minimal_content_understanding("Ответ.").model_dump()
+    understanding["tooth_count"] = count
+    payload = production_envelope_template(
+        extent=extent, request_understanding=understanding,
+    )
+    with pytest.raises(OneCallEnvelopeProtocolError, match="scope_count_extent_conflict"):
+        parse_production_envelope_json(
+            json.dumps(payload, ensure_ascii=False),
+            active_service_catalog=_EMPTY_CATALOG,
+            service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        )
+
+
+@pytest.mark.parametrize("count,expected_extent", [(1, "one_tooth"), (3, "few_teeth")])
+def test_tooth_count_fills_missing_extent(count: int, expected_extent: str) -> None:
+    understanding = minimal_content_understanding("Ответ.").model_dump()
+    understanding["tooth_count"] = count
+    payload = production_envelope_template(request_understanding=understanding)
+    parsed = parse_production_envelope_json(
+        json.dumps(payload, ensure_ascii=False),
+        active_service_catalog=_EMPTY_CATALOG,
+        service_reference_catalog=_EMPTY_REF_CATALOG,
+        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+    )
+    assert parsed.extent == expected_extent
+
+
 def test_subject_id_pattern() -> None:
     with pytest.raises(ValueError):
         RequestUnderstandingSubject(subject_id="x1", relation="unknown", age_group="unknown")

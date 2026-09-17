@@ -28,6 +28,7 @@ class SessionPatientFacts:
     stage_ref: str | None = None
     jaw: Literal["upper", "lower", "both"] | None = None
     reported_context: ReportedContext | None = None
+    tooth_count: int | None = None
 
     def is_fresh(self, *, session_turn_count: int) -> bool:
         age = max(0, int(session_turn_count) - int(self.set_at_turn))
@@ -113,6 +114,7 @@ def session_patient_facts_from_ui_stage_action(
         set_at_turn=int(set_at_turn),
         stage=action.stage,
         stage_ref=action.ref,
+        tooth_count=prior.tooth_count if prior is not None else None,
     )
 
 
@@ -142,6 +144,8 @@ def read_session_patient_facts(raw: object) -> SessionPatientFacts | None:
     reported_context: ReportedContext | None = None
     if reported_raw == "reported_bone_deficit":
         reported_context = "reported_bone_deficit"
+    count_raw = raw.get("tooth_count")
+    tooth_count = count_raw if type(count_raw) is int and count_raw > 0 else None
     return SessionPatientFacts(
         extent=extent,  # type: ignore[arg-type]
         topic=topic,
@@ -152,6 +156,7 @@ def read_session_patient_facts(raw: object) -> SessionPatientFacts | None:
         stage_ref=stage_ref,
         jaw=jaw,
         reported_context=reported_context,
+        tooth_count=tooth_count,
     )
 
 
@@ -171,4 +176,6 @@ def patient_facts_payload(facts: SessionPatientFacts) -> dict[str, str | int | N
         payload["jaw"] = facts.jaw
     if facts.reported_context is not None:
         payload["reported_context"] = facts.reported_context
+    if facts.tooth_count is not None:
+        payload["tooth_count"] = facts.tooth_count
     return payload

@@ -1410,6 +1410,15 @@ def _materialize_result(
                     in {"reported", "correction"}
                 )
             ) else None,  # type: ignore[arg-type]
+            reported_tooth_count=(
+                semantic.request_understanding.tooth_count
+                if semantic.request_understanding is not None
+                else None
+            ),
+            replace_tooth_count=bool(
+                semantic.request_understanding is not None
+                and semantic.request_understanding.scope_commitment in {"reported", "correction"}
+            ),
             presentation_cadence_update=widget.presentation_cadence_update,
             availability_status=semantic.availability_status,
             displayed_offer_ids=displayed_offer_ids,

@@ -370,6 +370,8 @@ def _apply_a9_patient_facts_to_state(
     effective_scope: EffectiveScope,
     prior: SessionPatientFacts | None,
     current_topic: str | None,
+    reported_tooth_count: int | None = None,
+    replace_tooth_count: bool = False,
 ) -> None:
     from core.target_effective_scope_merge import simulate_session_patient_facts_after_turn
 
@@ -384,6 +386,15 @@ def _apply_a9_patient_facts_to_state(
     )
     if not sim.wrote or sim.facts is None:
         return
+    tooth_count = reported_tooth_count if replace_tooth_count else (
+        prior.tooth_count
+        if prior is not None
+        and prior.topic == sim.facts.topic
+        and prior.extent == sim.facts.extent
+        else None
+    )
+    if sim.facts.extent == "one_tooth" and tooth_count not in (None, 1):
+        tooth_count = None
     facts = SessionPatientFacts(
         extent=sim.facts.extent,
         topic=sim.facts.topic,
@@ -394,6 +405,7 @@ def _apply_a9_patient_facts_to_state(
         stage_ref=sim.facts.stage_ref,
         jaw=sim.facts.jaw,
         reported_context=None,
+        tooth_count=tooth_count,
     )
     st[_PATIENT_FACTS_KEY] = patient_facts_payload(facts)
 
@@ -501,6 +513,8 @@ def write_target_runtime_session_after_materialized(
     current_selection: TargetMaterializedSessionSelection,
     followups: tuple[TargetRuntimeFollowupItem, ...],
     effective_scope: EffectiveScope | None = None,
+    reported_tooth_count: int | None = None,
+    replace_tooth_count: bool = False,
     presentation_cadence_update: TargetPresentationCadenceUpdate | None = None,
     availability_status: str | None = None,
     displayed_offer_ids: tuple[str, ...] = (),
@@ -652,6 +666,8 @@ def write_target_runtime_session_after_materialized(
                 effective_scope=effective_scope,
                 prior=prior.patient_facts,
                 current_topic=turn_frame.topic,
+                reported_tooth_count=reported_tooth_count,
+                replace_tooth_count=replace_tooth_count,
             )
         _persist_unlocked(sid, st)
 

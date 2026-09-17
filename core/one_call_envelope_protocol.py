@@ -371,6 +371,14 @@ def _validate_structure(
                 message if message else "request_understanding_invalid"
             ) from exc
 
+    tooth_count = request_understanding.tooth_count if request_understanding is not None else None
+    if tooth_count is not None:
+        count_extent = "one_tooth" if tooth_count == 1 else "few_teeth"
+        if extent is None:
+            extent = count_extent
+        elif extent in {"one_tooth", "few_teeth"} and extent != count_extent:
+            raise OneCallEnvelopeProtocolError("scope_count_extent_conflict")
+
     primary_price_request_id = _optional_nonblank_string(
         payload.get("primary_price_request_id"),
         code="primary_price_request_id_invalid",

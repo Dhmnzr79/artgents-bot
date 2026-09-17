@@ -103,6 +103,12 @@ def _with_scope_commitment(envelope_json: str, commitment: str) -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 
+def _with_reported_count(envelope_json: str, commitment: str, count: int | None) -> str:
+    payload = json.loads(_with_scope_commitment(envelope_json, commitment))
+    payload["request_understanding"]["tooth_count"] = count
+    return json.dumps(payload, ensure_ascii=False)
+
+
 def _scope_clarify_envelope(axis: str = "extent") -> str:
     return answer_envelope(
         "Какая челюсть?" if axis == "jaw" else "Сколько зубов нужно восстановить?",
@@ -377,6 +383,90 @@ def test_explicit_other_service_after_full_arch_scope_does_not_inherit_implant_a
     if offer_ids:
         assert all(oid.startswith("removable_dentures.") for oid in offer_ids)
     assert (payload.get("meta") or {}).get("matched_service_id") == "removable_dentures"
+
+
+def test_service_detour_keeps_reported_need_without_pricing_other_service_from_it(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+    isolated_demo_sqlite,
+) -> None:
+    monkeypatch.setattr(
+        "core.target_runtime_client_context.runtime_today",
+        lambda: date(2026, 8, 10),
+    )
+    sid = f"demo-vol-detour-{uuid.uuid4().hex[:8]}"
+    reported = _with_scope_commitment(answer_envelope(
+        "Стоимость восстановления одного зуба.", commercial_intent="price",
+        service_id="classic", extent="one_tooth",
+        service_reference_status="resolved", requested_service_id="classic",
+    ), "reported")
+    _run_ask(
+        monkeypatch, sid=sid, backend=_Backend(reported),
+        user_message="У меня нет одного зуба. Сколько стоит имплантация?",
+        envelope_json=reported,
+    )
+    assert read_target_runtime_session_for(sid).patient_facts.extent == "one_tooth"
+
+    other = answer_envelope(
+        "Стоимость съёмного протеза зависит от конструкции.",
+        commercial_intent="price", service_id="removable_dentures",
+        service_reference_status="resolved", requested_service_id="removable_dentures",
+    )
+    other_reply = _run_ask(
+        monkeypatch, sid=sid, backend=_Backend(other),
+        user_message="А сколько стоит съёмный протез?",
+        envelope_json=other, reset_session=False,
+    )
+    assert (other_reply.get("meta") or {}).get("matched_service_id") == "removable_dentures"
+    assert "76200" not in _norm_digits(str(other_reply.get("answer") or ""))
+    saved = read_target_runtime_session_for(sid).patient_facts
+    assert saved is not None and saved.extent == "one_tooth" and saved.topic == "implantation"
+
+    back = answer_envelope(
+        "Стоимость имплантации.", commercial_intent="price",
+        service_id="classic", service_reference_status="resolved",
+        requested_service_id="classic",
+    )
+    back_reply = _run_ask(
+        monkeypatch, sid=sid, backend=_Backend(back),
+        user_message="Вернёмся к имплантации. Сколько стоит?",
+        envelope_json=back, reset_session=False,
+    )
+    assert "76200" in _norm_digits(str(back_reply.get("answer") or ""))
+
+
+@pytest.mark.parametrize("runner", (_run_ask, _run_stream))
+def test_exact_reported_count_correction_hypothetical_and_unspecified_correction(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+    isolated_demo_sqlite,
+    runner,
+) -> None:
+    sid = f"demo-vol-count-{uuid.uuid4().hex[:8]}"
+
+    def turn(
+        message: str, commitment: str, count: int | None, *,
+        reset: bool, extent: str | None = "few_teeth",
+    ) -> None:
+        env = _with_reported_count(answer_envelope(
+            "Понял объём лечения.", commercial_intent="none",
+            service_id="classic", extent=extent,
+            service_reference_status="resolved", requested_service_id="classic",
+        ), commitment, count)
+        runner(
+            monkeypatch, sid=sid, backend=_Backend(env),
+            user_message=message, envelope_json=env, reset_session=reset,
+        )
+
+    turn("У меня нет двух зубов", "reported", 2, reset=True)
+    assert read_target_runtime_session_for(sid).patient_facts.tooth_count == 2
+    turn("Нет, трёх", "correction", 3, reset=False, extent=None)
+    assert read_target_runtime_session_for(sid).patient_facts.tooth_count == 3
+    turn("А если четыре?", "hypothetical", 4, reset=False)
+    assert read_target_runtime_session_for(sid).patient_facts.tooth_count == 3
+    turn("Точнее, несколько зубов, число пока не знаю", "correction", None, reset=False)
+    facts = read_target_runtime_session_for(sid).patient_facts
+    assert facts is not None and facts.extent == "few_teeth" and facts.tooth_count is None
 
 
 def test_correction_one_tooth_after_full_arch_scope_click(

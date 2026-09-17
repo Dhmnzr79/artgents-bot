@@ -107,6 +107,14 @@ class RequestUnderstanding(BaseModel):
     subjects: tuple[RequestUnderstandingSubject, ...]
     requests: tuple[RequestUnderstandingRequest, ...]
     scope_commitment: ScopeCommitment = "unknown"
+    tooth_count: int | None = None
+
+    @field_validator("tooth_count")
+    @classmethod
+    def _validate_tooth_count(cls, value: int | None) -> int | None:
+        if value is not None and value < 1:
+            raise ValueError("tooth_count_invalid")
+        return value
 
     @field_validator("subjects", "requests", mode="before")
     @classmethod

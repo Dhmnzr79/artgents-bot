@@ -7,6 +7,7 @@ import json
 import uuid
 
 from core.one_call_envelope_protocol import (
+    ENVELOPE_NORMALIZED_DUPLICATE_PATIENT_TEXT,
     ENVELOPE_NORMALIZED_NESTED_PRIMARY_PRICE_REQUEST_ID,
     OneCallEnvelopeProtocolError,
     parse_production_envelope_json,
@@ -126,6 +127,41 @@ def test_unknown_nested_understanding_field_is_still_rejected() -> None:
     payload["request_understanding"]["unknown"] = "x"  # type: ignore[index]
     with pytest.raises(OneCallEnvelopeProtocolError, match="extra_forbidden"):
         _parse(payload)
+
+
+def test_duplicate_answer_and_ledger_text_is_normalized_to_one_ledger_copy() -> None:
+    import app as app_module
+    from core import turn_timing
+
+    payload = production_envelope_template(
+        patient_text="Краткое объяснение из материала.",
+        request_understanding={
+            "subjects": [],
+            "requests": [{
+                "request_id": "r1",
+                "kind": "content",
+                "subject_id": None,
+                "context": "general_information",
+                "policy_ids": [],
+                "payment_scheme": "unspecified",
+                "payment_scheme_intent": "unspecified",
+                "contact_fields": [],
+                "content_text": "Краткое объяснение из материала.",
+                "content_ref": None,
+            }],
+        },
+    )
+    with app_module.app.test_request_context("/ask", method="POST"):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        parsed = _parse(payload)
+        assert parsed.patient_text is None
+        assert parsed.request_understanding is not None
+        assert parsed.request_understanding.requests[0].content_text == "Краткое объяснение из материала."
+        assert turn_timing.summary_for_turn_complete()["envelope_input_normalizations"] == [
+            ENVELOPE_NORMALIZED_DUPLICATE_PATIENT_TEXT
+        ]
 
 
 def test_content_ref_is_limited_to_safe_content_requests() -> None:
@@ -335,6 +371,19 @@ def test_nested_price_id_keeps_vinirs_price_scenario_on_the_normal_path(
     )
     payload.pop("primary_price_request_id")
     payload["request_understanding"]["primary_price_request_id"] = "r1"  # type: ignore[index]
+    payload["patient_text"] = "Стоимость виниров зависит от выбранного материала."
+    payload["request_understanding"]["requests"].append({  # type: ignore[index]
+        "request_id": "r2",
+        "kind": "content",
+        "subject_id": None,
+        "context": "general_information",
+        "policy_ids": [],
+        "payment_scheme": "unspecified",
+        "payment_scheme_intent": "unspecified",
+        "contact_fields": [],
+        "content_text": "Стоимость виниров зависит от выбранного материала.",
+        "content_ref": None,
+    })
     response, backend = _post_ask(
         monkeypatch,
         sid=f"d2-f1-vinirs-{uuid.uuid4().hex}",

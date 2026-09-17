@@ -46,6 +46,9 @@ ENVELOPE_NORMALIZED_UNEXPECTED_PRICE_TEXT = "envelope_normalized_unexpected_pric
 ENVELOPE_NORMALIZED_NESTED_PRIMARY_PRICE_REQUEST_ID = (
     "envelope_normalized_nested_primary_price_request_id"
 )
+ENVELOPE_NORMALIZED_DUPLICATE_PATIENT_TEXT = (
+    "envelope_normalized_duplicate_patient_text"
+)
 
 
 class OneCallEnvelopeProtocolError(ValueError):
@@ -128,6 +131,26 @@ def _normalize_production_payload(
             if key != "primary_price_request_id"
         }
         codes.append(ENVELOPE_NORMALIZED_NESTED_PRIMARY_PRICE_REQUEST_ID)
+    patient_text = payload.get("patient_text")
+    requests = understanding.get("requests") if isinstance(understanding, dict) else None
+    if (
+        payload.get("route") == "ANSWER"
+        and isinstance(patient_text, str)
+        and patient_text.strip()
+        and isinstance(requests, list)
+        and any(
+            isinstance(request, dict)
+            and request.get("kind") in {"content", "other"}
+            and isinstance(request.get("content_text"), str)
+            and request["content_text"].strip() == patient_text.strip()
+            for request in requests
+        )
+    ):
+        # The ledger owns informational prose. Keep its one copy instead of
+        # rejecting an otherwise usable response for a duplicated text field.
+        payload = dict(payload)
+        payload["patient_text"] = None
+        codes.append(ENVELOPE_NORMALIZED_DUPLICATE_PATIENT_TEXT)
     if "price_text" not in keys:
         payload = dict(payload)
         payload["price_text"] = None

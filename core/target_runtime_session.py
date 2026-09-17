@@ -513,6 +513,7 @@ def write_target_runtime_session_after_materialized(
     current_selection: TargetMaterializedSessionSelection,
     followups: tuple[TargetRuntimeFollowupItem, ...],
     effective_scope: EffectiveScope | None = None,
+    clear_patient_facts: bool = False,
     reported_tooth_count: int | None = None,
     replace_tooth_count: bool = False,
     presentation_cadence_update: TargetPresentationCadenceUpdate | None = None,
@@ -660,6 +661,8 @@ def write_target_runtime_session_after_materialized(
             for item in followups
             if item.ref
         ]
+        if clear_patient_facts:
+            st.pop(_PATIENT_FACTS_KEY, None)
         if effective_scope is not None:
             _apply_a9_patient_facts_to_state(
                 st,

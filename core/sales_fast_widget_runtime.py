@@ -520,6 +520,44 @@ def _topic_for_effective_scope_merge(
     return None
 
 
+def _is_current_care_for_other_person(understanding: object | None) -> bool:
+    """Return true only for a current-care request explicitly owned by another person."""
+
+    if understanding is None:
+        return False
+    other_subject_ids = {
+        str(getattr(subject, "subject_id", "") or "").strip()
+        for subject in (getattr(understanding, "subjects", ()) or ())
+        if getattr(subject, "relation", None) == "other"
+    }
+    other_subject_ids.discard("")
+    if not other_subject_ids:
+        return False
+    return any(
+        str(getattr(request, "subject_id", "") or "").strip() in other_subject_ids
+        and getattr(request, "context", None) == "current_care"
+        and getattr(request, "kind", None) in {"booking", "content", "other", "price"}
+        for request in (getattr(understanding, "requests", ()) or ())
+    )
+
+
+def _session_state_for_other_person_scope(
+    session_state: object,
+    *,
+    understanding: object | None,
+) -> object:
+    """Do not let one patient's treatment scope or offer survive into another's turn."""
+
+    if not _is_current_care_for_other_person(understanding):
+        return session_state
+    return replace(
+        session_state,
+        patient_facts=None,
+        last_displayed_offer_ids=(),
+        last_selected_offer_id=None,
+    )
+
+
 def _authoritative_effective_scope_for_turn(
     *,
     session_state: object,
@@ -586,9 +624,14 @@ def _rebuild_authoritative_context(
     ExactSalesResolution,
     object,
     object,
+    object,
 ]:
     if result.envelope is None:
         raise ValueError("authoritative_rebuild_requires_envelope")
+    session_state = _session_state_for_other_person_scope(
+        session_state,
+        understanding=result.envelope.request_understanding,
+    )
     governed_ui = governed_ui_authority_from_resolution(resolution)
     session_service_id = resolve_session_service_for_followup(
         turn_frame=build_effective_provisional_turn_frame(
@@ -704,7 +747,7 @@ def _rebuild_authoritative_context(
         shown_amplifier_refs=session_state.shown_amplifier_refs,  # type: ignore[attr-defined]
         shown_consultation_value_refs=session_state.shown_consultation_value_refs,  # type: ignore[attr-defined]
     )
-    return turn_frame, bound, effective_scope, commerce_resolution, strategy_context, semantic
+    return turn_frame, bound, effective_scope, commerce_resolution, strategy_context, semantic, session_state
 
 
 ONE_CALL_RUNTIME_ARCHITECTURE = "fullcontext_one_call"
@@ -1122,6 +1165,7 @@ def _materialize_result(
             commerce_resolution,
             strategy_context,
             semantic,
+            session_state,
         ) = _rebuild_authoritative_context(
             result=result,
             context=context,
@@ -1168,6 +1212,12 @@ def _materialize_result(
                 provider_calls=provider_calls,
             )
         raise
+    cadence = TargetPresentationCadenceState(
+        shown_video_ids=frozenset(session_state.shown_video_ids),  # type: ignore[attr-defined]
+        shown_content_followup_refs=frozenset(session_state.shown_content_followup_refs),  # type: ignore[attr-defined]
+        shown_price_followup_refs=frozenset(session_state.shown_price_followup_refs),  # type: ignore[attr-defined]
+        situation_offered=bool(session_state.situation_offered),  # type: ignore[attr-defined]
+    )
     precomposer_selected_offer = resolve_authoritative_selected_offer_for_turn(
         bundle=context.bundle,
         doctor_catalog=context.doctor_catalog,
@@ -1429,6 +1479,9 @@ def _materialize_result(
                     in {"reported", "correction"}
                 )
             ) else None,  # type: ignore[arg-type]
+            clear_patient_facts=_is_current_care_for_other_person(
+                semantic.request_understanding,
+            ),
             reported_tooth_count=(
                 semantic.request_understanding.tooth_count
                 if semantic.request_understanding is not None

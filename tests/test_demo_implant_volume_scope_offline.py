@@ -109,6 +109,35 @@ def _with_reported_count(envelope_json: str, commitment: str, count: int | None)
     return json.dumps(payload, ensure_ascii=False)
 
 
+def _for_other_person_current_care(
+    envelope_json: str,
+    *,
+    commitment: str = "none",
+    context: str = "current_care",
+    count: int | None = None,
+) -> str:
+    payload = json.loads(envelope_json)
+    payload["request_understanding"] = {
+        "subjects": [{"subject_id": "s1", "relation": "other", "age_group": "adult"}],
+        "scope_commitment": commitment,
+        "tooth_count": count,
+        "requests": [{
+            "request_id": "r1",
+            "kind": "price",
+            "subject_id": "s1",
+            "context": context,
+            "policy_ids": [],
+            "payment_scheme": "unspecified",
+            "payment_scheme_intent": "unspecified",
+            "contact_fields": [],
+            "content_text": None,
+            "content_ref": None,
+        }],
+    }
+    payload["primary_price_request_id"] = "r1"
+    return json.dumps(payload, ensure_ascii=False)
+
+
 def _scope_clarify_envelope(axis: str = "extent") -> str:
     return answer_envelope(
         "Какая челюсть?" if axis == "jaw" else "Сколько зубов нужно восстановить?",
@@ -399,6 +428,123 @@ def test_explicit_other_service_after_full_arch_scope_does_not_inherit_implant_a
     if offer_ids:
         assert all(oid.startswith("removable_dentures.") for oid in offer_ids)
     assert (payload.get("meta") or {}).get("matched_service_id") == "removable_dentures"
+
+
+@pytest.mark.parametrize("runner", (_run_ask, _run_stream))
+def test_other_person_current_care_clears_self_scope_and_offer_context(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+    isolated_demo_sqlite,
+    runner,
+) -> None:
+    monkeypatch.setattr(
+        "core.target_runtime_client_context.runtime_today",
+        lambda: date(2026, 8, 10),
+    )
+    sid = f"demo-other-person-{uuid.uuid4().hex[:8]}"
+    self_scope = _with_reported_count(answer_envelope(
+        "Стоимость восстановления одного зуба.", commercial_intent="price",
+        service_id="classic", extent="one_tooth", jaw="lower",
+        service_reference_status="resolved", requested_service_id="classic",
+    ), "reported", 1)
+    runner(
+        monkeypatch, sid=sid, backend=_Backend(self_scope),
+        user_message="У меня нет одного зуба снизу. Сколько стоит имплантация?",
+        envelope_json=self_scope,
+    )
+    before = read_target_runtime_session_for(sid)
+    assert before.patient_facts is not None
+    assert before.patient_facts.extent == "one_tooth"
+    assert before.patient_facts.jaw == "lower"
+
+    for_mother = _for_other_person_current_care(answer_envelope(
+        "Для мамы сначала нужно уточнить объём восстановления.",
+        commercial_intent="price", service_id=None, extent=None, jaw=None,
+        service_reference_status="none", requested_service_id=None,
+    ))
+    other_reply = runner(
+        monkeypatch, sid=sid, backend=_Backend(for_mother),
+        user_message="А маме сколько стоит имплантация?",
+        envelope_json=for_mother, reset_session=False,
+    )
+    assert "318000" in _norm_digits(str(other_reply.get("answer") or ""))
+    after = read_target_runtime_session_for(sid)
+    assert after.patient_facts is None
+
+    vague = answer_envelope(
+        "Уточните объём восстановления.", commercial_intent="price",
+        service_id=None, extent=None, service_reference_status="none",
+    )
+    continued = runner(
+        monkeypatch, sid=sid, backend=_Backend(vague),
+        user_message="А сколько?", envelope_json=vague, reset_session=False,
+    )
+    assert "76200" not in _norm_digits(str(continued.get("answer") or ""))
+    assert "уточните объём" in str(continued.get("answer") or "").casefold()
+    assert read_target_runtime_session_for(sid).patient_facts is None
+
+
+def test_other_person_past_history_does_not_clear_self_scope(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+    isolated_demo_sqlite,
+) -> None:
+    sid = f"demo-other-history-{uuid.uuid4().hex[:8]}"
+    self_scope = _with_reported_count(answer_envelope(
+        "Стоимость восстановления одного зуба.", commercial_intent="price",
+        service_id="classic", extent="one_tooth",
+        service_reference_status="resolved", requested_service_id="classic",
+    ), "reported", 1)
+    _run_ask(
+        monkeypatch, sid=sid, backend=_Backend(self_scope),
+        user_message="У меня нет одного зуба. Сколько стоит имплантация?",
+        envelope_json=self_scope,
+    )
+    history = _for_other_person_current_care(answer_envelope(
+        "В детстве маме уже лечили зуб.", commercial_intent="none",
+        service_id=None, extent=None, service_reference_status="none",
+    ), context="past_history")
+    _run_ask(
+        monkeypatch, sid=sid, backend=_Backend(history),
+        user_message="У мамы в детстве уже лечили зуб.",
+        envelope_json=history, reset_session=False,
+    )
+    saved = read_target_runtime_session_for(sid).patient_facts
+    assert saved is not None
+    assert saved.extent == "one_tooth"
+    assert saved.tooth_count == 1
+
+
+def test_other_person_reported_scope_replaces_self_scope_without_old_jaw(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+    isolated_demo_sqlite,
+) -> None:
+    sid = f"demo-other-reported-{uuid.uuid4().hex[:8]}"
+    self_scope = _with_reported_count(answer_envelope(
+        "Стоимость восстановления одного зуба.", commercial_intent="price",
+        service_id="classic", extent="one_tooth", jaw="lower",
+        service_reference_status="resolved", requested_service_id="classic",
+    ), "reported", 1)
+    _run_ask(
+        monkeypatch, sid=sid, backend=_Backend(self_scope),
+        user_message="У меня нет одного зуба снизу.", envelope_json=self_scope,
+    )
+    mother_scope = _for_other_person_current_care(answer_envelope(
+        "Для мамы нужно восстановить три зуба.", commercial_intent="none",
+        service_id="classic", extent="few_teeth", jaw=None,
+        service_reference_status="resolved", requested_service_id="classic",
+    ), commitment="reported", count=3)
+    _run_ask(
+        monkeypatch, sid=sid, backend=_Backend(mother_scope),
+        user_message="Маме нужно восстановить три зуба.",
+        envelope_json=mother_scope, reset_session=False,
+    )
+    saved = read_target_runtime_session_for(sid).patient_facts
+    assert saved is not None
+    assert saved.extent == "few_teeth"
+    assert saved.tooth_count == 3
+    assert saved.jaw is None
 
 
 def test_service_detour_keeps_reported_need_without_pricing_other_service_from_it(

@@ -57,6 +57,44 @@ def _price_understanding() -> dict[str, object]:
     }
 
 
+def test_ordered_d2_request_parts_preserve_per_part_refs() -> None:
+    payload = production_envelope_template(
+        patient_text="Служебный текст.",
+        request_understanding={
+            "subjects": [],
+            "requests": [
+                {
+                    **_price_understanding()["requests"][0],  # type: ignore[index]
+                    "service_id": "service_one",
+                    "topic_id": "implantation",
+                    "statement_mode": "question",
+                },
+                {
+                    "request_id": "r2",
+                    "kind": "content",
+                    "subject_id": None,
+                    "context": "general_information",
+                    "policy_ids": [],
+                    "payment_scheme": "unspecified",
+                    "payment_scheme_intent": "not_requested",
+                    "contact_fields": [],
+                    "content_text": "Источник выбирается отдельно.",
+                    "content_ref": "pain.md",
+                    "service_id": "service_one",
+                    "topic_id": "implantation",
+                    "statement_mode": "hypothesis",
+                },
+            ],
+        },
+    )
+
+    parsed = _parse(payload)
+    assert [item.request_id for item in parsed.request_understanding.requests] == ["r1", "r2"]
+    assert parsed.request_understanding.requests[0].service_id == "service_one"
+    assert parsed.request_understanding.requests[1].content_ref == "pain.md"
+    assert parsed.request_understanding.requests[1].statement_mode == "hypothesis"
+
+
 def test_nested_primary_price_request_id_is_repaired_before_understanding_validation() -> None:
     payload = production_envelope_template(request_understanding=_price_understanding())
     payload.pop("primary_price_request_id")

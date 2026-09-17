@@ -17,11 +17,17 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
 
     parts: list[str] = []
     if plan.is_price_answer:
-        assert plan.price_block is not None
-        parts.append(plan.price_block.display_text.strip())
+        if plan.price_block is not None:
+            parts.append(plan.price_block.display_text.strip())
+        else:
+            assert plan.d2_price_block is not None
+            for row in plan.d2_price_block.rows:
+                parts.append(row.display_text.strip())
+                parts.extend(text.strip() for text in row.condition_texts)
         parts.extend(_condition_display_texts(plan.required_offer_conditions))
         if plan.patient_text:
             parts.append(plan.patient_text.strip())
+        parts.extend(block.display_text.strip() for block in plan.information_blocks)
         parts.extend(block.display_text.strip() for block in plan.requested_fact_blocks)
         parts.extend(block.display_text.strip() for block in plan.promo_blocks)
         parts.extend(_render_amplifier_list(plan))
@@ -30,6 +36,7 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
 
     if plan.patient_text:
         parts.append(plan.patient_text.strip())
+    parts.extend(block.display_text.strip() for block in plan.information_blocks)
     if plan.authored_service_alternative_block is not None:
         parts.extend(_render_authored_service_alternative(plan))
     elif plan.service_options_block is not None:

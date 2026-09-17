@@ -97,6 +97,52 @@ class MaterializationContractError(ValueError):
     """Invalid materialization contract input."""
 
 
+class D2AuthoredContentAuthority(ResponsePlanModel):
+    """Clinic-owned text that may be selected by a D1R content request."""
+
+    source_client_id: str
+    content_ref: str
+    display_text: str
+    allowed_service_ids: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_d2_content(self) -> Self:
+        for value, code in (
+            (self.source_client_id, "d2_content_client_invalid"),
+            (self.content_ref, "d2_content_ref_invalid"),
+            (self.display_text, "d2_content_text_invalid"),
+        ):
+            if not value or value != value.strip():
+                raise ValueError(code)
+        if len(self.allowed_service_ids) != len(set(self.allowed_service_ids)):
+            raise ValueError("d2_content_service_duplicate")
+        if any(not value or value != value.strip() for value in self.allowed_service_ids):
+            raise ValueError("d2_content_service_invalid")
+        return self
+
+
+class D2DirectionAuthority(ResponsePlanModel):
+    """Clinic-approved services available for one broad treatment direction."""
+
+    source_client_id: str
+    topic_id: str
+    service_ids: tuple[str, ...]
+
+    @model_validator(mode="after")
+    def _validate_d2_direction(self) -> Self:
+        for value, code in (
+            (self.source_client_id, "d2_direction_client_invalid"),
+            (self.topic_id, "d2_direction_topic_invalid"),
+        ):
+            if not value or value != value.strip():
+                raise ValueError(code)
+        if not self.service_ids or len(self.service_ids) != len(set(self.service_ids)):
+            raise ValueError("d2_direction_services_invalid")
+        if any(not value or value != value.strip() for value in self.service_ids):
+            raise ValueError("d2_direction_service_invalid")
+        return self
+
+
 class OfferConditionEvidence(ResponsePlanModel):
     source_client_id: str
     offer_id: str
@@ -138,6 +184,8 @@ class ResponsePlanMaterializationSources(ResponsePlanModel):
     shown_promo_fact_ids: tuple[str, ...] = ()
     shown_amplifier_fact_ids: tuple[str, ...] = ()
     shown_service_value_ids: tuple[str, ...] = ()
+    d2_authored_content: tuple[D2AuthoredContentAuthority, ...] = ()
+    d2_directions: tuple[D2DirectionAuthority, ...] = ()
 
     @model_validator(mode="after")
     def _validate_ownership(self) -> Self:
@@ -159,6 +207,20 @@ class ResponsePlanMaterializationSources(ResponsePlanModel):
                 raise ValueError("materialization_condition_key_mismatch")
             if evidence.source_client_id != client_id:
                 raise ValueError("materialization_condition_client_mismatch")
+        content_refs: set[str] = set()
+        for content in self.d2_authored_content:
+            if content.source_client_id != client_id:
+                raise ValueError("materialization_d2_content_client_mismatch")
+            if content.content_ref in content_refs:
+                raise ValueError("materialization_d2_content_ref_duplicate")
+            content_refs.add(content.content_ref)
+        direction_topics: set[str] = set()
+        for direction in self.d2_directions:
+            if direction.source_client_id != client_id:
+                raise ValueError("materialization_d2_direction_client_mismatch")
+            if direction.topic_id in direction_topics:
+                raise ValueError("materialization_d2_direction_topic_duplicate")
+            direction_topics.add(direction.topic_id)
         return self
 
 

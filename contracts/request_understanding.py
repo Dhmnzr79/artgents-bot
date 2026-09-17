@@ -19,6 +19,7 @@ PaymentSchemeIntent = Literal[
     "unspecified",
 ]
 ScopeCommitment = Literal["unknown", "none", "reported", "correction", "hypothetical"]
+RequestStatementMode = Literal["question", "statement", "correction", "hypothesis"]
 
 _SUBJECT_ID_RE = re.compile(r"^s[1-9][0-9]*$")
 _REQUEST_ID_RE = re.compile(r"^r[1-9][0-9]*$")
@@ -65,6 +66,9 @@ class RequestUnderstandingRequest(BaseModel):
     contact_fields: tuple[str, ...] = ()
     content_text: str | None = None
     content_ref: str | None = None
+    service_id: str | None = None
+    topic_id: str | None = None
+    statement_mode: RequestStatementMode = "question"
 
     @field_validator("request_id")
     @classmethod
@@ -102,6 +106,16 @@ class RequestUnderstandingRequest(BaseModel):
             or ".." in token
         ):
             raise ValueError("content_ref_invalid")
+        return token
+
+    @field_validator("service_id", "topic_id")
+    @classmethod
+    def _validate_semantic_ref(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        token = value.strip()
+        if not token or token != value:
+            raise ValueError("semantic_ref_invalid")
         return token
 
     @model_validator(mode="after")

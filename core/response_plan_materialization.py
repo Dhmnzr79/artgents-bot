@@ -14,10 +14,14 @@ from contracts.response_plan import (
     CommercialFactCandidate,
     ComposerResult,
     ComposerSelectedRouteAuthority,
+    D2FrozenPriceBlock,
+    D2FrozenPriceRow,
     FactRole,
     FrozenPriceOfferRow,
+    InformationSourceBlock,
     PreComposerPlan,
     PricePlan,
+    RouteModePair,
     RequiredOfferConditionBlock,
     RequiredOfferConditionOfferEntry,
     ResponseCaps,
@@ -31,6 +35,8 @@ from contracts.response_plan import (
     UiWidgetCandidate,
     all_allowed_route_mode_pairs,
 )
+from contracts.one_call_envelope import OneCallEnvelope
+from contracts.request_understanding import RequestUnderstandingRequest
 from contracts.response_plan_composer import AdaptedComposerDecision
 from contracts.response_plan_materialization import (
     ConsideredOfferTrace,
@@ -46,8 +52,18 @@ from contracts.response_plan_materialization import (
     ResponsePlanMaterializationSources,
     SelectedOfferTrace,
 )
-from contracts.response_plan_post_composer import PostComposerSelectionPlan
-from contracts.response_schema import ResponseSchemaBundle, TargetCommercialFact, TargetFixedPrice, TargetOffer, TargetService
+from contracts.response_plan_post_composer import PostComposerSelectionPlan, ResponseSituationDelta
+from contracts.response_schema import (
+    ResponseSchemaBundle,
+    TargetCommercialFact,
+    TargetFixedPrice,
+    TargetFromPrice,
+    TargetNoPublicPrice,
+    TargetOffer,
+    TargetRangePrice,
+    TargetService,
+    TargetStrategyMatch,
+)
 from contracts.response_schema_refs import ResponseSchemaExternalIndex
 from core.response_plan_authored_alternative_policy import unambiguous_topic_for_service_ids
 from core.response_plan_condition_evidence import materialization_price_scope_label
@@ -66,6 +82,7 @@ from core.response_text_renderer import render_response_text
 from core.response_strategy import resolve_target_strategy
 from core.response_ui_projection import project_response_ui
 from core.service_data_context import ServiceDataContext, build_service_data_context
+from core.target_offer_projection import project_target_service_offers
 from core.service_value_selection import resolve_service_value_ref
 from core.target_marketing_selector import (
     TargetMarketingSelectionError,
@@ -252,6 +269,278 @@ def resolve_materialized_response(
         situation_delta=payload.situation_delta,
         trace=trace,
     )
+
+
+def resolve_d2_envelope_response(
+    envelope: OneCallEnvelope,
+    sources: ResponsePlanMaterializationSources,
+    *,
+    as_of: date,
+) -> MaterializedResponseOutcome:
+    """Resolve the D2 lower plan from an already validated D1R envelope.
+
+    This boundary deliberately accepts the parsed D1R object, never a second model
+    payload. It is isolated until S3 wires it to HTTP/SSE.
+    """
+
+    del as_of
+    if envelope.route != "ANSWER":
+        raise MaterializationContractError("d2_envelope_route_unsupported")
+    understanding = envelope.request_understanding
+    if understanding is None or not understanding.requests:
+        raise MaterializationContractError("d2_request_understanding_required")
+
+    price_parts = tuple(item for item in understanding.requests if item.kind == "price")
+    content_parts = tuple(item for item in understanding.requests if item.kind == "content")
+    unsupported = tuple(
+        item.request_id
+        for item in understanding.requests
+        if item.kind not in {"price", "content"}
+    )
+    if unsupported:
+        raise MaterializationContractError("d2_request_kind_unsupported")
+    if len(price_parts) != 1 or not content_parts:
+        raise MaterializationContractError("d2_price_and_content_parts_required")
+
+    price_part = price_parts[0]
+    client_id = sources.material_authority.source_client_id
+    if client_id != sources.session_key.client_id:
+        raise MaterializationOwnershipError("materialization_client_mismatch")
+    service_ids, response_scope, selected_topic_id = _d2_price_scope(
+        price_part, client_id=client_id, sources=sources
+    )
+    price_block, trace = _d2_price_block(
+        bundle=sources.material_authority.bundle,
+        client_id=client_id,
+        service_ids=service_ids,
+        condition_evidence=sources.condition_evidence_by_offer,
+    )
+    information_blocks = _d2_information_blocks(
+        content_parts=content_parts,
+        client_id=client_id,
+        service_ids=service_ids,
+        topic_id=selected_topic_id,
+        sources=sources,
+    )
+    available_ui = _materialize_ui_candidates(sources)
+    price_ui = UiPlanCandidates(
+        buttons=tuple(item for item in available_ui.buttons if item.action_kind == "cta"),
+    )
+
+    plan = PreComposerPlan(
+        session_key=sources.session_key,
+        context_strategy=sources.context_strategy,
+        route_authority=ComposerSelectedRouteAuthority(
+            allowed_route_modes=(RouteModePair(route="ANSWER", mode="standard"),),
+            terminal_candidates=(),
+        ),
+        response_scope=response_scope,
+        selected_service_id=service_ids[0] if response_scope == "service" else None,
+        active_session_service_id=None,
+        selected_topic_id=selected_topic_id,
+        price_plan=PricePlan(kind="none"),
+        d2_price_block=price_block,
+        textual_cta_candidate=_materialize_textual_cta(sources),
+        ui_candidates=price_ui,
+        transport_kind=sources.transport_kind,
+    )
+    composer_result = ComposerResult(
+        route="ANSWER",
+        mode="standard",
+        patient_text=None,
+        information_blocks=information_blocks,
+    )
+    resolved = resolve_response_plan(plan, composer_result)
+    finalized_trace = replace(trace, finalized_offers=_build_finalized_offer_trace(resolved))
+    return MaterializedResponseOutcome(
+        resolved=resolved,
+        rendered_text=render_response_text(resolved),
+        ui_projection=project_response_ui(resolved),
+        materialization_diagnostics=(),
+        selection_diagnostics=(),
+        adapter_diagnostics=(),
+        situation_delta=ResponseSituationDelta(action="keep"),
+        trace=finalized_trace,
+    )
+
+
+def _d2_price_scope(
+    part: RequestUnderstandingRequest,
+    *,
+    client_id: str,
+    sources: ResponsePlanMaterializationSources,
+) -> tuple[tuple[str, ...], str, str | None]:
+    if part.service_id is not None:
+        return (part.service_id,), "service", part.topic_id
+    if part.topic_id is None:
+        raise MaterializationContractError("d2_price_scope_required")
+    for direction in sources.d2_directions:
+        if direction.topic_id == part.topic_id and direction.source_client_id == client_id:
+            return direction.service_ids, "topic", direction.topic_id
+    raise MaterializationOwnershipError("materialization_foreign_material")
+
+
+def _d2_price_block(
+    *,
+    bundle: ResponseSchemaBundle,
+    client_id: str,
+    service_ids: tuple[str, ...],
+    condition_evidence: dict[str, OfferConditionEvidence],
+) -> tuple[D2FrozenPriceBlock, MaterializationTrace]:
+    offers: list[TargetOffer] = []
+    for service_id in service_ids:
+        if service_id not in bundle.services:
+            raise MaterializationOwnershipError("materialization_foreign_material")
+        context = build_service_data_context(bundle, TargetDoctorCatalog(doctors={}), service_id)
+        projection = project_target_service_offers(
+            context,
+            bundle.strategy,
+            TargetStrategyMatch(family=context.service.family),
+        )
+        for offer in projection.offers:
+            evidence = condition_evidence.get(offer.offer_id)
+            if evidence is None or evidence.completeness != "complete":
+                continue
+            offers.append(offer)
+            if len(offers) >= 3:
+                break
+        if len(offers) >= 3:
+            break
+    if not offers:
+        raise MaterializationContractError("d2_no_complete_price_candidates")
+    rows = tuple(
+        _d2_frozen_price_row(
+            offer,
+            client_id=client_id,
+            evidence=condition_evidence[offer.offer_id],
+        )
+        for offer in offers
+    )
+    trace = MaterializationTrace(
+        price_lookup_mode="catalog_reference",
+        considered_offers=(),
+        selected_offers=tuple(
+            SelectedOfferTrace(
+                offer_id=offer.offer_id,
+                service_id=offer.service_id,
+                amount=offer.price.amount if isinstance(offer.price, TargetFixedPrice) else None,
+                currency=offer.price.currency if isinstance(offer.price, TargetFixedPrice) else None,
+                billing_unit=offer.price.billing_unit if isinstance(offer.price, TargetFixedPrice) else None,
+            )
+            for offer in offers
+        ),
+        price_candidate_service_ids=service_ids,
+    )
+    return D2FrozenPriceBlock(source_client_id=client_id, rows=rows), trace
+
+
+def _d2_frozen_price_row(
+    offer: TargetOffer,
+    *,
+    client_id: str,
+    evidence: OfferConditionEvidence,
+) -> D2FrozenPriceRow:
+    price = offer.price
+    unit = ""
+    if isinstance(price, TargetFixedPrice):
+        body = f"{_format_d2_amount(price.amount)} {_d2_currency(price.currency)}"
+        unit = billing_unit_phrase(price.billing_unit)
+        mode = "fixed"
+    elif isinstance(price, TargetFromPrice):
+        body = f"от {_format_d2_amount(price.min_amount)} {_d2_currency(price.currency)}"
+        unit = billing_unit_phrase(price.billing_unit)
+        mode = "from"
+    elif isinstance(price, TargetRangePrice):
+        body = (
+            f"{_format_d2_amount(price.min_amount)}–{_format_d2_amount(price.max_amount)} "
+            f"{_d2_currency(price.currency)}"
+        )
+        unit = billing_unit_phrase(price.billing_unit)
+        mode = "range"
+    elif isinstance(price, TargetNoPublicPrice):
+        return D2FrozenPriceRow(
+            source_client_id=client_id,
+            offer_id=offer.offer_id,
+            service_id=offer.service_id,
+            mode="no_public_price",
+            display_text=price.approved_text,
+            approved_text=price.approved_text,
+            condition_texts=_d2_condition_texts(evidence),
+        )
+    else:  # pragma: no cover - TargetPrice is a discriminated union.
+        raise MaterializationContractError("d2_price_mode_invalid")
+    return D2FrozenPriceRow(
+        source_client_id=client_id,
+        offer_id=offer.offer_id,
+        service_id=offer.service_id,
+        mode=mode,
+        display_text=f"{body} {unit} — {offer.package.label}",
+        amount=price.amount if isinstance(price, TargetFixedPrice) else None,
+        min_amount=(
+            price.min_amount
+            if isinstance(price, (TargetFromPrice, TargetRangePrice))
+            else None
+        ),
+        max_amount=price.max_amount if isinstance(price, TargetRangePrice) else None,
+        currency=price.currency,
+        billing_unit=price.billing_unit,
+        condition_texts=_d2_condition_texts(evidence),
+    )
+
+
+def _format_d2_amount(amount: int) -> str:
+    return f"{amount:,}".replace(",", " ")
+
+
+def _d2_currency(currency: str) -> str:
+    if currency == "RUB":
+        return "₽"
+    return currency
+
+
+def _d2_condition_texts(evidence: OfferConditionEvidence) -> tuple[str, ...]:
+    texts: list[str] = []
+    for block in evidence.conditions:
+        if block.entries:
+            texts.extend(entry.display_text for entry in block.entries)
+        elif block.display_text is not None:
+            texts.append(block.display_text)
+    return tuple(texts)
+
+
+def _d2_information_blocks(
+    *,
+    content_parts: tuple[RequestUnderstandingRequest, ...],
+    client_id: str,
+    service_ids: tuple[str, ...],
+    topic_id: str | None,
+    sources: ResponsePlanMaterializationSources,
+) -> tuple[InformationSourceBlock, ...]:
+    by_ref = {item.content_ref: item for item in sources.d2_authored_content}
+    blocks: list[InformationSourceBlock] = []
+    for part in content_parts:
+        if part.content_ref is None:
+            raise MaterializationContractError("d2_content_ref_required")
+        authority = by_ref.get(part.content_ref)
+        if authority is None:
+            raise MaterializationOwnershipError("materialization_foreign_material")
+        if authority.source_client_id != client_id:
+            raise MaterializationOwnershipError("materialization_foreign_material")
+        if authority.allowed_service_ids and not set(service_ids).intersection(authority.allowed_service_ids):
+            raise MaterializationOwnershipError("materialization_foreign_material")
+        if part.service_id is not None and part.service_id not in service_ids:
+            raise MaterializationContractError("d2_content_service_mismatch")
+        if part.topic_id is not None and part.topic_id != topic_id:
+            raise MaterializationContractError("d2_content_topic_mismatch")
+        blocks.append(
+            InformationSourceBlock(
+                request_id=part.request_id,
+                source_client_id=client_id,
+                content_ref=authority.content_ref,
+                display_text=authority.display_text,
+            )
+        )
+    return tuple(blocks)
 
 
 def _validate_ownership(

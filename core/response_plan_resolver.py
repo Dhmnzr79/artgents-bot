@@ -141,6 +141,9 @@ def _collect_owned_candidates(plan: PreComposerPlan) -> list[object]:
         items.append(plan.price_plan.single)
     if plan.price_plan.multi is not None:
         items.append(plan.price_plan.multi)
+    if plan.d2_price_block is not None:
+        items.append(plan.d2_price_block)
+        items.extend(plan.d2_price_block.rows)
     items.extend(plan.required_offer_conditions)
     items.extend(plan.commercial_facts)
     if plan.service_value_candidate is not None:
@@ -289,7 +292,8 @@ def _resolve_composer_answer(
     diagnostics.extend(requested_diag)
     requested_ids = {block.fact_id for block in requested_blocks}
 
-    is_price_answer = price_block is not None
+    d2_price_block = plan.d2_price_block
+    is_price_answer = price_block is not None or d2_price_block is not None
     caps = plan.price_caps if is_price_answer else plan.normal_caps
     reserved_service_value_id = _reserved_service_value_fact_id(plan)
 
@@ -323,6 +327,7 @@ def _resolve_composer_answer(
     authored_service_alternative_block = plan.authored_service_alternative_block
     finalized = _build_finalized_ids(
         price_block,
+        d2_price_block,
         required_conditions,
         requested_blocks,
         service_value_block,
@@ -341,6 +346,8 @@ def _resolve_composer_answer(
         patient_text=composer.patient_text,
         terminal_text=None,
         price_block=price_block,
+        d2_price_block=d2_price_block,
+        information_blocks=composer.information_blocks,
         required_offer_conditions=required_conditions,
         requested_fact_blocks=tuple(requested_blocks),
         service_value_block=service_value_block,
@@ -643,6 +650,7 @@ def _resolve_commerce_ui(plan: PreComposerPlan) -> ResolvedUiPlan:
 
 def _build_finalized_ids(
     price_block: ResolvedPriceBlock | None,
+    d2_price_block,
     required_conditions: tuple[RequiredOfferConditionBlock, ...],
     requested_blocks: list[ResolvedFactBlock],
     service_value_block: ResolvedServiceValueBlock | None,
@@ -665,7 +673,15 @@ def _build_finalized_ids(
         service_value_ids=(
             (service_value_block.fact_id,) if service_value_block is not None else ()
         ),
-        price_offer_ids=tuple(price_block.offer_ids) if price_block is not None else (),
+        price_offer_ids=(
+            tuple(price_block.offer_ids)
+            if price_block is not None
+            else (
+                tuple(row.offer_id for row in d2_price_block.rows)
+                if d2_price_block is not None
+                else ()
+            )
+        ),
         required_offer_condition_ids=tuple(
             block.condition_id for block in required_conditions
         ),

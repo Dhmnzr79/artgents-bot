@@ -358,6 +358,93 @@ class FrozenPriceOfferRow(ResponsePlanModel):
     brand_id: NonBlankStr | None = None
 
 
+D2PriceMode = Literal["fixed", "from", "range", "no_public_price"]
+
+
+class D2FrozenPriceRow(ResponsePlanModel):
+    """A price row frozen from one verified target offer for the D2 path."""
+
+    source_client_id: NonBlankStr
+    offer_id: NonBlankStr
+    service_id: NonBlankStr
+    mode: D2PriceMode
+    display_text: NonBlankStr
+    amount: int | None = Field(default=None, ge=0)
+    min_amount: int | None = Field(default=None, ge=0)
+    max_amount: int | None = Field(default=None, ge=0)
+    currency: NonBlankStr | None = None
+    billing_unit: NonBlankStr | None = None
+    approved_text: NonBlankStr | None = None
+    condition_texts: tuple[NonBlankStr, ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_mode_values(self) -> Self:
+        if self.mode == "fixed":
+            if self.amount is None or self.currency is None or self.billing_unit is None:
+                raise ValueError("d2_fixed_price_metadata_required")
+            if any(value is not None for value in (self.min_amount, self.max_amount, self.approved_text)):
+                raise ValueError("d2_fixed_price_metadata_conflict")
+        elif self.mode == "from":
+            if self.min_amount is None or self.currency is None or self.billing_unit is None:
+                raise ValueError("d2_from_price_metadata_required")
+            if any(value is not None for value in (self.amount, self.max_amount, self.approved_text)):
+                raise ValueError("d2_from_price_metadata_conflict")
+        elif self.mode == "range":
+            if (
+                self.min_amount is None
+                or self.max_amount is None
+                or self.currency is None
+                or self.billing_unit is None
+            ):
+                raise ValueError("d2_range_price_metadata_required")
+            if self.min_amount > self.max_amount:
+                raise ValueError("d2_price_range_invalid")
+            if self.amount is not None or self.approved_text is not None:
+                raise ValueError("d2_range_price_metadata_conflict")
+        elif self.mode == "no_public_price":
+            if self.approved_text is None:
+                raise ValueError("d2_no_public_price_text_required")
+            if any(
+                value is not None
+                for value in (
+                    self.amount,
+                    self.min_amount,
+                    self.max_amount,
+                    self.currency,
+                    self.billing_unit,
+                )
+            ):
+                raise ValueError("d2_no_public_price_metadata_conflict")
+        return self
+
+
+class D2FrozenPriceBlock(ResponsePlanModel):
+    source_client_id: NonBlankStr
+    rows: tuple[D2FrozenPriceRow, ...]
+
+    @model_validator(mode="after")
+    def _validate_rows(self) -> Self:
+        if not (1 <= len(self.rows) <= 3):
+            raise ValueError("d2_price_rows_out_of_bounds")
+        seen: set[str] = set()
+        for row in self.rows:
+            if row.source_client_id != self.source_client_id:
+                raise ValueError("d2_price_row_owner_mismatch")
+            if row.offer_id in seen:
+                raise ValueError("d2_price_row_duplicate")
+            seen.add(row.offer_id)
+        return self
+
+
+class InformationSourceBlock(ResponsePlanModel):
+    """Verified authored content selected by one D1R request part."""
+
+    request_id: NonBlankStr
+    source_client_id: NonBlankStr
+    content_ref: NonBlankStr
+    display_text: NonBlankStr
+
+
 class PricePlan(ResponsePlanModel):
     kind: PricePlanKind
     single: CanonicalSinglePriceCandidate | None = None
@@ -561,6 +648,7 @@ class PreComposerPlan(ResponsePlanModel):
     selected_topic_id: str | None = None
     history_turn_count: int = Field(default=0, ge=0)
     price_plan: PricePlan
+    d2_price_block: D2FrozenPriceBlock | None = None
     required_offer_conditions: UniqueRequiredOfferConditions = ()
     commercial_facts: UniqueCommercialFacts = ()
     promo_candidate_ids: UniquePromoCandidateIds = ()
@@ -624,6 +712,8 @@ class PreComposerPlan(ResponsePlanModel):
             raise ValueError("price_caps_max_amplifiers_exceeded")
         if self.service_options_block is not None and self.authored_service_alternative_block is not None:
             raise ValueError("service_options_and_authored_alternative_conflict")
+        if self.d2_price_block is not None and self.price_plan.kind != "none":
+            raise ValueError("d2_price_block_conflicts_with_legacy_price_plan")
         return self
 
     @property
@@ -636,6 +726,7 @@ class ComposerResult(ResponsePlanModel):
     mode: ResponseMode = "standard"
     patient_text: str | None = None
     requested_fact_ids: UniqueRequestedFactIds = ()
+    information_blocks: tuple[InformationSourceBlock, ...] = ()
 
     @model_validator(mode="after")
     def _validate_pair_and_invariants(self) -> Self:
@@ -643,22 +734,22 @@ class ComposerResult(ResponsePlanModel):
         if pair not in ALLOWED_ROUTE_MODE_PAIRS:
             raise ValueError("route_mode_conflict")
         if pair == ("ANSWER", "standard"):
-            if not (self.patient_text and self.patient_text.strip()):
+            if not (self.patient_text and self.patient_text.strip()) and not self.information_blocks:
                 raise ValueError("answer_requires_patient_text")
         elif pair == ("ANSWER", "contacts"):
             if self.patient_text is not None:
                 raise ValueError("contacts_requires_null_patient_text")
-            if self.requested_fact_ids:
+            if self.requested_fact_ids or self.information_blocks:
                 raise ValueError("contacts_forbids_requested_facts")
         elif self.route == "ADMIN":
             if self.patient_text is not None:
                 raise ValueError("admin_requires_null_patient_text")
-            if self.requested_fact_ids:
+            if self.requested_fact_ids or self.information_blocks:
                 raise ValueError("admin_forbids_requested_facts")
         elif self.route == "CLARIFY":
             if not (self.patient_text and self.patient_text.strip()):
                 raise ValueError("clarify_requires_patient_text")
-            if self.requested_fact_ids:
+            if self.requested_fact_ids or self.information_blocks:
                 raise ValueError("clarify_forbids_requested_facts")
         return self
 
@@ -765,6 +856,10 @@ class ResponseSessionDelta(ResponsePlanModel):
 def _assert_no_commerce(plan: ResolvedResponsePlan) -> None:
     if plan.price_block is not None:
         raise ValueError("terminal_plan_forbids_price_block")
+    if plan.d2_price_block is not None:
+        raise ValueError("terminal_plan_forbids_d2_price_block")
+    if plan.information_blocks:
+        raise ValueError("terminal_plan_forbids_information_blocks")
     if plan.required_offer_conditions:
         raise ValueError("terminal_plan_forbids_required_conditions")
     if plan.requested_fact_blocks:
@@ -851,9 +946,16 @@ def _validate_finalized_ids(plan: ResolvedResponsePlan) -> None:
         (plan.service_value_block.fact_id,) if plan.service_value_block is not None else ()
     ):
         raise ValueError("finalized_service_value_ids_mismatch")
-    if finalized.price_offer_ids != (
-        tuple(plan.price_block.offer_ids) if plan.price_block is not None else ()
-    ):
+    expected_price_ids = (
+        tuple(plan.price_block.offer_ids)
+        if plan.price_block is not None
+        else (
+            tuple(row.offer_id for row in plan.d2_price_block.rows)
+            if plan.d2_price_block is not None
+            else ()
+        )
+    )
+    if finalized.price_offer_ids != expected_price_ids:
         raise ValueError("finalized_price_offer_ids_mismatch")
     if finalized.required_offer_condition_ids != tuple(
         block.condition_id for block in plan.required_offer_conditions
@@ -949,6 +1051,12 @@ def _validate_resolved_client_ownership(plan: ResolvedResponsePlan) -> None:
 
     if plan.price_block is not None:
         _check(plan.price_block)
+    if plan.d2_price_block is not None:
+        _check(plan.d2_price_block)
+        for row in plan.d2_price_block.rows:
+            _check(row)
+    for block in plan.information_blocks:
+        _check(block)
     for condition in plan.required_offer_conditions:
         _check(condition)
     for block in plan.requested_fact_blocks:
@@ -987,6 +1095,8 @@ class ResolvedResponsePlan(ResponsePlanModel):
     patient_text: str | None = None
     terminal_text: str | None = None
     price_block: ResolvedPriceBlock | None = None
+    d2_price_block: D2FrozenPriceBlock | None = None
+    information_blocks: tuple[InformationSourceBlock, ...] = ()
     required_offer_conditions: tuple[RequiredOfferConditionBlock, ...] = ()
     requested_fact_blocks: tuple[ResolvedFactBlock, ...] = ()
     service_value_block: ResolvedServiceValueBlock | None = None
@@ -1002,7 +1112,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
 
     @property
     def is_price_answer(self) -> bool:
-        return self.price_block is not None
+        return self.price_block is not None or self.d2_price_block is not None
 
     @model_validator(mode="after")
     def _validate_consistency(self) -> Self:
@@ -1011,7 +1121,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
             raise ValueError("route_mode_conflict")
 
         if pair == ("ANSWER", "standard"):
-            if not (self.patient_text and self.patient_text.strip()):
+            if not (self.patient_text and self.patient_text.strip()) and not self.information_blocks:
                 raise ValueError("answer_requires_patient_text")
             if self.terminal_text is not None:
                 raise ValueError("answer_standard_forbids_terminal_text")
@@ -1034,15 +1144,17 @@ class ResolvedResponsePlan(ResponsePlanModel):
                 raise ValueError("clarify_forbids_terminal_text")
             _assert_no_commerce(self)
 
+        if self.price_block is not None and self.d2_price_block is not None:
+            raise ValueError("legacy_and_d2_price_block_conflict")
         if self.required_offer_conditions and self.price_block is None:
             raise ValueError("conditions_require_price_block")
 
-        if self.service_options_block is not None and self.price_block is not None:
+        if self.service_options_block is not None and self.is_price_answer:
             raise ValueError("service_options_forbidden_with_price_block")
         if self.authored_service_alternative_block is not None:
             if self.service_options_block is not None:
                 raise ValueError("authored_alternative_and_service_options_conflict")
-            if self.price_block is not None:
+            if self.is_price_answer:
                 raise ValueError("authored_alternative_forbidden_with_price_block")
 
         if self.required_offer_conditions:

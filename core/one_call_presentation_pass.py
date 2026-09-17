@@ -1049,6 +1049,7 @@ def build_one_call_presentation_result(
         model_patient_text=patient_text,
         request_understanding=semantic.request_understanding,
         primary_price_request_id=semantic.primary_price_request_id,
+        suppress_missing_content_text=turn_frame.needs_clarification,
     )
     if clinic_policy.enforced:
         patient_text = clinic_policy.patient_text

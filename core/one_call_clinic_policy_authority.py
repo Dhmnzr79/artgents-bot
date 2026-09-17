@@ -134,6 +134,7 @@ def apply_clinic_business_policy_authority(
     model_patient_text: str,
     request_understanding: RequestUnderstanding | None = None,
     primary_price_request_id: str | None = None,
+    suppress_missing_content_text: bool = False,
 ) -> ClinicPolicyEnforcementResult:
     try:
         validate_connectable_business_policies(client_id)
@@ -163,10 +164,23 @@ def apply_clinic_business_policy_authority(
         model_patient_text=model_patient_text,
         primary_price_request_id=primary_price_request_id,
         user_message=user_message,
+        suppress_missing_content_text=suppress_missing_content_text,
     )
     policy_keys = tuple(dict.fromkeys(
         decision.policy_key for decision in composed.resolution.decisions if decision.policy_key
     ))
+    if (
+        suppress_missing_content_text
+        and not composed.patient_text.strip()
+        and model_patient_text.strip()
+    ):
+        return ClinicPolicyEnforcementResult(
+            patient_text=model_patient_text.strip(),
+            enforced=bool(policy_keys) or composed.suppress_forbidden_booking_cta,
+            applicable_policy_keys=policy_keys,
+            suppress_forbidden_booking_cta=composed.suppress_forbidden_booking_cta,
+            reason_code="clinic_policy_d1r_composed" if policy_keys else None,
+        )
     enforced = bool(policy_keys) or composed.suppress_forbidden_booking_cta or composed.used_model_patient_text
     if composed.patient_text != model_patient_text.strip():
         enforced = True

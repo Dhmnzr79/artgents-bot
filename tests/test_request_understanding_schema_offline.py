@@ -279,6 +279,45 @@ def test_unknown_content_ref_keeps_answer_but_projects_no_unrelated_ui(
     assert not response.get("quick_replies")
 
 
+def test_clarify_hides_missing_content_template_and_keeps_question(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tests.test_one_call_tenant_isolation_offline import _enable_demo_nikadent, _post_ask
+
+    _enable_demo_nikadent(monkeypatch)
+    response, backend = _post_ask(
+        monkeypatch,
+        sid=f"d2-f3-clarify-{uuid.uuid4().hex}",
+        user_message="Сколько это стоит?",
+        envelope_json=json.dumps(production_envelope_template(
+            route="CLARIFY",
+            patient_text="Какую услугу вы имеете в виду?",
+            clarify_axis="service",
+            clarify_service_options=["classic", "veneers"],
+            request_understanding={
+                "subjects": [],
+                "requests": [{
+                    "request_id": "r1",
+                    "kind": "content",
+                    "subject_id": None,
+                    "context": "general_information",
+                    "policy_ids": [],
+                    "payment_scheme": "unspecified",
+                    "payment_scheme_intent": "unspecified",
+                    "contact_fields": [],
+                    "content_text": None,
+                }],
+            },
+        ), ensure_ascii=False),
+        client_id="demo",
+    )
+
+    assert backend.call_count == 1
+    answer = str(response.get("answer") or "")
+    assert answer == "Какую услугу вы имеете в виду?"
+    assert "Не могу надёжно ответить" not in answer
+
+
 def test_nested_price_id_keeps_vinirs_price_scenario_on_the_normal_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

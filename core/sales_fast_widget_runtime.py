@@ -1054,6 +1054,7 @@ def _compose_understanding_clarification(
         client_id=client_id, understanding=envelope.request_understanding,
         primary_price_request_id=envelope.primary_price_request_id,
         user_message=user_message,
+        suppress_missing_content_text=result.decision == "clarify",
     )
     # A full-route CLARIFY question comes from the validated envelope. A code
     # scope-defer uses the existing deterministic widget question instead.

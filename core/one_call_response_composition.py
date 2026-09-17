@@ -74,6 +74,7 @@ def compose_response_from_understanding(
     primary_price_request_id: str | None = None,
     user_message: str = "",
     primary_price_text: str = "",
+    suppress_missing_content_text: bool = False,
 ) -> ResponseCompositionResult:
     """Assemble visible patient text from ledger; ignore hostile model prose for code-owned blocks."""
 
@@ -144,6 +145,8 @@ def compose_response_from_understanding(
             if content:
                 segments.append(content)
                 record(req, "answered", content)
+            elif suppress_missing_content_text:
+                record(req, "clarification_needed")
             else:
                 segments.append(_MISSING_CONTENT_TEXT)
                 record(req, "clarification_needed", _MISSING_CONTENT_TEXT)

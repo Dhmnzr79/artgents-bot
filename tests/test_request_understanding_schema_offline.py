@@ -22,6 +22,7 @@ _EMPTY_REF_CATALOG = ServiceReferenceCatalogSnapshot(canonical_json="{}")
 _EMPTY_COMMERCIAL_CATALOG = CommercialFactCatalogSnapshot(canonical_json="{}")
 
 from contracts.request_understanding import (
+    RequestTreatmentSituation,
     RequestUnderstanding,
     RequestUnderstandingRequest,
     RequestUnderstandingSubject,
@@ -464,6 +465,24 @@ def test_tooth_count_accepts_only_explicit_positive_integer() -> None:
         payload["tooth_count"] = invalid
         with pytest.raises(ValueError):
             RequestUnderstanding.model_validate(payload)
+
+
+def test_request_treatment_situation_is_strict_and_reset_clears_facts() -> None:
+    assert RequestTreatmentSituation(
+        scope_commitment="reset",
+        extent="unknown",
+        tooth_count=None,
+        jaw="unknown",
+        continuity="new",
+    ).scope_commitment == "reset"
+    with pytest.raises(ValueError, match="treatment_reset_requires_unknown_facts"):
+        RequestTreatmentSituation(
+            scope_commitment="reset",
+            extent="few_teeth",
+            tooth_count=None,
+            jaw="unknown",
+            continuity="new",
+        )
 
 
 @pytest.mark.parametrize("count,extent", [(2, "one_tooth"), (1, "few_teeth")])

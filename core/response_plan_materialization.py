@@ -16,6 +16,7 @@ from contracts.response_plan import (
     ComposerSelectedRouteAuthority,
     D2FrozenPriceBlock,
     D2FrozenPriceRow,
+    D2TreatmentSituationDecision,
     FactRole,
     FrozenPriceOfferRow,
     InformationSourceBlock,
@@ -38,7 +39,7 @@ from contracts.response_plan import (
     all_allowed_route_mode_pairs,
 )
 from contracts.one_call_envelope import OneCallEnvelope
-from contracts.request_understanding import RequestUnderstandingRequest
+from contracts.request_understanding import RequestUnderstanding, RequestUnderstandingRequest
 from contracts.response_plan_composer import AdaptedComposerDecision
 from contracts.response_plan_materialization import (
     ConsideredOfferTrace,
@@ -310,6 +311,10 @@ def resolve_d2_envelope_response(
     if client_id != sources.session_key.client_id:
         raise MaterializationOwnershipError("materialization_client_mismatch")
 
+    treatment_situation = _d2_treatment_situation(
+        understanding, client_id=client_id, sources=sources
+    )
+
     price_block: D2FrozenPriceBlock | None = None
     if price_parts:
         service_ids, response_scope, selected_topic_id = _d2_price_scope(
@@ -361,6 +366,7 @@ def resolve_d2_envelope_response(
         selected_topic_id=selected_topic_id,
         price_plan=PricePlan(kind="none"),
         d2_price_block=price_block,
+        d2_treatment_situation=treatment_situation,
         textual_cta_candidate=(
             _materialize_textual_cta(sources) if price_block is not None else None
         ),
@@ -385,6 +391,53 @@ def resolve_d2_envelope_response(
         adapter_diagnostics=(),
         situation_delta=ResponseSituationDelta(action="keep"),
         trace=finalized_trace,
+    )
+
+
+def _d2_treatment_situation(
+    understanding: RequestUnderstanding,
+    *,
+    client_id: str,
+    sources: ResponsePlanMaterializationSources,
+) -> D2TreatmentSituationDecision | None:
+    owning_request = next((item for item in understanding.requests if item.situation is not None), None)
+    if owning_request is None:
+        return None
+    situation = owning_request.situation
+    assert situation is not None
+
+    if owning_request.service_id is not None:
+        if owning_request.service_id not in sources.material_authority.bundle.services:
+            raise MaterializationOwnershipError("materialization_foreign_material")
+    if owning_request.topic_id is not None:
+        direction = next(
+            (
+                item
+                for item in sources.d2_directions
+                if item.topic_id == owning_request.topic_id and item.source_client_id == client_id
+            ),
+            None,
+        )
+        if direction is None:
+            raise MaterializationOwnershipError("materialization_foreign_material")
+        if owning_request.service_id is not None and owning_request.service_id not in direction.service_ids:
+            raise MaterializationContractError("d2_treatment_service_topic_mismatch")
+
+    subject = next(
+        (item for item in understanding.subjects if item.subject_id == owning_request.subject_id),
+        None,
+    )
+    return D2TreatmentSituationDecision(
+        source_request_id=owning_request.request_id,
+        subject_relation=subject.relation if subject is not None else None,
+        subject_age_group=subject.age_group if subject is not None else None,
+        service_id=owning_request.service_id,
+        topic_id=owning_request.topic_id,
+        scope_commitment=situation.scope_commitment,
+        extent=situation.extent,
+        tooth_count=situation.tooth_count,
+        jaw=situation.jaw,
+        continuity=situation.continuity,
     )
 
 

@@ -20,6 +20,10 @@ PaymentSchemeIntent = Literal[
 ]
 ScopeCommitment = Literal["unknown", "none", "reported", "correction", "hypothetical"]
 RequestStatementMode = Literal["question", "statement", "correction", "hypothesis"]
+TreatmentScopeCommitment = Literal["unknown", "reported", "correction", "hypothetical", "reset"]
+TreatmentExtent = Literal["unknown", "one_tooth", "few_teeth", "full_arch"]
+TreatmentJaw = Literal["unknown", "upper", "lower", "both"]
+TreatmentContinuity = Literal["new", "same", "unknown"]
 
 _SUBJECT_ID_RE = re.compile(r"^s[1-9][0-9]*$")
 _REQUEST_ID_RE = re.compile(r"^r[1-9][0-9]*$")
@@ -53,6 +57,39 @@ class RequestUnderstandingSubject(BaseModel):
         return token
 
 
+class RequestTreatmentSituation(BaseModel):
+    """Turn-local treatment facts attached to one D1R request."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    scope_commitment: TreatmentScopeCommitment
+    extent: TreatmentExtent
+    tooth_count: int | None = None
+    jaw: TreatmentJaw
+    continuity: TreatmentContinuity
+
+    @field_validator("tooth_count")
+    @classmethod
+    def _validate_tooth_count(cls, value: int | None) -> int | None:
+        if value is not None and value < 1:
+            raise ValueError("treatment_tooth_count_invalid")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_shape(self) -> Self:
+        if self.extent == "one_tooth" and self.tooth_count not in {None, 1}:
+            raise ValueError("treatment_count_extent_conflict")
+        if self.extent == "few_teeth" and self.tooth_count is not None and self.tooth_count < 2:
+            raise ValueError("treatment_count_extent_conflict")
+        if self.extent == "unknown" and self.tooth_count is not None:
+            raise ValueError("treatment_unknown_extent_forbids_count")
+        if self.scope_commitment == "reset" and (
+            self.extent != "unknown" or self.jaw != "unknown" or self.tooth_count is not None
+        ):
+            raise ValueError("treatment_reset_requires_unknown_facts")
+        return self
+
+
 class RequestUnderstandingRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
@@ -69,6 +106,7 @@ class RequestUnderstandingRequest(BaseModel):
     service_id: str | None = None
     topic_id: str | None = None
     statement_mode: RequestStatementMode = "question"
+    situation: RequestTreatmentSituation | None = None
 
     @field_validator("request_id")
     @classmethod
@@ -132,6 +170,8 @@ class RequestUnderstandingRequest(BaseModel):
             raise ValueError("content_ref_forbidden")
         if self.content_ref is not None and self.content_text is None:
             raise ValueError("content_ref_without_content_text")
+        if self.situation is not None and self.situation.continuity == "same" and self.subject_id is None:
+            raise ValueError("treatment_same_requires_subject")
         return self
 
 
@@ -165,12 +205,21 @@ class RequestUnderstanding(BaseModel):
                 raise ValueError("subject_id_duplicate")
             subject_ids.add(subj.subject_id)
         request_ids: set[str] = set()
+        treatment_situation_count = 0
         for req in self.requests:
             if req.request_id in request_ids:
                 raise ValueError("request_id_duplicate")
             request_ids.add(req.request_id)
             if req.subject_id is not None and req.subject_id not in subject_ids:
                 raise ValueError("subject_id_unresolved")
+            if req.situation is not None:
+                treatment_situation_count += 1
+        if treatment_situation_count > 1:
+            raise ValueError("treatment_situation_multiple")
+        if treatment_situation_count and (
+            self.scope_commitment != "unknown" or self.tooth_count is not None
+        ):
+            raise ValueError("treatment_situation_legacy_conflict")
         return self
 
 

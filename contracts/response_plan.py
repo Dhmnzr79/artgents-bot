@@ -639,6 +639,27 @@ class UiPlanCandidates(ResponsePlanModel):
     source_content_ref: NonBlankStr | None = None
 
 
+class D2TreatmentSituationDecision(ResponsePlanModel):
+    """Verified D1R treatment situation frozen before rendering and UI projection."""
+
+    source_request_id: NonBlankStr
+    subject_relation: Literal["self", "other", "unknown"] | None = None
+    subject_age_group: Literal["adult", "child", "unknown"] | None = None
+    service_id: NonBlankStr | None = None
+    topic_id: NonBlankStr | None = None
+    scope_commitment: Literal["unknown", "reported", "correction", "hypothetical", "reset"]
+    extent: Literal["unknown", "one_tooth", "few_teeth", "full_arch"]
+    tooth_count: int | None = Field(default=None, ge=1)
+    jaw: Literal["unknown", "upper", "lower", "both"]
+    continuity: Literal["new", "same", "unknown"]
+
+    @model_validator(mode="after")
+    def _validate_subject_pair(self) -> Self:
+        if (self.subject_relation is None) != (self.subject_age_group is None):
+            raise ValueError("treatment_subject_metadata_incomplete")
+        return self
+
+
 class PreComposerPlan(ResponsePlanModel):
     session_key: SessionKey
     context_strategy: ContextStrategy
@@ -650,6 +671,7 @@ class PreComposerPlan(ResponsePlanModel):
     history_turn_count: int = Field(default=0, ge=0)
     price_plan: PricePlan
     d2_price_block: D2FrozenPriceBlock | None = None
+    d2_treatment_situation: D2TreatmentSituationDecision | None = None
     required_offer_conditions: UniqueRequiredOfferConditions = ()
     commercial_facts: UniqueCommercialFacts = ()
     promo_candidate_ids: UniquePromoCandidateIds = ()
@@ -1103,6 +1125,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
     terminal_text: str | None = None
     price_block: ResolvedPriceBlock | None = None
     d2_price_block: D2FrozenPriceBlock | None = None
+    d2_treatment_situation: D2TreatmentSituationDecision | None = None
     information_blocks: tuple[InformationSourceBlock, ...] = ()
     required_offer_conditions: tuple[RequiredOfferConditionBlock, ...] = ()
     requested_fact_blocks: tuple[ResolvedFactBlock, ...] = ()

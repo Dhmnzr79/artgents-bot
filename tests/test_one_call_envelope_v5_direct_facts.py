@@ -22,7 +22,10 @@ from core.one_call_envelope_protocol import (
 )
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
 from core.one_call_exact_commercial_catalog import ExactCommercialCatalogSnapshot
-from core.one_call_prompt_contract import ONE_CALL_PROMPT_CONTRACT_VERSION
+from core.one_call_prompt_contract import (
+    ONE_CALL_PROMPT_CONTRACT_VERSION,
+    ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS,
+)
 from core.one_call_prefix_cache import clear_one_call_prefix_cache, get_or_build_stable_prefix
 from core.one_call_prefix_input_fingerprint import compute_prefix_input_fingerprint
 from core import turn_timing
@@ -300,8 +303,10 @@ def test_envelope_size_limit_unchanged() -> None:
         )
 
 
-def test_prompt_contract_version_is_six() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 14
+def test_prompt_contract_version_is_fifteen() -> None:
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 15
+    assert '"request_understanding":{' in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
+    assert '},"primary_price_request_id":null}' in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
 
 
 def test_prefix_contains_exact_commercial_catalog_with_full_fields() -> None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from config import SALES_ONE_PLUS_MODEL
 
-ONE_CALL_PROMPT_CONTRACT_VERSION = 14
+ONE_CALL_PROMPT_CONTRACT_VERSION = 15
 ONE_CALL_MODEL_SNAPSHOT = SALES_ONE_PLUS_MODEL
 
 ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS = """Return exactly one JSON object and nothing else.
@@ -28,6 +28,9 @@ requested_service_id: canonical service_id from SERVICE_REFERENCE_CATALOG or nul
 references: object with closed nested key direct_fact_ids only
 request_understanding: object (required with at least one request for every ANSWER/CLARIFY); ADMIN may use null or empty arrays
 primary_price_request_id: string or null (one kind=price request_id for code-owned primary price)
+
+Return this complete shape. primary_price_request_id is TOP-LEVEL, beside request_understanding:
+{"route":"ANSWER","service_id":null,"extent":null,"jaw":null,"stage":null,"scenario":"none","commercial_intent":"none","promotion_scope":"none","clarify_axis":null,"clarify_service_options":null,"patient_text":null,"price_text":null,"service_reference_status":"none","requested_service_id":null,"references":{"direct_fact_ids":[]},"request_understanding":{"subjects":[],"scope_commitment":"none","tooth_count":null,"requests":[{"request_id":"r1","kind":"content","subject_id":null,"context":"general_information","policy_ids":[],"payment_scheme":"unspecified","payment_scheme_intent":"unspecified","contact_fields":[],"content_text":"..."}]},"primary_price_request_id":null}
 
 request_understanding (when non-null):
 subjects: array of {subject_id, relation, age_group} — may be empty

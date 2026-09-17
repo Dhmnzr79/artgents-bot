@@ -6,7 +6,12 @@ import pytest
 import json
 import uuid
 
-from core.one_call_envelope_protocol import OneCallEnvelopeProtocolError, parse_production_envelope_json, production_envelope_template
+from core.one_call_envelope_protocol import (
+    ENVELOPE_NORMALIZED_NESTED_PRIMARY_PRICE_REQUEST_ID,
+    OneCallEnvelopeProtocolError,
+    parse_production_envelope_json,
+    production_envelope_template,
+)
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
@@ -21,6 +26,137 @@ from contracts.request_understanding import (
     RequestUnderstandingSubject,
     minimal_content_understanding,
 )
+
+
+def _parse(payload: dict[str, object]):
+    return parse_production_envelope_json(
+        json.dumps(payload, ensure_ascii=False),
+        active_service_catalog=_EMPTY_CATALOG,
+        service_reference_catalog=_EMPTY_REF_CATALOG,
+        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+    )
+
+
+def _price_understanding() -> dict[str, object]:
+    return {
+        "subjects": [],
+        "requests": [
+            {
+                "request_id": "r1",
+                "kind": "price",
+                "subject_id": None,
+                "context": "current_care",
+                "policy_ids": [],
+                "payment_scheme": "unspecified",
+                "payment_scheme_intent": "unspecified",
+                "contact_fields": [],
+                "content_text": None,
+            }
+        ],
+    }
+
+
+def test_nested_primary_price_request_id_is_repaired_before_understanding_validation() -> None:
+    payload = production_envelope_template(request_understanding=_price_understanding())
+    payload.pop("primary_price_request_id")
+    payload["request_understanding"]["primary_price_request_id"] = "r1"  # type: ignore[index]
+    assert _parse(payload).primary_price_request_id == "r1"
+
+
+def test_nested_null_primary_price_request_id_is_repaired_before_understanding_validation() -> None:
+    payload = production_envelope_template(request_understanding=_price_understanding())
+    payload.pop("primary_price_request_id")
+    payload["request_understanding"]["primary_price_request_id"] = None  # type: ignore[index]
+    assert _parse(payload).primary_price_request_id is None
+
+
+def test_nested_primary_price_request_id_records_only_its_known_normalization() -> None:
+    import app as app_module
+    from core import turn_timing
+
+    payload = production_envelope_template(request_understanding=_price_understanding())
+    payload.pop("primary_price_request_id")
+    payload["request_understanding"]["primary_price_request_id"] = "r1"  # type: ignore[index]
+    with app_module.app.test_request_context("/ask", method="POST"):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        parsed = _parse(payload)
+        assert parsed.primary_price_request_id == "r1"
+        assert turn_timing.summary_for_turn_complete()["envelope_input_normalizations"] == [
+            ENVELOPE_NORMALIZED_NESTED_PRIMARY_PRICE_REQUEST_ID
+        ]
+
+
+@pytest.mark.parametrize(
+    ("top_level", "nested"),
+    ((None, "r1"), ("r1", None), ("r1", "r2")),
+)
+def test_conflicting_nested_primary_price_request_id_is_rejected(
+    top_level: str | None, nested: str | None,
+) -> None:
+    payload = production_envelope_template(
+        primary_price_request_id=top_level,
+        request_understanding=_price_understanding(),
+    )
+    payload["request_understanding"]["primary_price_request_id"] = nested  # type: ignore[index]
+    with pytest.raises(OneCallEnvelopeProtocolError, match="primary_price_request_id_location_conflict"):
+        _parse(payload)
+
+
+def test_matching_nested_primary_price_request_id_is_deduplicated() -> None:
+    payload = production_envelope_template(
+        primary_price_request_id="r1",
+        request_understanding=_price_understanding(),
+    )
+    payload["request_understanding"]["primary_price_request_id"] = " r1 "  # type: ignore[index]
+    assert _parse(payload).primary_price_request_id == "r1"
+
+
+def test_nested_primary_price_request_id_still_requires_a_price_request() -> None:
+    payload = production_envelope_template()
+    payload.pop("primary_price_request_id")
+    payload["request_understanding"]["primary_price_request_id"] = "r1"  # type: ignore[index]
+    with pytest.raises(OneCallEnvelopeProtocolError, match="primary_price_request_id_invalid"):
+        _parse(payload)
+
+
+def test_unknown_nested_understanding_field_is_still_rejected() -> None:
+    payload = production_envelope_template()
+    payload["request_understanding"]["unknown"] = "x"  # type: ignore[index]
+    with pytest.raises(OneCallEnvelopeProtocolError, match="extra_forbidden"):
+        _parse(payload)
+
+
+def test_nested_price_id_keeps_vinirs_price_scenario_on_the_normal_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A misplaced known field must not turn a valid price reply into a technical failure."""
+    from tests.test_one_call_tenant_isolation_offline import _enable_demo_nikadent, _post_ask
+
+    _enable_demo_nikadent(monkeypatch)
+    payload = production_envelope_template(
+        patient_text=None,
+        service_id="veneers",
+        requested_service_id="veneers",
+        service_reference_status="resolved",
+        commercial_intent="price",
+        request_understanding=_price_understanding(),
+    )
+    payload.pop("primary_price_request_id")
+    payload["request_understanding"]["primary_price_request_id"] = "r1"  # type: ignore[index]
+    response, backend = _post_ask(
+        monkeypatch,
+        sid=f"d2-f1-vinirs-{uuid.uuid4().hex}",
+        user_message="Сколько стоят виниры?",
+        envelope_json=json.dumps(payload, ensure_ascii=False),
+        client_id="demo",
+    )
+
+    assert backend.call_count == 1
+    answer = str(response.get("answer") or "")
+    assert "35" in answer.replace("\u00a0", "").replace(" ", "")
+    assert "Сейчас не удалось подготовить ответ" not in answer
 
 
 def test_minimal_content_understanding_valid() -> None:

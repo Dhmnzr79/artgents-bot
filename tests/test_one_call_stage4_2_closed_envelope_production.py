@@ -413,8 +413,8 @@ def test_invalid_envelope_does_not_retry() -> None:
     assert backend.calls == 1
 
 
-def test_prompt_contract_version_is_fourteen() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 14
+def test_prompt_contract_version_is_fifteen() -> None:
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 15
     assert "commercial_intent" in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
     assert "@ANSWER" not in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
 

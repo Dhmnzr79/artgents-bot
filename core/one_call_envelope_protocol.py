@@ -43,6 +43,9 @@ _ALLOWED_PROMOTION_SCOPE = frozenset({"none", "general", "service", "shown"})
 _ALLOWED_CLARIFY_AXIS = frozenset({"service", "extent", "jaw", "stage"})
 _ALLOWED_SERVICE_REFERENCE_STATUS = frozenset({"none", "resolved", "unresolved"})
 ENVELOPE_NORMALIZED_UNEXPECTED_PRICE_TEXT = "envelope_normalized_unexpected_price_text"
+ENVELOPE_NORMALIZED_NESTED_PRIMARY_PRICE_REQUEST_ID = (
+    "envelope_normalized_nested_primary_price_request_id"
+)
 
 
 class OneCallEnvelopeProtocolError(ValueError):
@@ -99,6 +102,32 @@ def _normalize_production_payload(
     codes: list[str] = []
     required = required_envelope_field_names()
     keys = set(payload.keys())
+    understanding = payload.get("request_understanding")
+    if isinstance(understanding, dict) and "primary_price_request_id" in understanding:
+        nested_value = _optional_nonblank_string(
+            understanding["primary_price_request_id"],
+            code="primary_price_request_id_invalid",
+        )
+        payload = dict(payload)
+        if "primary_price_request_id" in keys:
+            top_level_value = _optional_nonblank_string(
+                payload["primary_price_request_id"],
+                code="primary_price_request_id_invalid",
+            )
+            if top_level_value != nested_value:
+                raise OneCallEnvelopeProtocolError(
+                    "primary_price_request_id_location_conflict"
+                )
+            payload["primary_price_request_id"] = top_level_value
+        else:
+            payload["primary_price_request_id"] = nested_value
+            keys.add("primary_price_request_id")
+        payload["request_understanding"] = {
+            key: value
+            for key, value in understanding.items()
+            if key != "primary_price_request_id"
+        }
+        codes.append(ENVELOPE_NORMALIZED_NESTED_PRIMARY_PRICE_REQUEST_ID)
     if "price_text" not in keys:
         payload = dict(payload)
         payload["price_text"] = None
@@ -442,6 +471,8 @@ def _validate_structure(
         )
     except ValueError as exc:
         message = str(exc)
+        if "Value error, " in message:
+            message = message.split("Value error, ", 1)[1].split(" [", 1)[0].strip()
         if message in {
             "patient_text_required",
             "patient_text_forbidden_for_admin",
@@ -454,6 +485,7 @@ def _validate_structure(
             "service_id_invalid",
             "stage_invalid",
             "clarify_service_options_invalid",
+            "primary_price_request_id_invalid",
             "promotion_scope_forbidden",
             "promotion_scope_invalid",
             "direct_fact_ids_forbidden_for_route",
@@ -480,6 +512,7 @@ def _validate_structure(
                     "service_id_invalid",
                     "stage_invalid",
                     "clarify_service_options_invalid",
+                    "primary_price_request_id_invalid",
                     "promotion_scope_forbidden",
                     "promotion_scope_invalid",
                     "service_reference_status_invalid",

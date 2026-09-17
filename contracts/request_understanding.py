@@ -64,6 +64,7 @@ class RequestUnderstandingRequest(BaseModel):
     payment_scheme_intent: PaymentSchemeIntent = "unspecified"
     contact_fields: tuple[str, ...] = ()
     content_text: str | None = None
+    content_ref: str | None = None
 
     @field_validator("request_id")
     @classmethod
@@ -88,6 +89,21 @@ class RequestUnderstandingRequest(BaseModel):
                 raise ValueError("contact_fields_invalid")
         return value
 
+    @field_validator("content_ref")
+    @classmethod
+    def _validate_content_ref(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        token = value.strip().replace("\\", "/")
+        if (
+            token != value
+            or not token.endswith(".md")
+            or "/" in token
+            or ".." in token
+        ):
+            raise ValueError("content_ref_invalid")
+        return token
+
     @model_validator(mode="after")
     def _kind_field_rules(self) -> Self:
         if self.content_text is not None and len(self.content_text) > _MAX_CONTENT_TEXT_CODEPOINTS:
@@ -98,6 +114,10 @@ class RequestUnderstandingRequest(BaseModel):
             raise ValueError("policy_ids_forbidden")
         if self.kind not in {"content", "other"} and self.content_text is not None:
             raise ValueError("content_text_forbidden")
+        if self.kind not in {"content", "other"} and self.content_ref is not None:
+            raise ValueError("content_ref_forbidden")
+        if self.content_ref is not None and self.content_text is None:
+            raise ValueError("content_ref_without_content_text")
         return self
 
 

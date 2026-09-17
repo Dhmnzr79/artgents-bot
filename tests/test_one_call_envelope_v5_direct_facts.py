@@ -303,10 +303,11 @@ def test_envelope_size_limit_unchanged() -> None:
         )
 
 
-def test_prompt_contract_version_is_fifteen() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 15
+def test_prompt_contract_version_is_sixteen() -> None:
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 16
     assert '"request_understanding":{' in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
     assert '},"primary_price_request_id":null}' in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
+    assert '"content_ref":null' in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
 
 
 def test_prefix_contains_exact_commercial_catalog_with_full_fields() -> None:

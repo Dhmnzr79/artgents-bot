@@ -128,6 +128,157 @@ def test_unknown_nested_understanding_field_is_still_rejected() -> None:
         _parse(payload)
 
 
+def test_content_ref_is_limited_to_safe_content_requests() -> None:
+    request = RequestUnderstandingRequest(
+        request_id="r1",
+        kind="content",
+        subject_id=None,
+        context="general_information",
+        content_text="Ответ из материала.",
+        content_ref="implantation__faq__pain.md",
+    )
+    assert request.content_ref == "implantation__faq__pain.md"
+    with pytest.raises(ValueError, match="content_ref_forbidden"):
+        RequestUnderstandingRequest(
+            request_id="r1",
+            kind="price",
+            subject_id=None,
+            context="current_care",
+            content_ref="implantation__faq__pain.md",
+        )
+    with pytest.raises(ValueError, match="content_ref_invalid"):
+        RequestUnderstandingRequest(
+            request_id="r1",
+            kind="content",
+            subject_id=None,
+            context="general_information",
+            content_text="Ответ из материала.",
+            content_ref="../outside.md",
+        )
+
+
+def test_answered_pain_source_projects_its_video_and_followup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tests.test_one_call_tenant_isolation_offline import _enable_demo_nikadent, _post_ask
+
+    _enable_demo_nikadent(monkeypatch)
+    response, backend = _post_ask(
+        monkeypatch,
+        sid=f"d2-f2-pain-{uuid.uuid4().hex}",
+        user_message="А я боюсь боли",
+        envelope_json=json.dumps(production_envelope_template(
+            patient_text=None,
+            service_id="classic",
+            requested_service_id="classic",
+            service_reference_status="resolved",
+            request_understanding={
+                "subjects": [],
+                "requests": [{
+                    "request_id": "r1",
+                    "kind": "content",
+                    "subject_id": None,
+                    "context": "general_information",
+                    "policy_ids": [],
+                    "payment_scheme": "unspecified",
+                    "payment_scheme_intent": "unspecified",
+                    "contact_fields": [],
+                    "content_text": "Страх боли при имплантации — нормальная реакция.",
+                    "content_ref": "implantation__faq__pain.md",
+                }],
+            },
+        ), ensure_ascii=False),
+        client_id="demo",
+    )
+
+    assert backend.call_count == 1
+    assert "Страх боли" in str(response.get("answer") or "")
+    video = response.get("video") or {}
+    assert "pain-doctor-explains" in str(video.get("src") or "")
+    refs = {
+        str(item.get("ref") or "")
+        for item in (response.get("quick_replies") or [])
+    }
+    assert "implantation__faq__pain.md#kakuyu-anesteziyu-ispolzuyut" in refs
+
+
+def test_answered_warranty_source_projects_its_followup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tests.test_one_call_tenant_isolation_offline import _enable_demo_nikadent, _post_ask
+
+    _enable_demo_nikadent(monkeypatch)
+    response, backend = _post_ask(
+        monkeypatch,
+        sid=f"d2-f2-warranty-{uuid.uuid4().hex}",
+        user_message="А гарантия у вас есть?",
+        envelope_json=json.dumps(production_envelope_template(
+            patient_text=None,
+            request_understanding={
+                "subjects": [],
+                "requests": [{
+                    "request_id": "r1",
+                    "kind": "content",
+                    "subject_id": None,
+                    "context": "general_information",
+                    "policy_ids": [],
+                    "payment_scheme": "unspecified",
+                    "payment_scheme_intent": "unspecified",
+                    "contact_fields": [],
+                    "content_text": "Условия гарантии фиксируются документально.",
+                    "content_ref": "clinic__info__warranty.md",
+                }],
+            },
+        ), ensure_ascii=False),
+        client_id="demo",
+    )
+
+    assert backend.call_count == 1
+    assert "гарантии" in str(response.get("answer") or "").casefold()
+    refs = {
+        str(item.get("ref") or "")
+        for item in (response.get("quick_replies") or [])
+    }
+    assert "clinic__info__warranty.md#chto-delat-esli-voznikla-problema" in refs
+
+
+def test_unknown_content_ref_keeps_answer_but_projects_no_unrelated_ui(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tests.test_one_call_tenant_isolation_offline import _enable_demo_nikadent, _post_ask
+
+    _enable_demo_nikadent(monkeypatch)
+    response, backend = _post_ask(
+        monkeypatch,
+        sid=f"d2-f2-unknown-source-{uuid.uuid4().hex}",
+        user_message="А я боюсь боли",
+        envelope_json=json.dumps(production_envelope_template(
+            patient_text=None,
+            request_understanding={
+                "subjects": [],
+                "requests": [{
+                    "request_id": "r1",
+                    "kind": "content",
+                    "subject_id": None,
+                    "context": "general_information",
+                    "policy_ids": [],
+                    "payment_scheme": "unspecified",
+                    "payment_scheme_intent": "unspecified",
+                    "contact_fields": [],
+                    "content_text": "Страх боли при имплантации — нормальная реакция.",
+                    "content_ref": "not-in-document-index.md",
+                }],
+            },
+        ), ensure_ascii=False),
+        client_id="demo",
+    )
+
+    assert backend.call_count == 1
+    assert "Страх боли" in str(response.get("answer") or "")
+    assert response.get("video") is None
+    assert not response.get("quick_replies")
+
+
 def test_nested_price_id_keeps_vinirs_price_scenario_on_the_normal_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -98,6 +98,7 @@ from core.target_presentation_decision import (
     TargetPresentationDecision,
     decide_target_presentation,
 )
+from core.target_presentation_source_identity import validate_used_content_refs
 from core.target_presentation_turn_projection import (
     resolve_target_semantic_context,
     should_include_automatic_marketing_block,
@@ -801,6 +802,8 @@ def _build_verified(
     turn_frame: TurnFrame,
     patient_text: str,
     user_message: str,
+    understanding: object | None = None,
+    composition_resolution: object | None = None,
 ) -> TargetVerifiedComposedResponse:
     package_primary = bound_package.package.plan.primary_content_ref
     try:
@@ -827,10 +830,27 @@ def _build_verified(
         turn_timing.set_flag("post_composer_evidence_degraded", True)
         turn_timing.set_flag("post_composer_evidence_error_code", exc.code)
         package_used = ()
+    selected_followups = bound_package.package.selected_followups
+    source_ref = _answered_content_source_ref(
+        understanding=understanding,
+        composition_resolution=composition_resolution,
+        context=context,
+    )
+    if source_ref is not None:
+        # The visible answer names this document. Do not retain buttons prepared
+        # for a broad service selected before the model chose this source.
+        package_primary = source_ref
+        package_used = (source_ref, *tuple(ref for ref in package_used if ref != source_ref))
+        selected_followups = replace(
+            selected_followups,
+            source=None,
+            content=(),
+            price=(),
+        )
     verified = TargetVerifiedComposedResponse(
         text=patient_text,
         spec=bound_package.spec,
-        selected_followups=bound_package.package.selected_followups,
+        selected_followups=selected_followups,
         selected_cta_key=bound_package.selected_cta_key,
         navigation_followups=bound_package.package.navigation_followups,
         primary_content_ref=package_primary,
@@ -841,6 +861,45 @@ def _build_verified(
         client_id=context.client_id,
         md_root=context.md_root,
     )
+
+
+def _answered_content_source_ref(
+    *,
+    understanding: object | None,
+    composition_resolution: object | None,
+    context: TargetRuntimeClientContext,
+) -> str | None:
+    """Return one current-pack MD source named by an answered content request.
+
+    Prose remains visible when the optional source is absent or invalid. UI
+    metadata is projected only for one unambiguous document from this pack.
+    """
+    if understanding is None or composition_resolution is None:
+        return None
+    requests = getattr(understanding, "requests", ())
+    ledger = getattr(composition_resolution, "ledger", ())
+    answered_ids = {
+        str(entry.request_id)
+        for entry in ledger
+        if str(getattr(entry, "status", "")) == "answered"
+    }
+    candidates: list[str] = []
+    allowed_paths = frozenset(context.cached_full_context.document_paths)
+    for request in requests:
+        if (
+            str(getattr(request, "kind", "")) not in {"content", "other"}
+            or str(getattr(request, "request_id", "")) not in answered_ids
+            or not str(getattr(request, "content_text", "") or "").strip()
+        ):
+            continue
+        validated = validate_used_content_refs(
+            context.md_root,
+            (getattr(request, "content_ref", None),),
+        )
+        if validated and validated[0] in allowed_paths:
+            candidates.append(validated[0])
+    unique = tuple(dict.fromkeys(candidates))
+    return unique[0] if len(unique) == 1 else None
 
 
 def _rendered_fact_ids_from_text(
@@ -1025,6 +1084,7 @@ def build_one_call_presentation_result(
             verified = _build_verified(
                 bound_package=bound_package, context=context, turn_frame=turn_frame,
                 patient_text=composed.patient_text, user_message=user_message,
+                understanding=understanding, composition_resolution=composed.resolution,
             )
             return OneCallPresentationResult(
                 status="ok", reason_code="primary_price_blocked_by_policy",
@@ -1706,6 +1766,8 @@ def build_one_call_presentation_result(
         turn_frame=turn_frame,
         patient_text=final_patient_text,
         user_message=user_message,
+        understanding=understanding,
+        composition_resolution=composition_resolution,
     )
     presentation = decide_target_presentation(
         client_id=context.client_id,

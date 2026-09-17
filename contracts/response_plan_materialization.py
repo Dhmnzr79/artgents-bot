@@ -23,6 +23,9 @@ from contracts.response_plan import (
     ServiceOptionsBlock,
     SessionKey,
     TransportKind,
+    UiButtonCandidate,
+    UiQuickReplyCandidate,
+    UiVideoCandidate,
 )
 from contracts.response_plan_adapter import (
     ResponsePlanAdapterTerminalAuthority,
@@ -143,6 +146,30 @@ class D2DirectionAuthority(ResponsePlanModel):
         return self
 
 
+class D2SourceUiAuthority(ResponsePlanModel):
+    """Source-owned navigation candidates for one approved D2 material."""
+
+    source_client_id: str
+    content_ref: str
+    quick_replies: tuple[UiQuickReplyCandidate, ...] = ()
+    video: UiVideoCandidate | None = None
+    cta: UiButtonCandidate | None = None
+
+    @model_validator(mode="after")
+    def _validate_d2_source_ui(self) -> Self:
+        for value, code in (
+            (self.source_client_id, "d2_source_ui_client_invalid"),
+            (self.content_ref, "d2_source_ui_ref_invalid"),
+        ):
+            if not value or value != value.strip():
+                raise ValueError(code)
+        # Navigation is optional.  Candidate-level problems are deliberately
+        # diagnosed and omitted by the D2 materializer so they cannot suppress
+        # an otherwise valid approved text.  The authority itself remains
+        # tenant-bound below in ResponsePlanMaterializationSources.
+        return self
+
+
 class OfferConditionEvidence(ResponsePlanModel):
     source_client_id: str
     offer_id: str
@@ -186,6 +213,8 @@ class ResponsePlanMaterializationSources(ResponsePlanModel):
     shown_service_value_ids: tuple[str, ...] = ()
     d2_authored_content: tuple[D2AuthoredContentAuthority, ...] = ()
     d2_directions: tuple[D2DirectionAuthority, ...] = ()
+    d2_source_ui: tuple[D2SourceUiAuthority, ...] = ()
+    shown_d2_secondary_ref_ids: tuple[str, ...] = ()
 
     @model_validator(mode="after")
     def _validate_ownership(self) -> Self:
@@ -221,6 +250,19 @@ class ResponsePlanMaterializationSources(ResponsePlanModel):
             if direction.topic_id in direction_topics:
                 raise ValueError("materialization_d2_direction_topic_duplicate")
             direction_topics.add(direction.topic_id)
+        source_ui_refs: set[str] = set()
+        for source_ui in self.d2_source_ui:
+            if source_ui.source_client_id != client_id:
+                raise ValueError("materialization_d2_source_ui_client_mismatch")
+            if source_ui.content_ref not in content_refs:
+                raise ValueError("materialization_d2_source_ui_unknown_content_ref")
+            if source_ui.content_ref in source_ui_refs:
+                raise ValueError("materialization_d2_source_ui_ref_duplicate")
+            source_ui_refs.add(source_ui.content_ref)
+        if len(self.shown_d2_secondary_ref_ids) != len(set(self.shown_d2_secondary_ref_ids)):
+            raise ValueError("materialization_d2_shown_secondary_duplicate")
+        if any(not value or value != value.strip() for value in self.shown_d2_secondary_ref_ids):
+            raise ValueError("materialization_d2_shown_secondary_invalid")
         return self
 
 

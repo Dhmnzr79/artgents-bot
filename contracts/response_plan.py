@@ -636,6 +636,7 @@ class UiPlanCandidates(ResponsePlanModel):
     buttons: tuple[UiButtonCandidate, ...] = ()
     widget: UiWidgetCandidate | None = None
     video: UiVideoCandidate | None = None
+    source_content_ref: NonBlankStr | None = None
 
 
 class PreComposerPlan(ResponsePlanModel):
@@ -727,6 +728,7 @@ class ComposerResult(ResponsePlanModel):
     patient_text: str | None = None
     requested_fact_ids: UniqueRequestedFactIds = ()
     information_blocks: tuple[InformationSourceBlock, ...] = ()
+    visible_price_block: bool = False
 
     @model_validator(mode="after")
     def _validate_pair_and_invariants(self) -> Self:
@@ -734,22 +736,26 @@ class ComposerResult(ResponsePlanModel):
         if pair not in ALLOWED_ROUTE_MODE_PAIRS:
             raise ValueError("route_mode_conflict")
         if pair == ("ANSWER", "standard"):
-            if not (self.patient_text and self.patient_text.strip()) and not self.information_blocks:
+            if (
+                not (self.patient_text and self.patient_text.strip())
+                and not self.information_blocks
+                and not self.visible_price_block
+            ):
                 raise ValueError("answer_requires_patient_text")
         elif pair == ("ANSWER", "contacts"):
             if self.patient_text is not None:
                 raise ValueError("contacts_requires_null_patient_text")
-            if self.requested_fact_ids or self.information_blocks:
+            if self.requested_fact_ids or self.information_blocks or self.visible_price_block:
                 raise ValueError("contacts_forbids_requested_facts")
         elif self.route == "ADMIN":
             if self.patient_text is not None:
                 raise ValueError("admin_requires_null_patient_text")
-            if self.requested_fact_ids or self.information_blocks:
+            if self.requested_fact_ids or self.information_blocks or self.visible_price_block:
                 raise ValueError("admin_forbids_requested_facts")
         elif self.route == "CLARIFY":
             if not (self.patient_text and self.patient_text.strip()):
                 raise ValueError("clarify_requires_patient_text")
-            if self.requested_fact_ids or self.information_blocks:
+            if self.requested_fact_ids or self.information_blocks or self.visible_price_block:
                 raise ValueError("clarify_forbids_requested_facts")
         return self
 
@@ -826,6 +832,7 @@ class ResolvedUiPlan(ResponsePlanModel):
     widget: UiWidgetCandidate | None = None
     video: UiVideoCandidate | None = None
     contact: CanonicalContactCandidate | None = None
+    source_content_ref: NonBlankStr | None = None
 
 
 class FinalizedCommercialIds(ResponsePlanModel):
@@ -1121,7 +1128,11 @@ class ResolvedResponsePlan(ResponsePlanModel):
             raise ValueError("route_mode_conflict")
 
         if pair == ("ANSWER", "standard"):
-            if not (self.patient_text and self.patient_text.strip()) and not self.information_blocks:
+            if (
+                not (self.patient_text and self.patient_text.strip())
+                and not self.information_blocks
+                and not self.is_price_answer
+            ):
                 raise ValueError("answer_requires_patient_text")
             if self.terminal_text is not None:
                 raise ValueError("answer_standard_forbids_terminal_text")

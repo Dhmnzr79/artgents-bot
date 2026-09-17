@@ -32,6 +32,8 @@ from contracts.response_plan import (
     TextualCtaCandidate,
     UiButtonCandidate,
     UiPlanCandidates,
+    UiQuickReplyCandidate,
+    UiVideoCandidate,
     UiWidgetCandidate,
     all_allowed_route_mode_pairs,
 )
@@ -299,22 +301,36 @@ def resolve_d2_envelope_response(
     )
     if unsupported:
         raise MaterializationContractError("d2_request_kind_unsupported")
-    if len(price_parts) != 1 or not content_parts:
-        raise MaterializationContractError("d2_price_and_content_parts_required")
+    if len(price_parts) > 1:
+        raise MaterializationContractError("d2_multiple_price_parts_unsupported")
+    if not price_parts and not content_parts:
+        raise MaterializationContractError("d2_price_or_content_part_required")
 
-    price_part = price_parts[0]
     client_id = sources.material_authority.source_client_id
     if client_id != sources.session_key.client_id:
         raise MaterializationOwnershipError("materialization_client_mismatch")
-    service_ids, response_scope, selected_topic_id = _d2_price_scope(
-        price_part, client_id=client_id, sources=sources
-    )
-    price_block, trace = _d2_price_block(
-        bundle=sources.material_authority.bundle,
-        client_id=client_id,
-        service_ids=service_ids,
-        condition_evidence=sources.condition_evidence_by_offer,
-    )
+
+    price_block: D2FrozenPriceBlock | None = None
+    if price_parts:
+        service_ids, response_scope, selected_topic_id = _d2_price_scope(
+            price_parts[0], client_id=client_id, sources=sources
+        )
+        price_block, trace = _d2_price_block(
+            bundle=sources.material_authority.bundle,
+            client_id=client_id,
+            service_ids=service_ids,
+            condition_evidence=sources.condition_evidence_by_offer,
+        )
+    else:
+        service_ids, response_scope, selected_topic_id = _d2_content_scope(
+            content_parts[0], client_id=client_id, sources=sources
+        )
+        trace = MaterializationTrace(
+            price_lookup_mode=None,
+            considered_offers=(),
+            selected_offers=(),
+        )
+
     information_blocks = _d2_information_blocks(
         content_parts=content_parts,
         client_id=client_id,
@@ -322,9 +338,14 @@ def resolve_d2_envelope_response(
         topic_id=selected_topic_id,
         sources=sources,
     )
-    available_ui = _materialize_ui_candidates(sources)
-    price_ui = UiPlanCandidates(
-        buttons=tuple(item for item in available_ui.buttons if item.action_kind == "cta"),
+    source_ui, source_ui_diagnostics = _d2_source_ui(
+        content_parts=content_parts,
+        sources=sources,
+    )
+    ui_candidates = _d2_select_ui(
+        source_ui=source_ui,
+        sources=sources,
+        suppress_secondary=price_block is not None,
     )
 
     plan = PreComposerPlan(
@@ -340,8 +361,10 @@ def resolve_d2_envelope_response(
         selected_topic_id=selected_topic_id,
         price_plan=PricePlan(kind="none"),
         d2_price_block=price_block,
-        textual_cta_candidate=_materialize_textual_cta(sources),
-        ui_candidates=price_ui,
+        textual_cta_candidate=(
+            _materialize_textual_cta(sources) if price_block is not None else None
+        ),
+        ui_candidates=ui_candidates,
         transport_kind=sources.transport_kind,
     )
     composer_result = ComposerResult(
@@ -349,6 +372,7 @@ def resolve_d2_envelope_response(
         mode="standard",
         patient_text=None,
         information_blocks=information_blocks,
+        visible_price_block=price_block is not None,
     )
     resolved = resolve_response_plan(plan, composer_result)
     finalized_trace = replace(trace, finalized_offers=_build_finalized_offer_trace(resolved))
@@ -356,12 +380,39 @@ def resolve_d2_envelope_response(
         resolved=resolved,
         rendered_text=render_response_text(resolved),
         ui_projection=project_response_ui(resolved),
-        materialization_diagnostics=(),
+        materialization_diagnostics=source_ui_diagnostics,
         selection_diagnostics=(),
         adapter_diagnostics=(),
         situation_delta=ResponseSituationDelta(action="keep"),
         trace=finalized_trace,
     )
+
+
+def _d2_content_scope(
+    part: RequestUnderstandingRequest,
+    *,
+    client_id: str,
+    sources: ResponsePlanMaterializationSources,
+) -> tuple[tuple[str, ...], str, str | None]:
+    if part.content_ref is None:
+        raise MaterializationContractError("d2_content_ref_required")
+    authority = next(
+        (item for item in sources.d2_authored_content if item.content_ref == part.content_ref),
+        None,
+    )
+    if authority is None or authority.source_client_id != client_id:
+        raise MaterializationOwnershipError("materialization_foreign_material")
+    if part.service_id is not None:
+        return (part.service_id,), "service", part.topic_id
+    if part.topic_id is not None:
+        for direction in sources.d2_directions:
+            if direction.topic_id == part.topic_id and direction.source_client_id == client_id:
+                return direction.service_ids, "topic", part.topic_id
+        if not authority.allowed_service_ids:
+            return (), "topic", part.topic_id
+    if not authority.allowed_service_ids:
+        return (), "clinic", None
+    raise MaterializationContractError("d2_content_scope_required")
 
 
 def _d2_price_scope(
@@ -541,6 +592,124 @@ def _d2_information_blocks(
             )
         )
     return tuple(blocks)
+
+
+def _d2_source_ui(
+    *,
+    content_parts: tuple[RequestUnderstandingRequest, ...],
+    sources: ResponsePlanMaterializationSources,
+) -> tuple[UiPlanCandidates, tuple[MaterializationDiagnostic, ...]]:
+    if not content_parts:
+        return UiPlanCandidates(), ()
+    content_ref = content_parts[0].content_ref
+    if content_ref is None:
+        raise MaterializationContractError("d2_content_ref_required")
+    authority = next(
+        (item for item in sources.d2_source_ui if item.content_ref == content_ref),
+        None,
+    )
+    if authority is None:
+        return UiPlanCandidates(source_content_ref=content_ref), ()
+    shown_refs = set(sources.shown_d2_secondary_ref_ids)
+    diagnostics: list[MaterializationDiagnostic] = []
+    valid_reply_ids: set[str] = set()
+    valid_quick_replies = []
+    for item in authority.quick_replies:
+        if item.source_client_id != authority.source_client_id:
+            diagnostics.append(
+                MaterializationDiagnostic(
+                    code="materialization_optional_unavailable",
+                    detail=("d2_source_ui_quick_reply_client_mismatch", item.reply_id),
+                )
+            )
+            continue
+        if item.reply_id in valid_reply_ids:
+            diagnostics.append(
+                MaterializationDiagnostic(
+                    code="materialization_optional_unavailable",
+                    detail=("d2_source_ui_quick_reply_duplicate", item.reply_id),
+                )
+            )
+            continue
+        valid_reply_ids.add(item.reply_id)
+        valid_quick_replies.append(item)
+
+    video = authority.video
+    if video is not None and video.source_client_id != authority.source_client_id:
+        diagnostics.append(
+            MaterializationDiagnostic(
+                code="materialization_optional_unavailable",
+                detail=("d2_source_ui_video_client_mismatch", video.video_id),
+            )
+        )
+        video = None
+    elif video is not None and video.video_id in valid_reply_ids:
+        diagnostics.append(
+            MaterializationDiagnostic(
+                code="materialization_optional_unavailable",
+                detail=("d2_source_ui_secondary_ref_duplicate", video.video_id),
+            )
+        )
+        video = None
+    elif video is not None and video.video_id in shown_refs:
+        video = None
+
+    remaining_secondary_slots = 2 - int(video is not None)
+    quick_replies = tuple(
+        item
+        for item in valid_quick_replies
+        if item.reply_id not in shown_refs
+    )[:remaining_secondary_slots]
+    cta = authority.cta
+    if cta is not None and cta.source_client_id != authority.source_client_id:
+        diagnostics.append(
+            MaterializationDiagnostic(
+                code="materialization_optional_unavailable",
+                detail=("d2_source_ui_cta_client_mismatch", cta.button_id),
+            )
+        )
+        cta = None
+    elif cta is not None and cta.action_kind != "cta":
+        diagnostics.append(
+            MaterializationDiagnostic(
+                code="materialization_optional_unavailable",
+                detail=("d2_source_ui_cta_kind_invalid", cta.button_id),
+            )
+        )
+        cta = None
+    return (
+        UiPlanCandidates(
+            quick_replies=quick_replies,
+            buttons=(cta,) if cta is not None else (),
+            video=video,
+            source_content_ref=content_ref,
+        ),
+        tuple(diagnostics),
+    )
+
+
+def _d2_select_ui(
+    *,
+    source_ui: UiPlanCandidates,
+    sources: ResponsePlanMaterializationSources,
+    suppress_secondary: bool,
+) -> UiPlanCandidates:
+    source_cta = next(
+        (item for item in source_ui.buttons if item.action_kind == "cta"),
+        None,
+    )
+    global_ui = _materialize_ui_candidates(sources)
+    global_cta = next(
+        (item for item in global_ui.buttons if item.action_kind == "cta"),
+        None,
+    )
+    selected_cta = source_cta or global_cta
+    return UiPlanCandidates(
+        quick_replies=() if suppress_secondary else source_ui.quick_replies,
+        buttons=(selected_cta,) if selected_cta is not None else (),
+        video=None if suppress_secondary else source_ui.video,
+        source_content_ref=source_ui.source_content_ref,
+    )
 
 
 def _validate_ownership(

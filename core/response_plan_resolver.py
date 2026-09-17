@@ -645,6 +645,7 @@ def _resolve_commerce_ui(plan: PreComposerPlan) -> ResolvedUiPlan:
         buttons=plan.ui_candidates.buttons,
         widget=plan.ui_candidates.widget,
         video=plan.ui_candidates.video,
+        source_content_ref=plan.ui_candidates.source_content_ref,
     )
 
 

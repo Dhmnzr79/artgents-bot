@@ -146,6 +146,33 @@ class D2DirectionAuthority(ResponsePlanModel):
         return self
 
 
+class D2VolumeChoice(ResponsePlanModel):
+    extent: Literal["one_tooth", "few_teeth", "full_arch", "unknown"]
+    candidate: UiQuickReplyCandidate
+
+
+class D2DirectionPricePresentation(ResponsePlanModel):
+    source_client_id: str
+    topic_id: str
+    introduction_text: str
+    unknown_extent_text: str
+    volume_choices: tuple[D2VolumeChoice, ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_d2_direction_price_presentation(self) -> Self:
+        if any(not value or value != value.strip() for value in (
+            self.source_client_id, self.topic_id, self.introduction_text, self.unknown_extent_text,
+        )):
+            raise ValueError("d2_direction_price_presentation_invalid")
+        extents = [item.extent for item in self.volume_choices]
+        replies = [item.candidate.reply_id for item in self.volume_choices]
+        if len(extents) != len(set(extents)) or len(replies) != len(set(replies)):
+            raise ValueError("d2_direction_price_presentation_duplicate")
+        if any(item.candidate.source_client_id != self.source_client_id for item in self.volume_choices):
+            raise ValueError("d2_direction_price_presentation_client_mismatch")
+        return self
+
+
 class D2SourceUiAuthority(ResponsePlanModel):
     """Source-owned navigation candidates for one approved D2 material."""
 
@@ -213,6 +240,7 @@ class ResponsePlanMaterializationSources(ResponsePlanModel):
     shown_service_value_ids: tuple[str, ...] = ()
     d2_authored_content: tuple[D2AuthoredContentAuthority, ...] = ()
     d2_directions: tuple[D2DirectionAuthority, ...] = ()
+    d2_direction_price_presentations: tuple[D2DirectionPricePresentation, ...] = ()
     d2_source_ui: tuple[D2SourceUiAuthority, ...] = ()
     shown_d2_secondary_ref_ids: tuple[str, ...] = ()
 
@@ -250,6 +278,15 @@ class ResponsePlanMaterializationSources(ResponsePlanModel):
             if direction.topic_id in direction_topics:
                 raise ValueError("materialization_d2_direction_topic_duplicate")
             direction_topics.add(direction.topic_id)
+        presentation_topics: set[str] = set()
+        for presentation in self.d2_direction_price_presentations:
+            if presentation.source_client_id != client_id:
+                raise ValueError("materialization_d2_direction_presentation_client_mismatch")
+            if presentation.topic_id not in direction_topics:
+                raise ValueError("materialization_d2_direction_presentation_unknown_topic")
+            if presentation.topic_id in presentation_topics:
+                raise ValueError("materialization_d2_direction_presentation_topic_duplicate")
+            presentation_topics.add(presentation.topic_id)
         source_ui_refs: set[str] = set()
         for source_ui in self.d2_source_ui:
             if source_ui.source_client_id != client_id:

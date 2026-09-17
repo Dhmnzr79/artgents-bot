@@ -17,6 +17,12 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
 
     parts: list[str] = []
     if plan.is_price_answer:
+        scope = plan.d2_price_scope_decision
+        if scope is not None:
+            if scope.introduction_text is not None:
+                parts.append(scope.introduction_text.strip())
+            if scope.reason == "overview" and scope.unknown_extent_text is not None:
+                parts.append(scope.unknown_extent_text.strip())
         if plan.price_block is not None:
             parts.append(plan.price_block.display_text.strip())
         else:

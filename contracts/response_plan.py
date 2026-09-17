@@ -660,6 +660,36 @@ class D2TreatmentSituationDecision(ResponsePlanModel):
         return self
 
 
+class D2PriceScopeDecision(ResponsePlanModel):
+    source_request_id: NonBlankStr
+    topic_id: NonBlankStr
+    applied_extent: Literal["one_tooth", "few_teeth", "full_arch"] | None = None
+    reason: Literal["known_situation", "overview"]
+    selected_offer_ids: tuple[NonBlankStr, ...]
+    introduction_text: NonBlankStr | None = None
+    unknown_extent_text: NonBlankStr | None = None
+    volume_choices: tuple["D2PriceScopeChoice", ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_scope_decision(self) -> Self:
+        if self.reason == "known_situation" and self.applied_extent is None:
+            raise ValueError("d2_scope_decision_extent_required")
+        if self.reason == "overview" and self.applied_extent is not None:
+            raise ValueError("d2_scope_decision_overview_extent_forbidden")
+        if len(self.selected_offer_ids) != len(set(self.selected_offer_ids)):
+            raise ValueError("d2_scope_decision_offer_duplicate")
+        if len([item.candidate.reply_id for item in self.volume_choices]) != len(
+            set(item.candidate.reply_id for item in self.volume_choices)
+        ):
+            raise ValueError("d2_scope_decision_choice_duplicate")
+        return self
+
+
+class D2PriceScopeChoice(ResponsePlanModel):
+    extent: Literal["one_tooth", "few_teeth", "full_arch", "unknown"]
+    candidate: UiQuickReplyCandidate
+
+
 class PreComposerPlan(ResponsePlanModel):
     session_key: SessionKey
     context_strategy: ContextStrategy
@@ -672,6 +702,7 @@ class PreComposerPlan(ResponsePlanModel):
     price_plan: PricePlan
     d2_price_block: D2FrozenPriceBlock | None = None
     d2_treatment_situation: D2TreatmentSituationDecision | None = None
+    d2_price_scope_decision: D2PriceScopeDecision | None = None
     required_offer_conditions: UniqueRequiredOfferConditions = ()
     commercial_facts: UniqueCommercialFacts = ()
     promo_candidate_ids: UniquePromoCandidateIds = ()
@@ -1126,6 +1157,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
     price_block: ResolvedPriceBlock | None = None
     d2_price_block: D2FrozenPriceBlock | None = None
     d2_treatment_situation: D2TreatmentSituationDecision | None = None
+    d2_price_scope_decision: D2PriceScopeDecision | None = None
     information_blocks: tuple[InformationSourceBlock, ...] = ()
     required_offer_conditions: tuple[RequiredOfferConditionBlock, ...] = ()
     requested_fact_blocks: tuple[ResolvedFactBlock, ...] = ()

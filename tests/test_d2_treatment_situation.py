@@ -78,7 +78,15 @@ def _parse(
 
 
 def _resolve(envelope):
-    return resolve_d2_envelope_response(envelope, _sources(), as_of=date(2026, 9, 18))
+    sources = _sources()
+    source_payload = sources.model_dump()
+    source_payload["material_authority"]["bundle"]["offers"] = [
+        {**offer.model_dump(), "applies_to_extents": ["one_tooth", "few_teeth", "full_arch"]}
+        for offer in sources.material_authority.bundle.offers
+    ]
+    return resolve_d2_envelope_response(
+        envelope, type(sources).model_validate(source_payload), as_of=date(2026, 9, 18)
+    )
 
 
 def _situation(**overrides: object) -> dict[str, object]:
@@ -219,6 +227,12 @@ def test_legacy_envelope_axes_and_model_prose_do_not_change_frozen_decision() ->
 
 def test_situation_decision_and_rendering_stay_frozen_after_snapshot_mutation() -> None:
     sources = _sources()
+    source_payload = sources.model_dump()
+    source_payload["material_authority"]["bundle"]["offers"] = [
+        {**offer.model_dump(), "applies_to_extents": ["one_tooth", "few_teeth", "full_arch"]}
+        for offer in sources.material_authority.bundle.offers
+    ]
+    sources = type(sources).model_validate(source_payload)
     outcome = resolve_d2_envelope_response(_parse(_situation()), sources, as_of=date(2026, 9, 18))
     rendered, ui = outcome.rendered_text, outcome.ui_projection
     sources.material_authority.bundle.services.clear()

@@ -16,6 +16,8 @@ from contracts.response_plan import (
     ComposerSelectedRouteAuthority,
     D2FrozenPriceBlock,
     D2FrozenPriceRow,
+    D2PriceScopeDecision,
+    D2PriceScopeChoice,
     D2TreatmentSituationDecision,
     FactRole,
     FrozenPriceOfferRow,
@@ -55,6 +57,7 @@ from contracts.response_plan_materialization import (
     ResponsePlanMaterializationSources,
     SelectedOfferTrace,
 )
+from core.target_offer_extent_applicability import offer_applies_to_extent
 from contracts.response_plan_post_composer import PostComposerSelectionPlan, ResponseSituationDelta
 from contracts.response_schema import (
     ResponseSchemaBundle,
@@ -317,14 +320,25 @@ def resolve_d2_envelope_response(
 
     price_block: D2FrozenPriceBlock | None = None
     if price_parts:
+        price_part = price_parts[0]
         service_ids, response_scope, selected_topic_id = _d2_price_scope(
-            price_parts[0], client_id=client_id, sources=sources
+            price_part, client_id=client_id, sources=sources
         )
+        applied_extent = _d2_applied_extent(price_part, treatment_situation, sources)
         price_block, trace = _d2_price_block(
             bundle=sources.material_authority.bundle,
             client_id=client_id,
             service_ids=service_ids,
             condition_evidence=sources.condition_evidence_by_offer,
+            applied_extent=applied_extent,
+        )
+        scope_decision, volume_choices = _d2_price_scope_decision(
+            part=price_part,
+            client_id=client_id,
+            sources=sources,
+            service_ids=service_ids,
+            applied_extent=applied_extent,
+            selected_offer_ids=tuple(row.offer_id for row in price_block.rows),
         )
     else:
         service_ids, response_scope, selected_topic_id = _d2_content_scope(
@@ -335,6 +349,8 @@ def resolve_d2_envelope_response(
             considered_offers=(),
             selected_offers=(),
         )
+        scope_decision = None
+        volume_choices = ()
 
     information_blocks = _d2_information_blocks(
         content_parts=content_parts,
@@ -352,6 +368,10 @@ def resolve_d2_envelope_response(
         sources=sources,
         suppress_secondary=price_block is not None,
     )
+    if volume_choices:
+        ui_candidates = ui_candidates.model_copy(
+            update={"quick_replies": (*ui_candidates.quick_replies, *(item.candidate for item in volume_choices))}
+        )
 
     plan = PreComposerPlan(
         session_key=sources.session_key,
@@ -367,6 +387,7 @@ def resolve_d2_envelope_response(
         price_plan=PricePlan(kind="none"),
         d2_price_block=price_block,
         d2_treatment_situation=treatment_situation,
+        d2_price_scope_decision=scope_decision,
         textual_cta_candidate=(
             _materialize_textual_cta(sources) if price_block is not None else None
         ),
@@ -441,6 +462,101 @@ def _d2_treatment_situation(
     )
 
 
+def _d2_applied_extent(
+    part: RequestUnderstandingRequest,
+    situation: D2TreatmentSituationDecision | None,
+    sources: ResponsePlanMaterializationSources,
+) -> str | None:
+    del sources
+    if (
+        situation is None
+        or situation.source_request_id != part.request_id
+        or part.service_id is not None
+        or part.topic_id is None
+        or situation.scope_commitment not in {"reported", "correction", "hypothetical"}
+        or situation.extent not in {"one_tooth", "few_teeth", "full_arch"}
+    ):
+        return None
+    return situation.extent
+
+
+def _d2_price_scope_decision(
+    *,
+    part: RequestUnderstandingRequest,
+    client_id: str,
+    sources: ResponsePlanMaterializationSources,
+    service_ids: tuple[str, ...],
+    applied_extent: str | None,
+    selected_offer_ids: tuple[str, ...],
+    ) -> tuple[D2PriceScopeDecision | None, tuple[D2PriceScopeChoice, ...]]:
+    if part.service_id is not None or part.topic_id is None:
+        return None, ()
+    presentation = next(
+        (item for item in sources.d2_direction_price_presentations if item.topic_id == part.topic_id),
+        None,
+    )
+    if presentation is None or presentation.source_client_id != client_id:
+        return None, ()
+    choices: tuple[D2PriceScopeChoice, ...] = ()
+    situation = part.situation
+    can_offer_choices = situation is None
+    if applied_extent is None and can_offer_choices:
+        offer_sets = {
+            extent: _d2_scope_offer_ids(
+                service_ids=service_ids, extent=extent, sources=sources
+            )
+            for extent in ("one_tooth", "few_teeth", "full_arch")
+        }
+        if len(set(offer_sets.values())) > 1:
+            choices = tuple(
+                D2PriceScopeChoice(extent=item.extent, candidate=item.candidate)
+                for item in presentation.volume_choices
+            )
+    return (
+        D2PriceScopeDecision(
+            source_request_id=part.request_id,
+            topic_id=part.topic_id,
+            applied_extent=applied_extent,
+            reason="known_situation" if applied_extent is not None else "overview",
+            selected_offer_ids=selected_offer_ids,
+            introduction_text=presentation.introduction_text,
+            unknown_extent_text=presentation.unknown_extent_text if applied_extent is None else None,
+            volume_choices=choices,
+        ),
+        choices,
+    )
+
+
+def _d2_scope_offer_ids(
+    *, service_ids: tuple[str, ...], extent: str, sources: ResponsePlanMaterializationSources
+) -> tuple[str, ...]:
+    ids: list[str] = []
+    bundle = sources.material_authority.bundle
+    for service_id in service_ids:
+        service = bundle.services.get(service_id)
+        if service is None or not service.active:
+            continue
+        context = build_service_data_context(bundle, TargetDoctorCatalog(doctors={}), service_id)
+        options_by_id = {option.option_id: option for option in service.options}
+        for offer in context.offers:
+            if not offer.active:
+                continue
+            if offer.option_id is not None and options_by_id[offer.option_id].active is False:
+                continue
+            evidence = sources.condition_evidence_by_offer.get(offer.offer_id)
+            if evidence is None or evidence.completeness != "complete":
+                continue
+            if _d2_offer_applies(offer, service, extent):
+                ids.append(offer.offer_id)
+    return tuple(ids)
+
+
+def _d2_offer_applies(offer: TargetOffer, service: TargetService, extent: str) -> bool:
+    if offer.applies_to_extents is None and not service.selection.extent:
+        return False
+    return offer_applies_to_extent(offer, service, extent)  # type: ignore[arg-type]
+
+
 def _d2_content_scope(
     part: RequestUnderstandingRequest,
     *,
@@ -490,14 +606,24 @@ def _d2_price_block(
     client_id: str,
     service_ids: tuple[str, ...],
     condition_evidence: dict[str, OfferConditionEvidence],
+    applied_extent: str | None = None,
 ) -> tuple[D2FrozenPriceBlock, MaterializationTrace]:
     offers: list[TargetOffer] = []
     for service_id in service_ids:
         if service_id not in bundle.services:
             raise MaterializationOwnershipError("materialization_foreign_material")
         context = build_service_data_context(bundle, TargetDoctorCatalog(doctors={}), service_id)
+        candidate_context = context
+        if applied_extent is not None:
+            candidate_context = replace(
+                context,
+                offers=tuple(
+                    offer for offer in context.offers
+                    if _d2_offer_applies(offer, context.service, applied_extent)
+                ),
+            )
         projection = project_target_service_offers(
-            context,
+            candidate_context,
             bundle.strategy,
             TargetStrategyMatch(family=context.service.family),
         )
@@ -511,7 +637,9 @@ def _d2_price_block(
         if len(offers) >= 3:
             break
     if not offers:
-        raise MaterializationContractError("d2_no_complete_price_candidates")
+        raise MaterializationContractError(
+            "d2_no_scope_price_candidates" if applied_extent is not None else "d2_no_complete_price_candidates"
+        )
     rows = tuple(
         _d2_frozen_price_row(
             offer,

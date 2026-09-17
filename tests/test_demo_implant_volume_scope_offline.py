@@ -126,6 +126,22 @@ def _scope_clarify_envelope(axis: str = "extent") -> str:
     )
 
 
+def _service_clarify_envelope() -> str:
+    return answer_envelope(
+        "Вас интересует All-on-4 или All-on-6?", route="CLARIFY",
+        commercial_intent="price", service_id=None, extent=None,
+        service_reference_status="unresolved", requested_service_id=None,
+        clarify_axis="service", clarify_service_options=("all_on_4", "all_on_6"),
+        request_understanding={
+            "subjects": [],
+            "requests": [{"request_id": "r1", "kind": "price", "subject_id": None,
+                          "context": "current_care"}],
+            "scope_commitment": "none",
+        },
+        primary_price_request_id="r1",
+    )
+
+
 def _run_ask(
     monkeypatch: pytest.MonkeyPatch,
     *,
@@ -433,6 +449,117 @@ def test_service_detour_keeps_reported_need_without_pricing_other_service_from_i
         envelope_json=back, reset_session=False,
     )
     assert "76200" in _norm_digits(str(back_reply.get("answer") or ""))
+
+
+@pytest.mark.parametrize("runner", (_run_ask, _run_stream))
+def test_ambiguous_service_switch_does_not_reuse_old_tooth_price(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+    isolated_demo_sqlite,
+    runner,
+) -> None:
+    sid = f"demo-vol-ambiguous-{uuid.uuid4().hex[:8]}"
+    reported = _with_reported_count(answer_envelope(
+        "Стоимость восстановления одного зуба.", commercial_intent="price",
+        service_id="classic", extent="one_tooth",
+        service_reference_status="resolved", requested_service_id="classic",
+    ), "reported", 1)
+    runner(
+        monkeypatch, sid=sid, backend=_Backend(reported),
+        user_message="У меня нет одного зуба. Сколько стоит имплантация?",
+        envelope_json=reported,
+    )
+    assert read_target_runtime_session_for(sid).patient_facts.tooth_count == 1
+
+    ambiguous = _service_clarify_envelope()
+    question = runner(
+        monkeypatch, sid=sid, backend=_Backend(ambiguous),
+        user_message="Теперь хочу узнать цену восстановления всей челюсти, какой вариант?",
+        envelope_json=ambiguous, reset_session=False,
+    )
+    assert "76200" not in _norm_digits(str(question.get("answer") or ""))
+    assert {item["ref"] for item in question.get("quick_replies") or []} == {
+        "target:ui_service/all_on_4", "target:ui_service/all_on_6",
+    }
+    saved = read_target_runtime_session_for(sid).patient_facts
+    assert saved is not None and saved.extent == "one_tooth" and saved.tooth_count == 1
+
+    vague = answer_envelope(
+        "Уточните вариант восстановления.", commercial_intent="price",
+        service_id=None, extent=None, service_reference_status="none",
+    )
+    after = runner(
+        monkeypatch, sid=sid, backend=_Backend(vague),
+        user_message="А сколько?", envelope_json=vague, reset_session=False,
+    )
+    assert "76200" not in _norm_digits(str(after.get("answer") or ""))
+    assert (after.get("meta") or {}).get("matched_service_id") != "classic"
+    assert str(after.get("answer") or "").strip()
+    assert (after.get("meta") or {}).get("error_code") is None
+    assert read_target_runtime_session_for(sid).patient_facts.tooth_count == 1
+
+    back = answer_envelope(
+        "Стоимость имплантации.", commercial_intent="price",
+        service_id="classic", service_reference_status="resolved",
+        requested_service_id="classic",
+    )
+    returned = runner(
+        monkeypatch, sid=sid, backend=_Backend(back),
+        user_message="Вернёмся к имплантации одного зуба. Сколько стоит?",
+        envelope_json=back, reset_session=False,
+    )
+    assert "76200" in _norm_digits(str(returned.get("answer") or ""))
+    assert read_target_runtime_session_for(sid).patient_facts.tooth_count == 1
+
+
+@pytest.mark.parametrize("runner", (_run_ask, _run_stream))
+def test_ambiguous_service_choice_prices_selected_jaw_without_replacing_need(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+    isolated_demo_sqlite,
+    runner,
+) -> None:
+    monkeypatch.setattr(
+        "core.target_runtime_client_context.runtime_today",
+        lambda: date(2026, 8, 10),
+    )
+    sid = f"demo-vol-ambiguous-click-{uuid.uuid4().hex[:8]}"
+    reported = _with_reported_count(answer_envelope(
+        "Стоимость одного зуба.", commercial_intent="price",
+        service_id="classic", extent="one_tooth",
+        service_reference_status="resolved", requested_service_id="classic",
+    ), "reported", 1)
+    runner(
+        monkeypatch, sid=sid, backend=_Backend(reported),
+        user_message="У меня нет одного зуба. Сколько стоит имплантация?",
+        envelope_json=reported,
+    )
+    ambiguous = _service_clarify_envelope()
+    question = runner(
+        monkeypatch, sid=sid, backend=_Backend(ambiguous),
+        user_message="Теперь интересует вся челюсть. Какой вариант?",
+        envelope_json=ambiguous, reset_session=False,
+    )
+    selected_ref = next(
+        item["ref"] for item in question.get("quick_replies") or []
+        if item["ref"] == "target:ui_service/all_on_4"
+    )
+    quote = answer_envelope(
+        "Стоимость All-on-4 за челюсть.", commercial_intent="price",
+        service_id="all_on_4", extent="full_arch",
+        service_reference_status="resolved", requested_service_id="all_on_4",
+    )
+    selected = runner(
+        monkeypatch, sid=sid, backend=_Backend(quote),
+        user_message="", envelope_json=quote, ref=selected_ref,
+        reset_session=False,
+    )
+    digits = _norm_digits(str(selected.get("answer") or ""))
+    assert "318000" in digits
+    assert "76200" not in digits
+    assert (selected.get("meta") or {}).get("matched_service_id") == "all_on_4"
+    saved = read_target_runtime_session_for(sid).patient_facts
+    assert saved is not None and saved.extent == "one_tooth" and saved.tooth_count == 1
 
 
 @pytest.mark.parametrize("runner", (_run_ask, _run_stream))

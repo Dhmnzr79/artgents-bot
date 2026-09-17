@@ -1175,6 +1175,24 @@ def _materialize_result(
         session_state=session_state,  # type: ignore[arg-type]
         commercial_intent=semantic.commercial_intent,
     )
+    if (
+        result.decision == "clarify"
+        and result.envelope is not None
+        and result.envelope.commercial_intent == "price"
+        and semantic.clarify_axis == "service"
+    ):
+        return SalesFastWidgetOutcome(
+            widget=_compose_understanding_clarification(materialize_dialogue_price_clarify_payload(
+                client_id=client_id,
+                sid=sid,
+                clarify_service_options=semantic.clarify_service_options,
+                clarify_axis="service",
+                bundle=context.bundle,
+            ), result=result, client_id=client_id, sid=sid, user_message=user_message),
+            provider_calls=provider_calls,
+            model_route="clarify",
+            failure_kind=result.reason,
+        )
     if isinstance(bound, TargetTurnFrameBoundTerminalResponse):
         if (
             bound.dispatch.terminal_mode == "defer"

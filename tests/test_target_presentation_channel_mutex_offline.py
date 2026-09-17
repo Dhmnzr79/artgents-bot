@@ -14,7 +14,7 @@ from core.target_response_followup_policy import TargetResponseFollowupSelection
 _DEMO_MD = Path("clients/demo/md")
 
 
-def test_price_channel_without_content_secondary() -> None:
+def test_direct_price_answer_suppresses_content_and_price_followups() -> None:
     content = (
         TargetContentFollowup(
             id="f1",
@@ -52,8 +52,11 @@ def test_price_channel_without_content_secondary() -> None:
         cadence=TargetPresentationCadenceState(),
         allow_situation=False,
     )
-    assert decision.channel == "price"
-    assert all(not item["ref"].startswith("implantation__") for item in decision.quick_replies)
+    assert decision.channel == "none"
+    assert decision.quick_replies == ()
+    assert decision.video is None
+    assert "price_suppressed_by_price_answer:price:all_on_4/default" in decision.dropped
+    assert "content_suppressed_by_price_answer:implantation__service__bone_graft.md#f1" in decision.dropped
 
 
 def test_choice_channel_excludes_price_detail() -> None:

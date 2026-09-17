@@ -347,6 +347,8 @@ def test_nested_price_id_keeps_vinirs_price_scenario_on_the_normal_path(
     answer = str(response.get("answer") or "")
     assert "35" in answer.replace("\u00a0", "").replace(" ", "")
     assert "Сейчас не удалось подготовить ответ" not in answer
+    assert response.get("quick_replies") == []
+    assert response.get("video") is None
 
 
 def test_minimal_content_understanding_valid() -> None:

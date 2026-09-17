@@ -305,7 +305,7 @@ def test_promotion_intent_suppresses_commerce_surfaces() -> None:
     assert gated.presentation_mode == "none"
 
 
-def test_primary_price_channel_records_shown_followups() -> None:
+def test_direct_price_answer_does_not_record_price_followups() -> None:
     from core.target_response_followup_materializer import TargetPriceFollowup
     from core.target_response_followup_policy import TargetResponseFollowupSelection
 
@@ -342,8 +342,9 @@ def test_primary_price_channel_records_shown_followups() -> None:
         cadence=TargetPresentationCadenceState(),
         allow_situation=False,
     )
-    assert decision.channel == "price"
-    assert decision.cadence_update.shown_price_followup_refs == ("price:included",)
+    assert decision.channel == "none"
+    assert decision.quick_replies == ()
+    assert decision.cadence_update.shown_price_followup_refs == ()
 
 
 def test_no_promo_on_clarify_route() -> None:

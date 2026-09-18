@@ -76,6 +76,7 @@ from contracts.response_schema import (
 )
 from contracts.response_schema_refs import ResponseSchemaExternalIndex
 from core.response_plan_authored_alternative_policy import unambiguous_topic_for_service_ids
+from core.d2_content_realization import D2ContentRealization, realize_d2_content
 from core.response_plan_condition_evidence import materialization_price_scope_label
 from core.response_plan_fact_projection import (
     fact_active_as_of,
@@ -324,7 +325,7 @@ def resolve_d2_envelope_response(
 
     # Resolve every content reference first. A later foreign/malformed material is
     # fatal and must not disappear behind an otherwise recoverable price failure.
-    information_blocks = _d2_information_blocks(
+    information_blocks, content_realizations = _d2_information_blocks(
         content_parts=content_parts,
         client_id=client_id,
         sources=sources,
@@ -335,7 +336,7 @@ def resolve_d2_envelope_response(
     )
 
     price_block: D2FrozenPriceBlock | None = None
-    failure_blocks: tuple[D2PartFailureBlock, ...] = ()
+    failure_blocks: list[D2PartFailureBlock] = []
     price_failure_reason: str | None = None
     if price_parts:
         price_part = price_parts[0]
@@ -358,13 +359,13 @@ def resolve_d2_envelope_response(
                 "d2_no_scope_price_candidates",
             }:
                 raise
-            failure_blocks = (
+            failure_blocks.append(
                 _d2_part_failure_block(
                     request_id=price_part.request_id,
                     reason=price_failure_reason,
                     client_id=client_id,
                     sources=sources,
-                ),
+                )
             )
             trace = MaterializationTrace(
                 price_lookup_mode="catalog_reference",
@@ -421,9 +422,40 @@ def resolve_d2_envelope_response(
             ))
         elif part.kind == "content":
             _, scope, topic = content_scopes_by_id[part.request_id]
-            request_parts.append(D2ResolvedRequestPart(request_id=part.request_id, kind="content", status="answered", subject_id=part.subject_id, scope=scope, service_id=part.service_id, topic_id=topic, content_ref=part.content_ref, content_section_refs=part.content_section_refs))
+            realization = content_realizations[part.request_id]
+            if realization.outcome == "unavailable":
+                assert realization.reason is not None
+                failure_blocks.append(
+                    _d2_content_failure_block(
+                        request_id=part.request_id,
+                        reason=realization.reason,
+                        client_id=client_id,
+                    )
+                )
+            request_parts.append(D2ResolvedRequestPart(
+                request_id=part.request_id,
+                kind="content",
+                status=realization.outcome,
+                failure_reason=realization.reason,
+                subject_id=part.subject_id,
+                scope=scope,
+                service_id=part.service_id,
+                topic_id=topic,
+                content_ref=part.content_ref,
+                content_section_refs=realization.section_refs,
+                content_publication=realization.publication,
+                snapshot_fingerprint=(
+                    sources.d2_snapshot_fingerprint
+                    if realization.outcome != "unavailable" else None
+                ),
+            ))
+    frozen_failure_blocks = tuple(failure_blocks)
     source_ui, source_ui_diagnostics = _d2_source_ui(
-        content_parts=content_parts,
+        primary_content_part=(
+            content_parts[0]
+            if content_parts and content_realizations[content_parts[0].request_id].outcome != "unavailable"
+            else None
+        ),
         sources=sources,
     )
     ui_candidates = _d2_select_ui(
@@ -435,10 +467,11 @@ def resolve_d2_envelope_response(
         ui_candidates = ui_candidates.model_copy(
             update={"quick_replies": (*ui_candidates.quick_replies, *(item.candidate for item in volume_choices))}
         )
+    unavailable_count = sum(part.status == "unavailable" for part in request_parts)
     result_status = (
-        "degraded" if failure_blocks and content_parts
-        else "failed" if failure_blocks
-        else "complete"
+        "complete" if not unavailable_count and not any(part.status == "recovered" for part in request_parts)
+        else "failed" if unavailable_count == len(request_parts)
+        else "degraded"
     )
     plan = PreComposerPlan(
         session_key=sources.session_key,
@@ -456,7 +489,7 @@ def resolve_d2_envelope_response(
         d2_treatment_situation=treatment_situation,
         d2_price_scope_decision=scope_decision,
         d2_request_parts=tuple(request_parts),
-        d2_part_failure_blocks=failure_blocks,
+        d2_part_failure_blocks=frozen_failure_blocks,
         d2_result_status=result_status,
         textual_cta_candidate=(
             _materialize_textual_cta(sources) if price_block is not None else None
@@ -469,7 +502,7 @@ def resolve_d2_envelope_response(
         mode="standard",
         patient_text=None,
         information_blocks=information_blocks,
-        d2_part_failure_blocks=failure_blocks,
+        d2_part_failure_blocks=frozen_failure_blocks,
         visible_price_block=price_block is not None,
     )
     resolved = resolve_response_plan(plan, composer_result)
@@ -761,6 +794,28 @@ def _d2_part_failure_block(
     )
 
 
+def _d2_content_failure_block(
+    *,
+    request_id: str,
+    reason: str,
+    client_id: str,
+) -> D2PartFailureBlock:
+    """Freeze the neutral code-owned message for a rejected prose block."""
+    if reason not in {
+        "d2_model_prose_empty",
+        "d2_model_prose_money",
+        "d2_model_prose_link",
+    }:
+        raise MaterializationContractError("d2_content_failure_reason_invalid")
+    return D2PartFailureBlock(
+        request_id=request_id,
+        source_client_id=client_id,
+        message_id="d2-content-unavailable",
+        reason=reason,  # type: ignore[arg-type]
+        display_text="К сожалению, у меня пока недостаточно информации по этому вопросу",
+    )
+
+
 def _d2_frozen_price_row(
     offer: TargetOffer,
     *,
@@ -854,9 +909,10 @@ def _d2_information_blocks(
     content_parts: tuple[RequestUnderstandingRequest, ...],
     client_id: str,
     sources: ResponsePlanMaterializationSources,
-) -> tuple[InformationSourceBlock, ...]:
+) -> tuple[tuple[InformationSourceBlock, ...], dict[str, D2ContentRealization]]:
     by_ref = {item.content_ref: item for item in sources.d2_authored_content}
     blocks: list[InformationSourceBlock] = []
+    realizations: dict[str, D2ContentRealization] = {}
     for part in content_parts:
         part_service_ids, _, part_topic_id = _d2_content_scope(
             part, client_id=client_id, sources=sources
@@ -877,33 +933,37 @@ def _d2_information_blocks(
         if part.topic_id is not None and part.topic_id != part_topic_id:
             raise MaterializationContractError("d2_content_topic_mismatch")
         section_by_ref = {section.section_ref: section for section in authority.sections}
-        if part.content_section_refs:
-            try:
-                display_text = "\n\n".join(section_by_ref[ref].display_text for ref in part.content_section_refs)
-            except KeyError as exc:
-                raise MaterializationContractError("d2_content_section_ref_required") from exc
-        else:
-            display_text = authority.display_text
+        if any(ref not in section_by_ref for ref in part.content_section_refs):
+            raise MaterializationContractError("d2_content_section_ref_required")
+        realization = realize_d2_content(part, authority)
+        realizations[part.request_id] = realization
+        if realization.outcome == "unavailable":
+            continue
+        assert realization.display_text is not None
+        assert realization.publication is not None
         blocks.append(
             InformationSourceBlock(
                 request_id=part.request_id,
                 source_client_id=client_id,
                 content_ref=authority.content_ref,
-                display_text=display_text,
-                source_section_refs=part.content_section_refs,
+                display_text=realization.display_text,
+                source_section_refs=realization.section_refs,
+                publication=realization.publication,
+                snapshot_fingerprint=sources.d2_snapshot_fingerprint,
+                replacement_reason=realization.reason,
             )
         )
-    return tuple(blocks)
+    return tuple(blocks), realizations
 
 
 def _d2_source_ui(
     *,
-    content_parts: tuple[RequestUnderstandingRequest, ...],
+    primary_content_part: RequestUnderstandingRequest | None,
     sources: ResponsePlanMaterializationSources,
 ) -> tuple[UiPlanCandidates, tuple[MaterializationDiagnostic, ...]]:
-    if not content_parts:
+    if primary_content_part is None:
         return UiPlanCandidates(), ()
-    content_ref = content_parts[0].content_ref
+    content_ref = primary_content_part.content_ref
     if content_ref is None:
         raise MaterializationContractError("d2_content_ref_required")
     authority = next(

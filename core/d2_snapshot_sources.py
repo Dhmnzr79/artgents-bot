@@ -145,4 +145,5 @@ def build_d2_snapshot_sources(
             D2PartFailureAuthority(source_client_id=snapshot.client_id, message_id="d2-price-scope-unavailable", reason="d2_no_scope_price_candidates", display_text=_PRICE_UNAVAILABLE),
         ),
         shown_d2_secondary_ref_ids=shown_secondary_ref_ids,
+        d2_snapshot_fingerprint=snapshot.fingerprint,
     )

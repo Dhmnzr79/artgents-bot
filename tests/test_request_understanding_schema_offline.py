@@ -253,6 +253,27 @@ def test_content_ref_is_limited_to_safe_content_requests() -> None:
         )
 
 
+def test_model_prose_requires_grounded_sections_and_explicit_fallback() -> None:
+    request = RequestUnderstandingRequest(
+        request_id="r1", kind="content", subject_id=None, context="general_information",
+        content_realization="model_prose", content_text="Человеческий текст.",
+        content_ref="pain.md", content_section_refs=("a:pain",),
+        content_fallback_section_ref="a:pain",
+    )
+    assert request.content_realization == "model_prose"
+    with pytest.raises(ValueError, match="model_prose_grounding_required"):
+        request.model_copy(update={"content_section_refs": ()}).__class__.model_validate({
+            **request.model_dump(), "content_section_refs": []
+        })
+    with pytest.raises(ValueError, match="content_fallback_not_grounded"):
+        request.__class__.model_validate({
+            **request.model_dump(), "content_fallback_section_ref": "a:other"
+        })
+    with pytest.raises(ValueError, match="extra_forbidden"):
+        request.__class__.model_validate({**request.model_dump(), "safe": True})
+    assert request.__class__.model_validate({**request.model_dump(), "content_text": ""}).content_text == ""
+
+
 def test_answered_pain_source_projects_its_video_and_followup(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

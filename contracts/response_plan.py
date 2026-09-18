@@ -362,8 +362,12 @@ D2PriceMode = Literal["fixed", "from", "range", "no_public_price"]
 D2PartFailureReason = Literal[
     "d2_no_price_candidates",
     "d2_no_scope_price_candidates",
+    "d2_model_prose_empty",
+    "d2_model_prose_money",
+    "d2_model_prose_link",
 ]
 D2ResultStatus = Literal["complete", "degraded", "failed"]
+D2ContentPublication = Literal["authored", "model_prose", "fallback"]
 
 
 class D2FrozenPriceRow(ResponsePlanModel):
@@ -449,6 +453,20 @@ class InformationSourceBlock(ResponsePlanModel):
     content_ref: NonBlankStr
     display_text: NonBlankStr
     source_section_refs: tuple[NonBlankStr, ...] = ()
+    publication: D2ContentPublication = "authored"
+    snapshot_fingerprint: NonBlankStr = "fixture"
+    replacement_reason: D2PartFailureReason | None = None
+
+    @model_validator(mode="after")
+    def _validate_publication(self) -> Self:
+        if self.publication == "fallback":
+            if self.replacement_reason not in {
+                "d2_model_prose_empty", "d2_model_prose_money", "d2_model_prose_link",
+            }:
+                raise ValueError("d2_fallback_reason_required")
+        elif self.replacement_reason is not None:
+            raise ValueError("d2_content_replacement_reason_forbidden")
+        return self
 
 
 class D2PartFailureBlock(ResponsePlanModel):
@@ -709,7 +727,7 @@ class D2PriceScopeChoice(ResponsePlanModel):
 class D2ResolvedRequestPart(ResponsePlanModel):
     request_id: NonBlankStr
     kind: Literal["price", "content"]
-    status: Literal["answered", "unavailable"]
+    status: Literal["answered", "recovered", "unavailable"]
     failure_reason: D2PartFailureReason | None = None
     subject_id: NonBlankStr | None = None
     scope: ResponseScope
@@ -717,6 +735,8 @@ class D2ResolvedRequestPart(ResponsePlanModel):
     topic_id: NonBlankStr | None = None
     content_ref: NonBlankStr | None = None
     content_section_refs: tuple[NonBlankStr, ...] = ()
+    content_publication: D2ContentPublication | None = None
+    snapshot_fingerprint: NonBlankStr | None = None
 
     @model_validator(mode="after")
     def _validate_d2_part(self) -> Self:
@@ -732,8 +752,34 @@ class D2ResolvedRequestPart(ResponsePlanModel):
             raise ValueError("d2_content_part_content_ref_required")
         if self.status == "answered" and self.failure_reason is not None:
             raise ValueError("d2_answered_part_failure_reason_forbidden")
+        if self.kind == "price" and self.status == "recovered":
+            raise ValueError("d2_price_part_recovery_forbidden")
+        if self.kind == "price" and self.status == "unavailable" and self.failure_reason not in {
+            "d2_no_price_candidates", "d2_no_scope_price_candidates",
+        }:
+            raise ValueError("d2_price_part_failure_reason_invalid")
+        if self.kind == "content":
+            if self.status == "answered" and self.content_publication not in {"authored", "model_prose"}:
+                raise ValueError("d2_content_part_publication_required")
+            if self.status == "recovered" and (
+                self.content_publication != "fallback"
+                or self.failure_reason not in {
+                    "d2_model_prose_empty", "d2_model_prose_money", "d2_model_prose_link",
+                }
+            ):
+                raise ValueError("d2_content_part_recovery_invalid")
+            if self.status == "unavailable" and self.content_publication is not None:
+                raise ValueError("d2_content_part_unavailable_publication_forbidden")
+            if self.status == "unavailable" and self.failure_reason not in {
+                "d2_model_prose_empty", "d2_model_prose_money", "d2_model_prose_link",
+            }:
+                raise ValueError("d2_content_part_failure_reason_invalid")
+            if self.status != "unavailable" and self.snapshot_fingerprint is None:
+                raise ValueError("d2_content_part_snapshot_required")
+        elif self.content_publication is not None or self.snapshot_fingerprint is not None:
+            raise ValueError("d2_price_part_content_provenance_forbidden")
         if self.status == "unavailable":
-            if self.kind != "price" or self.failure_reason is None:
+            if self.failure_reason is None:
                 raise ValueError("d2_unavailable_part_failure_reason_required")
         return self
 
@@ -778,7 +824,7 @@ def _validate_d2_part_result_shape(
     elif d2_price_block is not None:
         raise ValueError("d2_request_part_price_linkage_invalid")
     expected_status: D2ResultStatus
-    if not unavailable_parts:
+    if not unavailable_parts and not any(part.status == "recovered" for part in parts):
         expected_status = "complete"
     elif len(unavailable_parts) == len(parts):
         expected_status = "failed"
@@ -1194,14 +1240,22 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
     if len(block_ids) != len(set(block_ids)):
         raise ValueError("d2_request_part_content_block_duplicate")
     content_by_request = {block.request_id: block for block in plan.information_blocks}
-    content_parts = [part for part in parts if part.kind == "content"]
-    if len(content_parts) != len(content_by_request):
+    published_content_parts = [
+        part for part in parts
+        if part.kind == "content" and part.status in {"answered", "recovered"}
+    ]
+    if len(published_content_parts) != len(content_by_request):
         raise ValueError("d2_request_part_content_linkage_invalid")
-    for part in content_parts:
-        if part.status != "answered":
-            raise ValueError("d2_request_part_content_linkage_invalid")
+    for part in published_content_parts:
         block = content_by_request.get(part.request_id)
-        if block is None or block.content_ref != part.content_ref or block.source_section_refs != part.content_section_refs:
+        if (
+            block is None
+            or block.content_ref != part.content_ref
+            or block.source_section_refs != part.content_section_refs
+            or block.publication != part.content_publication
+            or block.snapshot_fingerprint != part.snapshot_fingerprint
+            or block.replacement_reason != part.failure_reason
+        ):
             raise ValueError("d2_request_part_content_linkage_invalid")
 
 

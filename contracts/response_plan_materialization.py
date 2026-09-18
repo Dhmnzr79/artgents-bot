@@ -221,7 +221,13 @@ class D2PartFailureAuthority(ResponsePlanModel):
 
     source_client_id: str
     message_id: str
-    reason: Literal["d2_no_price_candidates", "d2_no_scope_price_candidates"]
+    reason: Literal[
+        "d2_no_price_candidates",
+        "d2_no_scope_price_candidates",
+        "d2_model_prose_empty",
+        "d2_model_prose_money",
+        "d2_model_prose_link",
+    ]
     display_text: str
 
     @model_validator(mode="after")
@@ -284,10 +290,13 @@ class ResponsePlanMaterializationSources(ResponsePlanModel):
     d2_source_ui: tuple[D2SourceUiAuthority, ...] = ()
     d2_part_failures: tuple[D2PartFailureAuthority, ...] = ()
     shown_d2_secondary_ref_ids: tuple[str, ...] = ()
+    d2_snapshot_fingerprint: str = "fixture"
 
     @model_validator(mode="after")
     def _validate_ownership(self) -> Self:
         client_id = self.session_key.client_id
+        if not self.d2_snapshot_fingerprint or self.d2_snapshot_fingerprint != self.d2_snapshot_fingerprint.strip():
+            raise ValueError("materialization_d2_snapshot_fingerprint_invalid")
         if self.material_authority.source_client_id != client_id:
             raise ValueError("materialization_client_mismatch")
         for authority in self.terminal_authorities:

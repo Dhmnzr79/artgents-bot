@@ -20,6 +20,7 @@ PaymentSchemeIntent = Literal[
 ]
 ScopeCommitment = Literal["unknown", "none", "reported", "correction", "hypothetical"]
 RequestStatementMode = Literal["question", "statement", "correction", "hypothesis"]
+ContentRealization = Literal["authored", "model_prose"]
 TreatmentScopeCommitment = Literal["unknown", "reported", "correction", "hypothetical", "reset"]
 TreatmentExtent = Literal["unknown", "one_tooth", "few_teeth", "full_arch"]
 TreatmentJaw = Literal["unknown", "upper", "lower", "both"]
@@ -102,8 +103,10 @@ class RequestUnderstandingRequest(BaseModel):
     payment_scheme_intent: PaymentSchemeIntent = "unspecified"
     contact_fields: tuple[str, ...] = ()
     content_text: str | None = None
+    content_realization: ContentRealization = "authored"
     content_ref: str | None = None
     content_section_refs: tuple[str, ...] = ()
+    content_fallback_section_ref: str | None = None
     service_id: str | None = None
     topic_id: str | None = None
     statement_mode: RequestStatementMode = "question"
@@ -166,6 +169,15 @@ class RequestUnderstandingRequest(BaseModel):
             raise ValueError("content_section_refs_invalid")
         return value
 
+    @field_validator("content_fallback_section_ref")
+    @classmethod
+    def _validate_content_fallback_section_ref(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value or value != value.strip():
+            raise ValueError("content_fallback_section_ref_invalid")
+        return value
+
     @model_validator(mode="after")
     def _kind_field_rules(self) -> Self:
         if self.content_text is not None and len(self.content_text) > _MAX_CONTENT_TEXT_CODEPOINTS:
@@ -182,6 +194,16 @@ class RequestUnderstandingRequest(BaseModel):
             raise ValueError("content_ref_without_content_text")
         if self.content_section_refs and (self.kind != "content" or self.content_ref is None):
             raise ValueError("content_section_refs_forbidden")
+        if self.content_realization == "model_prose":
+            if self.kind != "content":
+                raise ValueError("model_prose_forbidden")
+            if self.content_ref is None or not self.content_section_refs:
+                raise ValueError("model_prose_grounding_required")
+        if self.content_fallback_section_ref is not None:
+            if self.content_realization != "model_prose":
+                raise ValueError("content_fallback_forbidden")
+            if self.content_fallback_section_ref not in self.content_section_refs:
+                raise ValueError("content_fallback_not_grounded")
         if self.situation is not None and self.situation.continuity == "same" and self.subject_id is None:
             raise ValueError("treatment_same_requires_subject")
         return self

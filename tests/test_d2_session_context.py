@@ -395,6 +395,61 @@ def test_explicit_new_typed_topic_is_not_decided_by_ttl(projection_factory) -> N
     assert binding.carried_situation is None
 
 
+def test_fresh_explicit_same_situation_can_offer_typed_cross_topic_candidate() -> None:
+    binding = bind_d1r_envelope_to_d2_context(
+        _envelope(_request(topic_id="prosthetics", continuity="same")), _fresh_projection()
+    )
+    seed = seed_d2_plan_focus(binding)
+    assert binding.outcome == "explicit_new_topic"
+    assert binding.cross_topic_carry is not None
+    assert binding.cross_topic_carry.situation_owner_id == "owner-implant-1"
+    assert binding.cross_topic_carry.source_situation.topic_id == "implantation"
+    assert binding.cross_topic_carry.source_situation.tooth_count == 4
+    assert binding.cross_topic_carry.destination_topic_id == "prosthetics"
+    assert seed.topic_id == "prosthetics"
+    assert seed.cross_topic_carry == binding.cross_topic_carry
+
+
+@pytest.mark.parametrize(
+    "projection_update, continuity, reset",
+    [
+        ({"situation_state": _snapshot().state.situation_state.model_copy(update={"situation_owner_id": None})}, "same", False),  # type: ignore[union-attr]
+        ({"shown_options_snapshot": _snapshot().state.shown_options_snapshot.model_copy(update={"topic_id": "prosthetics"})}, "same", False),  # type: ignore[union-attr]
+        ({}, "new", False),
+        ({}, "unknown", False),
+        ({}, "same", True),
+    ],
+)
+def test_cross_topic_candidate_fails_closed_without_all_typed_guards(
+    projection_update: dict[str, object], continuity: str, reset: bool
+) -> None:
+    snapshot = _snapshot()
+    state = snapshot.state.model_copy(update=projection_update)  # type: ignore[union-attr]
+    projection = project_d2_session_context(
+        snapshot.model_copy(update={"state": state}),  # type: ignore[union-attr]
+        expected_session_key=_key(),
+        activity=_activity(at=NOW - timedelta(seconds=1)),
+        policy=D2SessionTtlPolicy(),
+        now=NOW,
+    )
+    binding = bind_d1r_envelope_to_d2_context(
+        _envelope(_request(topic_id="prosthetics", continuity=continuity, reset=reset)),
+        projection,
+    )
+    assert binding.outcome in {"explicit_new_topic", "ambiguous_focus"}
+    assert binding.cross_topic_carry is None
+
+
+def test_cross_topic_candidate_is_ttl_and_raw_text_invariant() -> None:
+    original = _envelope(_request(topic_id="prosthetics", continuity="same"))
+    hostile = original.model_copy(update={"patient_text": "НЕ МЕНЯЕТ TYPED CARRY"})
+    fresh = bind_d1r_envelope_to_d2_context(original, _fresh_projection())
+    hostile_fresh = bind_d1r_envelope_to_d2_context(hostile, _fresh_projection())
+    expired = bind_d1r_envelope_to_d2_context(original, _expired_projection())
+    assert fresh.cross_topic_carry == hostile_fresh.cross_topic_carry
+    assert expired.cross_topic_carry is None
+
+
 def test_missing_or_multiple_typed_focus_fails_closed_as_ambiguous() -> None:
     projection = _fresh_projection()
     missing = bind_d1r_envelope_to_d2_context(_envelope(_request()), projection)
@@ -489,6 +544,7 @@ def test_plan_focus_seed_maps_each_c11_outcome_without_reinterpreting_ttl() -> N
     assert ambiguous_seed.carried_situation is None
     assert (new_seed.action, new_seed.topic_id) == ("resolve_topic", "prosthetics")
     assert new_seed.carried_situation is None
+    assert new_seed.cross_topic_carry is None
 
 
 def test_plan_focus_seed_requires_a_typed_topic_for_clear_service_only_binding() -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from contracts.d2_session_context import (
+    D2CrossTopicSituationCarry,
     D2EnvelopeSessionBinding,
     D2OrdinarySessionContext,
     D2PlanFocusSeed,
@@ -141,6 +142,7 @@ def seed_d2_plan_focus(binding: D2EnvelopeSessionBinding) -> D2PlanFocusSeed:
             binding,
             action="resolve_topic",
             topic_id=binding.resolved_topic_id,
+            cross_topic_carry=binding.cross_topic_carry,
         )
     return _plan_focus_seed(
         binding,
@@ -174,6 +176,7 @@ def _plan_focus_seed(
     action: str,
     topic_id: str | None = None,
     carried_situation=None,
+    cross_topic_carry=None,
 ) -> D2PlanFocusSeed:
     return D2PlanFocusSeed(
         source_session_key=binding.source_session_key,
@@ -182,6 +185,7 @@ def _plan_focus_seed(
         action=action,  # type: ignore[arg-type]
         topic_id=topic_id,
         carried_situation=carried_situation,
+        cross_topic_carry=cross_topic_carry,
     )
 
 
@@ -210,6 +214,11 @@ def _bind_explicit_topic(
             projection,
             outcome="explicit_new_topic",
             resolved_topic_id=explicit_topic_id,
+            cross_topic_carry=_cross_topic_carry_candidate(
+                ordinary=ordinary,
+                requests=requests,
+                destination_topic_id=explicit_topic_id,
+            ),
         )
     if stored_topic_ids != {explicit_topic_id}:
         return _binding(projection, outcome="ambiguous_focus")
@@ -270,12 +279,45 @@ def _same_typed_situation(
     return None
 
 
+def _cross_topic_carry_candidate(
+    *,
+    ordinary: D2OrdinarySessionContext,
+    requests: tuple[RequestUnderstandingRequest, ...],
+    destination_topic_id: str,
+) -> D2CrossTopicSituationCarry | None:
+    source = ordinary.situation_state
+    if (
+        source is None
+        or source.situation_owner_id is None
+        or ordinary.active_topic is None
+        or ordinary.shown_options_snapshot is None
+        or ordinary.active_topic.topic_id != source.topic_id
+        or ordinary.shown_options_snapshot.topic_id != source.topic_id
+    ):
+        return None
+    for request in requests:
+        if (
+            request.topic_id == destination_topic_id
+            and request.subject_id is not None
+            and request.situation is not None
+            and request.situation.continuity == "same"
+            and request.situation.scope_commitment != "reset"
+        ):
+            return D2CrossTopicSituationCarry(
+                situation_owner_id=source.situation_owner_id,
+                source_situation=source,
+                destination_topic_id=destination_topic_id,
+            )
+    return None
+
+
 def _binding(
     projection: D2SessionContextProjection,
     *,
     outcome: str,
     resolved_topic_id: str | None = None,
     carried_situation=None,
+    cross_topic_carry=None,
 ) -> D2EnvelopeSessionBinding:
     return D2EnvelopeSessionBinding(
         source_session_key=projection.session_key,
@@ -284,6 +326,7 @@ def _binding(
         outcome=outcome,  # type: ignore[arg-type]
         resolved_topic_id=resolved_topic_id,
         carried_situation=carried_situation,
+        cross_topic_carry=cross_topic_carry,
     )
 
 

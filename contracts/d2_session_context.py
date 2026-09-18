@@ -96,6 +96,22 @@ class D2SessionContextProjection(ResponsePlanModel):
     retained_shown_ids: PersistedShownCommercialIds
 
 
+class D2CrossTopicSituationCarry(ResponsePlanModel):
+    """Typed source facts eligible for a later explicit cross-topic transfer."""
+
+    situation_owner_id: str
+    source_situation: PersistedSituationState
+    destination_topic_id: str
+
+    @model_validator(mode="after")
+    def _validate_shape(self) -> Self:
+        if self.situation_owner_id != self.source_situation.situation_owner_id:
+            raise ValueError("cross_topic_owner_mismatch")
+        if self.destination_topic_id == self.source_situation.topic_id:
+            raise ValueError("cross_topic_destination_not_new")
+        return self
+
+
 class D2EnvelopeSessionBinding(ResponsePlanModel):
     """Typed result of binding one parsed D1R envelope to a C10 projection.
 
@@ -110,15 +126,22 @@ class D2EnvelopeSessionBinding(ResponsePlanModel):
     outcome: D2SemanticContinuationOutcome
     resolved_topic_id: str | None = None
     carried_situation: PersistedSituationState | None = None
+    cross_topic_carry: D2CrossTopicSituationCarry | None = None
 
     @model_validator(mode="after")
     def _validate_carried_situation(self) -> Self:
-        if self.carried_situation is None:
-            return self
-        if self.outcome != "clear_continuation":
-            raise ValueError("carried_situation_requires_clear_continuation")
-        if self.resolved_topic_id != self.carried_situation.topic_id:
-            raise ValueError("carried_situation_topic_mismatch")
+        if self.carried_situation is not None:
+            if self.outcome != "clear_continuation":
+                raise ValueError("carried_situation_requires_clear_continuation")
+            if self.resolved_topic_id != self.carried_situation.topic_id:
+                raise ValueError("carried_situation_topic_mismatch")
+        if self.cross_topic_carry is not None:
+            if self.outcome != "explicit_new_topic":
+                raise ValueError("cross_topic_carry_requires_explicit_new_topic")
+            if self.carried_situation is not None:
+                raise ValueError("cross_topic_carry_forbids_same_topic_carry")
+            if self.resolved_topic_id != self.cross_topic_carry.destination_topic_id:
+                raise ValueError("cross_topic_destination_mismatch")
         return self
 
 
@@ -131,11 +154,16 @@ class D2PlanFocusSeed(ResponsePlanModel):
     action: D2PlanFocusAction
     topic_id: str | None = None
     carried_situation: PersistedSituationState | None = None
+    cross_topic_carry: D2CrossTopicSituationCarry | None = None
 
     @model_validator(mode="after")
     def _validate_shape(self) -> Self:
         if self.action == "clarify_focus":
-            if self.topic_id is not None or self.carried_situation is not None:
+            if (
+                self.topic_id is not None
+                or self.carried_situation is not None
+                or self.cross_topic_carry is not None
+            ):
                 raise ValueError("clarify_focus_forbids_topic_and_situation")
             return self
         if self.topic_id is None:
@@ -145,4 +173,9 @@ class D2PlanFocusSeed(ResponsePlanModel):
             and self.carried_situation.topic_id != self.topic_id
         ):
             raise ValueError("plan_focus_situation_topic_mismatch")
+        if (
+            self.cross_topic_carry is not None
+            and self.cross_topic_carry.destination_topic_id != self.topic_id
+        ):
+            raise ValueError("plan_focus_cross_topic_mismatch")
         return self

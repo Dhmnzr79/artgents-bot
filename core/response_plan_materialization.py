@@ -18,6 +18,7 @@ from contracts.response_plan import (
     D2FrozenPriceRow,
     D2PriceScopeDecision,
     D2PriceScopeChoice,
+    D2ResolvedRequestPart,
     D2TreatmentSituationDecision,
     FactRole,
     FrozenPriceOfferRow,
@@ -355,10 +356,31 @@ def resolve_d2_envelope_response(
     information_blocks = _d2_information_blocks(
         content_parts=content_parts,
         client_id=client_id,
-        service_ids=service_ids,
-        topic_id=selected_topic_id,
         sources=sources,
     )
+    content_part_scopes = tuple(
+        _d2_content_scope(part, client_id=client_id, sources=sources)
+        for part in content_parts
+    )
+    part_identities = []
+    def _scope_identity(scope: str, service_id: str | None, topic_id: str | None) -> tuple[str, str | None]:
+        if service_id is not None:
+            return ("service", service_id)
+        if topic_id is not None:
+            return ("topic", topic_id)
+        return (scope, None)
+    if price_parts:
+        part_identities.append(_scope_identity(response_scope, price_part.service_id, selected_topic_id))
+    part_identities.extend(_scope_identity(scope, part.service_id, topic) for part, (_, scope, topic) in zip(content_parts, content_part_scopes))
+    plan_scope = response_scope if len(set(part_identities)) == 1 else "mixed"
+    request_parts = []
+    content_scopes_by_id = {part.request_id: scope for part, scope in zip(content_parts, content_part_scopes)}
+    for part in understanding.requests:
+        if part.kind == "price":
+            request_parts.append(D2ResolvedRequestPart(request_id=part.request_id, kind="price", status="answered", subject_id=part.subject_id, scope=response_scope, service_id=part.service_id, topic_id=part.topic_id))
+        elif part.kind == "content":
+            _, scope, topic = content_scopes_by_id[part.request_id]
+            request_parts.append(D2ResolvedRequestPart(request_id=part.request_id, kind="content", status="answered", subject_id=part.subject_id, scope=scope, service_id=part.service_id, topic_id=topic, content_ref=part.content_ref))
     source_ui, source_ui_diagnostics = _d2_source_ui(
         content_parts=content_parts,
         sources=sources,
@@ -380,14 +402,15 @@ def resolve_d2_envelope_response(
             allowed_route_modes=(RouteModePair(route="ANSWER", mode="standard"),),
             terminal_candidates=(),
         ),
-        response_scope=response_scope,
-        selected_service_id=service_ids[0] if response_scope == "service" else None,
+        response_scope=plan_scope,
+        selected_service_id=service_ids[0] if plan_scope == "service" else None,
         active_session_service_id=None,
-        selected_topic_id=selected_topic_id,
+        selected_topic_id=selected_topic_id if plan_scope != "mixed" else None,
         price_plan=PricePlan(kind="none"),
         d2_price_block=price_block,
         d2_treatment_situation=treatment_situation,
         d2_price_scope_decision=scope_decision,
+        d2_request_parts=tuple(request_parts),
         textual_cta_candidate=(
             _materialize_textual_cta(sources) if price_block is not None else None
         ),
@@ -572,6 +595,12 @@ def _d2_content_scope(
     if authority is None or authority.source_client_id != client_id:
         raise MaterializationOwnershipError("materialization_foreign_material")
     if part.service_id is not None:
+        if part.service_id not in sources.material_authority.bundle.services:
+            raise MaterializationContractError("d2_content_service_mismatch")
+        if part.topic_id is not None:
+            direction = next((item for item in sources.d2_directions if item.topic_id == part.topic_id and item.source_client_id == client_id), None)
+            if direction is None or part.service_id not in direction.service_ids:
+                raise MaterializationContractError("d2_content_topic_mismatch")
         return (part.service_id,), "service", part.topic_id
     if part.topic_id is not None:
         for direction in sources.d2_directions:
@@ -744,13 +773,14 @@ def _d2_information_blocks(
     *,
     content_parts: tuple[RequestUnderstandingRequest, ...],
     client_id: str,
-    service_ids: tuple[str, ...],
-    topic_id: str | None,
     sources: ResponsePlanMaterializationSources,
 ) -> tuple[InformationSourceBlock, ...]:
     by_ref = {item.content_ref: item for item in sources.d2_authored_content}
     blocks: list[InformationSourceBlock] = []
     for part in content_parts:
+        part_service_ids, _, part_topic_id = _d2_content_scope(
+            part, client_id=client_id, sources=sources
+        )
         if part.content_ref is None:
             raise MaterializationContractError("d2_content_ref_required")
         authority = by_ref.get(part.content_ref)
@@ -758,11 +788,13 @@ def _d2_information_blocks(
             raise MaterializationOwnershipError("materialization_foreign_material")
         if authority.source_client_id != client_id:
             raise MaterializationOwnershipError("materialization_foreign_material")
-        if authority.allowed_service_ids and not set(service_ids).intersection(authority.allowed_service_ids):
-            raise MaterializationOwnershipError("materialization_foreign_material")
-        if part.service_id is not None and part.service_id not in service_ids:
+        if part.service_id is not None and authority.allowed_service_ids and part.service_id not in authority.allowed_service_ids:
             raise MaterializationContractError("d2_content_service_mismatch")
-        if part.topic_id is not None and part.topic_id != topic_id:
+        if authority.allowed_service_ids and not set(part_service_ids).intersection(authority.allowed_service_ids):
+            raise MaterializationOwnershipError("materialization_foreign_material")
+        if part.service_id is not None and part.service_id not in part_service_ids:
+            raise MaterializationContractError("d2_content_service_mismatch")
+        if part.topic_id is not None and part.topic_id != part_topic_id:
             raise MaterializationContractError("d2_content_topic_mismatch")
         blocks.append(
             InformationSourceBlock(

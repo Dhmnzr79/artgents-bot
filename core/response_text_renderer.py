@@ -17,23 +17,20 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
 
     parts: list[str] = []
     if plan.is_price_answer:
-        scope = plan.d2_price_scope_decision
-        if scope is not None:
-            if scope.introduction_text is not None:
-                parts.append(scope.introduction_text.strip())
-            if scope.reason == "overview" and scope.unknown_extent_text is not None:
-                parts.append(scope.unknown_extent_text.strip())
-        if plan.price_block is not None:
-            parts.append(plan.price_block.display_text.strip())
+        if plan.d2_request_parts:
+            blocks = {block.request_id: block for block in plan.information_blocks}
+            for part in plan.d2_request_parts:
+                if part.kind == "content":
+                    parts.append(blocks[part.request_id].display_text.strip())
+                    continue
+                _render_d2_price_parts(plan, parts)
         else:
-            assert plan.d2_price_block is not None
-            for row in plan.d2_price_block.rows:
-                parts.append(row.display_text.strip())
-                parts.extend(text.strip() for text in row.condition_texts)
+            _render_d2_price_parts(plan, parts)
         parts.extend(_condition_display_texts(plan.required_offer_conditions))
         if plan.patient_text:
             parts.append(plan.patient_text.strip())
-        parts.extend(block.display_text.strip() for block in plan.information_blocks)
+        if not plan.d2_request_parts:
+            parts.extend(block.display_text.strip() for block in plan.information_blocks)
         parts.extend(block.display_text.strip() for block in plan.requested_fact_blocks)
         parts.extend(block.display_text.strip() for block in plan.promo_blocks)
         parts.extend(_render_amplifier_list(plan))
@@ -54,6 +51,22 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
     parts.extend(_render_amplifier_list(plan))
     parts.extend(_render_textual_cta(plan))
     return _join_parts(parts)
+
+
+def _render_d2_price_parts(plan: ResolvedResponsePlan, parts: list[str]) -> None:
+    scope = plan.d2_price_scope_decision
+    if scope is not None:
+        if scope.introduction_text is not None:
+            parts.append(scope.introduction_text.strip())
+        if scope.reason == "overview" and scope.unknown_extent_text is not None:
+            parts.append(scope.unknown_extent_text.strip())
+    if plan.price_block is not None:
+        parts.append(plan.price_block.display_text.strip())
+        return
+    assert plan.d2_price_block is not None
+    for row in plan.d2_price_block.rows:
+        parts.append(row.display_text.strip())
+        parts.extend(text.strip() for text in row.condition_texts)
 
 
 def _render_authored_service_alternative(plan: ResolvedResponsePlan) -> list[str]:

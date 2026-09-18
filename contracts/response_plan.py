@@ -11,7 +11,7 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Discriminator, Field
 ResponseRoute = Literal["ANSWER", "ADMIN", "CLARIFY"]
 ResponseMode = Literal["standard", "contacts", "medical_terminal"]
 ContextStrategy = Literal["full_context", "hybrid"]
-ResponseScope = Literal["service", "topic", "clinic"]
+ResponseScope = Literal["service", "topic", "clinic", "mixed"]
 FactApplicability = Literal["clinic_wide", "topic_scoped", "service_scoped"]
 PricePlanKind = Literal["none", "single", "multi"]
 ExecutionKind = Literal["composer", "code_owned_terminal"]
@@ -690,6 +690,25 @@ class D2PriceScopeChoice(ResponsePlanModel):
     candidate: UiQuickReplyCandidate
 
 
+class D2ResolvedRequestPart(ResponsePlanModel):
+    request_id: NonBlankStr
+    kind: Literal["price", "content"]
+    status: Literal["answered"]
+    subject_id: NonBlankStr | None = None
+    scope: ResponseScope
+    service_id: NonBlankStr | None = None
+    topic_id: NonBlankStr | None = None
+    content_ref: NonBlankStr | None = None
+
+    @model_validator(mode="after")
+    def _validate_d2_part(self) -> Self:
+        if self.kind == "price" and self.content_ref is not None:
+            raise ValueError("d2_price_part_content_ref_forbidden")
+        if self.kind == "content" and self.content_ref is None:
+            raise ValueError("d2_content_part_content_ref_required")
+        return self
+
+
 class PreComposerPlan(ResponsePlanModel):
     session_key: SessionKey
     context_strategy: ContextStrategy
@@ -703,6 +722,7 @@ class PreComposerPlan(ResponsePlanModel):
     d2_price_block: D2FrozenPriceBlock | None = None
     d2_treatment_situation: D2TreatmentSituationDecision | None = None
     d2_price_scope_decision: D2PriceScopeDecision | None = None
+    d2_request_parts: tuple[D2ResolvedRequestPart, ...] = ()
     required_offer_conditions: UniqueRequiredOfferConditions = ()
     commercial_facts: UniqueCommercialFacts = ()
     promo_candidate_ids: UniquePromoCandidateIds = ()
@@ -746,6 +766,9 @@ class PreComposerPlan(ResponsePlanModel):
                 raise ValueError("clinic_scope_forbids_selected_service_id")
             if self.selected_topic_id is not None:
                 raise ValueError("clinic_scope_forbids_selected_topic_id")
+        elif self.response_scope == "mixed":
+            if self.selected_service_id is not None or self.selected_topic_id is not None:
+                raise ValueError("mixed_scope_forbids_selected_refs")
         return self
 
     @model_validator(mode="after")
@@ -1061,6 +1084,34 @@ def _validate_session_scope(plan: ResolvedResponsePlan) -> None:
             raise ValueError("clinic_scope_forbids_active_service_id")
         if delta.active_topic_id is not None:
             raise ValueError("clinic_scope_forbids_active_topic_id")
+    elif plan.response_scope == "mixed":
+        if delta.active_service_id is not None or delta.active_topic_id is not None:
+            raise ValueError("mixed_scope_forbids_active_refs")
+
+
+def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
+    parts = plan.d2_request_parts
+    if not parts:
+        if plan.d2_price_block is not None or plan.information_blocks:
+            raise ValueError("d2_request_parts_required")
+        return
+    ids = [part.request_id for part in parts]
+    if len(ids) != len(set(ids)):
+        raise ValueError("d2_request_part_duplicate")
+    price_parts = [part for part in parts if part.kind == "price"]
+    if len(price_parts) > 1 or (price_parts and plan.d2_price_block is None) or (plan.d2_price_block is not None and not price_parts):
+        raise ValueError("d2_request_part_price_linkage_invalid")
+    block_ids = [block.request_id for block in plan.information_blocks]
+    if len(block_ids) != len(set(block_ids)):
+        raise ValueError("d2_request_part_content_block_duplicate")
+    content_by_request = {block.request_id: block for block in plan.information_blocks}
+    content_parts = [part for part in parts if part.kind == "content"]
+    if len(content_parts) != len(content_by_request):
+        raise ValueError("d2_request_part_content_linkage_invalid")
+    for part in content_parts:
+        block = content_by_request.get(part.request_id)
+        if block is None or block.content_ref != part.content_ref:
+            raise ValueError("d2_request_part_content_linkage_invalid")
 
 
 def _validate_terminal_state(plan: ResolvedResponsePlan) -> None:
@@ -1158,6 +1209,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
     d2_price_block: D2FrozenPriceBlock | None = None
     d2_treatment_situation: D2TreatmentSituationDecision | None = None
     d2_price_scope_decision: D2PriceScopeDecision | None = None
+    d2_request_parts: tuple[D2ResolvedRequestPart, ...] = ()
     information_blocks: tuple[InformationSourceBlock, ...] = ()
     required_offer_conditions: tuple[RequiredOfferConditionBlock, ...] = ()
     requested_fact_blocks: tuple[ResolvedFactBlock, ...] = ()
@@ -1234,6 +1286,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
         _validate_finalized_ids(self)
         _validate_session_delta_ids(self)
         _validate_session_scope(self)
+        _validate_d2_request_parts(self)
         _validate_terminal_state(self)
         _validate_resolved_client_ownership(self)
         return self

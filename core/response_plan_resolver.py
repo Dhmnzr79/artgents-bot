@@ -355,6 +355,7 @@ def _resolve_composer_answer(
         terminal_text=None,
         d2_treatment_situation=plan.d2_treatment_situation,
         d2_price_scope_decision=plan.d2_price_scope_decision,
+        d2_request_parts=plan.d2_request_parts,
         price_block=price_block,
         d2_price_block=d2_price_block,
         information_blocks=composer.information_blocks,

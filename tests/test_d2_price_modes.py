@@ -51,7 +51,7 @@ def test_d2_price_modes_are_frozen_without_model_prose(
         assert row.approved_text == expected_text
 
 
-def test_unknown_conditions_do_not_publish_price() -> None:
+def test_missing_optional_conditions_do_not_suppress_published_price() -> None:
     bundle = _bundle()
     payload = _sources(bundle).model_dump()
     payload["condition_evidence_by_offer"] = {
@@ -61,17 +61,9 @@ def test_unknown_conditions_do_not_publish_price() -> None:
             completeness="unknown",
         ).model_dump()
     }
-    payload["d2_part_failures"] = [
-        D2PartFailureAuthority(
-            source_client_id="demo",
-            message_id="price-incomplete",
-            reason="d2_no_complete_price_candidates",
-            display_text="Стоимость сейчас недоступна.",
-        ).model_dump()
-    ]
     sources = type(_sources(bundle)).model_validate(payload)
 
     outcome = resolve_d2_envelope_response(_envelope(), sources, as_of=date(2026, 9, 18))
-    assert outcome.resolved.d2_result_status == "degraded"
-    assert outcome.resolved.d2_price_block is None
-    assert "Стоимость сейчас недоступна." in outcome.rendered_text
+    assert outcome.resolved.d2_result_status == "complete"
+    assert outcome.resolved.d2_price_block is not None
+    assert "120 000" in outcome.rendered_text

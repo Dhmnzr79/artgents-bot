@@ -21,6 +21,7 @@ from core.one_call_envelope_protocol import parse_production_envelope_json, prod
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
 from core.response_plan_materialization import resolve_d2_envelope_response
+from core.d2_published_offer_terms import build_d2_published_offer_terms
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from tests.test_target_offer_projection import _bundle
 
@@ -89,6 +90,10 @@ def _sources(bundle):
             )
             for offer in bundle.offers
             if offer.active
+        },
+        d2_published_terms_by_offer={
+            offer.offer_id: build_d2_published_offer_terms(offer=offer, source_client_id="demo")
+            for offer in bundle.offers
         },
         d2_authored_content=(
             D2AuthoredContentAuthority(

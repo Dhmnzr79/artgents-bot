@@ -103,6 +103,7 @@ class RequestUnderstandingRequest(BaseModel):
     contact_fields: tuple[str, ...] = ()
     content_text: str | None = None
     content_ref: str | None = None
+    content_section_refs: tuple[str, ...] = ()
     service_id: str | None = None
     topic_id: str | None = None
     statement_mode: RequestStatementMode = "question"
@@ -116,7 +117,7 @@ class RequestUnderstandingRequest(BaseModel):
             raise ValueError("request_id_invalid")
         return token
 
-    @field_validator("policy_ids", "contact_fields", mode="before")
+    @field_validator("policy_ids", "contact_fields", "content_section_refs", mode="before")
     @classmethod
     def _coerce_list_to_tuple(cls, value: object) -> object:
         if isinstance(value, list):
@@ -156,6 +157,15 @@ class RequestUnderstandingRequest(BaseModel):
             raise ValueError("semantic_ref_invalid")
         return token
 
+    @field_validator("content_section_refs")
+    @classmethod
+    def _validate_content_section_refs(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if len(value) != len(set(value)):
+            raise ValueError("content_section_refs_duplicate")
+        if any(not isinstance(item, str) or not item or item != item.strip() for item in value):
+            raise ValueError("content_section_refs_invalid")
+        return value
+
     @model_validator(mode="after")
     def _kind_field_rules(self) -> Self:
         if self.content_text is not None and len(self.content_text) > _MAX_CONTENT_TEXT_CODEPOINTS:
@@ -170,6 +180,8 @@ class RequestUnderstandingRequest(BaseModel):
             raise ValueError("content_ref_forbidden")
         if self.content_ref is not None and self.content_text is None:
             raise ValueError("content_ref_without_content_text")
+        if self.content_section_refs and (self.kind != "content" or self.content_ref is None):
+            raise ValueError("content_section_refs_forbidden")
         if self.situation is not None and self.situation.continuity == "same" and self.subject_id is None:
             raise ValueError("treatment_same_requires_subject")
         return self

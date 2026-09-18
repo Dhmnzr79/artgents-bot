@@ -96,6 +96,27 @@ def test_ordered_d2_request_parts_preserve_per_part_refs() -> None:
     assert parsed.request_understanding.requests[1].statement_mode == "hypothesis"
 
 
+def test_d2_section_refs_use_existing_envelope() -> None:
+    request = {
+        "request_id": "r1", "kind": "content", "subject_id": None,
+        "context": "general_information", "policy_ids": [], "payment_scheme": "unspecified",
+        "payment_scheme_intent": "not_requested", "contact_fields": [], "content_text": "Точный текст.",
+        "content_ref": "pain.md", "content_section_refs": ["a:one", "h:2"],
+        "service_id": None, "topic_id": None, "statement_mode": "question",
+    }
+    payload = production_envelope_template(request_understanding={"subjects": [], "requests": [request]})
+    assert _parse(payload).request_understanding.requests[0].content_section_refs == ("a:one", "h:2")
+
+    legacy = dict(request)
+    legacy.pop("content_section_refs")
+    assert _parse(production_envelope_template(request_understanding={"subjects": [], "requests": [legacy]})).request_understanding.requests[0].content_section_refs == ()
+    for invalid in (["a:one", "a:one"], [""], "a:one"):
+        broken = dict(request)
+        broken["content_section_refs"] = invalid
+        with pytest.raises(OneCallEnvelopeProtocolError):
+            _parse(production_envelope_template(request_understanding={"subjects": [], "requests": [broken]}))
+
+
 def test_nested_primary_price_request_id_is_repaired_before_understanding_validation() -> None:
     payload = production_envelope_template(request_understanding=_price_understanding())
     payload.pop("primary_price_request_id")

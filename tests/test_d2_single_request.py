@@ -25,6 +25,7 @@ from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
 from core.one_call_envelope_protocol import parse_production_envelope_json, production_envelope_template
 from core.response_plan_materialization import resolve_d2_envelope_response
+from core.d2_published_offer_terms import build_d2_published_offer_terms
 from core.response_text_renderer import render_response_text
 from core.response_ui_projection import project_response_ui
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
@@ -111,6 +112,10 @@ def _sources(*, content: tuple[D2AuthoredContentAuthority, ...] = ()) -> Respons
             source_client_id="demo", bundle=bundle
         ),
         condition_evidence_by_offer=condition_evidence,
+        d2_published_terms_by_offer={
+            offer.offer_id: build_d2_published_offer_terms(offer=offer, source_client_id="demo")
+            for offer in bundle.offers
+        },
         d2_authored_content=content,
         d2_directions=(
             D2DirectionAuthority(
@@ -128,7 +133,7 @@ def _sources(*, content: tuple[D2AuthoredContentAuthority, ...] = ()) -> Respons
             D2PartFailureAuthority(
                 source_client_id="demo",
                 message_id="price-incomplete",
-                reason="d2_no_complete_price_candidates",
+                reason="d2_no_price_candidates",
                 display_text="Стоимость сейчас недоступна.",
             ),
             D2PartFailureAuthority(
@@ -155,7 +160,7 @@ def test_standalone_direction_price_freezes_rows_and_real_conditions() -> None:
     assert outcome.resolved.session_delta.active_topic_id == "implantation"
     assert 1 <= len(outcome.resolved.d2_price_block.rows) <= 3
     assert all(row.condition_texts for row in outcome.resolved.d2_price_block.rows)
-    assert "Условие для" in outcome.rendered_text
+    assert "Exact include" in outcome.rendered_text
     assert outcome.trace.price_candidate_service_ids == ("service_one",)
 
 
@@ -174,7 +179,7 @@ def test_standalone_exact_service_price_uses_the_same_d1r_path() -> None:
     assert {row.service_id for row in outcome.resolved.d2_price_block.rows} == {"service_two"}
 
 
-def test_standalone_price_marks_unknown_condition_evidence_unavailable_without_legacy_fallback() -> None:
+def test_standalone_price_ignores_legacy_unknown_condition_evidence() -> None:
     envelope = _parsed_envelope(
         requests=[_price_request(service_id="service_one", topic_id="implantation")],
         commercial_intent="price",
@@ -190,9 +195,9 @@ def test_standalone_price_marks_unknown_condition_evidence_unavailable_without_l
     )
 
     outcome = resolve_d2_envelope_response(envelope, source, as_of=date(2026, 9, 18))
-    assert outcome.resolved.d2_result_status == "failed"
-    assert outcome.resolved.d2_request_parts[0].failure_reason == "d2_no_complete_price_candidates"
-    assert outcome.resolved.d2_price_block is None
+    assert outcome.resolved.d2_result_status == "complete"
+    assert outcome.resolved.d2_request_parts[0].failure_reason is None
+    assert outcome.resolved.d2_price_block is not None
 
 
 def test_standalone_global_content_has_no_price_and_is_frozen() -> None:

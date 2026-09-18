@@ -23,7 +23,7 @@ from tests.test_target_offer_projection import _bundle
 
 
 _AS_OF = date(2026, 9, 18)
-_COMPLETE = "d2_no_complete_price_candidates"
+_COMPLETE = "d2_no_price_candidates"
 _SCOPE = "d2_no_scope_price_candidates"
 
 
@@ -44,13 +44,8 @@ def _with_failure_authorities(sources, *reasons: str):
 def _sources_with_incomplete_price_and_content():
     base = _sources_ab()
     payload = base.model_dump()
-    payload["condition_evidence_by_offer"] = {
-        "generic_fixed": OfferConditionEvidence(
-            source_client_id="demo",
-            offer_id="generic_fixed",
-            completeness="unknown",
-        ).model_dump()
-    }
+    for offer in payload["material_authority"]["bundle"]["offers"]:
+        offer["active"] = False
     prepared = type(base).model_validate(payload)
     return _with_failure_authorities(prepared, _COMPLETE)
 
@@ -124,11 +119,8 @@ def test_single_unavailable_price_is_failed_with_empty_ui() -> None:
         _sources(_bundle()), _COMPLETE
     )
     payload = sources.model_dump()
-    payload["condition_evidence_by_offer"] = {
-        "generic_fixed": OfferConditionEvidence(
-            source_client_id="demo", offer_id="generic_fixed", completeness="unknown"
-        ).model_dump()
-    }
+    for offer in payload["material_authority"]["bundle"]["offers"]:
+        offer["active"] = False
     sources = type(sources).model_validate(payload)
     outcome = resolve_d2_envelope_response(
         _envelope([_part("r1", "price", service_id="service_one", topic_id="implantation")]),

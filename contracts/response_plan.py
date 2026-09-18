@@ -360,7 +360,7 @@ class FrozenPriceOfferRow(ResponsePlanModel):
 
 D2PriceMode = Literal["fixed", "from", "range", "no_public_price"]
 D2PartFailureReason = Literal[
-    "d2_no_complete_price_candidates",
+    "d2_no_price_candidates",
     "d2_no_scope_price_candidates",
 ]
 D2ResultStatus = Literal["complete", "degraded", "failed"]
@@ -448,6 +448,7 @@ class InformationSourceBlock(ResponsePlanModel):
     source_client_id: NonBlankStr
     content_ref: NonBlankStr
     display_text: NonBlankStr
+    source_section_refs: tuple[NonBlankStr, ...] = ()
 
 
 class D2PartFailureBlock(ResponsePlanModel):
@@ -715,11 +716,18 @@ class D2ResolvedRequestPart(ResponsePlanModel):
     service_id: NonBlankStr | None = None
     topic_id: NonBlankStr | None = None
     content_ref: NonBlankStr | None = None
+    content_section_refs: tuple[NonBlankStr, ...] = ()
 
     @model_validator(mode="after")
     def _validate_d2_part(self) -> Self:
         if self.kind == "price" and self.content_ref is not None:
             raise ValueError("d2_price_part_content_ref_forbidden")
+        if self.kind == "price" and self.content_section_refs:
+            raise ValueError("d2_price_part_section_refs_forbidden")
+        if self.content_section_refs and self.content_ref is None:
+            raise ValueError("d2_section_refs_require_content_ref")
+        if len(self.content_section_refs) != len(set(self.content_section_refs)):
+            raise ValueError("d2_section_refs_duplicate")
         if self.kind == "content" and self.content_ref is None:
             raise ValueError("d2_content_part_content_ref_required")
         if self.status == "answered" and self.failure_reason is not None:
@@ -1193,7 +1201,7 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
         if part.status != "answered":
             raise ValueError("d2_request_part_content_linkage_invalid")
         block = content_by_request.get(part.request_id)
-        if block is None or block.content_ref != part.content_ref:
+        if block is None or block.content_ref != part.content_ref or block.source_section_refs != part.content_section_refs:
             raise ValueError("d2_request_part_content_linkage_invalid")
 
 

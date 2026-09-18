@@ -55,6 +55,7 @@ from contracts.response_plan_materialization import (
     MaterializedPreComposerPayload,
     MaterializedResponseOutcome,
     D2PartFailureAuthority,
+    D2PublishedOfferTerms,
     OfferConditionEvidence,
     PriceLookupMode,
     ResponsePlanMaterializationSources,
@@ -347,13 +348,13 @@ def resolve_d2_envelope_response(
                 bundle=sources.material_authority.bundle,
                 client_id=client_id,
                 service_ids=service_ids,
-                condition_evidence=sources.condition_evidence_by_offer,
+                published_terms=sources.d2_published_terms_by_offer,
                 applied_extent=applied_extent,
             )
         except MaterializationContractError as error:
             price_failure_reason = str(error)
             if price_failure_reason not in {
-                "d2_no_complete_price_candidates",
+                "d2_no_price_candidates",
                 "d2_no_scope_price_candidates",
             }:
                 raise
@@ -420,7 +421,7 @@ def resolve_d2_envelope_response(
             ))
         elif part.kind == "content":
             _, scope, topic = content_scopes_by_id[part.request_id]
-            request_parts.append(D2ResolvedRequestPart(request_id=part.request_id, kind="content", status="answered", subject_id=part.subject_id, scope=scope, service_id=part.service_id, topic_id=topic, content_ref=part.content_ref))
+            request_parts.append(D2ResolvedRequestPart(request_id=part.request_id, kind="content", status="answered", subject_id=part.subject_id, scope=scope, service_id=part.service_id, topic_id=topic, content_ref=part.content_ref, content_section_refs=part.content_section_refs))
     source_ui, source_ui_diagnostics = _d2_source_ui(
         content_parts=content_parts,
         sources=sources,
@@ -439,9 +440,6 @@ def resolve_d2_envelope_response(
         else "failed" if failure_blocks
         else "complete"
     )
-    if result_status == "failed":
-        ui_candidates = UiPlanCandidates()
-
     plan = PreComposerPlan(
         session_key=sources.session_key,
         context_strategy=sources.context_strategy,
@@ -616,9 +614,6 @@ def _d2_scope_offer_ids(
                 continue
             if offer.option_id is not None and options_by_id[offer.option_id].active is False:
                 continue
-            evidence = sources.condition_evidence_by_offer.get(offer.offer_id)
-            if evidence is None or evidence.completeness != "complete":
-                continue
             if _d2_offer_applies(offer, service, extent):
                 ids.append(offer.offer_id)
     return tuple(ids)
@@ -646,6 +641,8 @@ def _d2_content_scope(
         raise MaterializationOwnershipError("materialization_foreign_material")
     if part.service_id is not None:
         if part.service_id not in sources.material_authority.bundle.services:
+            raise MaterializationContractError("d2_content_service_mismatch")
+        if part.service_id not in authority.allowed_service_ids:
             raise MaterializationContractError("d2_content_service_mismatch")
         if part.topic_id is not None:
             direction = next((item for item in sources.d2_directions if item.topic_id == part.topic_id and item.source_client_id == client_id), None)
@@ -684,7 +681,7 @@ def _d2_price_block(
     bundle: ResponseSchemaBundle,
     client_id: str,
     service_ids: tuple[str, ...],
-    condition_evidence: dict[str, OfferConditionEvidence],
+    published_terms: dict[str, D2PublishedOfferTerms],
     applied_extent: str | None = None,
 ) -> tuple[D2FrozenPriceBlock, MaterializationTrace]:
     offers: list[TargetOffer] = []
@@ -707,9 +704,6 @@ def _d2_price_block(
             TargetStrategyMatch(family=context.service.family),
         )
         for offer in projection.offers:
-            evidence = condition_evidence.get(offer.offer_id)
-            if evidence is None or evidence.completeness != "complete":
-                continue
             offers.append(offer)
             if len(offers) >= 3:
                 break
@@ -717,13 +711,13 @@ def _d2_price_block(
             break
     if not offers:
         raise MaterializationContractError(
-            "d2_no_scope_price_candidates" if applied_extent is not None else "d2_no_complete_price_candidates"
+            "d2_no_scope_price_candidates" if applied_extent is not None else "d2_no_price_candidates"
         )
     rows = tuple(
         _d2_frozen_price_row(
             offer,
             client_id=client_id,
-            evidence=condition_evidence[offer.offer_id],
+            terms=_d2_terms_for_offer(offer, client_id=client_id, published_terms=published_terms),
         )
         for offer in offers
     )
@@ -771,7 +765,7 @@ def _d2_frozen_price_row(
     offer: TargetOffer,
     *,
     client_id: str,
-    evidence: OfferConditionEvidence,
+    terms: D2PublishedOfferTerms,
 ) -> D2FrozenPriceRow:
     price = offer.price
     unit = ""
@@ -798,7 +792,7 @@ def _d2_frozen_price_row(
             mode="no_public_price",
             display_text=price.approved_text,
             approved_text=price.approved_text,
-            condition_texts=_d2_condition_texts(evidence),
+            condition_texts=tuple(item for item in (terms.package_label, *terms.condition_texts) if item != price.approved_text),
         )
     else:  # pragma: no cover - TargetPrice is a discriminated union.
         raise MaterializationContractError("d2_price_mode_invalid")
@@ -807,7 +801,7 @@ def _d2_frozen_price_row(
         offer_id=offer.offer_id,
         service_id=offer.service_id,
         mode=mode,
-        display_text=f"{body} {unit} — {offer.package.label}",
+        display_text=f"{body} {unit} — {terms.package_label}",
         amount=price.amount if isinstance(price, TargetFixedPrice) else None,
         min_amount=(
             price.min_amount
@@ -817,8 +811,22 @@ def _d2_frozen_price_row(
         max_amount=price.max_amount if isinstance(price, TargetRangePrice) else None,
         currency=price.currency,
         billing_unit=price.billing_unit,
-        condition_texts=_d2_condition_texts(evidence),
+        condition_texts=terms.condition_texts,
     )
+
+
+def _d2_terms_for_offer(
+    offer: TargetOffer,
+    *,
+    client_id: str,
+    published_terms: dict[str, D2PublishedOfferTerms],
+) -> D2PublishedOfferTerms:
+    terms = published_terms.get(offer.offer_id)
+    if terms is None:
+        raise MaterializationContractError("d2_published_terms_required")
+    if terms.source_client_id != client_id:
+        raise MaterializationOwnershipError("materialization_foreign_material")
+    return terms
 
 
 def _format_d2_amount(amount: int) -> str:
@@ -860,7 +868,7 @@ def _d2_information_blocks(
             raise MaterializationOwnershipError("materialization_foreign_material")
         if authority.source_client_id != client_id:
             raise MaterializationOwnershipError("materialization_foreign_material")
-        if part.service_id is not None and authority.allowed_service_ids and part.service_id not in authority.allowed_service_ids:
+        if part.service_id is not None and part.service_id not in authority.allowed_service_ids:
             raise MaterializationContractError("d2_content_service_mismatch")
         if authority.allowed_service_ids and not set(part_service_ids).intersection(authority.allowed_service_ids):
             raise MaterializationOwnershipError("materialization_foreign_material")
@@ -868,12 +876,21 @@ def _d2_information_blocks(
             raise MaterializationContractError("d2_content_service_mismatch")
         if part.topic_id is not None and part.topic_id != part_topic_id:
             raise MaterializationContractError("d2_content_topic_mismatch")
+        section_by_ref = {section.section_ref: section for section in authority.sections}
+        if part.content_section_refs:
+            try:
+                display_text = "\n\n".join(section_by_ref[ref].display_text for ref in part.content_section_refs)
+            except KeyError as exc:
+                raise MaterializationContractError("d2_content_section_ref_required") from exc
+        else:
+            display_text = authority.display_text
         blocks.append(
             InformationSourceBlock(
                 request_id=part.request_id,
                 source_client_id=client_id,
                 content_ref=authority.content_ref,
-                display_text=authority.display_text,
+                display_text=display_text,
+                source_section_refs=part.content_section_refs,
             )
         )
     return tuple(blocks)

@@ -107,6 +107,7 @@ class D2AuthoredContentAuthority(ResponsePlanModel):
     content_ref: str
     display_text: str
     allowed_service_ids: tuple[str, ...] = ()
+    sections: tuple["D2AuthoredContentSection", ...] = ()
 
     @model_validator(mode="after")
     def _validate_d2_content(self) -> Self:
@@ -121,6 +122,24 @@ class D2AuthoredContentAuthority(ResponsePlanModel):
             raise ValueError("d2_content_service_duplicate")
         if any(not value or value != value.strip() for value in self.allowed_service_ids):
             raise ValueError("d2_content_service_invalid")
+        refs = [section.section_ref for section in self.sections]
+        if len(refs) != len(set(refs)):
+            raise ValueError("d2_content_section_duplicate")
+        return self
+
+
+class D2AuthoredContentSection(ResponsePlanModel):
+    """One exact structural section of an approved content document."""
+
+    section_ref: str
+    display_text: str
+
+    @model_validator(mode="after")
+    def _validate_section(self) -> Self:
+        if not self.section_ref or self.section_ref != self.section_ref.strip():
+            raise ValueError("d2_content_section_ref_invalid")
+        if not self.display_text or self.display_text != self.display_text.strip():
+            raise ValueError("d2_content_section_text_invalid")
         return self
 
 
@@ -202,7 +221,7 @@ class D2PartFailureAuthority(ResponsePlanModel):
 
     source_client_id: str
     message_id: str
-    reason: Literal["d2_no_complete_price_candidates", "d2_no_scope_price_candidates"]
+    reason: Literal["d2_no_price_candidates", "d2_no_scope_price_candidates"]
     display_text: str
 
     @model_validator(mode="after")
@@ -251,6 +270,7 @@ class ResponsePlanMaterializationSources(ResponsePlanModel):
     transport_kind: TransportKind = "blocking"
     material_authority: PostComposerMaterialAuthority
     condition_evidence_by_offer: dict[str, OfferConditionEvidence] = Field(default_factory=dict)
+    d2_published_terms_by_offer: dict[str, D2PublishedOfferTerms] = Field(default_factory=dict)
     terminal_authorities: tuple[ResponsePlanAdapterTerminalAuthority, ...] = ()
     ui_authority: ResponsePlanAdapterUiAuthority | None = None
     textual_cta_authority: ResponsePlanAdapterTextualCtaAuthority | None = None
@@ -285,6 +305,11 @@ class ResponsePlanMaterializationSources(ResponsePlanModel):
                 raise ValueError("materialization_condition_key_mismatch")
             if evidence.source_client_id != client_id:
                 raise ValueError("materialization_condition_client_mismatch")
+        for key, terms in self.d2_published_terms_by_offer.items():
+            if key != terms.offer_id:
+                raise ValueError("materialization_d2_terms_key_mismatch")
+            if terms.source_client_id != client_id:
+                raise ValueError("materialization_d2_terms_client_mismatch")
         content_refs: set[str] = set()
         for content in self.d2_authored_content:
             if content.source_client_id != client_id:
@@ -332,6 +357,27 @@ class ResponsePlanMaterializationSources(ResponsePlanModel):
             raise ValueError("materialization_d2_shown_secondary_duplicate")
         if any(not value or value != value.strip() for value in self.shown_d2_secondary_ref_ids):
             raise ValueError("materialization_d2_shown_secondary_invalid")
+        return self
+
+
+class D2PublishedOfferTerms(ResponsePlanModel):
+    """Exact published price terms; missing optional metadata never blocks a price."""
+
+    source_client_id: str
+    offer_id: str
+    package_label: str
+    condition_texts: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_terms(self) -> Self:
+        if not self.source_client_id or self.source_client_id != self.source_client_id.strip():
+            raise ValueError("d2_terms_client_invalid")
+        if not self.offer_id or self.offer_id != self.offer_id.strip():
+            raise ValueError("d2_terms_offer_invalid")
+        if not self.package_label or self.package_label != self.package_label.strip():
+            raise ValueError("d2_terms_package_invalid")
+        if any(not item or item != item.strip() for item in self.condition_texts):
+            raise ValueError("d2_terms_condition_invalid")
         return self
 
 

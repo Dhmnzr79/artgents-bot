@@ -173,6 +173,10 @@ def _reject_duplicate_json_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]
 
 def _read_json_mapping(path: Path, relative_path: Path) -> dict[str, Any]:
     text = _read_utf8(path, relative_path)
+    return _parse_json_mapping(text, relative_path)
+
+
+def _parse_json_mapping(text: str, relative_path: Path) -> dict[str, Any]:
     try:
         raw = json.loads(text, object_pairs_hook=_reject_duplicate_json_pairs)
     except DuplicateKeyError as exc:
@@ -190,6 +194,10 @@ def _read_json_mapping(path: Path, relative_path: Path) -> dict[str, Any]:
 
 def _read_yaml_mapping(path: Path, relative_path: Path) -> dict[str, Any]:
     text = _read_utf8(path, relative_path)
+    return _parse_yaml_mapping(text, relative_path)
+
+
+def _parse_yaml_mapping(text: str, relative_path: Path) -> dict[str, Any]:
     try:
         raw = yaml.load(text, Loader=_TargetSafeLoader)
     except DuplicateKeyError as exc:
@@ -252,5 +260,33 @@ def load_response_schema_bundle(pack_root: Path) -> ResponseSchemaBundle:
                 "family_prices": family_prices,
             }
         )
+    except ValidationError as exc:
+        _raise_load_error("schema_invalid", Path("."), exc)
+
+
+def load_response_schema_bundle_from_texts(texts: dict[str, str]) -> ResponseSchemaBundle:
+    """Validate captured target-pack texts with exactly the path-loader rules."""
+    required = (_SERVICE_CATALOG, _BRAND_CATALOG, _FACTS, _CLINIC_STRATEGY, _MARKETING)
+    for relative in required:
+        if relative.as_posix() not in texts:
+            _raise_load_error("required_path_missing", relative, FileNotFoundError(relative.as_posix()))
+    offer_paths = sorted(
+        (path for path in texts if path.startswith(f"{_SERVICES_DIR.as_posix()}/") and path.endswith(".json"))
+    )
+    if not offer_paths:
+        _raise_load_error("required_path_missing", _SERVICES_DIR, FileNotFoundError(_SERVICES_DIR.as_posix()))
+    services = _parse_json_mapping(texts[_SERVICE_CATALOG.as_posix()], _SERVICE_CATALOG)
+    brands = _parse_json_mapping(texts[_BRAND_CATALOG.as_posix()], _BRAND_CATALOG)
+    facts = _parse_json_mapping(texts[_FACTS.as_posix()], _FACTS)
+    strategy = _parse_yaml_mapping(texts[_CLINIC_STRATEGY.as_posix()], _CLINIC_STRATEGY)
+    marketing = _parse_yaml_mapping(texts[_MARKETING.as_posix()], _MARKETING)
+    offers = [_parse_json_mapping(texts[path], Path(path)) for path in offer_paths]
+    family_text = texts.get(_FAMILY_PRICES.as_posix())
+    family_prices = {"version": 1, "records": []} if family_text is None else _parse_json_mapping(family_text, _FAMILY_PRICES)
+    try:
+        return ResponseSchemaBundle.model_validate({
+            "services": services, "brands": brands, "offers": offers, "facts": facts,
+            "strategy": strategy, "marketing": marketing, "family_prices": family_prices,
+        })
     except ValidationError as exc:
         _raise_load_error("schema_invalid", Path("."), exc)

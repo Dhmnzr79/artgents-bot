@@ -16,6 +16,29 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
         return (plan.patient_text or "").strip()
 
     parts: list[str] = []
+    if plan.d2_part_failure_blocks:
+        content_by_request = {
+            block.request_id: block for block in plan.information_blocks
+        }
+        failures_by_request = {
+            block.request_id: block for block in plan.d2_part_failure_blocks
+        }
+        for part in plan.d2_request_parts:
+            if part.status == "unavailable":
+                parts.append(failures_by_request[part.request_id].display_text.strip())
+            elif part.kind == "price":
+                _render_d2_price_parts(plan, parts)
+            else:
+                parts.append(content_by_request[part.request_id].display_text.strip())
+        parts.extend(_condition_display_texts(plan.required_offer_conditions))
+        if plan.patient_text:
+            parts.append(plan.patient_text.strip())
+        parts.extend(block.display_text.strip() for block in plan.requested_fact_blocks)
+        parts.extend(block.display_text.strip() for block in plan.promo_blocks)
+        parts.extend(_render_amplifier_list(plan))
+        parts.extend(_render_textual_cta(plan))
+        return _join_parts(parts)
+
     if plan.is_price_answer:
         if plan.d2_request_parts:
             blocks = {block.request_id: block for block in plan.information_blocks}

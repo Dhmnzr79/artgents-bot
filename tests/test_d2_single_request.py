@@ -15,6 +15,7 @@ from contracts.response_plan import (
 from contracts.response_plan_materialization import (
     D2AuthoredContentAuthority,
     D2DirectionAuthority,
+    D2PartFailureAuthority,
     MaterializationContractError,
     OfferConditionEvidence,
     ResponsePlanMaterializationSources,
@@ -123,6 +124,20 @@ def _sources(*, content: tuple[D2AuthoredContentAuthority, ...] = ()) -> Respons
                 service_ids=("service_two",),
             ),
         ),
+        d2_part_failures=(
+            D2PartFailureAuthority(
+                source_client_id="demo",
+                message_id="price-incomplete",
+                reason="d2_no_complete_price_candidates",
+                display_text="Стоимость сейчас недоступна.",
+            ),
+            D2PartFailureAuthority(
+                source_client_id="demo",
+                message_id="price-scope",
+                reason="d2_no_scope_price_candidates",
+                display_text="Нет подходящей опубликованной цены.",
+            ),
+        ),
     )
 
 
@@ -159,7 +174,7 @@ def test_standalone_exact_service_price_uses_the_same_d1r_path() -> None:
     assert {row.service_id for row in outcome.resolved.d2_price_block.rows} == {"service_two"}
 
 
-def test_standalone_price_rejects_unknown_condition_evidence_without_legacy_fallback() -> None:
+def test_standalone_price_marks_unknown_condition_evidence_unavailable_without_legacy_fallback() -> None:
     envelope = _parsed_envelope(
         requests=[_price_request(service_id="service_one", topic_id="implantation")],
         commercial_intent="price",
@@ -174,8 +189,10 @@ def test_standalone_price_rejects_unknown_condition_evidence_without_legacy_fall
         }
     )
 
-    with pytest.raises(MaterializationContractError, match="d2_no_complete_price_candidates"):
-        resolve_d2_envelope_response(envelope, source, as_of=date(2026, 9, 18))
+    outcome = resolve_d2_envelope_response(envelope, source, as_of=date(2026, 9, 18))
+    assert outcome.resolved.d2_result_status == "failed"
+    assert outcome.resolved.d2_request_parts[0].failure_reason == "d2_no_complete_price_candidates"
+    assert outcome.resolved.d2_price_block is None
 
 
 def test_standalone_global_content_has_no_price_and_is_frozen() -> None:

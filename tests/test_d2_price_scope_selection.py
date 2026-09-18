@@ -7,8 +7,8 @@ import pytest
 
 from contracts.response_plan_materialization import (
     D2DirectionPricePresentation,
+    D2PartFailureAuthority,
     D2VolumeChoice,
-    MaterializationContractError,
     ResponsePlanMaterializationSources,
 )
 from contracts.response_plan import UiQuickReplyCandidate
@@ -76,6 +76,19 @@ def _situation(extent: str, commitment: str = "reported") -> dict[str, object]:
     return {"scope_commitment": commitment, "extent": extent, "tooth_count": None, "jaw": "unknown", "continuity": "unknown"}
 
 
+def _with_scope_failure_authority(sources: ResponsePlanMaterializationSources) -> ResponsePlanMaterializationSources:
+    payload = sources.model_dump()
+    payload["d2_part_failures"] = [
+        D2PartFailureAuthority(
+            source_client_id="demo",
+            message_id="price-scope",
+            reason="d2_no_scope_price_candidates",
+            display_text="Нет подходящей опубликованной цены.",
+        ).model_dump()
+    ]
+    return ResponsePlanMaterializationSources.model_validate(payload)
+
+
 def test_direction_overview_freezes_authority_text_and_choices() -> None:
     outcome = resolve_d2_envelope_response(_envelope(None), _sources_with_scope_metadata(), as_of=date(2026, 9, 18))
     decision = outcome.resolved.d2_price_scope_decision
@@ -129,17 +142,19 @@ def test_missing_scope_metadata_cannot_publish_known_scope_price() -> None:
             )
         }
     )
-    with pytest.raises(MaterializationContractError, match="d2_no_scope_price_candidates"):
-        resolve_d2_envelope_response(
-            _envelope(_situation("few_teeth")), sources, as_of=date(2026, 9, 18)
-        )
+    outcome = resolve_d2_envelope_response(
+        _envelope(_situation("few_teeth")), _with_scope_failure_authority(sources), as_of=date(2026, 9, 18)
+    )
+    assert outcome.resolved.d2_result_status == "failed"
+    assert outcome.resolved.d2_request_parts[0].failure_reason == "d2_no_scope_price_candidates"
 
 
 def test_missing_scope_metadata_is_strict_even_without_presentation() -> None:
-    with pytest.raises(MaterializationContractError, match="d2_no_scope_price_candidates"):
-        resolve_d2_envelope_response(
-            _envelope(_situation("few_teeth")), _sources(_bundle()), as_of=date(2026, 9, 18)
-        )
+    outcome = resolve_d2_envelope_response(
+        _envelope(_situation("few_teeth")), _with_scope_failure_authority(_sources(_bundle())), as_of=date(2026, 9, 18)
+    )
+    assert outcome.resolved.d2_result_status == "failed"
+    assert outcome.resolved.d2_price_block is None
 
 
 def test_fourth_ranked_eligible_offer_is_not_lost_before_scope_filter() -> None:

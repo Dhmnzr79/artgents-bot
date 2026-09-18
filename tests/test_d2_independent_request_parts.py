@@ -10,8 +10,8 @@ from contracts.response_plan import UiButtonCandidate, UiQuickReplyCandidate, Ui
 from contracts.response_plan_materialization import (
     D2AuthoredContentAuthority,
     D2DirectionAuthority,
+    D2PartFailureAuthority,
     D2SourceUiAuthority,
-    MaterializationContractError,
     MaterializationOwnershipError,
 )
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
@@ -45,6 +45,19 @@ def _sources_ab(base=None):
     payload["d2_authored_content"] = (*payload["d2_authored_content"], D2AuthoredContentAuthority(source_client_id="demo", content_ref="therapy.md", display_text="Материал терапии.", allowed_service_ids=("service_two",)).model_dump())
     payload["d2_directions"] = (*payload["d2_directions"], D2DirectionAuthority(source_client_id="demo", topic_id="therapy", service_ids=("service_two",)).model_dump())
     return type(base).model_validate(payload)
+
+
+def _with_scope_failure_authority(sources):
+    payload = sources.model_dump()
+    payload["d2_part_failures"] = [
+        D2PartFailureAuthority(
+            source_client_id="demo",
+            message_id="price-scope",
+            reason="d2_no_scope_price_candidates",
+            display_text="Нет подходящей опубликованной цены.",
+        ).model_dump()
+    ]
+    return type(sources).model_validate(payload)
 
 
 def test_price_and_other_service_content_remain_independent_and_mixed() -> None:
@@ -220,10 +233,12 @@ def test_other_direction_content_cannot_supply_missing_known_scope_price() -> No
 
     price = {**_part("r1", "price", service_id=None, topic_id="implantation"), "situation": _situation("few_teeth")}
     content = _part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md")
-    with pytest.raises(MaterializationContractError, match="d2_no_scope_price_candidates"):
-        resolve_d2_envelope_response(
-            _envelope([price, content]), _sources_ab(), as_of=date(2026, 9, 18)
-        )
+    outcome = resolve_d2_envelope_response(
+        _envelope([price, content]), _with_scope_failure_authority(_sources_ab()), as_of=date(2026, 9, 18)
+    )
+    assert outcome.resolved.d2_result_status == "degraded"
+    assert outcome.resolved.d2_request_parts[0].failure_reason == "d2_no_scope_price_candidates"
+    assert "Материал терапии." in outcome.rendered_text
 
 
 def test_other_direction_situation_does_not_filter_price_part() -> None:

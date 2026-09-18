@@ -14,6 +14,7 @@ from contracts.response_plan import (
     CommercialFactCandidate,
     ComposerResult,
     ComposerSelectedRouteAuthority,
+    D2PartFailureBlock,
     D2FrozenPriceBlock,
     D2FrozenPriceRow,
     D2PriceScopeDecision,
@@ -53,6 +54,7 @@ from contracts.response_plan_materialization import (
     MaterializationTrace,
     MaterializedPreComposerPayload,
     MaterializedResponseOutcome,
+    D2PartFailureAuthority,
     OfferConditionEvidence,
     PriceLookupMode,
     ResponsePlanMaterializationSources,
@@ -319,28 +321,67 @@ def resolve_d2_envelope_response(
         understanding, client_id=client_id, sources=sources
     )
 
+    # Resolve every content reference first. A later foreign/malformed material is
+    # fatal and must not disappear behind an otherwise recoverable price failure.
+    information_blocks = _d2_information_blocks(
+        content_parts=content_parts,
+        client_id=client_id,
+        sources=sources,
+    )
+    content_part_scopes = tuple(
+        _d2_content_scope(part, client_id=client_id, sources=sources)
+        for part in content_parts
+    )
+
     price_block: D2FrozenPriceBlock | None = None
+    failure_blocks: tuple[D2PartFailureBlock, ...] = ()
+    price_failure_reason: str | None = None
     if price_parts:
         price_part = price_parts[0]
         service_ids, response_scope, selected_topic_id = _d2_price_scope(
             price_part, client_id=client_id, sources=sources
         )
         applied_extent = _d2_applied_extent(price_part, treatment_situation, sources)
-        price_block, trace = _d2_price_block(
-            bundle=sources.material_authority.bundle,
-            client_id=client_id,
-            service_ids=service_ids,
-            condition_evidence=sources.condition_evidence_by_offer,
-            applied_extent=applied_extent,
-        )
-        scope_decision, volume_choices = _d2_price_scope_decision(
-            part=price_part,
-            client_id=client_id,
-            sources=sources,
-            service_ids=service_ids,
-            applied_extent=applied_extent,
-            selected_offer_ids=tuple(row.offer_id for row in price_block.rows),
-        )
+        try:
+            price_block, trace = _d2_price_block(
+                bundle=sources.material_authority.bundle,
+                client_id=client_id,
+                service_ids=service_ids,
+                condition_evidence=sources.condition_evidence_by_offer,
+                applied_extent=applied_extent,
+            )
+        except MaterializationContractError as error:
+            price_failure_reason = str(error)
+            if price_failure_reason not in {
+                "d2_no_complete_price_candidates",
+                "d2_no_scope_price_candidates",
+            }:
+                raise
+            failure_blocks = (
+                _d2_part_failure_block(
+                    request_id=price_part.request_id,
+                    reason=price_failure_reason,
+                    client_id=client_id,
+                    sources=sources,
+                ),
+            )
+            trace = MaterializationTrace(
+                price_lookup_mode="catalog_reference",
+                considered_offers=(),
+                selected_offers=(),
+                price_candidate_service_ids=service_ids,
+            )
+            scope_decision = None
+            volume_choices = ()
+        else:
+            scope_decision, volume_choices = _d2_price_scope_decision(
+                part=price_part,
+                client_id=client_id,
+                sources=sources,
+                service_ids=service_ids,
+                applied_extent=applied_extent,
+                selected_offer_ids=tuple(row.offer_id for row in price_block.rows),
+            )
     else:
         service_ids, response_scope, selected_topic_id = _d2_content_scope(
             content_parts[0], client_id=client_id, sources=sources
@@ -352,16 +393,6 @@ def resolve_d2_envelope_response(
         )
         scope_decision = None
         volume_choices = ()
-
-    information_blocks = _d2_information_blocks(
-        content_parts=content_parts,
-        client_id=client_id,
-        sources=sources,
-    )
-    content_part_scopes = tuple(
-        _d2_content_scope(part, client_id=client_id, sources=sources)
-        for part in content_parts
-    )
     part_identities = []
     def _scope_identity(scope: str, service_id: str | None, topic_id: str | None) -> tuple[str, str | None]:
         if service_id is not None:
@@ -377,7 +408,16 @@ def resolve_d2_envelope_response(
     content_scopes_by_id = {part.request_id: scope for part, scope in zip(content_parts, content_part_scopes)}
     for part in understanding.requests:
         if part.kind == "price":
-            request_parts.append(D2ResolvedRequestPart(request_id=part.request_id, kind="price", status="answered", subject_id=part.subject_id, scope=response_scope, service_id=part.service_id, topic_id=part.topic_id))
+            request_parts.append(D2ResolvedRequestPart(
+                request_id=part.request_id,
+                kind="price",
+                status="unavailable" if price_failure_reason is not None else "answered",
+                failure_reason=price_failure_reason,
+                subject_id=part.subject_id,
+                scope=response_scope,
+                service_id=part.service_id,
+                topic_id=part.topic_id,
+            ))
         elif part.kind == "content":
             _, scope, topic = content_scopes_by_id[part.request_id]
             request_parts.append(D2ResolvedRequestPart(request_id=part.request_id, kind="content", status="answered", subject_id=part.subject_id, scope=scope, service_id=part.service_id, topic_id=topic, content_ref=part.content_ref))
@@ -388,12 +428,19 @@ def resolve_d2_envelope_response(
     ui_candidates = _d2_select_ui(
         source_ui=source_ui,
         sources=sources,
-        suppress_secondary=price_block is not None,
+        suppress_secondary=bool(price_parts),
     )
     if volume_choices:
         ui_candidates = ui_candidates.model_copy(
             update={"quick_replies": (*ui_candidates.quick_replies, *(item.candidate for item in volume_choices))}
         )
+    result_status = (
+        "degraded" if failure_blocks and content_parts
+        else "failed" if failure_blocks
+        else "complete"
+    )
+    if result_status == "failed":
+        ui_candidates = UiPlanCandidates()
 
     plan = PreComposerPlan(
         session_key=sources.session_key,
@@ -411,6 +458,8 @@ def resolve_d2_envelope_response(
         d2_treatment_situation=treatment_situation,
         d2_price_scope_decision=scope_decision,
         d2_request_parts=tuple(request_parts),
+        d2_part_failure_blocks=failure_blocks,
+        d2_result_status=result_status,
         textual_cta_candidate=(
             _materialize_textual_cta(sources) if price_block is not None else None
         ),
@@ -422,6 +471,7 @@ def resolve_d2_envelope_response(
         mode="standard",
         patient_text=None,
         information_blocks=information_blocks,
+        d2_part_failure_blocks=failure_blocks,
         visible_price_block=price_block is not None,
     )
     resolved = resolve_response_plan(plan, composer_result)
@@ -693,6 +743,28 @@ def _d2_price_block(
         price_candidate_service_ids=service_ids,
     )
     return D2FrozenPriceBlock(source_client_id=client_id, rows=rows), trace
+
+
+def _d2_part_failure_block(
+    *,
+    request_id: str,
+    reason: str,
+    client_id: str,
+    sources: ResponsePlanMaterializationSources,
+) -> D2PartFailureBlock:
+    authority: D2PartFailureAuthority | None = next(
+        (item for item in sources.d2_part_failures if item.reason == reason),
+        None,
+    )
+    if authority is None or authority.source_client_id != client_id:
+        raise MaterializationContractError("d2_part_failure_authority_missing")
+    return D2PartFailureBlock(
+        request_id=request_id,
+        source_client_id=client_id,
+        message_id=authority.message_id,
+        reason=authority.reason,
+        display_text=authority.display_text,
+    )
 
 
 def _d2_frozen_price_row(

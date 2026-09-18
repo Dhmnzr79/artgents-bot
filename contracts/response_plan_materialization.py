@@ -197,6 +197,26 @@ class D2SourceUiAuthority(ResponsePlanModel):
         return self
 
 
+class D2PartFailureAuthority(ResponsePlanModel):
+    """Clinic-owned text for one recoverable D2 request-part failure."""
+
+    source_client_id: str
+    message_id: str
+    reason: Literal["d2_no_complete_price_candidates", "d2_no_scope_price_candidates"]
+    display_text: str
+
+    @model_validator(mode="after")
+    def _validate_d2_part_failure(self) -> Self:
+        for value, code in (
+            (self.source_client_id, "d2_part_failure_client_invalid"),
+            (self.message_id, "d2_part_failure_message_invalid"),
+            (self.display_text, "d2_part_failure_text_invalid"),
+        ):
+            if not value or value != value.strip():
+                raise ValueError(code)
+        return self
+
+
 class OfferConditionEvidence(ResponsePlanModel):
     source_client_id: str
     offer_id: str
@@ -242,6 +262,7 @@ class ResponsePlanMaterializationSources(ResponsePlanModel):
     d2_directions: tuple[D2DirectionAuthority, ...] = ()
     d2_direction_price_presentations: tuple[D2DirectionPricePresentation, ...] = ()
     d2_source_ui: tuple[D2SourceUiAuthority, ...] = ()
+    d2_part_failures: tuple[D2PartFailureAuthority, ...] = ()
     shown_d2_secondary_ref_ids: tuple[str, ...] = ()
 
     @model_validator(mode="after")
@@ -296,6 +317,17 @@ class ResponsePlanMaterializationSources(ResponsePlanModel):
             if source_ui.content_ref in source_ui_refs:
                 raise ValueError("materialization_d2_source_ui_ref_duplicate")
             source_ui_refs.add(source_ui.content_ref)
+        failure_reasons: set[str] = set()
+        failure_message_ids: set[str] = set()
+        for failure in self.d2_part_failures:
+            if failure.source_client_id != client_id:
+                raise ValueError("materialization_d2_part_failure_client_mismatch")
+            if failure.reason in failure_reasons:
+                raise ValueError("materialization_d2_part_failure_reason_duplicate")
+            if failure.message_id in failure_message_ids:
+                raise ValueError("materialization_d2_part_failure_message_duplicate")
+            failure_reasons.add(failure.reason)
+            failure_message_ids.add(failure.message_id)
         if len(self.shown_d2_secondary_ref_ids) != len(set(self.shown_d2_secondary_ref_ids)):
             raise ValueError("materialization_d2_shown_secondary_duplicate")
         if any(not value or value != value.strip() for value in self.shown_d2_secondary_ref_ids):

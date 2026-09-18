@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from contracts.d2_session_context import (
     D2EnvelopeSessionBinding,
     D2OrdinarySessionContext,
+    D2PlanFocusSeed,
     D2SessionActivity,
     D2SessionContextError,
     D2SessionContextProjection,
@@ -120,6 +121,67 @@ def bind_d1r_envelope_to_d2_context(
         projection,
         ordinary=ordinary,
         service_id=next(iter(service_ids)),
+    )
+
+
+def seed_d2_plan_focus(binding: D2EnvelopeSessionBinding) -> D2PlanFocusSeed:
+    """Project a C11 result into one resolver-neutral, typed focus seed.
+
+    C10 freshness and all D1R semantic interpretation have already happened
+    upstream.  This helper neither revisits them nor infers a topic from a
+    service.  A usable resolved topic is the sole condition for ``resolve``;
+    every incomplete but structurally valid binding asks for clarification.
+    """
+
+    _validate_binding_for_plan_focus(binding)
+    if binding.outcome == "ambiguous_focus" or binding.resolved_topic_id is None:
+        return _plan_focus_seed(binding, action="clarify_focus")
+    if binding.outcome == "explicit_new_topic":
+        return _plan_focus_seed(
+            binding,
+            action="resolve_topic",
+            topic_id=binding.resolved_topic_id,
+        )
+    return _plan_focus_seed(
+        binding,
+        action="resolve_topic",
+        topic_id=binding.resolved_topic_id,
+        carried_situation=binding.carried_situation,
+    )
+
+
+def _validate_binding_for_plan_focus(binding: D2EnvelopeSessionBinding) -> None:
+    if binding.outcome == "ambiguous_focus":
+        if binding.resolved_topic_id is not None or binding.carried_situation is not None:
+            raise D2SessionContextError("ambiguous_binding_has_focus")
+        return
+    if binding.outcome == "explicit_new_topic":
+        if binding.resolved_topic_id is None or binding.carried_situation is not None:
+            raise D2SessionContextError("explicit_new_binding_invalid")
+        return
+    if binding.outcome != "clear_continuation":
+        raise D2SessionContextError("binding_outcome_invalid")
+    if (
+        binding.carried_situation is not None
+        and binding.resolved_topic_id != binding.carried_situation.topic_id
+    ):
+        raise D2SessionContextError("clear_binding_situation_topic_mismatch")
+
+
+def _plan_focus_seed(
+    binding: D2EnvelopeSessionBinding,
+    *,
+    action: str,
+    topic_id: str | None = None,
+    carried_situation=None,
+) -> D2PlanFocusSeed:
+    return D2PlanFocusSeed(
+        source_session_key=binding.source_session_key,
+        source_revision=binding.source_revision,
+        source_turn_index=binding.source_turn_index,
+        action=action,  # type: ignore[arg-type]
+        topic_id=topic_id,
+        carried_situation=carried_situation,
     )
 
 

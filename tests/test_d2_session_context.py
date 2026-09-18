@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from contracts.d2_session_context import (
     DEFAULT_D2_SESSION_IDLE_TTL_SECONDS,
+    D2EnvelopeSessionBinding,
     D2SessionActivity,
     D2SessionContextError,
     D2SessionTtlPolicy,
@@ -33,6 +34,7 @@ from contracts.response_plan_session import (
 from core.d2_session_context import (
     bind_d1r_envelope_to_d2_context,
     project_d2_session_context,
+    seed_d2_plan_focus,
 )
 
 
@@ -463,3 +465,73 @@ def test_binding_does_not_mutate_envelope_or_projection() -> None:
     bind_d1r_envelope_to_d2_context(envelope, projection)
     assert envelope.model_dump(mode="json") == before_envelope
     assert projection.model_dump(mode="json") == before_projection
+
+
+def test_plan_focus_seed_maps_each_c11_outcome_without_reinterpreting_ttl() -> None:
+    clear = bind_d1r_envelope_to_d2_context(
+        _envelope(_request(topic_id="implantation", continuity="same")), _fresh_projection()
+    )
+    ambiguous = bind_d1r_envelope_to_d2_context(_envelope(_request()), _fresh_projection())
+    explicit_new = bind_d1r_envelope_to_d2_context(
+        _envelope(_request(topic_id="prosthetics")), _expired_projection()
+    )
+    clear_seed = seed_d2_plan_focus(clear)
+    ambiguous_seed = seed_d2_plan_focus(ambiguous)
+    new_seed = seed_d2_plan_focus(explicit_new)
+    assert (clear_seed.action, clear_seed.topic_id) == ("resolve_topic", "implantation")
+    assert clear_seed.carried_situation == clear.carried_situation
+    assert (ambiguous_seed.action, ambiguous_seed.topic_id) == ("clarify_focus", None)
+    assert ambiguous_seed.carried_situation is None
+    assert (new_seed.action, new_seed.topic_id) == ("resolve_topic", "prosthetics")
+    assert new_seed.carried_situation is None
+
+
+def test_plan_focus_seed_requires_a_typed_topic_for_clear_service_only_binding() -> None:
+    binding = D2EnvelopeSessionBinding(
+        source_session_key=_key(),
+        source_revision=7,
+        source_turn_index=99,
+        outcome="clear_continuation",
+    )
+    seed = seed_d2_plan_focus(binding)
+    assert seed.action == "clarify_focus"
+    assert seed.topic_id is None
+
+
+@pytest.mark.parametrize(
+    "binding",
+    [
+        D2EnvelopeSessionBinding(
+            source_session_key=_key(),
+            source_revision=7,
+            source_turn_index=99,
+            outcome="ambiguous_focus",
+        ).model_copy(update={"resolved_topic_id": "implantation"}),
+        D2EnvelopeSessionBinding(
+            source_session_key=_key(),
+            source_revision=7,
+            source_turn_index=99,
+            outcome="explicit_new_topic",
+            resolved_topic_id="prosthetics",
+        ).model_copy(update={"carried_situation": _snapshot().state.situation_state}),  # type: ignore[union-attr]
+    ],
+)
+def test_plan_focus_seed_rejects_inconsistent_binding_fail_closed(
+    binding: D2EnvelopeSessionBinding,
+) -> None:
+    with pytest.raises(D2SessionContextError):
+        seed_d2_plan_focus(binding)
+
+
+def test_plan_focus_seed_is_invariant_to_raw_text_and_immutable() -> None:
+    original_envelope = _envelope(_request(topic_id="implantation", continuity="same"))
+    hostile_envelope = original_envelope.model_copy(
+        update={"patient_text": "Новый текст, который нельзя классифицировать"}
+    )
+    original_binding = bind_d1r_envelope_to_d2_context(original_envelope, _fresh_projection())
+    hostile_binding = bind_d1r_envelope_to_d2_context(hostile_envelope, _fresh_projection())
+    before_binding = original_binding.model_dump(mode="json")
+    original_seed = seed_d2_plan_focus(original_binding)
+    hostile_seed = seed_d2_plan_focus(hostile_binding)
+    assert original_seed == hostile_seed
+    assert original_binding.model_dump(mode="json") == before_binding

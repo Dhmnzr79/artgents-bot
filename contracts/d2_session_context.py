@@ -29,6 +29,7 @@ D2SessionContextFreshness = Literal["fresh", "expired", "unknown"]
 D2SemanticContinuationOutcome = Literal[
     "clear_continuation", "ambiguous_focus", "explicit_new_topic"
 ]
+D2PlanFocusAction = Literal["resolve_topic", "clarify_focus"]
 
 
 class D2SessionContextError(ValueError):
@@ -118,4 +119,30 @@ class D2EnvelopeSessionBinding(ResponsePlanModel):
             raise ValueError("carried_situation_requires_clear_continuation")
         if self.resolved_topic_id != self.carried_situation.topic_id:
             raise ValueError("carried_situation_topic_mismatch")
+        return self
+
+
+class D2PlanFocusSeed(ResponsePlanModel):
+    """Minimal typed focus for a future isolated response-plan seam."""
+
+    source_session_key: SessionKey
+    source_revision: int
+    source_turn_index: int
+    action: D2PlanFocusAction
+    topic_id: str | None = None
+    carried_situation: PersistedSituationState | None = None
+
+    @model_validator(mode="after")
+    def _validate_shape(self) -> Self:
+        if self.action == "clarify_focus":
+            if self.topic_id is not None or self.carried_situation is not None:
+                raise ValueError("clarify_focus_forbids_topic_and_situation")
+            return self
+        if self.topic_id is None:
+            raise ValueError("resolve_topic_requires_topic")
+        if (
+            self.carried_situation is not None
+            and self.carried_situation.topic_id != self.topic_id
+        ):
+            raise ValueError("plan_focus_situation_topic_mismatch")
         return self

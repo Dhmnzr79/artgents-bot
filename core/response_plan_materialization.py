@@ -44,6 +44,7 @@ from contracts.response_plan import (
     all_allowed_route_mode_pairs,
 )
 from contracts.one_call_envelope import OneCallEnvelope
+from contracts.d2_session_context import D2PlanFocusSeed
 from contracts.request_understanding import RequestUnderstanding, RequestUnderstandingRequest
 from contracts.response_plan_composer import AdaptedComposerDecision
 from contracts.response_plan_materialization import (
@@ -288,6 +289,7 @@ def resolve_d2_envelope_response(
     sources: ResponsePlanMaterializationSources,
     *,
     as_of: date,
+    d2_plan_focus_seed: D2PlanFocusSeed | None = None,
 ) -> MaterializedResponseOutcome:
     """Resolve the D2 lower plan from an already validated D1R envelope.
 
@@ -356,6 +358,13 @@ def resolve_d2_envelope_response(
             for part in price_parts[1:]
         )
         applied_extent = _d2_applied_extent(price_part, treatment_situation, sources)
+        if applied_extent is None:
+            applied_extent = _d2_cross_topic_applied_extent(
+                price_part,
+                price_parts=price_parts,
+                d2_plan_focus_seed=d2_plan_focus_seed,
+                sources=sources,
+            )
         try:
             price_block, trace = _d2_price_block(
                 bundle=sources.material_authority.bundle,
@@ -603,6 +612,55 @@ def _d2_applied_extent(
     ):
         return None
     return situation.extent
+
+
+def _d2_cross_topic_applied_extent(
+    part: RequestUnderstandingRequest,
+    *,
+    price_parts: tuple[RequestUnderstandingRequest, ...],
+    d2_plan_focus_seed: D2PlanFocusSeed | None,
+    sources: ResponsePlanMaterializationSources,
+) -> str | None:
+    """Return a C14 candidate's source extent only for its exact destination.
+
+    The seed is an already TTL-gated, typed C12/C14 projection.  This resolver
+    does not revisit that projection or infer any semantic relation from text.
+    A current request's own typed situation is handled first by
+    ``_d2_applied_extent`` and is never replaced here.
+    """
+
+    if (
+        d2_plan_focus_seed is None
+        or d2_plan_focus_seed.action != "resolve_topic"
+        or d2_plan_focus_seed.source_session_key != sources.session_key
+        or d2_plan_focus_seed.topic_id is None
+    ):
+        return None
+    carry = d2_plan_focus_seed.cross_topic_carry
+    if (
+        carry is None
+        or part.service_id is not None
+        or part.topic_id is None
+        or part.subject_id is None
+        or part.topic_id != d2_plan_focus_seed.topic_id
+        or part.topic_id != carry.destination_topic_id
+        or {item.topic_id for item in price_parts} != {part.topic_id}
+    ):
+        return None
+    source = carry.source_situation
+    situation = part.situation
+    if (
+        source.situation_owner_id is None
+        or carry.situation_owner_id != source.situation_owner_id
+        or source.session_key != sources.session_key
+        or carry.destination_topic_id == source.topic_id
+        or situation is None
+        or situation.continuity != "same"
+        or situation.scope_commitment == "reset"
+        or source.extent not in {"one_tooth", "few_teeth", "full_arch"}
+    ):
+        return None
+    return source.extent
 
 
 def _d2_price_scope_decision(

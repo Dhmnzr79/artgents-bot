@@ -240,19 +240,49 @@ class PersistedSituationState(ResponsePlanModel):
     stage: SituationStage
     modifiers: tuple[SituationModifier, ...]
     set_at_turn: int
+    situation_owner_id: str | None = None
+    tooth_count: int | None = None
 
     @field_validator("set_at_turn", mode="before")
     @classmethod
     def _strict_set_at_turn(cls, value: object) -> object:
         return reject_non_strict_int_input("set_at_turn", value)
 
+    @field_validator("tooth_count", mode="before")
+    @classmethod
+    def _strict_tooth_count(cls, value: object) -> object:
+        if value is None:
+            return None
+        return reject_non_strict_int_input("situation_tooth_count", value)
+
+    @field_validator("situation_owner_id", mode="before")
+    @classmethod
+    def _opaque_owner_id(cls, value: object) -> object:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("situation_owner_id_not_string")
+        return require_exact_nonblank_id("situation_owner_id", value)
+
     @model_validator(mode="after")
     def _validate(self) -> Self:
         require_strict_non_negative_int("set_at_turn", self.set_at_turn)
         require_exact_nonblank_id("situation_topic_id", self.topic_id)
+        if self.tooth_count is not None:
+            require_strict_positive_int("situation_tooth_count", self.tooth_count)
+            if self.extent == "one_tooth" and self.tooth_count != 1:
+                raise ValueError("situation_tooth_count_extent_conflict")
+            if self.extent == "few_teeth" and self.tooth_count < 2:
+                raise ValueError("situation_tooth_count_extent_conflict")
+            if self.extent == "unknown":
+                raise ValueError("situation_unknown_extent_forbids_tooth_count")
         return self
 
     def to_runtime(self) -> ResponseSituationState:
+        if self.situation_owner_id is not None or self.tooth_count is not None:
+            raise ResponsePlanSessionContractError(
+                "persisted_situation_c13_fields_not_runtime_compatible"
+            )
         return ResponseSituationState(
             session_key=self.session_key,
             topic_id=self.topic_id,

@@ -26,6 +26,7 @@ from contracts.response_plan_session import (
     PersistedShownCommercialIds,
     PersistedShownOptionsSnapshot,
     PersistedSituationState,
+    ResponsePlanSessionContractError,
     ResponsePlanSessionState,
     SESSION_SCHEMA_VERSION,
     SessionDialoguePair,
@@ -73,6 +74,8 @@ def _snapshot() -> object:
             stage="unknown",
             modifiers=(),
             set_at_turn=1,
+            situation_owner_id="owner-implant-1",
+            tooth_count=4,
         ),
         shown_options_snapshot=PersistedShownOptionsSnapshot(
             session_key=key,
@@ -228,6 +231,8 @@ def test_fresh_context_keeps_typed_ordinary_state_without_interpreting_text() ->
     assert projection.ordinary.active_service.service_id == "all_on_4"
     assert projection.ordinary.active_topic is not None
     assert projection.ordinary.situation_state is not None
+    assert projection.ordinary.situation_state.situation_owner_id == "owner-implant-1"
+    assert projection.ordinary.situation_state.tooth_count == 4
     assert projection.ordinary.shown_options_snapshot is not None
     assert projection.ordinary.historical_price_offers is not None
     assert projection.ordinary.dialogue_pairs == snapshot.state.dialogue_pairs  # type: ignore[union-attr]
@@ -535,3 +540,41 @@ def test_plan_focus_seed_is_invariant_to_raw_text_and_immutable() -> None:
     hostile_seed = seed_d2_plan_focus(hostile_binding)
     assert original_seed == hostile_seed
     assert original_binding.model_dump(mode="json") == before_binding
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "error"),
+    [
+        ("situation_owner_id", " owner-1", "situation_owner_id_padded"),
+        ("situation_owner_id", 1, "situation_owner_id_not_string"),
+        ("tooth_count", True, "situation_tooth_count_invalid_type"),
+        ("tooth_count", 0, "situation_tooth_count_not_positive"),
+        ("tooth_count", 2, "situation_tooth_count_extent_conflict"),
+    ],
+)
+def test_c13_persisted_situation_validates_owner_and_tooth_count(
+    field: str, value: object, error: str
+) -> None:
+    payload = _snapshot().state.situation_state.model_dump()  # type: ignore[union-attr]
+    payload.update({"extent": "one_tooth", field: value})
+    with pytest.raises(ValidationError, match=error):
+        PersistedSituationState.model_validate(payload)
+
+
+def test_c13_fields_are_opaque_in_c10_and_fail_closed_at_legacy_conversion() -> None:
+    situation = _snapshot().state.situation_state  # type: ignore[union-attr]
+    assert situation is not None
+    fresh = _fresh_projection()
+    assert fresh.ordinary.situation_state == situation
+    with pytest.raises(
+        ResponsePlanSessionContractError,
+        match="persisted_situation_c13_fields_not_runtime_compatible",
+    ):
+        situation.to_runtime()
+
+    legacy = situation.model_copy(
+        update={"situation_owner_id": None, "tooth_count": None}
+    ).to_runtime()
+    restored = PersistedSituationState.from_runtime(legacy)
+    assert restored.situation_owner_id is None
+    assert restored.tooth_count is None

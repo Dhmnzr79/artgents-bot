@@ -10,6 +10,13 @@ from contracts.d2_session_context import (
     D2SessionContextError,
     D2SessionTtlPolicy,
 )
+from contracts.one_call_envelope import OneCallEnvelope, OneCallEnvelopeReferences
+from contracts.request_understanding import (
+    RequestTreatmentSituation,
+    RequestUnderstanding,
+    RequestUnderstandingRequest,
+    RequestUnderstandingSubject,
+)
 from contracts.response_plan import FrozenPriceOfferRow, SessionKey
 from contracts.response_plan_session import (
     HistoricalPriceOffersSnapshot,
@@ -23,7 +30,10 @@ from contracts.response_plan_session import (
     SessionDialoguePair,
     empty_session_snapshot,
 )
-from core.d2_session_context import project_d2_session_context
+from core.d2_session_context import (
+    bind_d1r_envelope_to_d2_context,
+    project_d2_session_context,
+)
 
 
 NOW = datetime(2026, 9, 18, 12, 0, tzinfo=UTC)
@@ -93,6 +103,83 @@ def _snapshot() -> object:
 
 def _activity(*, at: datetime, key: SessionKey | None = None) -> D2SessionActivity:
     return D2SessionActivity(session_key=key or _key(), last_user_turn_at=at)
+
+
+def _envelope(
+    *requests: RequestUnderstandingRequest,
+    patient_text: str = "Исходный текст не является semantic input.",
+) -> OneCallEnvelope:
+    subject_ids = {request.subject_id for request in requests if request.subject_id is not None}
+    subjects = tuple(
+        RequestUnderstandingSubject(subject_id=subject_id, relation="self", age_group="adult")
+        for subject_id in sorted(subject_ids)
+    )
+    return OneCallEnvelope(
+        route="ANSWER",
+        service_id=None,
+        extent=None,
+        jaw=None,
+        stage=None,
+        scenario="none",
+        commercial_intent="none",
+        promotion_scope="none",
+        clarify_axis=None,
+        clarify_service_options=None,
+        patient_text=patient_text,
+        service_reference_status="none",
+        requested_service_id=None,
+        references=OneCallEnvelopeReferences(direct_fact_ids=()),
+        request_understanding=RequestUnderstanding(subjects=subjects, requests=requests),
+    )
+
+
+def _request(
+    *,
+    request_id: str = "r1",
+    topic_id: str | None = None,
+    service_id: str | None = None,
+    continuity: str | None = None,
+    reset: bool = False,
+) -> RequestUnderstandingRequest:
+    situation = None
+    subject_id = None
+    if continuity is not None:
+        subject_id = "s1" if continuity == "same" else None
+        situation = RequestTreatmentSituation(
+            scope_commitment="reset" if reset else "reported",
+            extent="unknown" if reset else "one_tooth",
+            jaw="unknown" if reset else "upper",
+            continuity=continuity,  # type: ignore[arg-type]
+        )
+    return RequestUnderstandingRequest(
+        request_id=request_id,
+        kind="price",
+        subject_id=subject_id,
+        context="current_care",
+        service_id=service_id,
+        topic_id=topic_id,
+        situation=situation,
+    )
+
+
+def _fresh_projection():
+    return project_d2_session_context(
+        _snapshot(),  # type: ignore[arg-type]
+        expected_session_key=_key(),
+        activity=_activity(at=NOW - timedelta(seconds=1)),
+        policy=D2SessionTtlPolicy(),
+        now=NOW,
+    )
+
+
+def _expired_projection():
+    return project_d2_session_context(
+        _snapshot(),  # type: ignore[arg-type]
+        expected_session_key=_key(),
+        activity=_activity(at=NOW - timedelta(seconds=1800)),
+        policy=D2SessionTtlPolicy(),
+        now=NOW,
+    )
 
 
 def test_default_ttl_is_30_minutes_and_is_injected() -> None:
@@ -276,3 +363,103 @@ def test_projection_does_not_mutate_snapshot_or_activity() -> None:
     assert projection.freshness == "expired"
     assert snapshot.model_dump(mode="json") == before_snapshot  # type: ignore[union-attr]
     assert activity.model_dump(mode="json") == before_activity
+
+
+def test_fresh_exact_typed_topic_with_same_situation_carries_only_typed_state() -> None:
+    projection = _fresh_projection()
+    binding = bind_d1r_envelope_to_d2_context(
+        _envelope(_request(topic_id="implantation", continuity="same")), projection
+    )
+    assert binding.outcome == "clear_continuation"
+    assert binding.resolved_topic_id == "implantation"
+    assert binding.carried_situation == projection.ordinary.situation_state
+    assert binding.source_session_key == _key()
+    assert binding.source_revision == 7
+    assert binding.source_turn_index == 99
+
+
+@pytest.mark.parametrize("projection_factory", [_fresh_projection, _expired_projection])
+def test_explicit_new_typed_topic_is_not_decided_by_ttl(projection_factory) -> None:
+    binding = bind_d1r_envelope_to_d2_context(
+        _envelope(_request(topic_id="prosthetics", continuity="same")), projection_factory()
+    )
+    assert binding.outcome == "explicit_new_topic"
+    assert binding.resolved_topic_id == "prosthetics"
+    assert binding.carried_situation is None
+
+
+def test_missing_or_multiple_typed_focus_fails_closed_as_ambiguous() -> None:
+    projection = _fresh_projection()
+    missing = bind_d1r_envelope_to_d2_context(_envelope(_request()), projection)
+    multiple = bind_d1r_envelope_to_d2_context(
+        _envelope(
+            _request(request_id="r1", topic_id="implantation"),
+            _request(request_id="r2", topic_id="prosthetics"),
+        ),
+        projection,
+    )
+    assert missing.outcome == "ambiguous_focus"
+    assert multiple.outcome == "ambiguous_focus"
+    assert missing.carried_situation is None
+    assert multiple.carried_situation is None
+
+
+def test_exact_active_service_or_shown_option_is_the_only_service_continuation() -> None:
+    projection = _fresh_projection()
+    active = bind_d1r_envelope_to_d2_context(
+        _envelope(_request(service_id="all_on_4")), projection
+    )
+    non_exact = bind_d1r_envelope_to_d2_context(
+        _envelope(_request(service_id="all-on-4")), projection
+    )
+    assert active.outcome == "clear_continuation"
+    assert active.resolved_topic_id == "implantation"
+    assert non_exact.outcome == "ambiguous_focus"
+
+
+@pytest.mark.parametrize(
+    ("continuity", "reset"),
+    [("new", False), ("unknown", False), ("unknown", True)],
+)
+def test_non_same_or_reset_typed_situation_never_carries(continuity: str, reset: bool) -> None:
+    binding = bind_d1r_envelope_to_d2_context(
+        _envelope(_request(topic_id="implantation", continuity=continuity, reset=reset)),
+        _fresh_projection(),
+    )
+    assert binding.outcome == "clear_continuation"
+    assert binding.carried_situation is None
+
+
+def test_raw_dialogue_and_envelope_text_cannot_change_typed_binding() -> None:
+    snapshot = _snapshot()
+    changed_pair = snapshot.state.dialogue_pairs[0].model_copy(  # type: ignore[union-attr]
+        update={"patient_text": "HOSTILE_NEW_TOPIC", "assistant_text": "HOSTILE_REPLY"}
+    )
+    changed_snapshot = snapshot.model_copy(  # type: ignore[union-attr]
+        update={"state": snapshot.state.model_copy(update={"dialogue_pairs": (changed_pair,)})}
+    )
+    kwargs = {
+        "expected_session_key": _key(),
+        "activity": _activity(at=NOW - timedelta(seconds=1)),
+        "policy": D2SessionTtlPolicy(),
+        "now": NOW,
+    }
+    envelope = _envelope(_request(topic_id="implantation", continuity="same"))
+    changed_envelope = envelope.model_copy(update={"patient_text": "HOSTILE_PATIENT_TEXT"})
+    original = bind_d1r_envelope_to_d2_context(
+        envelope, project_d2_session_context(snapshot, **kwargs)  # type: ignore[arg-type]
+    )
+    changed = bind_d1r_envelope_to_d2_context(
+        changed_envelope, project_d2_session_context(changed_snapshot, **kwargs)
+    )
+    assert original == changed
+
+
+def test_binding_does_not_mutate_envelope_or_projection() -> None:
+    envelope = _envelope(_request(topic_id="implantation", continuity="same"))
+    projection = _fresh_projection()
+    before_envelope = envelope.model_dump(mode="json")
+    before_projection = projection.model_dump(mode="json")
+    bind_d1r_envelope_to_d2_context(envelope, projection)
+    assert envelope.model_dump(mode="json") == before_envelope
+    assert projection.model_dump(mode="json") == before_projection

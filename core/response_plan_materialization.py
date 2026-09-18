@@ -14,6 +14,7 @@ from contracts.response_plan import (
     CommercialFactCandidate,
     ComposerResult,
     ComposerSelectedRouteAuthority,
+    D2PartDeferredBlock,
     D2PartFailureBlock,
     D2FrozenPriceBlock,
     D2FrozenPriceRow,
@@ -310,8 +311,6 @@ def resolve_d2_envelope_response(
     )
     if unsupported:
         raise MaterializationContractError("d2_request_kind_unsupported")
-    if len(price_parts) > 1:
-        raise MaterializationContractError("d2_multiple_price_parts_unsupported")
     if not price_parts and not content_parts:
         raise MaterializationContractError("d2_price_or_content_part_required")
 
@@ -337,11 +336,24 @@ def resolve_d2_envelope_response(
 
     price_block: D2FrozenPriceBlock | None = None
     failure_blocks: list[D2PartFailureBlock] = []
+    deferred_blocks: list[D2PartDeferredBlock] = []
     price_failure_reason: str | None = None
+    price_scopes_by_id: dict[str, tuple[tuple[str, ...], str, str | None]] = {}
     if price_parts:
         price_part = price_parts[0]
-        service_ids, response_scope, selected_topic_id = _d2_price_scope(
-            price_part, client_id=client_id, sources=sources
+        for part in price_parts:
+            price_scope = _d2_price_scope(part, client_id=client_id, sources=sources)
+            _d2_validate_price_scope_ownership(
+                price_scope[0], bundle=sources.material_authority.bundle
+            )
+            price_scopes_by_id[part.request_id] = price_scope
+        service_ids, response_scope, selected_topic_id = price_scopes_by_id[price_part.request_id]
+        deferred_blocks.extend(
+            D2PartDeferredBlock(
+                request_id=part.request_id,
+                source_client_id=client_id,
+            )
+            for part in price_parts[1:]
         )
         applied_extent = _d2_applied_extent(price_part, treatment_situation, sources)
         try:
@@ -410,15 +422,20 @@ def resolve_d2_envelope_response(
     content_scopes_by_id = {part.request_id: scope for part, scope in zip(content_parts, content_part_scopes)}
     for part in understanding.requests:
         if part.kind == "price":
+            _, part_scope, part_topic_id = price_scopes_by_id[part.request_id]
             request_parts.append(D2ResolvedRequestPart(
                 request_id=part.request_id,
                 kind="price",
-                status="unavailable" if price_failure_reason is not None else "answered",
-                failure_reason=price_failure_reason,
+                status=(
+                    "unavailable" if price_failure_reason is not None else "answered"
+                ) if part.request_id == price_part.request_id else "deferred",
+                failure_reason=(
+                    price_failure_reason if part.request_id == price_part.request_id else None
+                ),
                 subject_id=part.subject_id,
-                scope=response_scope,
+                scope=part_scope,
                 service_id=part.service_id,
-                topic_id=part.topic_id,
+                topic_id=part_topic_id,
             ))
         elif part.kind == "content":
             _, scope, topic = content_scopes_by_id[part.request_id]
@@ -450,6 +467,7 @@ def resolve_d2_envelope_response(
                 ),
             ))
     frozen_failure_blocks = tuple(failure_blocks)
+    frozen_deferred_blocks = tuple(deferred_blocks)
     source_ui, source_ui_diagnostics = _d2_source_ui(
         primary_content_part=(
             content_parts[0]
@@ -468,8 +486,9 @@ def resolve_d2_envelope_response(
             update={"quick_replies": (*ui_candidates.quick_replies, *(item.candidate for item in volume_choices))}
         )
     unavailable_count = sum(part.status == "unavailable" for part in request_parts)
+    deferred_count = sum(part.status == "deferred" for part in request_parts)
     result_status = (
-        "complete" if not unavailable_count and not any(part.status == "recovered" for part in request_parts)
+        "complete" if not unavailable_count and not deferred_count and not any(part.status == "recovered" for part in request_parts)
         else "failed" if unavailable_count == len(request_parts)
         else "degraded"
     )
@@ -490,6 +509,7 @@ def resolve_d2_envelope_response(
         d2_price_scope_decision=scope_decision,
         d2_request_parts=tuple(request_parts),
         d2_part_failure_blocks=frozen_failure_blocks,
+        d2_part_deferred_blocks=frozen_deferred_blocks,
         d2_result_status=result_status,
         textual_cta_candidate=(
             _materialize_textual_cta(sources) if price_block is not None else None
@@ -503,6 +523,7 @@ def resolve_d2_envelope_response(
         patient_text=None,
         information_blocks=information_blocks,
         d2_part_failure_blocks=frozen_failure_blocks,
+        d2_part_deferred_blocks=frozen_deferred_blocks,
         visible_price_block=price_block is not None,
     )
     resolved = resolve_response_plan(plan, composer_result)
@@ -707,6 +728,16 @@ def _d2_price_scope(
         if direction.topic_id == part.topic_id and direction.source_client_id == client_id:
             return direction.service_ids, "topic", direction.topic_id
     raise MaterializationOwnershipError("materialization_foreign_material")
+
+
+def _d2_validate_price_scope_ownership(
+    service_ids: tuple[str, ...],
+    *,
+    bundle: ResponseSchemaBundle,
+) -> None:
+    """Validate every deferred price reference without looking up its offers."""
+    if not service_ids or any(service_id not in bundle.services for service_id in service_ids):
+        raise MaterializationOwnershipError("materialization_foreign_material")
 
 
 def _d2_price_block(

@@ -16,16 +16,21 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
         return (plan.patient_text or "").strip()
 
     parts: list[str] = []
-    if plan.d2_part_failure_blocks:
+    if plan.d2_request_parts:
         content_by_request = {
             block.request_id: block for block in plan.information_blocks
         }
         failures_by_request = {
             block.request_id: block for block in plan.d2_part_failure_blocks
         }
+        deferred_by_request = {
+            block.request_id: block for block in plan.d2_part_deferred_blocks
+        }
         for part in plan.d2_request_parts:
             if part.status == "unavailable":
                 parts.append(failures_by_request[part.request_id].display_text.strip())
+            elif part.status == "deferred":
+                parts.append(deferred_by_request[part.request_id].display_text.strip())
             elif part.kind == "price":
                 _render_d2_price_parts(plan, parts)
             else:
@@ -40,15 +45,7 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
         return _join_parts(parts)
 
     if plan.is_price_answer:
-        if plan.d2_request_parts:
-            blocks = {block.request_id: block for block in plan.information_blocks}
-            for part in plan.d2_request_parts:
-                if part.kind == "content":
-                    parts.append(blocks[part.request_id].display_text.strip())
-                    continue
-                _render_d2_price_parts(plan, parts)
-        else:
-            _render_d2_price_parts(plan, parts)
+        _render_d2_price_parts(plan, parts)
         parts.extend(_condition_display_texts(plan.required_offer_conditions))
         if plan.patient_text:
             parts.append(plan.patient_text.strip())

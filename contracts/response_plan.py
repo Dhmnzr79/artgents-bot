@@ -368,6 +368,7 @@ D2PartFailureReason = Literal[
 ]
 D2ResultStatus = Literal["complete", "degraded", "failed"]
 D2ContentPublication = Literal["authored", "model_prose", "fallback"]
+D2_PRICE_DEFERRAL_TEXT = "Стоимость следующей услуги можно спросить следующим сообщением"
 
 
 class D2FrozenPriceRow(ResponsePlanModel):
@@ -477,6 +478,20 @@ class D2PartFailureBlock(ResponsePlanModel):
     message_id: NonBlankStr
     reason: D2PartFailureReason
     display_text: NonBlankStr
+
+
+class D2PartDeferredBlock(ResponsePlanModel):
+    """Frozen code-owned notice for a price request deferred to a later turn."""
+
+    request_id: NonBlankStr
+    source_client_id: NonBlankStr
+    display_text: NonBlankStr = D2_PRICE_DEFERRAL_TEXT
+
+    @model_validator(mode="after")
+    def _validate_display_text(self) -> Self:
+        if self.display_text != D2_PRICE_DEFERRAL_TEXT:
+            raise ValueError("d2_deferred_part_display_text_invalid")
+        return self
 
 
 class PricePlan(ResponsePlanModel):
@@ -727,7 +742,7 @@ class D2PriceScopeChoice(ResponsePlanModel):
 class D2ResolvedRequestPart(ResponsePlanModel):
     request_id: NonBlankStr
     kind: Literal["price", "content"]
-    status: Literal["answered", "recovered", "unavailable"]
+    status: Literal["answered", "recovered", "unavailable", "deferred"]
     failure_reason: D2PartFailureReason | None = None
     subject_id: NonBlankStr | None = None
     scope: ResponseScope
@@ -752,6 +767,11 @@ class D2ResolvedRequestPart(ResponsePlanModel):
             raise ValueError("d2_content_part_content_ref_required")
         if self.status == "answered" and self.failure_reason is not None:
             raise ValueError("d2_answered_part_failure_reason_forbidden")
+        if self.status == "deferred":
+            if self.kind != "price":
+                raise ValueError("d2_deferred_part_kind_invalid")
+            if self.failure_reason is not None:
+                raise ValueError("d2_deferred_part_failure_reason_forbidden")
         if self.kind == "price" and self.status == "recovered":
             raise ValueError("d2_price_part_recovery_forbidden")
         if self.kind == "price" and self.status == "unavailable" and self.failure_reason not in {
@@ -787,11 +807,12 @@ class D2ResolvedRequestPart(ResponsePlanModel):
 def _validate_d2_part_result_shape(
     parts: tuple[D2ResolvedRequestPart, ...],
     failure_blocks: tuple[D2PartFailureBlock, ...],
+    deferred_blocks: tuple[D2PartDeferredBlock, ...],
     result_status: D2ResultStatus | None,
     d2_price_block: D2FrozenPriceBlock | None,
 ) -> None:
     if not parts:
-        if failure_blocks or result_status is not None:
+        if failure_blocks or deferred_blocks or result_status is not None:
             raise ValueError("d2_part_result_without_parts")
         return
     if result_status is None:
@@ -800,8 +821,6 @@ def _validate_d2_part_result_shape(
     if len(ids) != len(set(ids)):
         raise ValueError("d2_request_part_duplicate")
     price_parts = [part for part in parts if part.kind == "price"]
-    if len(price_parts) > 1:
-        raise ValueError("d2_request_part_price_linkage_invalid")
     failure_ids = [block.request_id for block in failure_blocks]
     if len(failure_ids) != len(set(failure_ids)):
         raise ValueError("d2_part_failure_block_duplicate")
@@ -815,16 +834,31 @@ def _validate_d2_part_result_shape(
             raise ValueError("d2_part_failure_block_linkage_invalid")
     if any(block.request_id not in ids for block in failure_blocks):
         raise ValueError("d2_part_failure_block_linkage_invalid")
+    deferred_parts = [part for part in parts if part.status == "deferred"]
+    deferred_ids = [block.request_id for block in deferred_blocks]
+    if len(deferred_ids) != len(set(deferred_ids)):
+        raise ValueError("d2_part_deferred_block_duplicate")
+    if deferred_ids != [part.request_id for part in deferred_parts]:
+        raise ValueError("d2_part_deferred_block_linkage_invalid")
+    if any(block.request_id not in ids for block in deferred_blocks):
+        raise ValueError("d2_part_deferred_block_linkage_invalid")
     if price_parts:
-        price_part = price_parts[0]
+        first_price_index = next(index for index, part in enumerate(parts) if part.kind == "price")
+        if parts[first_price_index].status == "deferred" or any(
+            part.status != "deferred" for part in parts[first_price_index + 1:] if part.kind == "price"
+        ):
+            raise ValueError("d2_request_part_price_linkage_invalid")
+        price_part = parts[first_price_index]
         if price_part.status == "answered" and d2_price_block is None:
             raise ValueError("d2_request_part_price_linkage_invalid")
         if price_part.status == "unavailable" and d2_price_block is not None:
             raise ValueError("d2_request_part_price_linkage_invalid")
+        if price_part.status not in {"answered", "unavailable"}:
+            raise ValueError("d2_request_part_price_linkage_invalid")
     elif d2_price_block is not None:
         raise ValueError("d2_request_part_price_linkage_invalid")
     expected_status: D2ResultStatus
-    if not unavailable_parts and not any(part.status == "recovered" for part in parts):
+    if not unavailable_parts and not deferred_parts and not any(part.status == "recovered" for part in parts):
         expected_status = "complete"
     elif len(unavailable_parts) == len(parts):
         expected_status = "failed"
@@ -849,6 +883,7 @@ class PreComposerPlan(ResponsePlanModel):
     d2_price_scope_decision: D2PriceScopeDecision | None = None
     d2_request_parts: tuple[D2ResolvedRequestPart, ...] = ()
     d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()
+    d2_part_deferred_blocks: tuple[D2PartDeferredBlock, ...] = ()
     d2_result_status: D2ResultStatus | None = None
     required_offer_conditions: UniqueRequiredOfferConditions = ()
     commercial_facts: UniqueCommercialFacts = ()
@@ -921,6 +956,7 @@ class PreComposerPlan(ResponsePlanModel):
         _validate_d2_part_result_shape(
             self.d2_request_parts,
             self.d2_part_failure_blocks,
+            self.d2_part_deferred_blocks,
             self.d2_result_status,
             self.d2_price_block,
         )
@@ -938,6 +974,7 @@ class ComposerResult(ResponsePlanModel):
     requested_fact_ids: UniqueRequestedFactIds = ()
     information_blocks: tuple[InformationSourceBlock, ...] = ()
     d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()
+    d2_part_deferred_blocks: tuple[D2PartDeferredBlock, ...] = ()
     visible_price_block: bool = False
 
     @model_validator(mode="after")
@@ -950,23 +987,24 @@ class ComposerResult(ResponsePlanModel):
                 not (self.patient_text and self.patient_text.strip())
                 and not self.information_blocks
                 and not self.d2_part_failure_blocks
+                and not self.d2_part_deferred_blocks
                 and not self.visible_price_block
             ):
                 raise ValueError("answer_requires_patient_text")
         elif pair == ("ANSWER", "contacts"):
             if self.patient_text is not None:
                 raise ValueError("contacts_requires_null_patient_text")
-            if self.requested_fact_ids or self.information_blocks or self.d2_part_failure_blocks or self.visible_price_block:
+            if self.requested_fact_ids or self.information_blocks or self.d2_part_failure_blocks or self.d2_part_deferred_blocks or self.visible_price_block:
                 raise ValueError("contacts_forbids_requested_facts")
         elif self.route == "ADMIN":
             if self.patient_text is not None:
                 raise ValueError("admin_requires_null_patient_text")
-            if self.requested_fact_ids or self.information_blocks or self.d2_part_failure_blocks or self.visible_price_block:
+            if self.requested_fact_ids or self.information_blocks or self.d2_part_failure_blocks or self.d2_part_deferred_blocks or self.visible_price_block:
                 raise ValueError("admin_forbids_requested_facts")
         elif self.route == "CLARIFY":
             if not (self.patient_text and self.patient_text.strip()):
                 raise ValueError("clarify_requires_patient_text")
-            if self.requested_fact_ids or self.information_blocks or self.d2_part_failure_blocks or self.visible_price_block:
+            if self.requested_fact_ids or self.information_blocks or self.d2_part_failure_blocks or self.d2_part_deferred_blocks or self.visible_price_block:
                 raise ValueError("clarify_forbids_requested_facts")
         return self
 
@@ -1229,6 +1267,7 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
     _validate_d2_part_result_shape(
         parts,
         plan.d2_part_failure_blocks,
+        plan.d2_part_deferred_blocks,
         plan.d2_result_status,
         plan.d2_price_block,
     )
@@ -1313,6 +1352,8 @@ def _validate_resolved_client_ownership(plan: ResolvedResponsePlan) -> None:
             _check(row)
     for block in plan.d2_part_failure_blocks:
         _check(block)
+    for block in plan.d2_part_deferred_blocks:
+        _check(block)
     for block in plan.information_blocks:
         _check(block)
     for condition in plan.required_offer_conditions:
@@ -1358,6 +1399,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
     d2_price_scope_decision: D2PriceScopeDecision | None = None
     d2_request_parts: tuple[D2ResolvedRequestPart, ...] = ()
     d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()
+    d2_part_deferred_blocks: tuple[D2PartDeferredBlock, ...] = ()
     d2_result_status: D2ResultStatus | None = None
     information_blocks: tuple[InformationSourceBlock, ...] = ()
     required_offer_conditions: tuple[RequiredOfferConditionBlock, ...] = ()
@@ -1389,6 +1431,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
                 and not self.information_blocks
                 and not self.is_price_answer
                 and not self.d2_part_failure_blocks
+                and not self.d2_part_deferred_blocks
             ):
                 raise ValueError("answer_requires_patient_text")
             if self.terminal_text is not None:

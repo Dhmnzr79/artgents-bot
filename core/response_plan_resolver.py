@@ -145,6 +145,7 @@ def _collect_owned_candidates(plan: PreComposerPlan) -> list[object]:
         items.append(plan.d2_price_block)
         items.extend(plan.d2_price_block.rows)
     items.extend(plan.d2_part_failure_blocks)
+    items.extend(plan.d2_part_deferred_blocks)
     items.extend(plan.required_offer_conditions)
     items.extend(plan.commercial_facts)
     if plan.service_value_candidate is not None:
@@ -293,6 +294,8 @@ def _resolve_composer_answer(
 ) -> ResolvedResponsePlan:
     if composer.d2_part_failure_blocks != plan.d2_part_failure_blocks:
         raise ResponsePlanContractError("d2_part_failure_blocks_mismatch")
+    if composer.d2_part_deferred_blocks != plan.d2_part_deferred_blocks:
+        raise ResponsePlanContractError("d2_part_deferred_blocks_mismatch")
     diagnostics: list[PlanDiagnostic] = []
     price_block, price_diag = _resolve_price(plan, composer)
     diagnostics.extend(price_diag)
@@ -360,6 +363,7 @@ def _resolve_composer_answer(
         d2_price_scope_decision=plan.d2_price_scope_decision,
         d2_request_parts=plan.d2_request_parts,
         d2_part_failure_blocks=plan.d2_part_failure_blocks,
+        d2_part_deferred_blocks=plan.d2_part_deferred_blocks,
         d2_result_status=plan.d2_result_status,
         price_block=price_block,
         d2_price_block=d2_price_block,

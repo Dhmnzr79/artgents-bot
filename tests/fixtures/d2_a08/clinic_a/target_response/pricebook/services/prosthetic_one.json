@@ -1,0 +1,7 @@
+{
+  "offer_id": "prosthetic_one", "service_id": "prosthetics", "active": true,
+  "applies_to_extents": ["one_tooth"],
+  "price": {"mode": "fixed", "amount": 17000, "currency": "RUB", "billing_unit": "tooth_package"},
+  "package": {"label": "Протезирование одного зуба", "includes": ["Тестовая коронка"]},
+  "fact_refs": [], "followups": []
+}

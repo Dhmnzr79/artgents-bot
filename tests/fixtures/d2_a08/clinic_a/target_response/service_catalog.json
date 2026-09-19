@@ -1,0 +1,10 @@
+{
+  "implantation_single": {
+    "name": "Восстановление одного зуба", "family": "implantology", "roles": [],
+    "active": true, "selection": {"mode": "direct"}, "options": [], "content_ref": "implantation.md"
+  },
+  "prosthetics": {
+    "name": "Протезирование", "family": "prosthodontics", "roles": [],
+    "active": true, "selection": {"mode": "direct"}, "options": [], "content_ref": "prosthetics.md"
+  }
+}

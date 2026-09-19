@@ -12,6 +12,7 @@ from contracts.response_plan import SessionKey, UiButtonCandidate, UiQuickReplyC
 from contracts.response_plan_adapter import ResponsePlanAdapterUiAuthority, ResponsePlanAdapterUiButtonAuthority
 from contracts.response_plan_materialization import (
     D2DirectionAuthority,
+    D2DirectionPricePresentation,
     D2PartFailureAuthority,
     D2SourceUiAuthority,
     ResponsePlanMaterializationSources,
@@ -86,11 +87,11 @@ def build_d2_snapshot_sources(
         if request.service_id is not None and request.service_id not in authority.allowed_service_ids:
             raise D2SnapshotBindingError("content_service_scope_unavailable")
 
-    # The demo pack has service prices, but no approved broad direction
-    # overview.  Do not manufacture one from the first three offers.  This is
-    # preparation failure for the adapter, not a substitute user-facing route.
+    # Broad prices require explicit authored direction membership and order.
+    configured_topics = {item.topic_id for item in model_view.direction_prices}
     if any(
         request.kind == "price" and request.service_id is None and request.topic_id is not None
+        and request.topic_id not in configured_topics
         for request in understanding.requests
     ):
         raise D2SnapshotBindingError("direction_overview_not_configured")
@@ -130,6 +131,11 @@ def build_d2_snapshot_sources(
             cta = UiButtonCandidate(source_client_id=snapshot.client_id, button_id=cta_key, label=labels[cta_key], action_kind="cta")
         ui_rows.append(D2SourceUiAuthority(source_client_id=snapshot.client_id, content_ref=content.content_ref, quick_replies=tuple(quick), video=video, cta=cta))
     directions = tuple(D2DirectionAuthority(source_client_id=snapshot.client_id, topic_id=topic, service_ids=tuple(dict.fromkeys(ids))) for topic, ids in direction_map.items() if ids)
+    directions = tuple(item for item in directions if item.topic_id not in configured_topics) + tuple(
+        D2DirectionAuthority(source_client_id=snapshot.client_id, topic_id=item.topic_id,
+                             service_ids=item.service_ids, ordered_offer_ids=item.offer_ids)
+        for item in model_view.direction_prices
+    )
     return ResponsePlanMaterializationSources(
         session_key=session_key,
         context_strategy="full_context",
@@ -139,6 +145,12 @@ def build_d2_snapshot_sources(
         ui_authority=ui_authority,
         d2_authored_content=snapshot.content,
         d2_directions=directions,
+        d2_direction_price_presentations=tuple(
+            D2DirectionPricePresentation(source_client_id=snapshot.client_id, topic_id=item.topic_id,
+                                         introduction_text=item.introduction_text,
+                                         unknown_extent_text=item.unknown_extent_text)
+            for item in model_view.direction_prices
+        ),
         d2_source_ui=tuple(ui_rows),
         d2_part_failures=(
             D2PartFailureAuthority(source_client_id=snapshot.client_id, message_id="d2-price-unavailable", reason="d2_no_price_candidates", display_text=_PRICE_UNAVAILABLE),

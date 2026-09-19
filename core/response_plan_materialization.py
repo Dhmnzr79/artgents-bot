@@ -372,6 +372,8 @@ def resolve_d2_envelope_response(
                 service_ids=service_ids,
                 published_terms=sources.d2_published_terms_by_offer,
                 applied_extent=applied_extent,
+                ordered_offer_ids=next((item.ordered_offer_ids for item in sources.d2_directions
+                                        if price_part.service_id is None and item.topic_id == selected_topic_id), ()),
             )
         except MaterializationContractError as error:
             price_failure_reason = str(error)
@@ -805,9 +807,25 @@ def _d2_price_block(
     service_ids: tuple[str, ...],
     published_terms: dict[str, D2PublishedOfferTerms],
     applied_extent: str | None = None,
+    ordered_offer_ids: tuple[str, ...] = (),
 ) -> tuple[D2FrozenPriceBlock, MaterializationTrace]:
     offers: list[TargetOffer] = []
-    for service_id in service_ids:
+    if ordered_offer_ids:
+        # Authored D2 direction order bypasses legacy strategy/semantic selectors.
+        by_id = {offer.offer_id: offer for offer in bundle.offers}
+        for offer_id in ordered_offer_ids:
+            offer = by_id.get(offer_id)
+            if offer is None or offer.service_id not in service_ids or not offer.active:
+                raise MaterializationOwnershipError("d2_direction_offer_unavailable")
+            service = bundle.services.get(offer.service_id)
+            if service is None or not service.active or (offer.option_id is not None and not any(
+                option.option_id == offer.option_id and option.active for option in service.options
+            )):
+                raise MaterializationOwnershipError("d2_direction_service_unavailable")
+            if applied_extent is None or _d2_offer_applies(offer, service, applied_extent):
+                offers.append(offer)
+        offers = offers[:3]
+    for service_id in (() if ordered_offer_ids else service_ids):
         if service_id not in bundle.services:
             raise MaterializationOwnershipError("materialization_foreign_material")
         context = build_service_data_context(bundle, TargetDoctorCatalog(doctors={}), service_id)

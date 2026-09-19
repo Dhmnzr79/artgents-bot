@@ -149,6 +149,7 @@ class D2DirectionAuthority(ResponsePlanModel):
     source_client_id: str
     topic_id: str
     service_ids: tuple[str, ...]
+    ordered_offer_ids: tuple[str, ...] = ()
 
     @model_validator(mode="after")
     def _validate_d2_direction(self) -> Self:
@@ -162,6 +163,9 @@ class D2DirectionAuthority(ResponsePlanModel):
             raise ValueError("d2_direction_services_invalid")
         if any(not value or value != value.strip() for value in self.service_ids):
             raise ValueError("d2_direction_service_invalid")
+        if (len(self.ordered_offer_ids) != len(set(self.ordered_offer_ids))
+                or any(not value or value != value.strip() for value in self.ordered_offer_ids)):
+            raise ValueError("d2_direction_offers_invalid")
         return self
 
 

@@ -8,7 +8,8 @@ from pathlib import Path
 
 import yaml
 
-from contracts.d2_tenant_snapshot import D2ModelView, D2TenantSnapshot
+from contracts.d2_tenant_snapshot import D2DirectionPriceConfig, D2DirectionPricePack, D2ModelView, D2TenantSnapshot
+from contracts.response_schema import ResponseSchemaBundle
 from contracts.response_plan_materialization import D2AuthoredContentAuthority, D2AuthoredContentSection
 from core.d2_published_offer_terms import build_d2_published_offer_terms
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
@@ -131,6 +132,7 @@ def load_d2_tenant_snapshot(client_id: str, *, clients_root: Path) -> D2TenantSn
         bundle = load_response_schema_bundle_from_texts(texts)
     except (UnicodeDecodeError, ResponseSchemaLoadError) as exc:
         raise D2TenantSnapshotError(f"schema_load_failed:{exc}") from exc
+    _direction_prices(first, bundle)
     parsed_content: list[tuple[str, dict[str, object], str, tuple[D2AuthoredContentSection, ...]]] = []
     diagnostics: list[str] = []
     for path, data in first:
@@ -188,4 +190,35 @@ def build_d2_model_view(snapshot: D2TenantSnapshot) -> D2ModelView:
         commercial_fact_catalog=CommercialFactCatalogSnapshot.from_bundle(bundle),
         content=snapshot.content,
         published_terms=tuple(build_d2_published_offer_terms(offer=offer, source_client_id=snapshot.client_id) for offer in bundle.offers),
+        direction_prices=_direction_prices(snapshot.files, bundle),
     )
+
+
+def _direction_prices(
+    files: tuple[tuple[str, bytes], ...], bundle: ResponseSchemaBundle,
+) -> tuple[D2DirectionPriceConfig, ...]:
+    raw = dict(files).get("target_response/d2_direction_prices.json")
+    if raw is None:
+        return ()
+    try:
+        pack = D2DirectionPricePack.model_validate_json(raw)
+    except ValueError as exc:
+        raise D2TenantSnapshotError("direction_price_config_invalid") from exc
+    offers = {offer.offer_id: offer for offer in bundle.offers}
+    for direction in pack.directions:
+        for service_id in direction.service_ids:
+            service = bundle.services.get(service_id)
+            if service is None or not service.active:
+                raise D2TenantSnapshotError("direction_price_service_unavailable")
+        for offer_id in direction.offer_ids:
+            offer = offers.get(offer_id)
+            if offer is None or not offer.active or offer.service_id not in direction.service_ids:
+                raise D2TenantSnapshotError("direction_price_offer_unavailable")
+            service = bundle.services[offer.service_id]
+            if offer.option_id is not None and not any(
+                option.option_id == offer.option_id and option.active for option in service.options
+            ):
+                raise D2TenantSnapshotError("direction_price_option_unavailable")
+        if {offers[ref].service_id for ref in direction.offer_ids} != set(direction.service_ids):
+            raise D2TenantSnapshotError("direction_price_service_without_offer")
+    return pack.directions

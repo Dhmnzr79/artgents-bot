@@ -1,0 +1,7 @@
+{
+  "offer_id": "prosthetic_many", "service_id": "prosthetics", "active": true,
+  "applies_to_extents": ["few_teeth"],
+  "price": {"mode": "fixed", "amount": 49000, "currency": "RUB", "billing_unit": "procedure"},
+  "package": {"label": "Протезирование нескольких зубов", "includes": ["Тестовый мост"]},
+  "fact_refs": [], "followups": []
+}

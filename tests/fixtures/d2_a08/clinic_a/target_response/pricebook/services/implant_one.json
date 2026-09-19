@@ -1,0 +1,7 @@
+{
+  "offer_id": "implant_one", "service_id": "implantation_single", "active": true,
+  "applies_to_extents": ["one_tooth"],
+  "price": {"mode": "fixed", "amount": 51000, "currency": "RUB", "billing_unit": "tooth_package"},
+  "package": {"label": "Восстановление одного зуба", "includes": ["Тестовый пакет восстановления"]},
+  "fact_refs": [], "followups": []
+}

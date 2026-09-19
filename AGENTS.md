@@ -3,6 +3,23 @@
 This file is the permanent workflow contract for Codex, Cursor, and human contributors.
 Task-specific acceptance criteria belong in the current task or PR, not here.
 
+## Deployment reality — non-negotiable
+
+**This repository has no production bot and no production users.** The current
+local `/ask` and `/ask/stream` route is a disposable baseline for comparison,
+not a production-compatibility target.
+
+- A task may replace or break the local normal-dialogue runtime when that is
+  necessary for the agreed result. Preserve only explicitly named external
+  contracts, tenant data, and lead/privacy boundaries.
+- Do **not** assume production migration, user-data compatibility, dual-run,
+  per-request fallback, release rollback, or protection of the current local
+  semantic route unless the owner explicitly says that a production deployment
+  exists and places it in scope.
+- Reports must distinguish a local baseline from a deployed, user-facing bot.
+  Never cite the existence of the local route as a reason to defer a clean
+  semantic replacement.
+
 ## Workspace model
 
 - One active task equals one `codex/<slug>` branch in the permanent repository folder and one editor window.

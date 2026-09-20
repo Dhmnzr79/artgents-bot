@@ -155,8 +155,11 @@ def _run_reserved_d2_dialogue_turn(
         raise ValueError("d2_experiment_terminal_session_unsupported")
     binding = bind_d1r_envelope_to_d2_context(envelope, context)
     focus = seed_d2_plan_focus(binding)
-    if focus.action != "resolve_topic" or binding.outcome != "explicit_new_topic":
-        raise ValueError("d2_experiment_explicit_new_topic_required")
+    if (
+        focus.action != "resolve_topic"
+        or binding.outcome not in {"explicit_new_topic", "clear_continuation"}
+    ):
+        raise ValueError("d2_experiment_resolved_topic_required")
     sources = build_d2_snapshot_sources(tenant, model_view=view, envelope=envelope, session_key=session_key)
     response = resolve_d2_envelope_response(envelope, sources, as_of=now.date(), d2_plan_focus_seed=focus)
     price = response.resolved.d2_price_block
@@ -165,11 +168,25 @@ def _run_reserved_d2_dialogue_turn(
         raise ValueError("d2_experiment_price_not_resolved")
     turn = snapshot.current_turn_index
     situation = None
-    # Persist only finalized facts. C15 consumption, not a candidate alone,
-    # authorizes keeping the source extent in the new topic.
+    # Persist only finalized facts. A typed carry is retained only when the
+    # materialized price answer consumed its extent.
     if decision.applied_extent is not None:
         current = part.situation
-        if current.scope_commitment == "reported" and current.extent == decision.applied_extent:
+        carried = focus.carried_situation
+        if (
+            carried is not None
+            and current.continuity == "same"
+            and carried.situation_owner_id is not None
+            and carried.session_key == session_key
+            and carried.topic_id == part.topic_id
+            and carried.extent == decision.applied_extent
+        ):
+            situation = PersistedSituationState(
+                session_key=session_key, topic_id=part.topic_id, extent=carried.extent,
+                jaw=carried.jaw, stage=carried.stage, modifiers=carried.modifiers, set_at_turn=turn,
+                situation_owner_id=carried.situation_owner_id, tooth_count=carried.tooth_count,
+            )
+        elif current.scope_commitment == "reported" and current.extent == decision.applied_extent:
             situation = PersistedSituationState(
                 session_key=session_key, topic_id=part.topic_id, extent=current.extent,
                 jaw=current.jaw, stage="unknown", modifiers=(), set_at_turn=turn,

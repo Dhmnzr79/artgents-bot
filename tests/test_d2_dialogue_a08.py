@@ -199,6 +199,84 @@ def test_a08_demo_tenant_pack_supplies_direction_prices_through_snapshot(tmp_pat
     assert second.response.resolved.d2_price_scope_decision.applied_extent == "one_tooth"
 
 
+def test_a10_same_topic_price_followup_uses_fresh_typed_a08_situation(tmp_path):
+    """A short follow-up is assembled through the common D2 route, not a seam."""
+    clients = tmp_path / "clients"
+    shutil.copytree(Path("clients") / "demo", clients / "demo")
+    key = SessionKey(client_id="demo", sid="a10-same-topic")
+    with observed_route() as calls:
+        with D2DialogueStore(tmp_path / "dialogue.sqlite") as store:
+            first, _ = run(
+                store,
+                raw_price("implantation", reported=True, continuity="new"),
+                key=key,
+                clients_root=clients,
+            )
+            saved1 = store.read(key)
+            second, invocation = run(
+                store,
+                raw_price("implantation", continuity="same"),
+                key=key,
+                message="А сколько стоит?",
+                now=NOW + timedelta(seconds=30),
+                clients_root=clients,
+            )
+            saved2 = store.read(key)
+
+    assert invocation.context.freshness == "fresh"
+    assert invocation.context.source_revision == 1
+    assert second.focus.carried_situation == saved1.state.situation_state
+    assert second.focus.cross_topic_carry is None
+    assert offer_ids(first) == offer_ids(second) == (
+        "classic.one_tooth.impro",
+        "classic.one_tooth.implantium",
+        "classic.one_tooth.nobel",
+    )
+    assert second.response.resolved.d2_price_scope_decision.applied_extent == "one_tooth"
+    assert all(row.source_client_id == "demo" for row in second.response.resolved.d2_price_block.rows)
+    assert "КТ при необходимости и временная коронка — отдельно" in second.response.rendered_text
+    assert saved2.state.revision == 2
+    assert saved2.state.active_topic.topic_id == "implantation"
+    assert saved2.state.situation_state.extent == "one_tooth"
+    assert saved2.state.situation_state.situation_owner_id == saved1.state.situation_state.situation_owner_id
+    for function in (
+        "parse_production_envelope_json",
+        "project_d2_session_context",
+        "bind_d1r_envelope_to_d2_context",
+        "seed_d2_plan_focus",
+        "build_d2_snapshot_sources",
+        "resolve_d2_envelope_response",
+    ):
+        assert sum(name == function for _, name in calls) == 2, function
+
+
+def test_a10_same_topic_price_followup_never_carries_expired_situation(tmp_path):
+    clients = tmp_path / "clients"
+    shutil.copytree(Path("clients") / "demo", clients / "demo")
+    key = SessionKey(client_id="demo", sid="a10-expired")
+    with D2DialogueStore(tmp_path / "dialogue.sqlite") as store:
+        run(
+            store,
+            raw_price("implantation", reported=True, continuity="new"),
+            key=key,
+            clients_root=clients,
+        )
+        second, invocation = run(
+            store,
+            raw_price("implantation", continuity="same"),
+            key=key,
+            message="А сколько стоит?",
+            now=NOW + timedelta(minutes=30),
+            clients_root=clients,
+        )
+        saved = store.read(key)
+
+    assert invocation.context.freshness == "expired"
+    assert second.focus.carried_situation is None
+    assert second.response.resolved.d2_price_scope_decision.applied_extent is None
+    assert saved.state.situation_state is None
+
+
 @pytest.mark.parametrize("mode", ["expired", "other_session", "new_situation", "unknown_continuity"])
 def test_no_carry_without_fresh_same_situation(tmp_path, mode):
     with D2DialogueStore(tmp_path / "dialogue.sqlite") as store:

@@ -359,6 +359,13 @@ def resolve_d2_envelope_response(
         )
         applied_extent = _d2_applied_extent(price_part, treatment_situation, sources)
         if applied_extent is None:
+            applied_extent = _d2_same_topic_applied_extent(
+                price_part,
+                price_parts=price_parts,
+                d2_plan_focus_seed=d2_plan_focus_seed,
+                sources=sources,
+            )
+        if applied_extent is None:
             applied_extent = _d2_cross_topic_applied_extent(
                 price_part,
                 price_parts=price_parts,
@@ -614,6 +621,42 @@ def _d2_applied_extent(
     ):
         return None
     return situation.extent
+
+
+def _d2_same_topic_applied_extent(
+    part: RequestUnderstandingRequest,
+    *,
+    price_parts: tuple[RequestUnderstandingRequest, ...],
+    d2_plan_focus_seed: D2PlanFocusSeed | None,
+    sources: ResponsePlanMaterializationSources,
+) -> str | None:
+    """Use only a fresh, typed same-topic situation from the D2 focus seed."""
+
+    if (
+        d2_plan_focus_seed is None
+        or d2_plan_focus_seed.action != "resolve_topic"
+        or d2_plan_focus_seed.source_session_key != sources.session_key
+        or d2_plan_focus_seed.topic_id is None
+    ):
+        return None
+    source = d2_plan_focus_seed.carried_situation
+    situation = part.situation
+    if (
+        source is None
+        or source.situation_owner_id is None
+        or source.session_key != sources.session_key
+        or part.service_id is not None
+        or part.topic_id is None
+        or part.topic_id != d2_plan_focus_seed.topic_id
+        or part.topic_id != source.topic_id
+        or {item.topic_id for item in price_parts} != {part.topic_id}
+        or situation is None
+        or situation.continuity != "same"
+        or situation.scope_commitment == "reset"
+        or source.extent not in {"one_tooth", "few_teeth", "full_arch"}
+    ):
+        return None
+    return source.extent
 
 
 def _d2_cross_topic_applied_extent(

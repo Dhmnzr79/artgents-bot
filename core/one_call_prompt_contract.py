@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from config import SALES_ONE_PLUS_MODEL
 
-ONE_CALL_PROMPT_CONTRACT_VERSION = 17
+ONE_CALL_PROMPT_CONTRACT_VERSION = 19
 ONE_CALL_MODEL_SNAPSHOT = SALES_ONE_PLUS_MODEL
 
 ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS = """Return exactly one JSON object and nothing else.
@@ -30,12 +30,13 @@ request_understanding: object (required with at least one request for every ANSW
 primary_price_request_id: string or null (one kind=price request_id for code-owned primary price)
 
 Return this complete shape. primary_price_request_id is TOP-LEVEL, beside request_understanding:
-{"route":"ANSWER","service_id":null,"extent":null,"jaw":null,"stage":null,"scenario":"none","commercial_intent":"none","promotion_scope":"none","clarify_axis":null,"clarify_service_options":null,"patient_text":null,"price_text":null,"service_reference_status":"none","requested_service_id":null,"references":{"direct_fact_ids":[]},"request_understanding":{"subjects":[],"scope_commitment":"none","tooth_count":null,"requests":[{"request_id":"r1","kind":"content","subject_id":null,"context":"general_information","policy_ids":[],"payment_scheme":"unspecified","payment_scheme_intent":"unspecified","contact_fields":[],"content_text":"...","content_ref":null,"service_id":null,"topic_id":null,"statement_mode":"question","situation":null}]},"primary_price_request_id":null}
+{"route":"ANSWER","service_id":null,"extent":null,"jaw":null,"stage":null,"scenario":"none","commercial_intent":"none","promotion_scope":"none","clarify_axis":null,"clarify_service_options":null,"patient_text":null,"price_text":null,"service_reference_status":"none","requested_service_id":null,"references":{"direct_fact_ids":[]},"request_understanding":{"subjects":[],"scope_commitment":"unknown","tooth_count":null,"requests":[{"request_id":"r1","kind":"content","subject_id":null,"context":"general_information","policy_ids":[],"payment_scheme":"unspecified","payment_scheme_intent":"unspecified","contact_fields":[],"content_text":"...","content_ref":null,"service_id":null,"topic_id":null,"statement_mode":"question","situation":null}]},"primary_price_request_id":null}
 
 request_understanding (when non-null):
 subjects: array of {subject_id, relation, age_group} — may be empty
-scope_commitment: unknown | none | reported | correction | hypothetical. Use reported only when the patient states their own current treatment scope; correction when they explicitly replace a previously stated scope; hypothetical for “а если” comparisons; none for service questions without a stated patient need. Use unknown if the distinction is unclear. This field controls session memory, not whether a price question may be answered.
-tooth_count: positive integer or null. Set only when the patient explicitly says an exact number of teeth missing or needing restoration in this turn, including a correction or hypothetical comparison. Do not treat the number of remaining teeth or proposed implants as missing teeth. “Несколько зубов” has tooth_count=null. A correction to a scope without an exact number clears the prior count.
+scope_commitment: unknown | none | reported | correction | hypothetical. Include this legacy summary field only when every request has situation=null. Use reported only when the patient states their own current treatment scope; correction when they explicitly replace a previously stated scope; hypothetical for “а если” comparisons; none for service questions without a stated patient need. Use unknown if the distinction is unclear. This field controls legacy session memory, not whether a price question may be answered.
+tooth_count: positive integer or null. Include this legacy summary field only when every request has situation=null. Set it only when the patient explicitly says an exact number of teeth missing or needing restoration in this turn, including a correction or hypothetical comparison. Do not treat the number of remaining teeth or proposed implants as missing teeth. “Несколько зубов” has tooth_count=null. A correction to a scope without an exact number clears the prior count.
+When any request has a non-null situation, OMIT request_understanding.scope_commitment and request_understanding.tooth_count entirely. The nested situation is the only treatment-scope source; these legacy summary fields are forbidden even when their values would match it. The production schema supplies unknown and null for their omitted values.
 subjects[].subject_id: unique s1, s2, ... (pattern s[1-9][0-9]*); relation: self | other | unknown; age_group: adult | child | unknown. Never infer current child age from childhood history.
 requests: ordered array (>=1 for ANSWER/CLARIFY) of {request_id, kind, subject_id, context, policy_ids, payment_scheme, payment_scheme_intent, contact_fields, content_text, content_ref, service_id, topic_id, statement_mode, situation}
 requests[].request_id: unique r1, r2, ... (pattern r[1-9][0-9]*); subject_id: matching subject ID or null when no patient is named, including general policy/contact/price. Booking may use null if patient identity is unknown.

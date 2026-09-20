@@ -7,6 +7,7 @@ from datetime import date
 
 import pytest
 
+from contracts.request_understanding import RequestTreatmentSituation
 from contracts.response_plan_materialization import MaterializationContractError
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
@@ -197,6 +198,20 @@ def test_legacy_request_understanding_fields_conflict_with_nested_situation() ->
         _parse(_situation(), legacy_scope_commitment="reported")
     with pytest.raises(OneCallEnvelopeProtocolError, match="treatment_situation_legacy_conflict"):
         _parse(_situation(), legacy_tooth_count=3)
+
+
+def test_exact_legacy_treatment_duplicate_is_canonicalized_to_nested_situation() -> None:
+    envelope = _parse(
+        _situation(), legacy_scope_commitment="reported", legacy_tooth_count=3,
+    )
+    understanding = envelope.request_understanding
+    assert understanding is not None
+    assert understanding.scope_commitment == "unknown"
+    assert understanding.tooth_count is None
+    assert understanding.requests[0].situation == RequestTreatmentSituation(
+        scope_commitment="reported", extent="few_teeth", tooth_count=3,
+        jaw="upper", continuity="unknown",
+    )
 
 
 def test_two_nested_situations_are_rejected() -> None:

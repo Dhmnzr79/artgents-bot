@@ -26,6 +26,29 @@ from core.one_call_envelope_protocol import parse_production_envelope_json
 from core.response_plan_materialization import resolve_d2_envelope_response
 
 
+def _d2_a08_shape_failure_codes(*, part: object, subject: object) -> tuple[str, ...]:
+    """Return typed gate failures only; never include model prose or payload values."""
+    failures: list[str] = []
+    if part.kind != "price":
+        failures.append("request_kind_not_price")
+    if part.service_id is not None:
+        failures.append("request_service_id_present")
+    if part.topic_id is None:
+        failures.append("request_topic_id_missing")
+    if subject is None:
+        failures.append("subject_missing")
+    else:
+        if subject.relation != "self":
+            failures.append("subject_relation_not_self")
+        if subject.age_group == "child":
+            failures.append("subject_age_group_child")
+    if part.situation is None:
+        failures.append("situation_missing")
+    elif part.situation.scope_commitment not in {"reported", "unknown"}:
+        failures.append("situation_scope_unsupported")
+    return tuple(failures)
+
+
 def run_d2_dialogue_turn(
     *, session_key: SessionKey, user_message: str, provider: D2RawProvider,
     clients_root: Path, store: D2DialogueStore, now: datetime,
@@ -54,10 +77,9 @@ def run_d2_dialogue_turn(
         raise ValueError("d2_experiment_single_price_required")
     part = understanding.requests[0]
     subject = next((item for item in understanding.subjects if item.subject_id == part.subject_id), None)
-    if (part.kind != "price" or part.service_id is not None or part.topic_id is None
-            or subject is None or subject.relation != "self" or subject.age_group == "child"
-            or part.situation is None or part.situation.scope_commitment not in {"reported", "unknown"}):
-        raise ValueError("d2_experiment_a08_shape_required")
+    shape_failures = _d2_a08_shape_failure_codes(part=part, subject=subject)
+    if shape_failures:
+        raise ValueError("d2_experiment_a08_shape_required:" + ",".join(shape_failures))
     if context.retained_terminal_state != "none":
         raise ValueError("d2_experiment_terminal_session_unsupported")
     binding = bind_d1r_envelope_to_d2_context(envelope, context)

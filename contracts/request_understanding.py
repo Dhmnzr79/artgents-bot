@@ -217,6 +217,40 @@ class RequestUnderstanding(BaseModel):
     scope_commitment: ScopeCommitment = "unknown"
     tooth_count: int | None = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _canonicalize_exact_legacy_treatment_duplicate(cls, value: object) -> object:
+        """Discard only a legacy scope summary that exactly repeats one situation."""
+        if not isinstance(value, dict):
+            return value
+        requests = value.get("requests")
+        if not isinstance(requests, (list, tuple)):
+            return value
+        situations = [
+            request.get("situation")
+            for request in requests
+            if isinstance(request, dict) and request.get("situation") is not None
+        ]
+        if len(situations) != 1 or not isinstance(situations[0], dict):
+            return value
+        situation = situations[0]
+        legacy_scope = value.get("scope_commitment", "unknown")
+        legacy_count = value.get("tooth_count")
+        nested_scope = situation.get("scope_commitment")
+        nested_count = situation.get("tooth_count")
+        if (
+            legacy_scope not in {"unknown", "none", "reported", "correction", "hypothetical"}
+            or nested_scope not in {"unknown", "reported", "correction", "hypothetical"}
+            or legacy_scope != nested_scope
+            or type(legacy_count) is not type(nested_count)
+            or legacy_count != nested_count
+        ):
+            return value
+        canonical = dict(value)
+        canonical.pop("scope_commitment", None)
+        canonical.pop("tooth_count", None)
+        return canonical
+
     @field_validator("tooth_count")
     @classmethod
     def _validate_tooth_count(cls, value: int | None) -> int | None:

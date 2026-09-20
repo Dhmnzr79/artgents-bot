@@ -231,6 +231,14 @@ def test_invalid_provider_or_out_of_scope_input_does_not_commit(tmp_path, raw):
         assert store.read(KEY) == before
 
 
+def test_a08_shape_diagnostic_identifies_typed_failure_without_model_payload(tmp_path):
+    with D2DialogueStore(tmp_path / "dialogue.sqlite") as store:
+        run(store, raw_price("implantation", reported=True, continuity="new"))
+        with pytest.raises(ValueError, match="d2_experiment_a08_shape_required:subject_relation_not_self"):
+            run(store, raw_price("prosthetics", relation="other"), message=SECOND,
+                now=NOW + timedelta(seconds=30))
+
+
 def test_clinics_with_same_sid_do_not_share_context_or_prices(tmp_path):
     clients = tmp_path / "clients"
     shutil.copytree(PACK / "clinic_a", clients / "clinic_a")

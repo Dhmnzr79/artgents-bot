@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import re
 
-from name_gate import accept_lead_name
-
 PHONE_PLACEHOLDER = "[телефон скрыт]"
 EMAIL_PLACEHOLDER = "[email скрыт]"
 
@@ -28,6 +26,21 @@ _MENYA_ZOVUT_ONLY_RX = re.compile(
     r"^(?:меня зовут|меня звать|мо[её] имя)\s+(.+)$",
     re.I,
 )
+_EXPLICIT_NAME_RX = re.compile(r"^[А-ЯЁA-Za-zа-яё][А-ЯЁA-Za-zа-яё-]{1,39}(?:\s+[А-ЯЁA-Za-zа-яё][А-ЯЁA-Za-zа-яё-]{1,39}){0,2}$")
+_NOT_A_NAME_TOKENS = frozenset({
+    "нет", "зуб", "зуба", "зубы", "сколько", "стоит", "болит", "боль",
+    "имплантация", "имплант", "протезирование", "коронка", "лечение",
+})
+
+
+def _accepted_personal_name(value: str) -> str | None:
+    """Privacy-only structural check; never enters legacy lead/session code."""
+    candidate = (value or "").strip()
+    if not _EXPLICIT_NAME_RX.fullmatch(candidate):
+        return None
+    if any(token in _NOT_A_NAME_TOKENS for token in candidate.casefold().split()):
+        return None
+    return candidate
 
 _PLACEHOLDER_RX = re.compile(
     rf"(?:{re.escape(PHONE_PLACEHOLDER)}|{re.escape(EMAIL_PLACEHOLDER)})"
@@ -52,27 +65,27 @@ def _strip_explicit_self_introduction(text: str, *, profile_name: str = "") -> s
     only_intro = _MENYA_ZOVUT_ONLY_RX.match(s)
     if only_intro:
         tail = only_intro.group(1).strip()
-        maybe_only = accept_lead_name(tail)
+        maybe_only = _accepted_personal_name(tail)
         if maybe_only and maybe_only.casefold() == tail.casefold():
             return ""
 
     match = _MENYA_ZOVUT_RX.match(s)
     if match:
-        maybe = accept_lead_name(match.group(1).strip())
+        maybe = _accepted_personal_name(match.group(1).strip())
         rest = match.group(2).strip()
         if maybe and rest and (not prof or maybe.casefold() == prof.casefold()):
             return rest
 
     match = _YA_INTRO_RX.match(s)
     if match:
-        maybe = accept_lead_name(match.group(1).strip())
+        maybe = _accepted_personal_name(match.group(1).strip())
         rest = match.group(2).strip()
         if maybe and rest and (not prof or maybe.casefold() == prof.casefold()):
             return rest
 
     intro = _INTRO_COMMA_RX.match(s)
     if intro:
-        maybe_name = accept_lead_name(intro.group(1).strip())
+        maybe_name = _accepted_personal_name(intro.group(1).strip())
         rest = intro.group(2).strip()
         if maybe_name and rest and (not prof or maybe_name.casefold() == prof.casefold()):
             return rest
@@ -157,7 +170,7 @@ def provider_message_has_substance(
     if raw_source and _contains_leaked_phone_digits(stripped, raw_source):
         return False
     if reject_lone_personal_name:
-        lone_name = accept_lead_name(stripped)
+        lone_name = _accepted_personal_name(stripped)
         if lone_name and stripped.casefold() == lone_name.casefold():
             return False
     return True

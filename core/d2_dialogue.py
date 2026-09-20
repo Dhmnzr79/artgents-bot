@@ -5,10 +5,14 @@ product. Unsupported inputs fail explicitly; there is no legacy fallback.
 """
 
 from datetime import datetime
+from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 
-from contracts.d2_dialogue import D2DialogueRecord, D2DialogueTurn, D2ProviderInput, D2RawProvider
+from contracts.d2_dialogue import (
+    D2CompletedTurn, D2DialogueRecord, D2DialogueTurn, D2LeadEffect,
+    D2LeadEffectDispatcher, D2ProviderInput, D2RawProvider,
+)
 from contracts.d2_session_context import D2SessionActivity, D2SessionTtlPolicy
 from contracts.response_plan import SessionKey
 from contracts.response_plan_session import (
@@ -24,6 +28,25 @@ from core.d2_snapshot_sources import build_d2_snapshot_sources
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
 from core.one_call_envelope_protocol import parse_production_envelope_json
 from core.response_plan_materialization import resolve_d2_envelope_response
+from core.user_text_privacy import provider_message_has_substance, provider_safe_user_text
+
+
+def _request_fingerprint(*, session_key: SessionKey, user_message: str) -> str:
+    """Store a non-reversible request identity, never the raw patient message."""
+    source = "\x1f".join((session_key.client_id, session_key.sid, user_message))
+    return sha256(source.encode("utf-8")).hexdigest()
+
+
+def _turn_from_completion(completion: D2CompletedTurn, *, idempotent_replay: bool) -> D2DialogueTurn:
+    return D2DialogueTurn(
+        response=completion.response,
+        context=completion.context,
+        focus=completion.focus,
+        committed_revision=completion.committed_revision,
+        request_id=completion.request_id,
+        idempotent_replay=idempotent_replay,
+        lead_effect=completion.lead_effect,
+    )
 
 
 def _d2_a08_shape_failure_codes(*, part: object, subject: object) -> tuple[str, ...]:
@@ -53,8 +76,56 @@ def run_d2_dialogue_turn(
     *, session_key: SessionKey, user_message: str, provider: D2RawProvider,
     clients_root: Path, store: D2DialogueStore, now: datetime,
     ttl_policy: D2SessionTtlPolicy = D2SessionTtlPolicy(),
+    request_id: str | None = None,
+    lead_effect_id: str | None = None,
+    lead_effect_dispatcher: D2LeadEffectDispatcher | None = None,
 ) -> D2DialogueTurn:
-    """All state/context/sources are built here, never accepted from the caller."""
+    """Complete one D2 turn with one state/result owner and no legacy memory."""
+    effective_request_id = (request_id or uuid4().hex).strip()
+    if not effective_request_id:
+        raise ValueError("d2_request_id_required")
+    if (lead_effect_id is None) != (lead_effect_dispatcher is None):
+        raise ValueError("d2_lead_effect_pair_required")
+    fingerprint = _request_fingerprint(session_key=session_key, user_message=user_message)
+    reservation = store.reserve_request(
+        session_key, request_id=effective_request_id, request_fingerprint=fingerprint,
+    )
+    if reservation.is_replay:
+        return _turn_from_completion(reservation.completed, idempotent_replay=True)
+    safe_user_message = provider_safe_user_text(user_message)
+    if not provider_message_has_substance(safe_user_message, raw_source=user_message):
+        store.abandon_request(
+            session_key, request_id=effective_request_id, request_fingerprint=fingerprint,
+        )
+        raise ValueError("d2_provider_input_privacy_only")
+    try:
+        return _run_reserved_d2_dialogue_turn(
+            session_key=session_key,
+            safe_user_message=safe_user_message,
+            provider=provider,
+            clients_root=clients_root,
+            store=store,
+            now=now,
+            ttl_policy=ttl_policy,
+            request_id=effective_request_id,
+            request_fingerprint=fingerprint,
+            lead_effect_id=lead_effect_id,
+            lead_effect_dispatcher=lead_effect_dispatcher,
+        )
+    except Exception:
+        store.abandon_request(
+            session_key, request_id=effective_request_id, request_fingerprint=fingerprint,
+        )
+        raise
+
+
+def _run_reserved_d2_dialogue_turn(
+    *, session_key: SessionKey, safe_user_message: str, provider: D2RawProvider,
+    clients_root: Path, store: D2DialogueStore, now: datetime,
+    ttl_policy: D2SessionTtlPolicy, request_id: str, request_fingerprint: str,
+    lead_effect_id: str | None, lead_effect_dispatcher: D2LeadEffectDispatcher | None,
+) -> D2DialogueTurn:
+    """Build a final result only after ``reserve_request`` made this turn owner."""
     tenant = load_d2_tenant_snapshot(session_key.client_id, clients_root=clients_root)
     view = build_d2_model_view(tenant)
     previous = store.read(session_key)
@@ -66,7 +137,7 @@ def run_d2_dialogue_turn(
         snapshot, expected_session_key=session_key,
         activity=previous.activity if previous else None, policy=ttl_policy, now=now,
     )
-    raw = provider.generate(D2ProviderInput(user_message=user_message, model_view=view, context=context))
+    raw = provider.generate(D2ProviderInput(user_message=safe_user_message, model_view=view, context=context))
     envelope = parse_production_envelope_json(
         raw, active_service_catalog=view.active_service_catalog,
         service_reference_catalog=view.service_reference_catalog,
@@ -128,8 +199,33 @@ def run_d2_dialogue_turn(
         accumulated_shown_ids=PersistedShownCommercialIds(price_offer_ids=shown_offers),
         terminal_state=context.retained_terminal_state,
     )
-    store.commit(D2DialogueRecord(
+    initial_effect = (
+        D2LeadEffect(effect_id=lead_effect_id, status="pending")
+        if lead_effect_id is not None else D2LeadEffect()
+    )
+    completion = D2CompletedTurn(
+        request_id=request_id,
+        request_fingerprint=request_fingerprint,
+        response=response,
+        context=context,
+        focus=focus,
+        committed_revision=state.revision,
+        lead_effect=initial_effect,
+    )
+    store.complete(D2DialogueRecord(
         state=state, activity=D2SessionActivity(session_key=session_key, last_user_turn_at=now),
         tenant_fingerprint=tenant.fingerprint,
-    ), expected_revision=snapshot.state.revision)
-    return D2DialogueTurn(response=response, context=context, focus=focus, committed_revision=state.revision)
+    ), expected_revision=snapshot.state.revision, completion=completion)
+    if lead_effect_dispatcher is not None and lead_effect_id is not None:
+        try:
+            effect_status = lead_effect_dispatcher.dispatch(effect_id=lead_effect_id)
+            if effect_status not in {"sent", "failed", "unknown", "demo_stub"}:
+                raise ValueError("d2_lead_effect_dispatch_status_invalid")
+        except Exception:
+            effect_status = "unknown"
+        completion = store.update_lead_effect(
+            session_key,
+            request_id=request_id,
+            effect=D2LeadEffect(effect_id=lead_effect_id, status=effect_status),
+        )
+    return _turn_from_completion(completion, idempotent_replay=False)

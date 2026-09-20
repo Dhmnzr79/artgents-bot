@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from contracts.response_plan import SessionKey
+from contracts.d2_dialogue import D2CompletedTurn
 from contracts.response_plan_session import ResponsePlanSessionRevisionConflict
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore
@@ -136,7 +137,7 @@ def test_a08_real_two_turn_route_survives_store_reopen(tmp_path):
                                       message=SECOND, now=NOW + timedelta(seconds=30), clients_root=clients)
             saved2 = store.read(KEY)
             tables = store._connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
-    assert tables == [("d2_dialogue",)]
+    assert {name for (name,) in tables} == {"d2_dialogue", "d2_turn_request"}
     assert invocation2.user_message == SECOND
     assert invocation2.context.freshness == "fresh"
     assert invocation2.context.source_revision == 1
@@ -289,12 +290,23 @@ def test_direction_prices_require_valid_production_binding(tmp_path, fault):
         assert store.read(KEY) is None
 
 
-def test_stale_store_commit_cannot_overwrite_state_or_activity(tmp_path):
+def test_stale_complete_cannot_overwrite_state_or_activity(tmp_path):
     with D2DialogueStore(tmp_path / "dialogue.sqlite") as store:
-        run(store, raw_price("implantation", reported=True, continuity="new"))
+        first, _ = run(store, raw_price("implantation", reported=True, continuity="new"))
         saved = store.read(KEY)
-        with pytest.raises(ResponsePlanSessionRevisionConflict):
-            store.commit(saved, expected_revision=0)
+        fingerprint = "stale-request-fingerprint"
+        store.reserve_request(KEY, request_id="stale-request", request_fingerprint=fingerprint)
+        completion = D2CompletedTurn(
+            request_id="stale-request",
+            request_fingerprint=fingerprint,
+            response=first.response,
+            context=first.context,
+            focus=first.focus,
+            committed_revision=saved.state.revision,
+        )
+        with pytest.raises(ResponsePlanSessionRevisionConflict, match="d2_revision_conflict"):
+            store.complete(saved, expected_revision=0, completion=completion)
+        store.abandon_request(KEY, request_id="stale-request", request_fingerprint=fingerprint)
         assert store.read(KEY) == saved
 
 
@@ -312,3 +324,7 @@ def test_failed_write_keeps_first_turn_state_and_activity_together(tmp_path):
             run(store, raw_price("prosthetics"), message=SECOND, now=NOW + timedelta(seconds=30))
     with D2DialogueStore(database) as store:
         assert store.read(KEY) == before
+        requests = store._connection.execute(
+            "SELECT status FROM d2_turn_request WHERE client_id=? AND sid=?", (KEY.client_id, KEY.sid),
+        ).fetchall()
+    assert requests == [("complete",)]

@@ -17,7 +17,8 @@ C:\Cursor Projects\artgents-bot.
 
 1. Прочитай AGENTS.md, затем docs/tasks/DEMO_D2_EXECUTION_LOCK.md,
    docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md и
-   docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md. Если checkpoint противоречит
+   docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md и
+   docs/tasks/DEMO_D2_CODEX_EXECUTOR_PROMPT.md. Если checkpoint противоречит
    lock или молча обходит обязательный порядок roadmap — это основание для
    REJECT независимо от текста задания.
 2. Проверь preflight checkpoint: repo path/git top-level, branch, HEAD,
@@ -44,7 +45,10 @@ C:\Cursor Projects\artgents-bot.
 10. Проверь фактическую изоляцию тестов: BOT_LOG_DIR, временная БД и
     временный tenant pack; отсутствие записи в data/<tenant>/bot.db и
     любые постоянные stores; сеть/provider/SMTP заблокированы.
-11. Запусти ТОЛЬКО assigned offline tests из задания checkpoint.
+11. Если checkpoint меняет код, tests или доказанное поведение, проверь, что
+    тот же незакоммиченный diff содержит Ledger draft с checkpoint name и
+    доказанными фактами. Не требуй от него hash ещё не созданного commit.
+12. Запусти ТОЛЬКО assigned offline tests из задания checkpoint.
     Не запускай полный CI и не расширяй набор без конкретного сомнения,
     требующего одного дополнительного test node.
 

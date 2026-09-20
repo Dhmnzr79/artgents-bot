@@ -1,7 +1,8 @@
 # D2 — фиксированная дорожная карта до замены legacy runtime
 
 Статус: **действующий план исполнения**. Зафиксировано: 2026-09-20 на
-ветке `codex/demo-d2-service-volume`, HEAD `788450e`.
+ветке `codex/demo-d2-service-volume`; последний подтверждённый code checkpoint
+— CP1 `7a0fa7c`.
 
 Это единственная действующая roadmap D2. Историческая
 `DEMO_D2_REBUILD_ROADMAP.md` объясняет прежний план, но не задаёт порядок
@@ -39,11 +40,13 @@ lead/privacy, заявки, typed UI ownership и transport защиты. Нел
 
 ## Текущее доказанное состояние
 
-На HEAD `788450e` собран только внутренний двухходовый A08: raw fake-provider
+На HEAD `7a0fa7c` собран только внутренний двухходовый A08: raw fake-provider
 ответ проходит production D1R parser, production tenant loader, D2
 resolver/materializer, текст/UI и typed persistent state с close/reopen store.
 Это вызывает `core/d2_dialogue.py::run_d2_dialogue_turn` только его
-offline-тест.
+offline-тест. CP1 также обновил единственный production D1R prompt до v17:
+он требует typed `service_id`, `topic_id`, `statement_mode` и `situation` для
+каждого request; production parser проверен на корректном и malformed raw A08.
 
 Это **не** означает, что D2 подключён к HTTP, виджету или настоящей модели,
 что остальные A01–A12 собраны, или что legacy перестал обслуживать локального
@@ -88,7 +91,8 @@ resolution. Он не доказывает, что модель понимает
 Перед записью Terra объявляет baseline, точный allowlist, ACCEPTANCE, D2
 ROUTE, LEGACY IMPACT, OWNER DECISION, FUTURE SCOPE и точную команду offline
 теста с временной БД, `BOT_LOG_DIR` и temporary tenant pack. Вне allowlist
-не пишется ничего.
+не пишется ничего. Постоянный шаблон исполнителя —
+[DEMO_D2_CODEX_EXECUTOR_PROMPT.md](DEMO_D2_CODEX_EXECUTOR_PROMPT.md).
 
 Terra останавливается только при конфликте требований, новом видимом
 пользовательском правиле или двух допустимых реализациях с разным видимым
@@ -98,21 +102,24 @@ Terra останавливается только при конфликте тр
 `assistant_text`, `patient_message`, `dialogue`, regex или возраста turn.
 
 После изменений Terra запускает только assigned offline tests в изолированной
-среде и **не commitит**. Cursor независимо читает незакоммиченный diff по
-master prompt и выносит PASS/REJECT. После REJECT исправляется находка и
-проверяется именно она с необходимой регрессией. Один Cursor review нужен на
-законченный значимый checkpoint, а не на каждую строку документации или
-мелкое исправление его замечания.
+среде и добавляет в этот же незакоммиченный diff черновую строку Ledger с
+доказанными фактами checkpoint. В строке указывается устойчивое имя
+checkpoint, а не hash ещё не созданного commit. Cursor независимо читает весь
+diff — код, tests и Ledger — по master prompt и выносит PASS/REJECT. После
+REJECT исправляется находка и проверяется именно она с необходимой регрессией.
+Один Cursor review нужен на законченный значимый checkpoint, а не на каждую
+строку документации или мелкое исправление его замечания.
 
 Только после Cursor PASS: exact staging, staged diff/stat/`diff --check`,
-commit и push. Строка фактов в Ledger входит в тот же проверенный checkpoint,
-а не добавляется задним числом. Cursor не перепроектирует D2 и не отклоняет
-работу за честно указанный FUTURE SCOPE.
+commit и push. Финальный отчёт сообщает фактический hash и готовый prompt
+следующего checkpoint; он не меняет Ledger после PASS. Cursor не
+перепроектирует D2 и не отклоняет работу за честно указанный FUTURE SCOPE.
 
 ## Следующий шаг
 
-Следующий разрешённый checkpoint — **CP1**. Он меняет единый D1R
-prompt-contract и parser/schema offline только настолько, насколько нужно
-для typed A08. Он не начинает CP2–CP8 и не делает provider/HTTP/widget
-вызовов. После его Cursor PASS следующий шаг определяется этой таблицей:
-CP2, а не произвольная новая архитектурная задача.
+CP1 завершён в `7a0fa7c`; его строка Ledger добавлена отдельным поздним
+document-only correction checkpoint и не переопределяет доказательства CP1.
+Следующий разрешённый checkpoint — **CP2**: approved demo tenant data для
+A08 через штатный production tenant loader. Он не начинает CP3–CP8 и не
+делает provider/HTTP/widget вызовов. После его Cursor PASS следующий шаг
+определяется этой таблицей, а не произвольной новой архитектурной задачей.

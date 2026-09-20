@@ -64,10 +64,18 @@ memory **не достижимы из normal answer path**. Достижимос
 | FUTURE SCOPE | что осознанно оставлено следующим checkpoint |
 | Allowlist | точный перечень файлов записи |
 | Test isolation | временные БД/логи/tenant pack; сеть и provider запрещены offline |
+| Ledger draft | до Cursor review внесена строка доказанных фактов checkpoint; она называет checkpoint, но не требует невозможного self-reference на hash ещё не созданного commit |
 | Cursor verdict | результат независимого Checker |
 
 Значимый checkpoint **не commitится до независимого Cursor PASS**
 (master prompt: [DEMO_D2_CURSOR_CHECKER_PROMPT.md](DEMO_D2_CURSOR_CHECKER_PROMPT.md)).
+После PASS разрешены только exact staging, commit, push и финальный отчёт с
+фактическим hash. Нельзя дописывать Ledger после PASS только ради hash: Cursor
+должен увидеть Ledger вместе с кодом и тестами.
+
+Постоянный prompt исполнителя:
+[DEMO_D2_CODEX_EXECUTOR_PROMPT.md](DEMO_D2_CODEX_EXECUTOR_PROMPT.md). Каждый
+checkpoint card его дополняет, но не заменяет.
 
 ## 6. Приоритет документов
 
@@ -76,6 +84,7 @@ AGENTS.md
 → D2 Execution Lock (этот файл)
 → D2 Delivery Roadmap (фиксированный порядок checkpoint)
 → утверждённые D2 contract / acceptance / decision log
+→ D2 Codex Executor Prompt (постоянный процесс исполнения)
 → текущий checkpoint prompt
 ```
 

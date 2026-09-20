@@ -167,6 +167,37 @@ def test_a08_real_two_turn_route_survives_store_reopen(tmp_path):
     assert ("core.response_plan_materialization", "_d2_cross_topic_applied_extent") in calls
 
 
+def test_a08_demo_tenant_pack_supplies_direction_prices_through_snapshot(tmp_path):
+    """CP2: the real demo pack, not the test fixture, owns A08 price data."""
+    clients = tmp_path / "clients"
+    shutil.copytree(Path("clients") / "demo", clients / "demo")
+    key = SessionKey(client_id="demo", sid="a08-demo")
+
+    with D2DialogueStore(tmp_path / "dialogue.sqlite") as store:
+        first, _ = run(
+            store, raw_price("implantation", reported=True, continuity="new"),
+            key=key, clients_root=clients,
+        )
+        second, _ = run(
+            store, raw_price("prosthetics", subject_id="s7"), key=key,
+            message=SECOND, now=NOW + timedelta(seconds=30), clients_root=clients,
+        )
+
+    assert offer_ids(first) == (
+        "classic.one_tooth.impro",
+        "classic.one_tooth.implantium",
+        "classic.one_tooth.nobel",
+    )
+    assert all(row.source_client_id == "demo" for row in first.response.resolved.d2_price_block.rows)
+    assert all(row.billing_unit == "tooth_package" for row in first.response.resolved.d2_price_block.rows)
+    assert "КТ при необходимости и временная коронка — отдельно" in first.response.rendered_text
+    assert offer_ids(second) == ("implant_supported_prosthetics.default",)
+    assert second.response.resolved.d2_price_block.rows[0].source_client_id == "demo"
+    assert second.response.resolved.d2_price_block.rows[0].billing_unit == "tooth"
+    assert "Хирургическая установка импланта и КТ — отдельно" in second.response.rendered_text
+    assert second.response.resolved.d2_price_scope_decision.applied_extent == "one_tooth"
+
+
 @pytest.mark.parametrize("mode", ["expired", "other_session", "new_situation", "unknown_continuity"])
 def test_no_carry_without_fresh_same_situation(tmp_path, mode):
     with D2DialogueStore(tmp_path / "dialogue.sqlite") as store:

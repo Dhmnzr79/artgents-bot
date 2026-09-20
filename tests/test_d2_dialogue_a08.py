@@ -114,9 +114,13 @@ def offer_ids(turn):
 
 def test_a08_real_two_turn_route_survives_store_reopen(tmp_path):
     database = tmp_path / "dialogue.sqlite"
+    clients = tmp_path / "clients"
+    shutil.copytree(PACK / "clinic_a", clients / "clinic_a")
     with observed_route() as calls:
         with D2DialogueStore(database) as store:
-            first, invocation1 = run(store, raw_price("implantation", reported=True, continuity="new"))
+            first, invocation1 = run(
+                store, raw_price("implantation", reported=True, continuity="new"), clients_root=clients,
+            )
             saved1 = store.read(KEY)
             assert first.committed_revision == 1
             assert invocation1.context.freshness == "unknown"
@@ -129,7 +133,7 @@ def test_a08_real_two_turn_route_survives_store_reopen(tmp_path):
         # passed into the second turn; not even the first outcome is an input.
         with D2DialogueStore(database) as store:
             second, invocation2 = run(store, raw_price("prosthetics", subject_id="s7"),
-                                      message=SECOND, now=NOW + timedelta(seconds=30))
+                                      message=SECOND, now=NOW + timedelta(seconds=30), clients_root=clients)
             saved2 = store.read(KEY)
             tables = store._connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
     assert tables == [("d2_dialogue",)]

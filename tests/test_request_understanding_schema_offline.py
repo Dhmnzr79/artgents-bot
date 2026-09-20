@@ -16,6 +16,10 @@ from core.one_call_envelope_protocol import (
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
+from core.one_call_prompt_contract import (
+    ONE_CALL_PROMPT_CONTRACT_VERSION,
+    ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS,
+)
 
 _EMPTY_CATALOG = ActiveServiceCatalogSnapshot(canonical_json="{}")
 _EMPTY_REF_CATALOG = ServiceReferenceCatalogSnapshot(canonical_json="{}")
@@ -69,6 +73,13 @@ def test_ordered_d2_request_parts_preserve_per_part_refs() -> None:
                     "service_id": "service_one",
                     "topic_id": "implantation",
                     "statement_mode": "question",
+                    "situation": {
+                        "scope_commitment": "reported",
+                        "extent": "one_tooth",
+                        "tooth_count": 1,
+                        "jaw": "unknown",
+                        "continuity": "new",
+                    },
                 },
                 {
                     "request_id": "r2",
@@ -92,8 +103,45 @@ def test_ordered_d2_request_parts_preserve_per_part_refs() -> None:
     parsed = _parse(payload)
     assert [item.request_id for item in parsed.request_understanding.requests] == ["r1", "r2"]
     assert parsed.request_understanding.requests[0].service_id == "service_one"
+    assert parsed.request_understanding.requests[0].situation == RequestTreatmentSituation(
+        scope_commitment="reported", extent="one_tooth", tooth_count=1,
+        jaw="unknown", continuity="new",
+    )
     assert parsed.request_understanding.requests[1].content_ref == "pain.md"
     assert parsed.request_understanding.requests[1].statement_mode == "hypothesis"
+
+
+def test_v17_prompt_contract_requires_a08_typed_request_fields() -> None:
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 17
+    assert "service_id, topic_id, statement_mode, situation" in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
+    assert "situation: null or exactly {scope_commitment, extent, tooth_count, jaw, continuity}" in (
+        ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
+    )
+
+
+def test_production_parser_rejects_malformed_raw_a08_treatment_situation() -> None:
+    raw = production_envelope_template(
+        request_understanding={
+            "subjects": [{"subject_id": "s1", "relation": "self", "age_group": "unknown"}],
+            "requests": [{
+                "request_id": "r1", "kind": "price", "subject_id": "s1",
+                "context": "current_care", "policy_ids": [], "payment_scheme": "unspecified",
+                "payment_scheme_intent": "unspecified", "contact_fields": [], "content_text": None,
+                "service_id": None, "topic_id": "implantation", "statement_mode": "question",
+                "situation": {
+                    "scope_commitment": "reported", "extent": "one_tooth", "tooth_count": 1,
+                    "jaw": "unknown", "continuity": "new",
+                },
+            }],
+        },
+    )
+    parsed = _parse(raw)
+    assert parsed.request_understanding.requests[0].situation is not None
+
+    malformed = json.loads(json.dumps(raw))
+    malformed["request_understanding"]["requests"][0]["situation"]["continuity"] = "later"
+    with pytest.raises(OneCallEnvelopeProtocolError):
+        _parse(malformed)
 
 
 def test_d2_section_refs_use_existing_envelope() -> None:

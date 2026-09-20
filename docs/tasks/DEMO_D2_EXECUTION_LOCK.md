@@ -3,7 +3,9 @@
 Дата фиксации: 2026-09-20. Ветка: `codex/demo-d2-service-volume`, baseline `8e7a3b6`.
 Статус: **действующий lock**. Меняется только по явному решению владельца
 отдельным checkpoint. Это не roadmap, не архитектурный аудит и не план работ;
-факты выполнения ведутся в [DEMO_D2_CHECKPOINT_LEDGER.md](DEMO_D2_CHECKPOINT_LEDGER.md).
+фиксированный порядок checkpoint ведётся в
+[DEMO_D2_DELIVERY_ROADMAP.md](DEMO_D2_DELIVERY_ROADMAP.md), а факты выполнения —
+в [DEMO_D2_CHECKPOINT_LEDGER.md](DEMO_D2_CHECKPOINT_LEDGER.md).
 
 ## 1. Реальность развёртывания
 
@@ -72,9 +74,11 @@ memory **не достижимы из normal answer path**. Достижимос
 ```text
 AGENTS.md
 → D2 Execution Lock (этот файл)
+→ D2 Delivery Roadmap (фиксированный порядок checkpoint)
 → утверждённые D2 contract / acceptance / decision log
 → текущий checkpoint prompt
 ```
 
 Если checkpoint prompt слабее lock — действует lock. Молчание prompt
-не отменяет ни один запрет раздела 3.
+не отменяет ни один запрет раздела 3. Roadmap не может ослабить lock или
+целевой product contract, но checkpoint не может молча пропустить её этап.

@@ -15,9 +15,11 @@ C:\Cursor Projects\artgents-bot.
 
 Порядок работы:
 
-1. Прочитай AGENTS.md, затем docs/tasks/DEMO_D2_EXECUTION_LOCK.md и
+1. Прочитай AGENTS.md, затем docs/tasks/DEMO_D2_EXECUTION_LOCK.md,
+   docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md и
    docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md. Если checkpoint противоречит
-   lock — это основание для REJECT независимо от текста задания.
+   lock или молча обходит обязательный порядок roadmap — это основание для
+   REJECT независимо от текста задания.
 2. Проверь preflight checkpoint: repo path/git top-level, branch, HEAD,
    заявленный baseline, состояние staging, untracked и foreign WIP.
 3. Сверь фактический diff с точным allowlist checkpoint. Любой файл вне

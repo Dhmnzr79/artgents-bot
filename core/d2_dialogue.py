@@ -49,26 +49,25 @@ def _turn_from_completion(completion: D2CompletedTurn, *, idempotent_replay: boo
     )
 
 
-def _d2_a08_shape_failure_codes(*, part: object, subject: object) -> tuple[str, ...]:
+def _d2_supported_price_shape_failure_codes(*, part: object, subject: object) -> tuple[str, ...]:
     """Return typed gate failures only; never include model prose or payload values."""
     failures: list[str] = []
     if part.kind != "price":
         failures.append("request_kind_not_price")
-    if part.service_id is not None:
-        failures.append("request_service_id_present")
     if part.topic_id is None:
         failures.append("request_topic_id_missing")
-    if subject is None:
-        failures.append("subject_missing")
-    else:
-        if subject.relation != "self":
-            failures.append("subject_relation_not_self")
-        if subject.age_group == "child":
-            failures.append("subject_age_group_child")
-    if part.situation is None:
-        failures.append("situation_missing")
-    elif part.situation.scope_commitment not in {"reported", "unknown"}:
-        failures.append("situation_scope_unsupported")
+    if part.service_id is None:
+        if subject is None:
+            failures.append("subject_missing")
+        else:
+            if subject.relation != "self":
+                failures.append("subject_relation_not_self")
+            if subject.age_group == "child":
+                failures.append("subject_age_group_child")
+        if part.situation is None:
+            failures.append("situation_missing")
+        elif part.situation.scope_commitment not in {"reported", "unknown"}:
+            failures.append("situation_scope_unsupported")
     return tuple(failures)
 
 
@@ -148,7 +147,7 @@ def _run_reserved_d2_dialogue_turn(
         raise ValueError("d2_experiment_single_price_required")
     part = understanding.requests[0]
     subject = next((item for item in understanding.subjects if item.subject_id == part.subject_id), None)
-    shape_failures = _d2_a08_shape_failure_codes(part=part, subject=subject)
+    shape_failures = _d2_supported_price_shape_failure_codes(part=part, subject=subject)
     if shape_failures:
         raise ValueError("d2_experiment_a08_shape_required:" + ",".join(shape_failures))
     if context.retained_terminal_state != "none":
@@ -161,16 +160,29 @@ def _run_reserved_d2_dialogue_turn(
     ):
         raise ValueError("d2_experiment_resolved_topic_required")
     sources = build_d2_snapshot_sources(tenant, model_view=view, envelope=envelope, session_key=session_key)
-    response = resolve_d2_envelope_response(envelope, sources, as_of=now.date(), d2_plan_focus_seed=focus)
+    response = resolve_d2_envelope_response(
+        envelope,
+        sources,
+        as_of=now.date(),
+        d2_plan_focus_seed=focus,
+        common_route_direct_service_only=True,
+    )
     price = response.resolved.d2_price_block
     decision = response.resolved.d2_price_scope_decision
-    if price is None or decision is None or not response.rendered_text.strip():
+    if price is None or (part.service_id is None and decision is None) or not response.rendered_text.strip():
         raise ValueError("d2_experiment_price_not_resolved")
+    if part.service_id is not None:
+        offers = {
+            offer.offer_id: offer
+            for offer in sources.material_authority.bundle.offers
+        }
+        if any(offers[row.offer_id].fact_refs for row in price.rows):
+            raise ValueError("d2_experiment_service_price_marketing_unsupported")
     turn = snapshot.current_turn_index
     situation = None
     # Persist only finalized facts. A typed carry is retained only when the
     # materialized price answer consumed its extent.
-    if decision.applied_extent is not None:
+    if decision is not None and decision.applied_extent is not None:
         current = part.situation
         carried = focus.carried_situation
         if (

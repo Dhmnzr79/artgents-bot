@@ -290,6 +290,7 @@ def resolve_d2_envelope_response(
     *,
     as_of: date,
     d2_plan_focus_seed: D2PlanFocusSeed | None = None,
+    common_route_direct_service_only: bool = False,
 ) -> MaterializedResponseOutcome:
     """Resolve the D2 lower plan from an already validated D1R envelope.
 
@@ -381,6 +382,10 @@ def resolve_d2_envelope_response(
                 applied_extent=applied_extent,
                 ordered_offer_ids=next((item.ordered_offer_ids for item in sources.d2_directions
                                         if price_part.service_id is None and item.topic_id == selected_topic_id), ()),
+                direct_service_only=(
+                    common_route_direct_service_only
+                    and price_part.service_id is not None
+                ),
             )
         except MaterializationContractError as error:
             price_failure_reason = str(error)
@@ -851,9 +856,34 @@ def _d2_price_block(
     published_terms: dict[str, D2PublishedOfferTerms],
     applied_extent: str | None = None,
     ordered_offer_ids: tuple[str, ...] = (),
+    direct_service_only: bool = False,
 ) -> tuple[D2FrozenPriceBlock, MaterializationTrace]:
     offers: list[TargetOffer] = []
-    if ordered_offer_ids:
+    if direct_service_only:
+        # A direct D2 service-price request has no authored direction ordering.
+        # Keep this narrow: it is materializable only when the tenant publishes
+        # one active offer for that service, so no legacy strategy selector is
+        # needed to choose or rank alternatives.
+        if len(service_ids) != 1:
+            raise MaterializationContractError("d2_direct_service_scope_invalid")
+        service = bundle.services.get(service_ids[0])
+        if service is None or not service.active:
+            raise MaterializationOwnershipError("materialization_foreign_material")
+        options_by_id = {option.option_id: option for option in service.options}
+        offers = [
+            offer
+            for offer in bundle.offers
+            if offer.service_id == service_ids[0]
+            and offer.active
+            and (
+                offer.option_id is None
+                or (offer.option_id in options_by_id and options_by_id[offer.option_id].active)
+            )
+            and (applied_extent is None or _d2_offer_applies(offer, service, applied_extent))
+        ]
+        if len(offers) != 1:
+            raise MaterializationContractError("d2_direct_service_offer_selection_unsupported")
+    elif ordered_offer_ids:
         # Authored D2 direction order bypasses legacy strategy/semantic selectors.
         by_id = {offer.offer_id: offer for offer in bundle.offers}
         for offer_id in ordered_offer_ids:
@@ -868,7 +898,7 @@ def _d2_price_block(
             if applied_extent is None or _d2_offer_applies(offer, service, applied_extent):
                 offers.append(offer)
         offers = offers[:3]
-    for service_id in (() if ordered_offer_ids else service_ids):
+    for service_id in (() if ordered_offer_ids or direct_service_only else service_ids):
         if service_id not in bundle.services:
             raise MaterializationOwnershipError("materialization_foreign_material")
         context = build_service_data_context(bundle, TargetDoctorCatalog(doctors={}), service_id)

@@ -8,7 +8,13 @@ from pathlib import Path
 
 import yaml
 
-from contracts.d2_tenant_snapshot import D2DirectionPriceConfig, D2DirectionPricePack, D2ModelView, D2TenantSnapshot
+from contracts.d2_tenant_snapshot import (
+    D2CommercialPack,
+    D2DirectionPriceConfig,
+    D2DirectionPricePack,
+    D2ModelView,
+    D2TenantSnapshot,
+)
 from contracts.response_schema import ResponseSchemaBundle
 from contracts.response_plan_materialization import D2AuthoredContentAuthority, D2AuthoredContentSection
 from core.d2_published_offer_terms import build_d2_published_offer_terms
@@ -133,6 +139,7 @@ def load_d2_tenant_snapshot(client_id: str, *, clients_root: Path) -> D2TenantSn
     except (UnicodeDecodeError, ResponseSchemaLoadError) as exc:
         raise D2TenantSnapshotError(f"schema_load_failed:{exc}") from exc
     _direction_prices(first, bundle)
+    _commercial_contract(first, bundle, client_id)
     parsed_content: list[tuple[str, dict[str, object], str, tuple[D2AuthoredContentSection, ...]]] = []
     diagnostics: list[str] = []
     for path, data in first:
@@ -191,6 +198,7 @@ def build_d2_model_view(snapshot: D2TenantSnapshot) -> D2ModelView:
         content=snapshot.content,
         published_terms=tuple(build_d2_published_offer_terms(offer=offer, source_client_id=snapshot.client_id) for offer in bundle.offers),
         direction_prices=_direction_prices(snapshot.files, bundle),
+        commercial=_commercial_contract(snapshot.files, bundle, snapshot.client_id),
     )
 
 
@@ -222,3 +230,88 @@ def _direction_prices(
         if {offers[ref].service_id for ref in direction.offer_ids} != set(direction.service_ids):
             raise D2TenantSnapshotError("direction_price_service_without_offer")
     return pack.directions
+
+
+_COMMERCIAL_CODES = (
+    "commercial_blank",
+    "commercial_package_not_single",
+    "commercial_promo_ref_cap",
+    "commercial_promo_ref_duplicate",
+    "commercial_promo_fact_duplicate",
+    "commercial_package_duplicate",
+    "commercial_profile_duplicate",
+    "commercial_incompatibility_duplicate",
+    "commercial_incompatibility_too_small",
+    "commercial_incompatibility_duplicate_ref",
+)
+
+
+def _commercial_error_code(exc: Exception) -> str:
+    text = str(exc)
+    for code in _COMMERCIAL_CODES:
+        if code in text:
+            return code
+    return "commercial_config_invalid"
+
+
+def _commercial_texts(*values: str) -> tuple[str, ...]:
+    return tuple(" ".join(value.split()) for value in values)
+
+
+def _commercial_contract(
+    files: tuple[tuple[str, bytes], ...], bundle: ResponseSchemaBundle, client_id: str,
+) -> D2CommercialPack:
+    raw = dict(files).get("target_response/d2_commercial.json")
+    if raw is None:
+        return D2CommercialPack(version=1)
+    try:
+        pack = D2CommercialPack.model_validate_json(raw)
+    except ValueError as exc:
+        raise D2TenantSnapshotError(_commercial_error_code(exc)) from exc
+    if pack.client_id is not None and pack.client_id != client_id:
+        raise D2TenantSnapshotError("commercial_tenant_mismatch")
+    promos = {item.fact_id: item for item in pack.promo_facts}
+    for promo in pack.promo_facts:
+        fact = bundle.facts.get(promo.fact_id)
+        if fact is None or not fact.active:
+            raise D2TenantSnapshotError("commercial_fact_unavailable")
+        if fact.kind != "promo":
+            raise D2TenantSnapshotError("commercial_promo_kind_invalid")
+        if fact.microfact_text is None:
+            raise D2TenantSnapshotError("commercial_promo_short_missing")
+        if promo.short_text != fact.microfact_text or promo.full_text != fact.text_fact:
+            raise D2TenantSnapshotError("commercial_promo_forms_conflict")
+    boosters = {item.package_id: item for item in pack.price_booster_packages}
+    also_lists = {item.package_id: item for item in pack.also_list_packages}
+    for profile in pack.service_profiles:
+        service = bundle.services.get(profile.service_id)
+        if service is None or not service.active:
+            raise D2TenantSnapshotError("commercial_service_unavailable")
+        owned: list[str] = []
+        for fact_id in profile.promo_refs:
+            promo = promos.get(fact_id)
+            fact = bundle.facts.get(fact_id)
+            if promo is None:
+                raise D2TenantSnapshotError("commercial_promo_forms_missing")
+            if fact is None or profile.service_id not in fact.allowed_service_ids or profile.service_id in fact.excluded_service_ids:
+                raise D2TenantSnapshotError("commercial_promo_inapplicable")
+            owned.extend(_commercial_texts(promo.short_text, promo.full_text))
+        if profile.price_booster_id is not None:
+            package = boosters.get(profile.price_booster_id)
+            if package is None:
+                raise D2TenantSnapshotError("commercial_package_unavailable")
+            owned.append(_commercial_texts(package.body_text)[0])
+        if profile.also_list_id is not None:
+            package = also_lists.get(profile.also_list_id)
+            if package is None:
+                raise D2TenantSnapshotError("commercial_package_unavailable")
+            owned.append(_commercial_texts(package.body_text)[0])
+        if len(owned) != len(set(owned)):
+            raise D2TenantSnapshotError("commercial_meaning_duplicate")
+    offers = {offer.offer_id for offer in bundle.offers}
+    for group in pack.incompatibility_groups:
+        for ref in group.offer_or_fact_ids:
+            fact = bundle.facts.get(ref)
+            if ref not in offers and (fact is None or not fact.active):
+                raise D2TenantSnapshotError("commercial_incompatibility_ref_unavailable")
+    return pack

@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "promo_facts": [
+    {
+      "fact_id": "implant_same_day_discount",
+      "short_text": "Скидка до 15% при оплате в день обращения.",
+      "full_text": "При оплате в день обращения — скидка до 15% на имплантацию."
+    },
+    {
+      "fact_id": "free_implant_consult",
+      "short_text": "Бесплатная консультация до 31.12.2026.",
+      "full_text": "До 31 декабря 2026 — бесплатная консультация по имплантации и протезированию. На консультации подготовим три варианта плана лечения по стоимости, чтобы вы могли выбрать подходящий под свой бюджет. Врач подскажет, какой протокол или конструкция подойдут именно вам. КТ при необходимости оплачивается отдельно."
+    },
+    {
+      "fact_id": "professional_whitening_discount",
+      "short_text": "Скидка 10% до 30.11.2026.",
+      "full_text": "Сейчас на профессиональное отбеливание действует скидка 10% до 30 ноября 2026 года."
+    }
+  ],
+  "price_booster_packages": [
+    {
+      "package_id": "demo_payment_booster",
+      "name": "Оплата",
+      "body_text": "Удобный способ оплаты можно обсудить на консультации."
+    },
+    {
+      "package_id": "demo_warranty_booster",
+      "name": "Гарантия",
+      "body_text": "Условия гарантии фиксируются в договоре."
+    }
+  ],
+  "also_list_packages": [
+    {
+      "package_id": "demo_also_diagnostics",
+      "name": "Также мы предлагаем",
+      "body_text": "Перед лечением доступна диагностика по показаниям."
+    },
+    {
+      "package_id": "demo_also_followup",
+      "name": "Сопровождение",
+      "body_text": "После лечения клиника сопровождает пациента по утверждённому плану."
+    }
+  ],
+  "service_profiles": [
+    {
+      "service_id": "classic",
+      "promo_refs": ["implant_same_day_discount", "free_implant_consult"],
+      "price_booster_id": "demo_payment_booster",
+      "also_list_id": "demo_also_diagnostics"
+    },
+    {
+      "service_id": "caries",
+      "promo_refs": []
+    },
+    {
+      "service_id": "professional_whitening",
+      "promo_refs": ["professional_whitening_discount"]
+    }
+  ],
+  "incompatibility_groups": [
+    {
+      "group_id": "demo_discount_or_installment",
+      "offer_or_fact_ids": ["implant_same_day_discount", "installment_12"],
+      "explanation_text": "Скидка и рассрочка не суммируются: можно выбрать один вариант."
+    }
+  ]
+}

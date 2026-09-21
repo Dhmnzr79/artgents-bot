@@ -162,9 +162,9 @@ def test_tenants_do_not_share_commercial_packages(tmp_path: Path) -> None:
     shutil.copytree(Path("clients") / "demo", root / "clinic_b")
     payload = _read_commercial(root, "clinic_b")
     payload["price_booster_packages"][0]["package_id"] = "clinic_b_only_booster"
-    next(item for item in payload["service_profiles"] if item["service_id"] == "classic")["price_booster_id"] = (
-        "clinic_b_only_booster"
-    )
+    for profile in payload["service_profiles"]:
+        if profile.get("price_booster_id") == "demo_payment_booster":
+            profile["price_booster_id"] = "clinic_b_only_booster"
     _write_commercial(root, payload, "clinic_b")
 
     view_a = _load(root, "clinic_a")

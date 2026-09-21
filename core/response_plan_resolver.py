@@ -148,6 +148,12 @@ def _collect_owned_candidates(plan: PreComposerPlan) -> list[object]:
     items.extend(plan.d2_part_deferred_blocks)
     items.extend(plan.required_offer_conditions)
     items.extend(plan.commercial_facts)
+    items.extend(plan.d2_commercial_promo_blocks)
+    items.extend(plan.d2_compatibility_blocks)
+    if plan.d2_price_booster_block is not None:
+        items.append(plan.d2_price_booster_block)
+    if plan.d2_also_list_block is not None:
+        items.append(plan.d2_also_list_block)
     if plan.service_value_candidate is not None:
         items.append(plan.service_value_candidate)
     if plan.textual_cta_candidate is not None:
@@ -318,22 +324,28 @@ def _resolve_composer_answer(
         caps,
     )
     diagnostics.extend(service_value_diag)
-    promo_blocks, promo_diag = _resolve_promo_blocks(
-        plan,
-        facts_by_id,
-        requested_ids,
-        reserved_service_value_id,
-        caps.max_promo,
-    )
+    if plan.d2_commercial_owned:
+        promo_blocks = list(plan.d2_commercial_promo_blocks)
+        promo_diag = []
+        amplifier_blocks: list[ResolvedFactBlock] = []
+        amplifier_diag = []
+    else:
+        promo_blocks, promo_diag = _resolve_promo_blocks(
+            plan,
+            facts_by_id,
+            requested_ids,
+            reserved_service_value_id,
+            caps.max_promo,
+        )
+        amplifier_blocks, amplifier_diag = _resolve_amplifier_blocks(
+            plan,
+            facts_by_id,
+            requested_ids,
+            reserved_service_value_id,
+            promo_blocks,
+            caps.max_automatic_amplifiers,
+        )
     diagnostics.extend(promo_diag)
-    amplifier_blocks, amplifier_diag = _resolve_amplifier_blocks(
-        plan,
-        facts_by_id,
-        requested_ids,
-        reserved_service_value_id,
-        promo_blocks,
-        caps.max_automatic_amplifiers,
-    )
     diagnostics.extend(amplifier_diag)
     textual_cta_block = _resolve_textual_cta(plan)
     ui_plan = _resolve_commerce_ui(plan)
@@ -373,6 +385,9 @@ def _resolve_composer_answer(
         service_value_block=service_value_block,
         promo_blocks=tuple(promo_blocks),
         automatic_amplifier_blocks=tuple(amplifier_blocks),
+        d2_price_booster_block=plan.d2_price_booster_block,
+        d2_also_list_block=plan.d2_also_list_block,
+        d2_compatibility_blocks=plan.d2_compatibility_blocks,
         textual_cta_block=textual_cta_block,
         service_options_block=service_options_block,
         authored_service_alternative_block=authored_service_alternative_block,

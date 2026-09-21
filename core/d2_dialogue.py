@@ -159,7 +159,13 @@ def _run_reserved_d2_dialogue_turn(
         or binding.outcome not in {"explicit_new_topic", "clear_continuation"}
     ):
         raise ValueError("d2_experiment_resolved_topic_required")
-    sources = build_d2_snapshot_sources(tenant, model_view=view, envelope=envelope, session_key=session_key)
+    sources = build_d2_snapshot_sources(
+        tenant,
+        model_view=view,
+        envelope=envelope,
+        session_key=session_key,
+        shown_promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
+    )
     response = resolve_d2_envelope_response(
         envelope,
         sources,
@@ -171,13 +177,6 @@ def _run_reserved_d2_dialogue_turn(
     decision = response.resolved.d2_price_scope_decision
     if price is None or (part.service_id is None and decision is None) or not response.rendered_text.strip():
         raise ValueError("d2_experiment_price_not_resolved")
-    if part.service_id is not None:
-        offers = {
-            offer.offer_id: offer
-            for offer in sources.material_authority.bundle.offers
-        }
-        if any(offers[row.offer_id].fact_refs for row in price.rows):
-            raise ValueError("d2_experiment_service_price_marketing_unsupported")
     turn = snapshot.current_turn_index
     situation = None
     # Persist only finalized facts. A typed carry is retained only when the
@@ -225,7 +224,13 @@ def _run_reserved_d2_dialogue_turn(
             session_key=session_key, topic_id=part.topic_id, service_ids=shown_services,
             shown_at_turn=turn, provenance="finalized_plan_price_offers",
         ),
-        accumulated_shown_ids=PersistedShownCommercialIds(price_offer_ids=shown_offers),
+        accumulated_shown_ids=PersistedShownCommercialIds(
+            price_offer_ids=shown_offers,
+            promo_fact_ids=tuple(dict.fromkeys((
+                *context.retained_shown_ids.promo_fact_ids,
+                *response.resolved.session_delta.shown_promo_ids,
+            ))),
+        ),
         terminal_state=context.retained_terminal_state,
     )
     initial_effect = (

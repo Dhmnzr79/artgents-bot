@@ -274,6 +274,44 @@ class OfferConditionEvidence(ResponsePlanModel):
         return self
 
 
+class D2CommercialPromoAuthority(ResponsePlanModel):
+    source_client_id: str
+    fact_id: str
+    short_text: str
+    full_text: str
+
+
+class D2CommercialPackageAuthority(ResponsePlanModel):
+    source_client_id: str
+    package_id: str
+    name: str
+    body_text: str
+
+
+class D2ServiceCommercialProfileAuthority(ResponsePlanModel):
+    source_client_id: str
+    service_id: str
+    promo_refs: tuple[str, ...] = ()
+    price_booster_id: str | None = None
+    also_list_id: str | None = None
+
+
+class D2CompatibilityGroupAuthority(ResponsePlanModel):
+    source_client_id: str
+    group_id: str
+    offer_or_fact_ids: tuple[str, ...]
+    explanation_text: str
+
+
+class D2CommercialAuthority(ResponsePlanModel):
+    source_client_id: str
+    promo_facts: tuple[D2CommercialPromoAuthority, ...] = ()
+    price_booster_packages: tuple[D2CommercialPackageAuthority, ...] = ()
+    also_list_packages: tuple[D2CommercialPackageAuthority, ...] = ()
+    service_profiles: tuple[D2ServiceCommercialProfileAuthority, ...] = ()
+    incompatibility_groups: tuple[D2CompatibilityGroupAuthority, ...] = ()
+
+
 class ResponsePlanMaterializationSources(ResponsePlanModel):
     session_key: SessionKey
     context_strategy: ContextStrategy
@@ -295,6 +333,7 @@ class ResponsePlanMaterializationSources(ResponsePlanModel):
     d2_part_failures: tuple[D2PartFailureAuthority, ...] = ()
     shown_d2_secondary_ref_ids: tuple[str, ...] = ()
     d2_snapshot_fingerprint: str = "fixture"
+    d2_commercial: D2CommercialAuthority | None = None
 
     @model_validator(mode="after")
     def _validate_ownership(self) -> Self:
@@ -370,6 +409,8 @@ class ResponsePlanMaterializationSources(ResponsePlanModel):
             raise ValueError("materialization_d2_shown_secondary_duplicate")
         if any(not value or value != value.strip() for value in self.shown_d2_secondary_ref_ids):
             raise ValueError("materialization_d2_shown_secondary_invalid")
+        if self.d2_commercial is not None and self.d2_commercial.source_client_id != client_id:
+            raise ValueError("materialization_d2_commercial_client_mismatch")
         return self
 
 

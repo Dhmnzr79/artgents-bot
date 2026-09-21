@@ -40,6 +40,7 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
             parts.append(plan.patient_text.strip())
         parts.extend(block.display_text.strip() for block in plan.requested_fact_blocks)
         parts.extend(block.display_text.strip() for block in plan.promo_blocks)
+        parts.extend(_render_d2_commercial_packages(plan))
         parts.extend(_render_amplifier_list(plan))
         parts.extend(_render_textual_cta(plan))
         return _join_parts(parts)
@@ -53,6 +54,7 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
             parts.extend(block.display_text.strip() for block in plan.information_blocks)
         parts.extend(block.display_text.strip() for block in plan.requested_fact_blocks)
         parts.extend(block.display_text.strip() for block in plan.promo_blocks)
+        parts.extend(_render_d2_commercial_packages(plan))
         parts.extend(_render_amplifier_list(plan))
         parts.extend(_render_textual_cta(plan))
         return _join_parts(parts)
@@ -68,6 +70,7 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
     if plan.service_value_block is not None:
         parts.append(plan.service_value_block.display_text.strip())
     parts.extend(block.display_text.strip() for block in plan.promo_blocks)
+    parts.extend(_render_d2_commercial_packages(plan))
     parts.extend(_render_amplifier_list(plan))
     parts.extend(_render_textual_cta(plan))
     return _join_parts(parts)
@@ -124,6 +127,16 @@ def _condition_display_texts(
         elif block.display_text:
             texts.append(block.display_text.strip())
     return texts
+
+
+def _render_d2_commercial_packages(plan: ResolvedResponsePlan) -> list[str]:
+    parts: list[str] = []
+    if plan.d2_price_booster_block is not None:
+        parts.append(plan.d2_price_booster_block.body_text.strip())
+    if plan.d2_also_list_block is not None:
+        parts.append(plan.d2_also_list_block.body_text.strip())
+    parts.extend(block.explanation_text.strip() for block in plan.d2_compatibility_blocks)
+    return parts
 
 
 def _render_amplifier_list(plan: ResolvedResponsePlan) -> list[str]:

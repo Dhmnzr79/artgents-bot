@@ -79,6 +79,7 @@ from contracts.response_schema import (
 from contracts.response_schema_refs import ResponseSchemaExternalIndex
 from core.response_plan_authored_alternative_policy import unambiguous_topic_for_service_ids
 from core.d2_content_realization import D2ContentRealization, realize_d2_content
+from core.d2_commercial_plan import resolve_d2_commercial_plan
 from core.response_plan_condition_evidence import materialization_price_scope_label
 from core.response_plan_fact_projection import (
     fact_active_as_of,
@@ -515,6 +516,14 @@ def resolve_d2_envelope_response(
         else "failed" if unavailable_count == len(request_parts)
         else "degraded"
     )
+    commercial_service_id = price_parts[0].service_id if price_parts else content_parts[0].service_id
+    commercial = resolve_d2_commercial_plan(
+        authority=sources.d2_commercial,
+        service_id=commercial_service_id,
+        include_packages=price_block is not None,
+        shown_promo_fact_ids=sources.shown_promo_fact_ids,
+        offer_ids=tuple(row.offer_id for row in price_block.rows) if price_block is not None else (),
+    )
     plan = PreComposerPlan(
         session_key=sources.session_key,
         context_strategy=sources.context_strategy,
@@ -539,6 +548,11 @@ def resolve_d2_envelope_response(
         ),
         ui_candidates=ui_candidates,
         transport_kind=sources.transport_kind,
+        d2_commercial_owned=True,
+        d2_commercial_promo_blocks=commercial.promo_blocks,
+        d2_price_booster_block=commercial.price_booster_block,
+        d2_also_list_block=commercial.also_list_block,
+        d2_compatibility_blocks=commercial.compatibility_blocks,
     )
     composer_result = ComposerResult(
         route="ANSWER",

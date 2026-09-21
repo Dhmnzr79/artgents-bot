@@ -11,9 +11,14 @@ from contracts.one_call_envelope import OneCallEnvelope
 from contracts.response_plan import SessionKey, UiButtonCandidate, UiQuickReplyCandidate, UiVideoCandidate
 from contracts.response_plan_adapter import ResponsePlanAdapterUiAuthority, ResponsePlanAdapterUiButtonAuthority
 from contracts.response_plan_materialization import (
+    D2CommercialAuthority,
+    D2CommercialPackageAuthority,
+    D2CommercialPromoAuthority,
+    D2CompatibilityGroupAuthority,
     D2DirectionAuthority,
     D2DirectionPricePresentation,
     D2PartFailureAuthority,
+    D2ServiceCommercialProfileAuthority,
     D2SourceUiAuthority,
     ResponsePlanMaterializationSources,
 )
@@ -55,6 +60,7 @@ def build_d2_snapshot_sources(
     session_key: SessionKey,
     transport_kind: str = "blocking",
     shown_secondary_ref_ids: tuple[str, ...] = (),
+    shown_promo_fact_ids: tuple[str, ...] = (),
 ) -> ResponsePlanMaterializationSources:
     """Construct sources only after validating identity and every model-selected ref."""
     if snapshot.client_id != model_view.client_id or snapshot.fingerprint != model_view.fingerprint:
@@ -157,5 +163,46 @@ def build_d2_snapshot_sources(
             D2PartFailureAuthority(source_client_id=snapshot.client_id, message_id="d2-price-scope-unavailable", reason="d2_no_scope_price_candidates", display_text=_PRICE_UNAVAILABLE),
         ),
         shown_d2_secondary_ref_ids=shown_secondary_ref_ids,
+        shown_promo_fact_ids=shown_promo_fact_ids,
         d2_snapshot_fingerprint=snapshot.fingerprint,
+        d2_commercial=_commercial_authority(snapshot.client_id, model_view),
+    )
+
+
+def _commercial_authority(client_id: str, model_view: D2ModelView) -> D2CommercialAuthority:
+    pack = model_view.commercial
+    return D2CommercialAuthority(
+        source_client_id=client_id,
+        promo_facts=tuple(
+            D2CommercialPromoAuthority(
+                source_client_id=client_id, fact_id=item.fact_id, short_text=item.short_text, full_text=item.full_text,
+            )
+            for item in pack.promo_facts
+        ),
+        price_booster_packages=tuple(
+            D2CommercialPackageAuthority(
+                source_client_id=client_id, package_id=item.package_id, name=item.name, body_text=item.body_text,
+            )
+            for item in pack.price_booster_packages
+        ),
+        also_list_packages=tuple(
+            D2CommercialPackageAuthority(
+                source_client_id=client_id, package_id=item.package_id, name=item.name, body_text=item.body_text,
+            )
+            for item in pack.also_list_packages
+        ),
+        service_profiles=tuple(
+            D2ServiceCommercialProfileAuthority(
+                source_client_id=client_id, service_id=item.service_id, promo_refs=item.promo_refs,
+                price_booster_id=item.price_booster_id, also_list_id=item.also_list_id,
+            )
+            for item in pack.service_profiles
+        ),
+        incompatibility_groups=tuple(
+            D2CompatibilityGroupAuthority(
+                source_client_id=client_id, group_id=item.group_id, offer_or_fact_ids=item.offer_or_fact_ids,
+                explanation_text=item.explanation_text,
+            )
+            for item in pack.incompatibility_groups
+        ),
     )

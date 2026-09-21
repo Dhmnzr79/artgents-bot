@@ -903,6 +903,11 @@ class PreComposerPlan(ResponsePlanModel):
     transport_kind: TransportKind = "blocking"
     service_options_block: ServiceOptionsBlock | None = None
     authored_service_alternative_block: AuthoredServiceAlternativeBlock | None = None
+    d2_commercial_owned: bool = False
+    d2_commercial_promo_blocks: tuple[ResolvedFactBlock, ...] = ()
+    d2_price_booster_block: D2CommercialPackageBlock | None = None
+    d2_also_list_block: D2CommercialPackageBlock | None = None
+    d2_compatibility_blocks: tuple[D2CompatibilityBlock, ...] = ()
 
     @model_validator(mode="after")
     def _validate_scope(self) -> Self:
@@ -1064,6 +1069,28 @@ class ResolvedFactBlock(ResponsePlanModel):
     source_client_id: NonBlankStr
 
 
+class D2CommercialPackageBlock(ResponsePlanModel):
+    source_client_id: NonBlankStr
+    package_id: NonBlankStr
+    name: NonBlankStr
+    body_text: NonBlankStr
+
+
+class D2CompatibilityBlock(ResponsePlanModel):
+    source_client_id: NonBlankStr
+    group_id: NonBlankStr
+    member_ids: tuple[NonBlankStr, ...]
+    explanation_text: NonBlankStr
+
+    @model_validator(mode="after")
+    def _validate_members(self) -> Self:
+        if len(self.member_ids) < 2:
+            raise ValueError("d2_compatibility_too_small")
+        if len(set(self.member_ids)) != len(self.member_ids):
+            raise ValueError("d2_compatibility_duplicate_member")
+        return self
+
+
 class ResolvedServiceValueBlock(ResponsePlanModel):
     fact_id: NonBlankStr
     display_text: NonBlankStr
@@ -1132,6 +1159,8 @@ def _assert_no_commerce(plan: ResolvedResponsePlan) -> None:
         raise ValueError("terminal_plan_forbids_service_options")
     if plan.authored_service_alternative_block is not None:
         raise ValueError("terminal_plan_forbids_authored_alternative")
+    if plan.d2_price_booster_block is not None or plan.d2_also_list_block is not None or plan.d2_compatibility_blocks:
+        raise ValueError("terminal_plan_forbids_d2_commercial")
     finalized = plan.finalized_commercial_ids
     if any(
         (
@@ -1372,6 +1401,12 @@ def _validate_resolved_client_ownership(plan: ResolvedResponsePlan) -> None:
         _check(plan.service_options_block)
     if plan.authored_service_alternative_block is not None:
         _check(plan.authored_service_alternative_block)
+    if plan.d2_price_booster_block is not None:
+        _check(plan.d2_price_booster_block)
+    if plan.d2_also_list_block is not None:
+        _check(plan.d2_also_list_block)
+    for block in plan.d2_compatibility_blocks:
+        _check(block)
     ui = plan.ui_plan
     for item in ui.quick_replies:
         _check(item)
@@ -1407,6 +1442,9 @@ class ResolvedResponsePlan(ResponsePlanModel):
     service_value_block: ResolvedServiceValueBlock | None = None
     promo_blocks: tuple[ResolvedFactBlock, ...] = ()
     automatic_amplifier_blocks: tuple[ResolvedFactBlock, ...] = ()
+    d2_price_booster_block: D2CommercialPackageBlock | None = None
+    d2_also_list_block: D2CommercialPackageBlock | None = None
+    d2_compatibility_blocks: tuple[D2CompatibilityBlock, ...] = ()
     textual_cta_block: ResolvedTextualCtaBlock | None = None
     service_options_block: ServiceOptionsBlock | None = None
     authored_service_alternative_block: AuthoredServiceAlternativeBlock | None = None

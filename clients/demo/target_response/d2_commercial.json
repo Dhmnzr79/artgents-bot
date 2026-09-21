@@ -54,7 +54,9 @@
     },
     {
       "service_id": "professional_whitening",
-      "promo_refs": ["professional_whitening_discount"]
+      "promo_refs": ["professional_whitening_discount"],
+      "price_booster_id": "demo_payment_booster",
+      "also_list_id": "demo_also_diagnostics"
     }
   ],
   "incompatibility_groups": [

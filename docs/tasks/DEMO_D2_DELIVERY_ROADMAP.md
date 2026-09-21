@@ -1,8 +1,9 @@
 # D2 — фиксированная дорожная карта до замены legacy runtime
 
-Статус: **действующий план исполнения**. Зафиксировано: 2026-09-20 на
+Статус: **действующий план исполнения**. Зафиксировано: 2026-09-21 на
 ветке `codex/demo-d2-service-volume`; последний подтверждённый code checkpoint
-— CP1 `7a0fa7c`.
+— CP5-B13a `b66dc5c`. Документационный аудит коммерческого слоя выполняется
+поверх этого baseline и не объявляет новые сценарии собранными.
 
 Это единственная действующая roadmap D2. Историческая
 `DEMO_D2_REBUILD_ROADMAP.md` объясняет прежний план, но не задаёт порядок
@@ -40,17 +41,18 @@ lead/privacy, заявки, typed UI ownership и transport защиты. Нел
 
 ## Текущее доказанное состояние
 
-На HEAD `7a0fa7c` собран только внутренний двухходовый A08: raw fake-provider
-ответ проходит production D1R parser, production tenant loader, D2
-resolver/materializer, текст/UI и typed persistent state с close/reopen store.
-Это вызывает `core/d2_dialogue.py::run_d2_dialogue_turn` только его
-offline-тест. CP1 также обновил единственный production D1R prompt до v17:
-он требует typed `service_id`, `topic_id`, `statement_mode` и `situation` для
+На HEAD `b66dc5c` через внутренний `run_d2_dialogue_turn` собраны только:
+двухходовый A08; узкая часть A10a (same-topic price continuation после
+уже записанного typed контекста); узкая часть B13a (одна простая
+опубликованная service price без commercial-пакетов). Вызов идёт из их
+offline-тестов, не из HTTP. CP1 обновил единственный production D1R prompt
+до v17: typed `service_id`, `topic_id`, `statement_mode` и `situation` для
 каждого request; production parser проверен на корректном и malformed raw A08.
 
-Это **не** означает, что D2 подключён к HTTP, виджету или настоящей модели,
-что остальные A01–A12 собраны, или что legacy перестал обслуживать локального
-бота. При противоречии Ledger сильнее устного отчёта.
+Это **не** означает готовность полного A10/B13, что D2 подключён к HTTP,
+виджету или настоящей модели как общему runtime, что остальные A01–A12
+собраны, или что legacy перестал обслуживать локального бота. При
+противоречии Ledger сильнее устного отчёта.
 
 ## Неподменяемый порядок checkpoint
 
@@ -61,7 +63,7 @@ offline-тест. CP1 также обновил единственный product
 | CP2 — approved demo tenant data | Production tenant loader читает утверждённые direction-level данные для A08 | Штатный demo tenant pack/loader и tests; без test-only data binder | Цена/единица/условия берутся из tenant snapshot; tenant isolation проверяема | Настоящая модель, HTTP, widget и остальные сценарии |
 | CP3 — ограниченный live A08 | Та же внутренняя D2 entry получает два последовательных ответа настоящей модели и соблюдает D1R/continuity contract | Prompt, существующая D2 entry, изолированная harness; без HTTP/widget и новых product rules | Только после отдельного разрешения владельца: точные фразы, модель, data version, жёсткий call budget; проверяется структура/refs/continuity | Полная оценка качества, нагрузка, HTTP и готовность всего бота |
 | CP4 — D2 common turn completion | Внутренний общий D2 route завершает обычный ход с одним owner state, result/replay и обязательными lead/privacy effects | D2 turn service, typed state/result store, tenant snapshot, lead/privacy bridge и offline tests; legacy не расширяется | Применимые C04–C06, C09–C10: tenant refs, атомарность, replay, isolation, один effect | HTTP/SSE cutover, widget и непокрытые пользовательские семьи |
-| CP5 — D2 сценарии через общий route | A01–A12 и применимые B01–B17 проходят один внутренний D2 route, не набор helper-тестов | D2 contracts/resolvers/materializer/renderer, штатные tenant data и tests; каждая малая семья — отдельный checkpoint | У каждой семьи есть acceptance ID; второй ход берёт контекст из настоящего предыдущего D2 turn; raw-text semantic selector не добавлен | HTTP/SSE/widget и доказательство недостижимости legacy от реального входа |
+| CP5 — D2 сценарии через общий route | A01–A12 и применимые B01–B17 проходят один внутренний D2 route, не набор helper-тестов | D2 contracts/resolvers/materializer/renderer, штатные tenant data и tests; checkpoint определяется новым механизмом, а не названием услуги или комбинацией блоков | У каждой семьи есть acceptance ID; 2–3 сценария можно собрать вместе только на одном уже очерченном механизме; второй ход берёт контекст из настоящего предыдущего D2 turn; raw-text semantic selector не добавлен | HTTP/SSE/widget и доказательство недостижимости legacy от реального входа |
 | CP6 — D2 HTTP/SSE/widget cutover | Оба endpoint и widget доставляют результат одного D2 turn; legacy normal path недостижим | Ingress orchestration, transport adapters, UI projection и endpoint tests; без fallback и выбора runtime по типу вопроса | Реальные `/ask` и `/ask/stream` endpoint tests, parity, C05/C07/C08/C09; sentinels и dependency checks доказывают отсутствие legacy вызова | Физическое удаление legacy файлов и итоговый regression/live набор |
 | CP7 — удаление legacy | Composer/sales_fast semantic runtime, selectors, старая ordinary memory и их тесты удалены либо отсутствуют как normal-dialogue механизм | Только явно перечисленные legacy files/imports/wiring/tests/docs; не удалять tenant/lead/privacy/transport защиты | C08: dependency check и endpoint sentinels; назначенные offline regressions проходят без legacy imports | Merge/deploy; они не входят в D2 rebuild |
 | CP8 — final evidence | Есть единый evidence-pack: required offline acceptance, ограниченный live набор, Cursor PASS и актуальный Ledger | Только тесты, доказательства и документы уже сделанного D2 | A01–A12, применимые B/C, C01–C10, latency/cost facts и known limits перечислены явно | Production deployment: он не в scope и не совершается автоматически |
@@ -70,6 +72,33 @@ offline-тест. CP1 также обновил единственный product
 legacy fallback, нельзя удалить runtime до того, как его заменяет D2 endpoint
 route. Внутри CP4–CP5 разрешены малые checkpoint, но каждый имеет
 ACCEPTANCE, D2 ROUTE, LEGACY IMPACT и Cursor PASS.
+
+### Фиксированный порядок внутри оставшегося CP5
+
+Аудит [DEMO_D2_SCENARIO_MARKETING_AUDIT.md](DEMO_D2_SCENARIO_MARKETING_AUDIT.md)
+зафиксировал, что продолжать по одной услуге нельзя: acceptance-пример не должен
+становиться production-веткой. Следующий порядок обязателен:
+
+1. **CP5-M1 — commercial data contract:** две authored-формы одного promo fact,
+   один service commercial profile (promo_refs ≤2, необязательный один пакет
+   усилителя, необязательный один пакет «Также») и compatibility groups с
+   готовым текстом. Используется существующий tenant loader/snapshot; второй
+   data contract запрещён. Старые scenario rules не переносятся.
+2. **CP5-M2 — common commercial plan:** один D2-native resolver формирует
+   short promo, необязательный один пакет усилителя, необязательный один пакет
+   «Также» и compatibility blocks до freeze. Legacy marketing selector
+   недостижим из D2 route.
+3. **CP5-M3 — assembled A02/A11/B08:** цена использует короткие additions,
+   прямой запрос об акции — полную форму, несовместимость — authored alternatives.
+   Пакет допустим только если M2 остаётся одним механизмом без разных state/rules;
+   иначе он делится до реализации.
+4. **Остальные CP5-механизмы:** continuation/choice, multi-part, policy,
+   terminal/lead, directory/UI. Дополнительные услуги одного уже доказанного
+   механизма проверяются пакетно как data-driven cases, а не отдельным кодом.
+
+D2-O4 закрыто D2-090: к услуге 0 или 1 пакет усилителя и 0 или 1 пакет
+«Также». Перед CP5-M1 больше не требуется отдельное число усилителей. Старый
+технический cap `4` не переносится.
 
 ## Правила доказательства
 
@@ -117,9 +146,9 @@ commit и push. Финальный отчёт сообщает фактичес�
 
 ## Следующий шаг
 
-CP1 завершён в `7a0fa7c`; его строка Ledger добавлена отдельным поздним
-document-only correction checkpoint и не переопределяет доказательства CP1.
-Следующий разрешённый checkpoint — **CP2**: approved demo tenant data для
-A08 через штатный production tenant loader. Он не начинает CP3–CP8 и не
-делает provider/HTTP/widget вызовов. После его Cursor PASS следующий шаг
-определяется этой таблицей, а не произвольной новой архитектурной задачей.
+CP1–CP4, CP5-A10a и CP5-B13a завершены с доказательствами из Ledger. После
+Cursor PASS документационного аудита следующий разрешённый code checkpoint —
+**CP5-M1: единый commercial data contract**. Он не подключает HTTP/widget,
+не делает provider calls и не объявляет A02/A11/B08 собранными. Следующий шаг
+определяется этой таблицей и Ledger, а не новой услугой или комбинацией
+маркетинговых блоков.

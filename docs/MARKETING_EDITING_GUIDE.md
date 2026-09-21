@@ -1,5 +1,17 @@
 # Как редактировать маркетинг клиента
 
+> **Важно для D2 (2026-09-20).** Ниже описан фактический legacy/Stage 5.1
+> authoring surface, а не будущий D2 contract. `scenario_rules`, несколько
+> перекрывающихся promo/amplifier mappings и попарное `incompatible_with` не
+> должны переноситься в D2. Целевая упрощённая схема — один commercial fact с
+> короткой и полной формами, один профиль услуги с не более чем одним пакетом
+> усилителя и одним пакетом «Также», и compatibility groups с готовым
+> пояснением — зафиксирована в
+> [`DEMO_D2_SCENARIO_MARKETING_AUDIT.md`](tasks/DEMO_D2_SCENARIO_MARKETING_AUDIT.md)
+> и D2-090.
+> До CP5-M1 этот guide продолжает честно описывать текущие файлы; не редактировать
+> demo pack по будущей схеме заранее.
+
 **Статус:** current demo target_response config + authoring guide; Stage 5.1 runtime **принят** (`a268878`); Stage 5.1B availability/alternatives **принят** (`51621af`).
 
 Короткая памятка для demo-клиента и будущих паков. Канон demo target policy на дату:

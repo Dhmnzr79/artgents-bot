@@ -763,7 +763,11 @@ class D2ResolvedRequestPart(ResponsePlanModel):
             raise ValueError("d2_section_refs_require_content_ref")
         if len(self.content_section_refs) != len(set(self.content_section_refs)):
             raise ValueError("d2_section_refs_duplicate")
-        if self.kind == "content" and self.content_ref is None:
+        if (
+            self.kind == "content"
+            and self.content_ref is None
+            and self.content_publication is not None
+        ):
             raise ValueError("d2_content_part_content_ref_required")
         if self.status == "answered" and self.failure_reason is not None:
             raise ValueError("d2_answered_part_failure_reason_forbidden")
@@ -779,7 +783,10 @@ class D2ResolvedRequestPart(ResponsePlanModel):
         }:
             raise ValueError("d2_price_part_failure_reason_invalid")
         if self.kind == "content":
-            if self.status == "answered" and self.content_publication not in {"authored", "model_prose"}:
+            if self.status == "answered" and self.content_ref is None:
+                if self.content_publication is not None:
+                    raise ValueError("d2_content_part_publication_required")
+            elif self.status == "answered" and self.content_publication not in {"authored", "model_prose"}:
                 raise ValueError("d2_content_part_publication_required")
             if self.status == "recovered" and (
                 self.content_publication != "fallback"
@@ -981,6 +988,7 @@ class ComposerResult(ResponsePlanModel):
     d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()
     d2_part_deferred_blocks: tuple[D2PartDeferredBlock, ...] = ()
     visible_price_block: bool = False
+    code_owned_answer: bool = False
 
     @model_validator(mode="after")
     def _validate_pair_and_invariants(self) -> Self:
@@ -994,6 +1002,7 @@ class ComposerResult(ResponsePlanModel):
                 and not self.d2_part_failure_blocks
                 and not self.d2_part_deferred_blocks
                 and not self.visible_price_block
+                and not self.code_owned_answer
             ):
                 raise ValueError("answer_requires_patient_text")
         elif pair == ("ANSWER", "contacts"):
@@ -1310,7 +1319,9 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
     content_by_request = {block.request_id: block for block in plan.information_blocks}
     published_content_parts = [
         part for part in parts
-        if part.kind == "content" and part.status in {"answered", "recovered"}
+        if part.kind == "content"
+        and part.status in {"answered", "recovered"}
+        and part.content_ref is not None
     ]
     if len(published_content_parts) != len(content_by_request):
         raise ValueError("d2_request_part_content_linkage_invalid")
@@ -1470,6 +1481,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
                 and not self.is_price_answer
                 and not self.d2_part_failure_blocks
                 and not self.d2_part_deferred_blocks
+                and not self.promo_blocks
             ):
                 raise ValueError("answer_requires_patient_text")
             if self.terminal_text is not None:

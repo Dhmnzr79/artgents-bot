@@ -34,7 +34,9 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
             elif part.kind == "price":
                 _render_d2_price_parts(plan, parts)
             else:
-                parts.append(content_by_request[part.request_id].display_text.strip())
+                block = content_by_request.get(part.request_id)
+                if block is not None:
+                    parts.append(block.display_text.strip())
         parts.extend(_condition_display_texts(plan.required_offer_conditions))
         if plan.patient_text:
             parts.append(plan.patient_text.strip())

@@ -146,19 +146,28 @@ def _run_reserved_d2_dialogue_turn(
     if envelope.route != "ANSWER" or understanding is None or len(understanding.requests) != 1:
         raise ValueError("d2_experiment_single_price_required")
     part = understanding.requests[0]
-    subject = next((item for item in understanding.subjects if item.subject_id == part.subject_id), None)
-    shape_failures = _d2_supported_price_shape_failure_codes(part=part, subject=subject)
-    if shape_failures:
-        raise ValueError("d2_experiment_a08_shape_required:" + ",".join(shape_failures))
+    direct_promotion = (
+        envelope.commercial_intent == "promotion"
+        and envelope.promotion_scope in {"general", "service", "shown"}
+        and part.kind == "content"
+    )
+    if not direct_promotion:
+        subject = next((item for item in understanding.subjects if item.subject_id == part.subject_id), None)
+        shape_failures = _d2_supported_price_shape_failure_codes(part=part, subject=subject)
+        if shape_failures:
+            raise ValueError("d2_experiment_a08_shape_required:" + ",".join(shape_failures))
+    elif envelope.promotion_scope == "service" and part.service_id is None:
+        raise ValueError("d2_experiment_promotion_service_required")
     if context.retained_terminal_state != "none":
         raise ValueError("d2_experiment_terminal_session_unsupported")
     binding = bind_d1r_envelope_to_d2_context(envelope, context)
     focus = seed_d2_plan_focus(binding)
-    if (
-        focus.action != "resolve_topic"
-        or binding.outcome not in {"explicit_new_topic", "clear_continuation"}
-    ):
-        raise ValueError("d2_experiment_resolved_topic_required")
+    if not (direct_promotion and envelope.promotion_scope == "general"):
+        if (
+            focus.action != "resolve_topic"
+            or binding.outcome not in {"explicit_new_topic", "clear_continuation"}
+        ):
+            raise ValueError("d2_experiment_resolved_topic_required")
     sources = build_d2_snapshot_sources(
         tenant,
         model_view=view,
@@ -175,7 +184,10 @@ def _run_reserved_d2_dialogue_turn(
     )
     price = response.resolved.d2_price_block
     decision = response.resolved.d2_price_scope_decision
-    if price is None or (part.service_id is None and decision is None) or not response.rendered_text.strip():
+    if direct_promotion:
+        if not response.rendered_text.strip() or not response.resolved.promo_blocks:
+            raise ValueError("d2_experiment_promotion_not_resolved")
+    elif price is None or (part.service_id is None and decision is None) or not response.rendered_text.strip():
         raise ValueError("d2_experiment_price_not_resolved")
     turn = snapshot.current_turn_index
     situation = None
@@ -212,18 +224,26 @@ def _run_reserved_d2_dialogue_turn(
                 jaw=source.jaw, stage=source.stage, modifiers=source.modifiers, set_at_turn=turn,
                 situation_owner_id=source.situation_owner_id, tooth_count=source.tooth_count,
             )
-    shown_services = tuple(dict.fromkeys(row.service_id for row in price.rows))
-    shown_offers = tuple(dict.fromkeys((*context.retained_shown_ids.price_offer_ids,
-                                      *(row.offer_id for row in price.rows))))
+    shown_services = tuple(dict.fromkeys(row.service_id for row in price.rows)) if price is not None else ()
+    extra_offers = tuple(row.offer_id for row in price.rows) if price is not None else ()
+    shown_offers = tuple(dict.fromkeys((*context.retained_shown_ids.price_offer_ids, *extra_offers)))
+    active_topic = (
+        PersistedActiveTopic(topic_id=part.topic_id, provenance="explicit_topic", set_at_turn=turn)
+        if part.topic_id is not None
+        else snapshot.state.active_topic
+    )
+    shown_options_snapshot = snapshot.state.shown_options_snapshot
+    if price is not None and part.topic_id is not None:
+        shown_options_snapshot = PersistedShownOptionsSnapshot(
+            session_key=session_key, topic_id=part.topic_id, service_ids=shown_services,
+            shown_at_turn=turn, provenance="finalized_plan_price_offers",
+        )
     state = ResponsePlanSessionState(
         schema_version=SESSION_SCHEMA_VERSION, session_key=session_key,
         revision=snapshot.state.revision + 1, last_committed_turn_index=turn,
-        active_topic=PersistedActiveTopic(topic_id=part.topic_id, provenance="explicit_topic", set_at_turn=turn),
+        active_topic=active_topic,
         situation_state=situation,
-        shown_options_snapshot=PersistedShownOptionsSnapshot(
-            session_key=session_key, topic_id=part.topic_id, service_ids=shown_services,
-            shown_at_turn=turn, provenance="finalized_plan_price_offers",
-        ),
+        shown_options_snapshot=shown_options_snapshot,
         accumulated_shown_ids=PersistedShownCommercialIds(
             price_offer_ids=shown_offers,
             promo_fact_ids=tuple(dict.fromkeys((

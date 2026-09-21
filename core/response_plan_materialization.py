@@ -299,7 +299,6 @@ def resolve_d2_envelope_response(
     payload. It is isolated until S3 wires it to HTTP/SSE.
     """
 
-    del as_of
     if envelope.route != "ANSWER":
         raise MaterializationContractError("d2_envelope_route_unsupported")
     understanding = envelope.request_understanding
@@ -308,6 +307,7 @@ def resolve_d2_envelope_response(
 
     price_parts = tuple(item for item in understanding.requests if item.kind == "price")
     content_parts = tuple(item for item in understanding.requests if item.kind == "content")
+    direct_promotion = envelope.commercial_intent == "promotion"
     unsupported = tuple(
         item.request_id
         for item in understanding.requests
@@ -317,6 +317,8 @@ def resolve_d2_envelope_response(
         raise MaterializationContractError("d2_request_kind_unsupported")
     if not price_parts and not content_parts:
         raise MaterializationContractError("d2_price_or_content_part_required")
+    if direct_promotion and envelope.promotion_scope not in {"general", "service", "shown"}:
+        raise MaterializationContractError("d2_promotion_scope_invalid")
 
     client_id = sources.material_authority.source_client_id
     if client_id != sources.session_key.client_id:
@@ -332,9 +334,15 @@ def resolve_d2_envelope_response(
         content_parts=content_parts,
         client_id=client_id,
         sources=sources,
+        allow_missing_content_ref=direct_promotion,
     )
     content_part_scopes = tuple(
-        _d2_content_scope(part, client_id=client_id, sources=sources)
+        _d2_content_scope(
+            part,
+            client_id=client_id,
+            sources=sources,
+            allow_missing_content_ref=direct_promotion,
+        )
         for part in content_parts
     )
 
@@ -422,7 +430,10 @@ def resolve_d2_envelope_response(
             )
     else:
         service_ids, response_scope, selected_topic_id = _d2_content_scope(
-            content_parts[0], client_id=client_id, sources=sources
+            content_parts[0],
+            client_id=client_id,
+            sources=sources,
+            allow_missing_content_ref=direct_promotion,
         )
         trace = MaterializationTrace(
             price_lookup_mode=None,
@@ -495,7 +506,11 @@ def resolve_d2_envelope_response(
     source_ui, source_ui_diagnostics = _d2_source_ui(
         primary_content_part=(
             content_parts[0]
-            if content_parts and content_realizations[content_parts[0].request_id].outcome != "unavailable"
+            if (
+                content_parts
+                and content_parts[0].content_ref is not None
+                and content_realizations[content_parts[0].request_id].outcome != "unavailable"
+            )
             else None
         ),
         sources=sources,
@@ -503,7 +518,7 @@ def resolve_d2_envelope_response(
     ui_candidates = _d2_select_ui(
         source_ui=source_ui,
         sources=sources,
-        suppress_secondary=bool(price_parts),
+        suppress_secondary=bool(price_parts) or direct_promotion,
     )
     if volume_choices:
         ui_candidates = ui_candidates.model_copy(
@@ -516,13 +531,29 @@ def resolve_d2_envelope_response(
         else "failed" if unavailable_count == len(request_parts)
         else "degraded"
     )
-    commercial_service_id = price_parts[0].service_id if price_parts else content_parts[0].service_id
+    if price_parts:
+        commercial_service_id = price_parts[0].service_id
+    elif direct_promotion and envelope.promotion_scope == "general":
+        commercial_service_id = None
+    else:
+        commercial_service_id = content_parts[0].service_id
+    offer_ids = tuple(row.offer_id for row in price_block.rows) if price_block is not None else ()
+    active_promo_ids = frozenset(
+        fact.id
+        for fact in sources.material_authority.bundle.facts.values()
+        if fact_active_as_of(fact, as_of)
+    )
     commercial = resolve_d2_commercial_plan(
         authority=sources.d2_commercial,
         service_id=commercial_service_id,
-        include_packages=price_block is not None,
+        include_packages=price_block is not None and not direct_promotion,
         shown_promo_fact_ids=sources.shown_promo_fact_ids,
-        offer_ids=tuple(row.offer_id for row in price_block.rows) if price_block is not None else (),
+        offer_ids=offer_ids,
+        promo_form="full" if direct_promotion else "short",
+        promotion_scope=envelope.promotion_scope if direct_promotion else "service",
+        skip_shown=not direct_promotion,
+        max_promo=4 if direct_promotion else 2,
+        active_promo_ids=active_promo_ids,
     )
     plan = PreComposerPlan(
         session_key=sources.session_key,
@@ -554,6 +585,8 @@ def resolve_d2_envelope_response(
         d2_also_list_block=commercial.also_list_block,
         d2_compatibility_blocks=commercial.compatibility_blocks,
     )
+    if direct_promotion and not commercial.promo_blocks:
+        raise MaterializationContractError("d2_promotion_no_eligible_facts")
     composer_result = ComposerResult(
         route="ANSWER",
         mode="standard",
@@ -562,6 +595,7 @@ def resolve_d2_envelope_response(
         d2_part_failure_blocks=frozen_failure_blocks,
         d2_part_deferred_blocks=frozen_deferred_blocks,
         visible_price_block=price_block is not None,
+        code_owned_answer=direct_promotion and bool(commercial.promo_blocks),
     )
     resolved = resolve_response_plan(plan, composer_result)
     finalized_trace = replace(trace, finalized_offers=_build_finalized_offer_trace(resolved))
@@ -806,9 +840,25 @@ def _d2_content_scope(
     *,
     client_id: str,
     sources: ResponsePlanMaterializationSources,
+    allow_missing_content_ref: bool = False,
 ) -> tuple[tuple[str, ...], str, str | None]:
     if part.content_ref is None:
-        raise MaterializationContractError("d2_content_ref_required")
+        if not allow_missing_content_ref:
+            raise MaterializationContractError("d2_content_ref_required")
+        if part.service_id is not None:
+            if part.service_id not in sources.material_authority.bundle.services:
+                raise MaterializationOwnershipError("materialization_foreign_material")
+            if part.topic_id is not None:
+                direction = next((item for item in sources.d2_directions if item.topic_id == part.topic_id and item.source_client_id == client_id), None)
+                if direction is not None and part.service_id not in direction.service_ids:
+                    raise MaterializationContractError("d2_content_topic_mismatch")
+            return (part.service_id,), "service", part.topic_id
+        if part.topic_id is not None:
+            for direction in sources.d2_directions:
+                if direction.topic_id == part.topic_id and direction.source_client_id == client_id:
+                    return direction.service_ids, "topic", part.topic_id
+            return (), "topic", part.topic_id
+        return (), "clinic", None
     authority = next(
         (item for item in sources.d2_authored_content if item.content_ref == part.content_ref),
         None,
@@ -1103,16 +1153,28 @@ def _d2_information_blocks(
     content_parts: tuple[RequestUnderstandingRequest, ...],
     client_id: str,
     sources: ResponsePlanMaterializationSources,
+    allow_missing_content_ref: bool = False,
 ) -> tuple[tuple[InformationSourceBlock, ...], dict[str, D2ContentRealization]]:
     by_ref = {item.content_ref: item for item in sources.d2_authored_content}
     blocks: list[InformationSourceBlock] = []
     realizations: dict[str, D2ContentRealization] = {}
     for part in content_parts:
-        part_service_ids, _, part_topic_id = _d2_content_scope(
-            part, client_id=client_id, sources=sources
-        )
         if part.content_ref is None:
-            raise MaterializationContractError("d2_content_ref_required")
+            if not allow_missing_content_ref:
+                raise MaterializationContractError("d2_content_ref_required")
+            realizations[part.request_id] = D2ContentRealization(
+                outcome="answered",
+                publication=None,
+                display_text=None,
+                section_refs=(),
+            )
+            continue
+        part_service_ids, _, part_topic_id = _d2_content_scope(
+            part,
+            client_id=client_id,
+            sources=sources,
+            allow_missing_content_ref=allow_missing_content_ref,
+        )
         authority = by_ref.get(part.content_ref)
         if authority is None:
             raise MaterializationOwnershipError("materialization_foreign_material")

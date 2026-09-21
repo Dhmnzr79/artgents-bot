@@ -39,6 +39,11 @@
       "package_id": "demo_also_followup",
       "name": "Сопровождение",
       "body_text": "После лечения клиника сопровождает пациента по утверждённому плану."
+    },
+    {
+      "package_id": "demo_also_warranty",
+      "name": "Гарантия",
+      "body_text": "Гарантия на работу врача и импланты фиксируется в договоре."
     }
   ],
   "service_profiles": [
@@ -57,12 +62,22 @@
       "promo_refs": ["professional_whitening_discount"],
       "price_booster_id": "demo_payment_booster",
       "also_list_id": "demo_also_diagnostics"
+    },
+    {
+      "service_id": "veneers",
+      "promo_refs": []
+    },
+    {
+      "service_id": "pterygoid_implants",
+      "promo_refs": ["implant_same_day_discount"],
+      "price_booster_id": "demo_payment_booster",
+      "also_list_id": "demo_also_warranty"
     }
   ],
   "incompatibility_groups": [
     {
       "group_id": "demo_discount_or_installment",
-      "offer_or_fact_ids": ["implant_same_day_discount", "installment_12"],
+      "offer_or_fact_ids": ["implant_same_day_discount", "pterygoid_implants.default"],
       "explanation_text": "Скидка и рассрочка не суммируются: можно выбрать один вариант."
     }
   ]

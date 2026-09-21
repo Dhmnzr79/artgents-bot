@@ -78,7 +78,9 @@ def test_demo_pack_loads_commercial_contract_through_snapshot(tmp_path: Path) ->
     assert caries.also_list_id is None
     assert discount.short_text != discount.full_text
     assert len(commercial.price_booster_packages) == 2
-    assert len(commercial.also_list_packages) == 2
+    assert len(commercial.also_list_packages) == 3
+    assert any(item.service_id == "veneers" and item.promo_refs == () for item in commercial.service_profiles)
+    assert any(item.service_id == "pterygoid_implants" for item in commercial.service_profiles)
     assert commercial.incompatibility_groups[0].explanation_text
     assert not hasattr(commercial.price_booster_packages[0], "fact_refs")
 

@@ -186,6 +186,12 @@ def observed_common_route():
             "core.response_strategy",
         )), f"legacy runtime/selector called: {module}"
         assert module != "core.target_marketing_selector", "legacy marketing selector called"
+        # CP5-LEAD: bound-client probe may touch session; no ordinary mem mutations.
+        if module == "session":
+            assert frame.f_code.co_name == "current_session_client_id", (
+                f"unexpected session use on availability route: {frame.f_code.co_name}"
+            )
+            return
         assert module != "session", "second ordinary memory called"
         assert frame.f_code.co_name != "match_clinic_policy_key", "policy triggers used"
 

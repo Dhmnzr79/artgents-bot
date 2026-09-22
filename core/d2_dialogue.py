@@ -24,7 +24,7 @@ from core.d2_dialogue_store import D2DialogueStore
 from core.d2_session_context import (
     bind_d1r_envelope_to_d2_context, project_d2_session_context, seed_d2_plan_focus,
 )
-from core.d2_snapshot_sources import build_d2_snapshot_sources
+from core.d2_snapshot_sources import build_d2_focus_clarify_response, build_d2_snapshot_sources
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
 from core.one_call_envelope_protocol import parse_production_envelope_json
 from core.response_plan_materialization import resolve_d2_envelope_response
@@ -54,16 +54,20 @@ def _d2_supported_price_shape_failure_codes(*, part: object, subject: object) ->
     failures: list[str] = []
     if part.kind != "price":
         failures.append("request_kind_not_price")
+    # Empty/ambiguous «Сколько стоит?» (A10 / D2-077): no topic and no service → clarify.
+    if part.service_id is None and part.topic_id is None:
+        if subject is not None and subject.age_group == "child":
+            failures.append("subject_age_group_child")
+        return tuple(failures)
     if part.topic_id is None:
         failures.append("request_topic_id_missing")
     if part.service_id is None:
         if subject is None:
             failures.append("subject_missing")
         else:
-            if subject.relation != "self":
-                failures.append("subject_relation_not_self")
             if subject.age_group == "child":
                 failures.append("subject_age_group_child")
+            # B11: relation=other is allowed; carry is blocked in session binding.
         # situation=None is the direction overview turn (volume choices).
         if part.situation is not None and part.situation.scope_commitment not in {
             "reported",
@@ -188,35 +192,53 @@ def _run_reserved_d2_dialogue_turn(
             raise ValueError("d2_experiment_a08_shape_required:" + ",".join(shape_failures))
     elif direct_promotion and envelope.promotion_scope == "service" and part.service_id is None:
         raise ValueError("d2_experiment_promotion_service_required")
-    if context.retained_terminal_state != "none":
+    # Clarify is soft (A10); hard terminals remain unsupported on this route.
+    if context.retained_terminal_state not in {"none", "clarify"}:
         raise ValueError("d2_experiment_terminal_session_unsupported")
     binding = bind_d1r_envelope_to_d2_context(envelope, context)
     focus = seed_d2_plan_focus(binding)
+    price_focus_clarify = (
+        focus.action == "clarify_focus"
+        and part.kind == "price"
+        and part.service_id is None
+        and part.topic_id is None
+        and binding.outcome == "ambiguous_focus"
+    )
     if not (direct_promotion and envelope.promotion_scope == "general"):
-        if (
+        if price_focus_clarify:
+            pass
+        elif (
             focus.action != "resolve_topic"
             or binding.outcome not in {"explicit_new_topic", "clear_continuation"}
         ):
             raise ValueError("d2_experiment_resolved_topic_required")
-    sources = build_d2_snapshot_sources(
-        tenant,
-        model_view=view,
-        envelope=envelope,
-        session_key=session_key,
-        shown_promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
-        shown_secondary_ref_ids=context.retained_shown_ids.secondary_ref_ids,
-    )
-    response = resolve_d2_envelope_response(
-        envelope,
-        sources,
-        as_of=now.date(),
-        d2_plan_focus_seed=focus,
-        common_route_direct_service_only=True,
-        common_route_content_lookup=True,
-    )
-    price = response.resolved.d2_price_block
-    decision = response.resolved.d2_price_scope_decision
-    if direct_promotion:
+    if price_focus_clarify:
+        response = build_d2_focus_clarify_response(tenant, session_key=session_key)
+        price = None
+        decision = None
+    else:
+        sources = build_d2_snapshot_sources(
+            tenant,
+            model_view=view,
+            envelope=envelope,
+            session_key=session_key,
+            shown_promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
+            shown_secondary_ref_ids=context.retained_shown_ids.secondary_ref_ids,
+        )
+        response = resolve_d2_envelope_response(
+            envelope,
+            sources,
+            as_of=now.date(),
+            d2_plan_focus_seed=focus,
+            common_route_direct_service_only=True,
+            common_route_content_lookup=True,
+        )
+        price = response.resolved.d2_price_block
+        decision = response.resolved.d2_price_scope_decision
+    if price_focus_clarify:
+        if response.resolved.route != "CLARIFY" or not response.rendered_text.strip():
+            raise ValueError("d2_experiment_focus_clarify_not_resolved")
+    elif direct_promotion:
         if not response.rendered_text.strip() or not response.resolved.promo_blocks:
             raise ValueError("d2_experiment_promotion_not_resolved")
     elif direct_fact:
@@ -233,7 +255,9 @@ def _run_reserved_d2_dialogue_turn(
     # Persist only finalized facts. Hypothetical/overview/unknown must not wipe
     # a previously reported or corrected situation (D2-003).
     situation = snapshot.state.situation_state
-    if decision is not None and decision.applied_extent is not None:
+    if price_focus_clarify:
+        situation = snapshot.state.situation_state
+    elif decision is not None and decision.applied_extent is not None:
         current = part.situation
         carried = focus.carried_situation
         if (
@@ -287,6 +311,15 @@ def _run_reserved_d2_dialogue_turn(
             situation = None
         else:
             situation = snapshot.state.situation_state
+    elif (
+        snapshot.state.situation_state is not None
+        and part.topic_id is not None
+        and snapshot.state.situation_state.topic_id != part.topic_id
+        and focus.cross_topic_carry is None
+        and (decision is None or decision.applied_extent is None)
+    ):
+        # Explicit new topic without carried extent: do not keep prior situation (D2-032).
+        situation = None
     shown_services = tuple(dict.fromkeys(row.service_id for row in price.rows)) if price is not None else ()
     extra_offers = tuple(row.offer_id for row in price.rows) if price is not None else ()
     shown_offers = tuple(dict.fromkeys((*context.retained_shown_ids.price_offer_ids, *extra_offers)))
@@ -326,7 +359,8 @@ def _run_reserved_d2_dialogue_turn(
                 *_shown_secondary_ref_ids(response),
             ))),
         ),
-        terminal_state=context.retained_terminal_state,
+        terminal_state=response.resolved.session_delta.terminal_state,
+        clarify_pending=response.resolved.session_delta.clarify_pending,
     )
     initial_effect = (
         D2LeadEffect(effect_id=lead_effect_id, status="pending")

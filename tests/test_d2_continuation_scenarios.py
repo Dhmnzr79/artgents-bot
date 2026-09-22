@@ -1,4 +1,4 @@
-"""CP5-C2a: direction overview, volume choice, hypothesis/correction, A07, TTL."""
+"""CP5-C2a/C2b: continuation — overview/volume, A07, TTL, A10, B11 person-change."""
 
 from __future__ import annotations
 
@@ -27,6 +27,8 @@ CLASSIC_THREE = (
     "classic.one_tooth.implantium",
     "classic.one_tooth.nobel",
 )
+WHITENING_OFFER = "professional_whitening.default"
+CLARIFY_TEXT = "Могу подсказать по услугам, ценам, врачам или записи. Что вас интересует?"
 
 
 def _situation(
@@ -45,23 +47,33 @@ def _situation(
     }
 
 
-def _raw(topic: str, situation: dict[str, object] | None = None) -> str:
+def _raw(
+    topic: str | None,
+    situation: dict[str, object] | None = None,
+    *,
+    service_id: str | None = None,
+    subject_id: str | None = "s1",
+    relation: str = "self",
+) -> str:
+    subjects: list[dict[str, object]] = []
+    if subject_id is not None:
+        subjects.append(
+            {"subject_id": subject_id, "relation": relation, "age_group": "unknown"}
+        )
     return json.dumps(
         production_envelope_template(
             commercial_intent="price",
             primary_price_request_id="r1",
             request_understanding={
-                "subjects": [
-                    {"subject_id": "s1", "relation": "self", "age_group": "unknown"}
-                ],
+                "subjects": subjects,
                 "requests": [
                     {
                         "request_id": "r1",
                         "kind": "price",
-                        "subject_id": "s1",
+                        "subject_id": subject_id,
                         "context": "general_information",
                         "topic_id": topic,
-                        "service_id": None,
+                        "service_id": service_id,
                         "statement_mode": "question",
                         "situation": situation,
                     }
@@ -90,7 +102,7 @@ def isolated_io(monkeypatch, tmp_path):
     os.environ["BOT_LOG_DIR"] = str(log_dir)
 
     def forbidden(*_args, **_kwargs):
-        raise AssertionError("network forbidden in CP5-C2a")
+        raise AssertionError("network forbidden in CP5-C2 continuation")
 
     monkeypatch.setattr(socket.socket, "connect", forbidden)
     monkeypatch.setattr(socket.socket, "connect_ex", forbidden)
@@ -319,3 +331,88 @@ def test_ttl_expiry_drops_carried_situation_on_ambiguous_followup(tmp_path: Path
     assert second.response.resolved.d2_price_scope_decision.applied_extent is None
     assert second.response.resolved.d2_price_scope_decision.reason == "overview"
     assert saved.state.situation_state is None
+
+
+def test_a10_empty_session_price_ask_clarifies_without_inventing_price(tmp_path: Path) -> None:
+    key = SessionKey(client_id="demo", sid="c2b-a10-empty")
+    outcome, saved, _, _, _ = _run(
+        tmp_path,
+        _raw(None, subject_id=None),
+        key=key,
+        message="Сколько стоит?",
+    )
+    assert outcome.focus.action == "clarify_focus"
+    assert outcome.response.resolved.route == "CLARIFY"
+    assert outcome.response.resolved.d2_price_block is None
+    assert outcome.response.resolved.session_delta.clarify_pending is True
+    assert saved.state.clarify_pending is True
+    assert saved.state.terminal_state == "clarify"
+    assert saved.state.situation_state is None
+    assert CLARIFY_TEXT in outcome.response.rendered_text
+    assert outcome.response.ui_projection.quick_replies
+
+
+def test_a10_switch_to_whitening_does_not_carry_implant_prices(tmp_path: Path) -> None:
+    key = SessionKey(client_id="demo", sid="c2b-a10-switch")
+    first, saved, _, _, clients = _run(
+        tmp_path,
+        _raw("implantation", _situation()),
+        key=key,
+        message="Нет одного зуба, сколько стоит?",
+    )
+    assert _offer_ids(first) == CLASSIC_THREE
+
+    second, saved, _, _, _ = _run(
+        tmp_path,
+        _raw(
+            "whitening",
+            service_id="professional_whitening",
+            subject_id=None,
+        ),
+        key=key,
+        message="А отбеливание сколько?",
+        now=NOW.replace(minute=1),
+        clients=clients,
+    )
+    assert second.focus.action == "resolve_topic"
+    assert second.focus.carried_situation is None
+    assert second.focus.cross_topic_carry is None
+    assert _offer_ids(second) == (WHITENING_OFFER,)
+    assert all(row.offer_id != CLASSIC_THREE[0] for row in second.response.resolved.d2_price_block.rows)
+    assert second.response.resolved.d2_price_scope_decision is None
+    assert saved.state.situation_state is None
+    assert saved.state.active_topic is not None
+    assert saved.state.active_topic.topic_id == "whitening"
+
+
+def test_b11_other_person_does_not_inherit_prior_situation(tmp_path: Path) -> None:
+    key = SessionKey(client_id="demo", sid="c2b-b11-person")
+    first, saved, _, _, clients = _run(
+        tmp_path,
+        _raw("implantation", _situation()),
+        key=key,
+        message="Нет одного зуба, сколько стоит?",
+    )
+    owner = saved.state.situation_state.situation_owner_id
+    assert _offer_ids(first) == CLASSIC_THREE
+
+    second, saved, _, _, _ = _run(
+        tmp_path,
+        _raw(
+            "implantation",
+            _situation(commitment="reported", extent="one_tooth", tooth_count=1, continuity="same"),
+            subject_id="s2",
+            relation="other",
+        ),
+        key=key,
+        message="А жене тоже один зуб, сколько?",
+        now=NOW.replace(minute=1),
+        clients=clients,
+    )
+    assert second.focus.carried_situation is None
+    assert second.focus.cross_topic_carry is None
+    assert second.response.resolved.d2_price_scope_decision.applied_extent == "one_tooth"
+    assert _offer_ids(second) == CLASSIC_THREE
+    assert saved.state.situation_state is not None
+    assert saved.state.situation_state.extent == "one_tooth"
+    assert saved.state.situation_state.situation_owner_id != owner

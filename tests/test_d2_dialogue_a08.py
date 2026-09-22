@@ -26,12 +26,20 @@ FIRST = "Нет одного зуба, сколько стоит восстан�
 SECOND = "А протезирование?"
 
 
-def raw_price(topic, *, reported=False, continuity="same", subject_id="s1", relation="self"):
+def raw_price(
+    topic,
+    *,
+    reported=False,
+    continuity="same",
+    subject_id="s1",
+    relation="self",
+    age_group="unknown",
+):
     # Synthetic provider JSON, not a parsed envelope or downstream seed.
     return json.dumps(production_envelope_template(
         commercial_intent="price", primary_price_request_id="r1",
         request_understanding={
-            "subjects": [{"subject_id": subject_id, "relation": relation, "age_group": "unknown"}],
+            "subjects": [{"subject_id": subject_id, "relation": relation, "age_group": age_group}],
             "requests": [{
                 "request_id": "r1", "kind": "price", "subject_id": subject_id,
                 "context": "general_information", "topic_id": topic, "service_id": None,
@@ -300,7 +308,7 @@ def test_no_raw_message_semantic_inference(tmp_path):
     assert offer_ids(second) == ("prosthetic_one",)
 
 
-@pytest.mark.parametrize("raw", ["not JSON", {}, raw_price("prosthetics", relation="other")])
+@pytest.mark.parametrize("raw", ["not JSON", {}, raw_price("prosthetics", age_group="child")])
 def test_invalid_provider_or_out_of_scope_input_does_not_commit(tmp_path, raw):
     with D2DialogueStore(tmp_path / "dialogue.sqlite") as store:
         run(store, raw_price("implantation", reported=True, continuity="new"))
@@ -313,8 +321,8 @@ def test_invalid_provider_or_out_of_scope_input_does_not_commit(tmp_path, raw):
 def test_a08_shape_diagnostic_identifies_typed_failure_without_model_payload(tmp_path):
     with D2DialogueStore(tmp_path / "dialogue.sqlite") as store:
         run(store, raw_price("implantation", reported=True, continuity="new"))
-        with pytest.raises(ValueError, match="d2_experiment_a08_shape_required:subject_relation_not_self"):
-            run(store, raw_price("prosthetics", relation="other"), message=SECOND,
+        with pytest.raises(ValueError, match="d2_experiment_a08_shape_required:subject_age_group_child"):
+            run(store, raw_price("prosthetics", age_group="child"), message=SECOND,
                 now=NOW + timedelta(seconds=30))
 
 

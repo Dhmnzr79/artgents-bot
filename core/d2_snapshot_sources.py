@@ -8,7 +8,18 @@ import yaml
 
 from contracts.d2_tenant_snapshot import D2ModelView, D2TenantSnapshot
 from contracts.one_call_envelope import OneCallEnvelope
-from contracts.response_plan import SessionKey, UiButtonCandidate, UiQuickReplyCandidate, UiVideoCandidate
+from contracts.response_plan import (
+    ComposerResult,
+    ComposerSelectedRouteAuthority,
+    PreComposerPlan,
+    PricePlan,
+    RouteModePair,
+    SessionKey,
+    UiButtonCandidate,
+    UiPlanCandidates,
+    UiQuickReplyCandidate,
+    UiVideoCandidate,
+)
 from contracts.response_plan_adapter import ResponsePlanAdapterUiAuthority, ResponsePlanAdapterUiButtonAuthority
 from contracts.response_plan_materialization import (
     D2CommercialAuthority,
@@ -21,10 +32,15 @@ from contracts.response_plan_materialization import (
     D2ServiceCommercialProfileAuthority,
     D2SourceUiAuthority,
     D2VolumeChoice,
+    MaterializationTrace,
+    MaterializedResponseOutcome,
     ResponsePlanMaterializationSources,
 )
+from contracts.response_plan_post_composer import PostComposerMaterialAuthority, ResponseSituationDelta
 from core.d2_tenant_snapshot import build_d2_bundle, build_d2_model_view
-from contracts.response_plan_post_composer import PostComposerMaterialAuthority
+from core.response_plan_resolver import resolve_response_plan
+from core.response_text_renderer import render_response_text
+from core.response_ui_projection import project_response_ui
 
 
 class D2SnapshotBindingError(ValueError):
@@ -32,6 +48,7 @@ class D2SnapshotBindingError(ValueError):
 
 
 _PRICE_UNAVAILABLE = "К сожалению, у меня пока нет информации о стоимости этой услуги"
+_DEFAULT_FOCUS_CLARIFY = "Могу подсказать по услугам, ценам, врачам или записи. Что вас интересует?"
 _VOLUME_EXTENTS = ("one_tooth", "few_teeth", "full_arch", "unknown")
 _DEFAULT_VOLUME_LABELS = {
     "one_tooth": "Один зуб",
@@ -251,4 +268,64 @@ def _commercial_authority(client_id: str, model_view: D2ModelView) -> D2Commerci
             )
             for item in pack.incompatibility_groups
         ),
+    )
+
+
+def build_d2_focus_clarify_response(
+    snapshot: D2TenantSnapshot,
+    *,
+    session_key: SessionKey,
+) -> MaterializedResponseOutcome:
+    """A10/D2-077: short focus clarify from clinic ui.yaml, no invented price."""
+    if snapshot.client_id != session_key.client_id:
+        raise D2SnapshotBindingError("clarify_client_mismatch")
+    ui_yaml = _yaml_file(snapshot, "ui.yaml")
+    clarify = ui_yaml.get("continuation_clarify") if isinstance(ui_yaml.get("continuation_clarify"), dict) else {}
+    answer = clarify.get("answer") if isinstance(clarify, dict) else None
+    text = answer.strip() if isinstance(answer, str) and answer.strip() else _DEFAULT_FOCUS_CLARIFY
+    guided = ui_yaml.get("guided_menu") if isinstance(ui_yaml.get("guided_menu"), dict) else {}
+    quick: list[UiQuickReplyCandidate] = []
+    raw_replies = guided.get("quick_replies") if isinstance(guided, dict) else None
+    if isinstance(raw_replies, list):
+        for item in raw_replies:
+            if not isinstance(item, dict):
+                continue
+            label = item.get("label")
+            ref = item.get("ref")
+            if isinstance(label, str) and label.strip() and isinstance(ref, str) and ref.strip():
+                quick.append(
+                    UiQuickReplyCandidate(
+                        source_client_id=snapshot.client_id,
+                        reply_id=ref.strip(),
+                        label=label.strip(),
+                    )
+                )
+            if len(quick) >= 4:
+                break
+    plan = PreComposerPlan(
+        session_key=session_key,
+        context_strategy="full_context",
+        route_authority=ComposerSelectedRouteAuthority(
+            allowed_route_modes=(RouteModePair(route="CLARIFY", mode="standard"),),
+            terminal_candidates=(),
+        ),
+        response_scope="clinic",
+        selected_service_id=None,
+        active_session_service_id=None,
+        selected_topic_id=None,
+        price_plan=PricePlan(kind="none"),
+        ui_candidates=UiPlanCandidates(quick_replies=tuple(quick)),
+        transport_kind="blocking",
+    )
+    composer = ComposerResult(route="CLARIFY", mode="standard", patient_text=text)
+    resolved = resolve_response_plan(plan, composer)
+    return MaterializedResponseOutcome(
+        resolved=resolved,
+        rendered_text=render_response_text(resolved),
+        ui_projection=project_response_ui(resolved),
+        materialization_diagnostics=(),
+        selection_diagnostics=(),
+        adapter_diagnostics=(),
+        situation_delta=ResponseSituationDelta(action="keep"),
+        trace=MaterializationTrace(None, (), (), ()),
     )

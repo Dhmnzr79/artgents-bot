@@ -92,10 +92,12 @@ def bind_d1r_envelope_to_d2_context(
     this pure binding.
     """
 
-    requests = (
-        envelope.request_understanding.requests
-        if envelope.request_understanding is not None
-        else ()
+    understanding = envelope.request_understanding
+    requests = understanding.requests if understanding is not None else ()
+    subjects_by_id = (
+        {item.subject_id: item for item in understanding.subjects}
+        if understanding is not None
+        else {}
     )
     topic_ids = {request.topic_id for request in requests if request.topic_id is not None}
     if len(topic_ids) > 1:
@@ -112,6 +114,7 @@ def bind_d1r_envelope_to_d2_context(
             projection,
             ordinary=ordinary,
             requests=requests,
+            subjects_by_id=subjects_by_id,
             explicit_topic_id=explicit_topic_id,
         )
 
@@ -194,6 +197,7 @@ def _bind_explicit_topic(
     *,
     ordinary: D2OrdinarySessionContext,
     requests: tuple[RequestUnderstandingRequest, ...],
+    subjects_by_id: dict,
     explicit_topic_id: str,
 ) -> D2EnvelopeSessionBinding:
     stored_topic_ids = {
@@ -217,6 +221,7 @@ def _bind_explicit_topic(
             cross_topic_carry=_cross_topic_carry_candidate(
                 ordinary=ordinary,
                 requests=requests,
+                subjects_by_id=subjects_by_id,
                 destination_topic_id=explicit_topic_id,
             ),
         )
@@ -229,6 +234,7 @@ def _bind_explicit_topic(
         carried_situation=_same_typed_situation(
             requests,
             ordinary=ordinary,
+            subjects_by_id=subjects_by_id,
             resolved_topic_id=explicit_topic_id,
         ),
     )
@@ -261,10 +267,19 @@ def _bind_exact_service(
     )
 
 
+def _subject_is_self(request: RequestUnderstandingRequest, subjects_by_id: dict) -> bool:
+    """B11: only the same person (self) may inherit a prior typed situation."""
+    if request.subject_id is None:
+        return False
+    subject = subjects_by_id.get(request.subject_id)
+    return subject is not None and subject.relation == "self"
+
+
 def _same_typed_situation(
     requests: tuple[RequestUnderstandingRequest, ...],
     *,
     ordinary: D2OrdinarySessionContext,
+    subjects_by_id: dict,
     resolved_topic_id: str,
 ):
     if ordinary.situation_state is None or ordinary.situation_state.topic_id != resolved_topic_id:
@@ -274,6 +289,7 @@ def _same_typed_situation(
             request.topic_id == resolved_topic_id
             and request.situation is not None
             and request.situation.continuity == "same"
+            and _subject_is_self(request, subjects_by_id)
         ):
             return ordinary.situation_state
     return None
@@ -283,6 +299,7 @@ def _cross_topic_carry_candidate(
     *,
     ordinary: D2OrdinarySessionContext,
     requests: tuple[RequestUnderstandingRequest, ...],
+    subjects_by_id: dict,
     destination_topic_id: str,
 ) -> D2CrossTopicSituationCarry | None:
     source = ordinary.situation_state
@@ -302,6 +319,7 @@ def _cross_topic_carry_candidate(
             and request.situation is not None
             and request.situation.continuity == "same"
             and request.situation.scope_commitment != "reset"
+            and _subject_is_self(request, subjects_by_id)
         ):
             return D2CrossTopicSituationCarry(
                 situation_owner_id=source.situation_owner_id,

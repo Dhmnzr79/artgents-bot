@@ -89,7 +89,11 @@ def observed_common_route():
             "core.target_service_selection",
             "core.response_strategy",
         )), f"legacy runtime/selector called: {module}"
-        assert module != "session", "second ordinary memory called"
+        if module == "session":
+            assert frame.f_code.co_name == "current_session_client_id", (
+                f"unexpected session use on ordinary D2 route: {frame.f_code.co_name}"
+            )
+            return
 
     sys.setprofile(observe)
     try:
@@ -142,4 +146,6 @@ def test_b13_simple_direct_price_uses_common_route_and_demo_snapshot(tmp_path):
         "build_d2_snapshot_sources",
         "resolve_d2_envelope_response",
     ):
-        assert sum(name == function for _, name in calls) == 1, function
+        # The early lead/spam gate and provider input each project context.
+        expected = 2 if function == "project_d2_session_context" else 1
+        assert sum(name == function for _, name in calls) == expected, function

@@ -100,7 +100,11 @@ def observed_route():
             "core.one_call_runtime", "core.one_call_presentation", "core.response_plan_session",
             "core.target_offer_projection", "core.target_service_selection", "core.response_strategy",
         )), f"legacy runtime/selector called: {module}"
-        assert module != "session", "second ordinary memory called"
+        if module == "session":
+            assert frame.f_code.co_name == "current_session_client_id", (
+                f"unexpected session use on ordinary D2 route: {frame.f_code.co_name}"
+            )
+            return
 
     sys.setprofile(observe)
     try:
@@ -172,7 +176,9 @@ def test_a08_real_two_turn_route_survives_store_reopen(tmp_path):
     for function in ("parse_production_envelope_json", "project_d2_session_context",
                      "bind_d1r_envelope_to_d2_context", "seed_d2_plan_focus",
                      "build_d2_snapshot_sources", "resolve_d2_envelope_response"):
-        assert sum(name == function for _, name in calls) == 2, function
+        # Each turn projects once for early lead/spam gates and once for provider input.
+        expected = 4 if function == "project_d2_session_context" else 2
+        assert sum(name == function for _, name in calls) == expected, function
     assert ("core.response_plan_materialization", "_d2_cross_topic_applied_extent") in calls
 
 
@@ -255,7 +261,9 @@ def test_a10_same_topic_price_followup_uses_fresh_typed_a08_situation(tmp_path):
         "build_d2_snapshot_sources",
         "resolve_d2_envelope_response",
     ):
-        assert sum(name == function for _, name in calls) == 2, function
+        # Each turn projects once for early lead/spam gates and once for provider input.
+        expected = 4 if function == "project_d2_session_context" else 2
+        assert sum(name == function for _, name in calls) == expected, function
 
 
 def test_a10_same_topic_price_followup_never_carries_expired_situation(tmp_path):

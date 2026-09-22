@@ -156,8 +156,9 @@ def run_d2_dialogue_turn(
     slots stay with the existing session owner (CP5-LEAD / D2-036); only a
     PII-free effect receipt may be recorded on the D2 completion.
 
-    ``lead_bridge=True`` enables pre-provider lead/situation short-circuit via
-    session mem. Ordinary D2 scenarios leave it False and stay session-free.
+    ``lead_bridge=True`` enables booking entry via the existing lead owner.
+    Every turn may read the client binding to detect an already active lead;
+    ordinary state remains exclusively in ``D2DialogueStore``.
     """
     effective_request_id = (request_id or uuid4().hex).strip()
     if not effective_request_id:

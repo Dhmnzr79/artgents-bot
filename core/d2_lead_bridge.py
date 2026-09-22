@@ -98,9 +98,9 @@ def d2_lead_needs_pre_provider(
 ) -> bool:
     """True when the turn must short-circuit before the D1R provider.
 
-    Ordinary D2 turns never touch session mem. Active-lead / situation-pending
-    short-circuit runs only when the bound session client exactly matches
-    ``session_key.client_id``. Unbound ordinary routes stay session-free.
+    Ordinary D2 turns may probe the client binding but never read session mem.
+    Active-lead / situation-pending short-circuit runs only when the bound
+    session client exactly matches ``session_key.client_id``.
     A mismatched binding fails closed.
     """
     action = (situation_action or "").strip()

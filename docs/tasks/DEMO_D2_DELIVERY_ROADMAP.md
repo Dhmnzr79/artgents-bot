@@ -1,9 +1,10 @@
 # D2 — фиксированная дорожная карта до замены legacy runtime
 
-Статус: **действующий план исполнения**. Зафиксировано: 2026-09-21 на
-ветке `codex/demo-d2-service-volume`; последний подтверждённый code checkpoint
-— CP5-B13a `b66dc5c`. Документационный аудит коммерческого слоя выполняется
-поверх этого baseline и не объявляет новые сценарии собранными.
+Статус: **действующий план исполнения**, обновлён 2026-09-22 на ветке
+`codex/demo-d2-service-volume` от baseline `4f7ac07`. Подтверждённые
+внутренние CP5-сценарии перечислены в Ledger; общий агрегированный offline
+CP5-REG прогон дал **100 passed**, независимый Cursor Checker — **PASS**. HTTP и
+виджет пока обслуживает локальный legacy route.
 
 Это единственная действующая roadmap D2. Историческая
 `DEMO_D2_REBUILD_ROADMAP.md` объясняет прежний план, но не задаёт порядок
@@ -49,18 +50,17 @@ lead/privacy, заявки, typed UI ownership и transport защиты. Нел
 
 ## Текущее доказанное состояние
 
-На HEAD `b66dc5c` через внутренний `run_d2_dialogue_turn` собраны только:
-двухходовый A08; узкая часть A10a (same-topic price continuation после
-уже записанного typed контекста); узкая часть B13a (одна простая
-опубликованная service price без commercial-пакетов). Вызов идёт из их
-offline-тестов, не из HTTP. CP1 обновил единственный production D1R prompt
-до v17: typed `service_id`, `topic_id`, `statement_mode` и `situation` для
-каждого request; production parser проверен на корректном и malformed raw A08.
-
-Это **не** означает готовность полного A10/B13, что D2 подключён к HTTP,
-виджету или настоящей модели как общему runtime, что остальные A01–A12
-собраны, или что legacy перестал обслуживать локального бота. При
-противоречии Ledger сильнее устного отчёта.
+На baseline `4f7ac07` внутренний `run_d2_dialogue_turn` содержит CP5
+commercial, content, continuation, multipart, availability, recovery,
+terminal, lead/privacy, spam, directory, CTA и off-topic checkpoint из Ledger.
+Их fake provider проходит production D1R parser; ordinary state/result
+записывается только в `D2DialogueStore`, а PII/активная заявка остаются у
+существующего lead-owner. Точный client-binding probe через
+`session.current_session_client_id()` нужен для active-lead short-circuit
+даже без `lead_bridge`; он не читает ordinary memory. Агрегированный CP5-REG
+проверил 100 тестов вместе, но не доказывает HTTP, браузерный widget,
+общую live-модель или все полные A/B семьи. Конкретные доказанные срезы и
+оставшиеся пробелы ведутся в Ledger.
 
 ## Неподменяемый порядок checkpoint
 
@@ -72,9 +72,46 @@ offline-тестов, не из HTTP. CP1 обновил единственны�
 | CP3 — ограниченный live A08 | Та же внутренняя D2 entry получает два последовательных ответа настоящей модели и соблюдает D1R/continuity contract | Prompt, существующая D2 entry, изолированная harness; без HTTP/widget и новых product rules | Только после отдельного разрешения владельца: точные фразы, модель, data version, жёсткий call budget; проверяется структура/refs/continuity | Полная оценка качества, нагрузка, HTTP и готовность всего бота |
 | CP4 — D2 common turn completion | Внутренний общий D2 route завершает обычный ход с одним owner state, result/replay и обязательными lead/privacy effects | D2 turn service, typed state/result store, tenant snapshot, lead/privacy bridge и offline tests; legacy не расширяется | Применимые C04–C06, C09–C10: tenant refs, атомарность, replay, isolation, один effect | HTTP/SSE cutover, widget и непокрытые пользовательские семьи |
 | CP5 — D2 сценарии через общий route | A01–A12 и применимые B01–B17 проходят один внутренний D2 route, не набор helper-тестов | D2 contracts/resolvers/materializer/renderer, штатные tenant data и tests; checkpoint определяется новым механизмом, а не названием услуги или комбинацией блоков | У каждой семьи есть acceptance ID; 2–3 сценария можно собрать вместе только на одном уже очерченном механизме; второй ход берёт контекст из настоящего предыдущего D2 turn; raw-text semantic selector не добавлен | HTTP/SSE/widget и доказательство недостижимости legacy от реального входа |
-| CP6 — D2 HTTP/SSE/widget cutover | Оба endpoint и widget доставляют результат одного D2 turn; legacy normal path недостижим | Ingress orchestration, transport adapters, UI projection и endpoint tests; без fallback и выбора runtime по типу вопроса | Реальные `/ask` и `/ask/stream` endpoint tests, parity, C05/C07/C08/C09; sentinels и dependency checks доказывают отсутствие legacy вызова | Физическое удаление legacy файлов и итоговый regression/live набор |
+| CP6a — `/ask` | Реальный JSON endpoint вызывает общий D2 turn и отдаёт сохранённый final result/UI | Ingress, request identity, lead/privacy, JSON adapter и offline endpoint tests; без fallback | Raw fake D1R → production parser → D2 store; repeat/conflict/concurrency, tenant isolation, active lead/privacy/effect и invalid provider; C05/C07/C08/C09 sentinels и dependency check на `/ask` | SSE, браузерный widget, удаление legacy файлов |
+| CP6b — `/ask/stream` | Реальный SSE endpoint использует тот же D2 turn и тот же final result | SSE transport и offline parity/replay tests поверх CP6a; без второго semantic route | JSON↔SSE parity по text/UI/actions/state, disconnect/replay с тем же request ID без provider/effect, terminal/error events и no post-freeze writes; C05/C08/C09 sentinels на `/ask/stream` | Браузерный widget, удаление legacy файлов |
+| CP6c — widget | Существующий браузерный клиент отправляет D2 actions и показывает один сохранённый результат | Widget request identity, pure UI wire projection, JS/offline browser harness; без old presentation decision | Реальный widget/api код: current typed click работает, stale/foreign/forged отклоняются; повтор после обрыва до/после UI сохраняет ID и даёт один bubble/lead effect; новый ход получает новый ID; обе endpoint sentinel-проверки остаются зелёными | Физическое удаление legacy файлов и итоговый regression/live набор |
 | CP7 — удаление legacy | Composer/sales_fast semantic runtime, selectors, старая ordinary memory и их тесты удалены либо отсутствуют как normal-dialogue механизм | Только явно перечисленные legacy files/imports/wiring/tests/docs; не удалять tenant/lead/privacy/transport защиты | C08: dependency check и endpoint sentinels; назначенные offline regressions проходят без legacy imports | Merge/deploy; они не входят в D2 rebuild |
 | CP8 — final evidence | Есть единый evidence-pack: required offline acceptance, ограниченный live набор, Cursor PASS и актуальный Ledger | Только тесты, доказательства и документы уже сделанного D2 | A01–A12, применимые B/C, C01–C10, latency/cost facts и known limits перечислены явно | Production deployment: он не в scope и не совершается автоматически |
+
+### Приёмка CP6 по порядку доставки
+
+1. **CP6a `/ask`:** offline endpoint test посылает raw fake D1R через
+   настоящий parser, tenant snapshot и `run_d2_dialogue_turn`, затем сверяет
+   response/UI и сохранённый result/state. Проверяет idempotent replay того же
+   `(tenant, sid, request_id, payload)` после reopen store, конфликт и два
+   конкурентных хода, разные tenant с одним sid, invalid provider и отказ
+   commit. Отдельный путь проверяет booking→имя→pending-вопрос→телефон,
+   отсутствие PII в provider input/ordinary store и не более одного effect;
+   active lead не попадает в provider. Fail-on-call sentinels для legacy
+   semantic функций и transitive dependency check действуют на успешный,
+   ошибочный и lead/typed-action запрос. Proof: `test_d2_http_contract.py`,
+   `test_d2_http_scenarios.py`, `test_d2_no_legacy_path.py` и назначенные
+   lead/privacy/tenant offline regressions.
+2. **CP6b `/ask/stream`:** те же входные payload и request ID дают после
+   завершения одинаковые final text/UI/actions и одинаковую
+   ревизию памяти с `/ask`; SSE отличается только transport framing. Обрыв
+   до/после final с повтором через любой endpoint возвращает сохранённый
+   result с 0 новых provider/effect calls. Invalid provider и transport error
+   имеют один final/error outcome без late mutation; C08 sentinels и
+   dependency check применяются к реальному SSE пути. Proof: те же HTTP
+   contract/scenario/no-legacy tests с параметрами JSON↔SSE.
+3. **CP6c widget:** JS harness использует настоящий `static/widget/api.js` и
+   `widget.js`, а не мок UI projection. Проверяет один logical request ID
+   для retry при обрыве до UI и после UI, новый ID для нового хода с тем же
+   текстом, один bubble и отсутствие повторной заявки. Typed scope/lead
+   action допускается только из сохранённой актуальной D2 UI projection;
+   чужой, устаревший и forged action отклоняются. Text, CTA и secondary UI
+   совпадают с сохранённым plan, включая terminal без CTA. Proof:
+   `test_d2_widget_replay.py`, JS harness, оба HTTP contract/no-legacy набора.
+
+Каждый шаг получает собственный review и Ledger evidence. CP6b начинается
+после CP6a PASS, CP6c — после CP6b PASS. Текущий checkpoint CP5-REG не
+выполняет HTTP cutover.
 
 Нельзя считать CP5 готовым по unit/seam-тестам, нельзя перейти к CP6 с
 legacy fallback, нельзя удалить runtime до того, как его заменяет D2 endpoint

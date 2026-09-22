@@ -24,7 +24,12 @@ from core.d2_dialogue_store import D2DialogueStore
 from core.d2_session_context import (
     bind_d1r_envelope_to_d2_context, project_d2_session_context, seed_d2_plan_focus,
 )
-from core.d2_snapshot_sources import build_d2_focus_clarify_response, build_d2_snapshot_sources
+from core.d2_snapshot_sources import (
+    build_d2_focus_clarify_response,
+    build_d2_snapshot_sources,
+    build_d2_clinic_policy_response,
+    build_d2_service_availability_response,
+)
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
 from core.one_call_envelope_protocol import parse_production_envelope_json
 from core.response_plan_materialization import resolve_d2_envelope_response
@@ -197,6 +202,17 @@ def _run_reserved_d2_dialogue_turn(
     part = parts[0]
     subjects_by_id = {item.subject_id: item for item in understanding.subjects}
     multi_part = _d2_multipart_shape_ok(parts=parts, subjects_by_id=subjects_by_id)
+    clinic_policy = (
+        len(parts) == 1
+        and part.kind == "clinic_policy"
+    )
+    service_availability = (
+        envelope.commercial_intent == "none"
+        and len(parts) == 1
+        and part.kind == "content"
+        and part.content_ref is None
+        and part.service_id is not None
+    )
     direct_promotion = (
         envelope.commercial_intent == "promotion"
         and envelope.promotion_scope in {"general", "service", "shown"}
@@ -214,9 +230,19 @@ def _run_reserved_d2_dialogue_turn(
         and 1 <= len(parts) <= 2
         and all(item.kind == "content" for item in parts)
         and (len(parts) == 2 or part.content_ref is not None)
+        and not service_availability
     )
-    if not (direct_promotion or direct_fact or content_lookup or multi_part):
+    if not (
+        direct_promotion
+        or direct_fact
+        or content_lookup
+        or multi_part
+        or clinic_policy
+        or service_availability
+    ):
         if len(parts) != 1:
+            raise ValueError("d2_experiment_single_price_required")
+        if part.kind != "price":
             raise ValueError("d2_experiment_single_price_required")
         subject = subjects_by_id.get(part.subject_id) if part.subject_id else None
         shape_failures = _d2_supported_price_shape_failure_codes(part=part, subject=subject)
@@ -237,9 +263,8 @@ def _run_reserved_d2_dialogue_turn(
         and binding.outcome == "ambiguous_focus"
     )
     if not (direct_promotion and envelope.promotion_scope == "general"):
-        if price_focus_clarify or multi_part:
-            # Multi-part: each request carries its own typed topic/service (D2-042/T2).
-            # Session bind may be ambiguous across topics; parts stay independent.
+        if price_focus_clarify or multi_part or clinic_policy or service_availability:
+            # Policy/availability: typed ids only; no single-topic focus required.
             pass
         elif (
             focus.action != "resolve_topic"
@@ -248,6 +273,23 @@ def _run_reserved_d2_dialogue_turn(
             raise ValueError("d2_experiment_resolved_topic_required")
     if price_focus_clarify:
         response = build_d2_focus_clarify_response(tenant, session_key=session_key)
+        price = None
+        decision = None
+    elif clinic_policy:
+        response = build_d2_clinic_policy_response(
+            tenant,
+            session_key=session_key,
+            understanding=understanding,
+        )
+        price = None
+        decision = None
+    elif service_availability:
+        assert part.service_id is not None
+        response = build_d2_service_availability_response(
+            tenant,
+            session_key=session_key,
+            service_id=part.service_id,
+        )
         price = None
         decision = None
     else:
@@ -272,6 +314,9 @@ def _run_reserved_d2_dialogue_turn(
     if price_focus_clarify:
         if response.resolved.route != "CLARIFY" or not response.rendered_text.strip():
             raise ValueError("d2_experiment_focus_clarify_not_resolved")
+    elif clinic_policy or service_availability:
+        if not response.rendered_text.strip():
+            raise ValueError("d2_experiment_availability_not_resolved")
     elif direct_promotion:
         if not response.rendered_text.strip() or not response.resolved.promo_blocks:
             raise ValueError("d2_experiment_promotion_not_resolved")
@@ -306,7 +351,7 @@ def _run_reserved_d2_dialogue_turn(
     # Persist only finalized facts. Hypothetical/overview/unknown must not wipe
     # a previously reported or corrected situation (D2-003).
     situation = snapshot.state.situation_state
-    if price_focus_clarify:
+    if price_focus_clarify or clinic_policy or service_availability:
         situation = snapshot.state.situation_state
     elif multi_part and (price is None or decision is None or decision.applied_extent is None):
         # Independent parts: do not invent a situation from deferred/unavailable price.

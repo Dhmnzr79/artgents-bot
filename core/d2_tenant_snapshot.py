@@ -61,7 +61,7 @@ def _read_set(client_root: Path) -> tuple[tuple[str, bytes], ...]:
                 raise D2TenantSnapshotError("required_path_missing:md")
             continue
         files.extend(item for item in base.rglob(pattern) if item.is_file())
-    for name in ("tone.yaml", "ui.yaml", "video_catalog.yaml", "doctor_catalog.json"):
+    for name in ("tone.yaml", "ui.yaml", "video_catalog.yaml", "doctor_catalog.json", "clinic_policies.yaml"):
         path = client_root / name
         if path.is_file():
             files.append(path)

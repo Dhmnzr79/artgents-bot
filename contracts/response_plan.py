@@ -1487,6 +1487,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
                 and not self.d2_part_deferred_blocks
                 and not self.promo_blocks
                 and not self.requested_fact_blocks
+                and self.authored_service_alternative_block is None
             ):
                 raise ValueError("answer_requires_patient_text")
             if self.terminal_text is not None:

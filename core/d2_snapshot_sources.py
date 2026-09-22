@@ -19,6 +19,8 @@ from contracts.response_plan import (
     UiPlanCandidates,
     UiQuickReplyCandidate,
     UiVideoCandidate,
+    AuthoredServiceAlternativeBlock,
+    ServiceOptionEntry,
 )
 from contracts.response_plan_adapter import ResponsePlanAdapterUiAuthority, ResponsePlanAdapterUiButtonAuthority
 from contracts.response_plan_materialization import (
@@ -318,6 +320,230 @@ def build_d2_focus_clarify_response(
         transport_kind="blocking",
     )
     composer = ComposerResult(route="CLARIFY", mode="standard", patient_text=text)
+    resolved = resolve_response_plan(plan, composer)
+    return MaterializedResponseOutcome(
+        resolved=resolved,
+        rendered_text=render_response_text(resolved),
+        ui_projection=project_response_ui(resolved),
+        materialization_diagnostics=(),
+        selection_diagnostics=(),
+        adapter_diagnostics=(),
+        situation_delta=ResponseSituationDelta(action="keep"),
+        trace=MaterializationTrace(None, (), (), ()),
+    )
+
+
+_INFO_GAP = "К сожалению, у меня пока недостаточно информации по этому вопросу"
+_POLICY_CLARIFY = "Уточните, пожалуйста: вопрос про ОМС или ДМС?"
+
+
+def _clinic_policies_raw(snapshot: D2TenantSnapshot) -> dict[str, object]:
+    return _yaml_file(snapshot, "clinic_policies.yaml")
+
+
+def _authored_policy_answers(snapshot: D2TenantSnapshot) -> dict[str, str]:
+    raw = _clinic_policies_raw(snapshot).get("policies")
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, str] = {}
+    for key, body in raw.items():
+        if not isinstance(key, str) or not isinstance(body, dict):
+            continue
+        answer = body.get("answer")
+        if isinstance(answer, str) and answer.strip():
+            out[key] = answer.strip()
+    return out
+
+
+def _authored_service_alternative(
+    snapshot: D2TenantSnapshot,
+    service_id: str,
+) -> tuple[str, tuple[str, ...]] | None:
+    """Return (approved_text, alternative_service_ids) from typed rows only."""
+    raw = _clinic_policies_raw(snapshot).get("service_alternatives")
+    if not isinstance(raw, list):
+        return None
+    for row in raw:
+        if not isinstance(row, dict):
+            continue
+        requested = str(row.get("requested_service_id") or "").strip()
+        if requested != service_id:
+            continue
+        approved = str(row.get("approved_text") or "").strip()
+        alt_raw = row.get("alternative_service_ids")
+        alts = (
+            [str(item).strip() for item in alt_raw if str(item).strip()]
+            if isinstance(alt_raw, list)
+            else []
+        )
+        deduped: list[str] = []
+        for alt_id in alts:
+            if alt_id == service_id or alt_id in deduped:
+                continue
+            deduped.append(alt_id)
+            if len(deduped) >= 2:
+                break
+        if approved and deduped:
+            return approved, tuple(deduped)
+    return None
+
+
+def build_d2_clinic_policy_response(
+    snapshot: D2TenantSnapshot,
+    *,
+    session_key: SessionKey,
+    understanding,
+) -> MaterializedResponseOutcome:
+    """B10/D2-068: typed policy_ids → authored answers from tenant snapshot.
+
+    Triggers and patient_text matching are never used.
+    """
+    if snapshot.client_id != session_key.client_id:
+        raise D2SnapshotBindingError("policy_client_mismatch")
+    answers = _authored_policy_answers(snapshot)
+    request = understanding.requests[0]
+    inferred: list[str] = list(request.policy_ids)
+    if request.payment_scheme_intent == "eligibility_question":
+        payment_key = {"oms": "no_oms", "dms": "no_dms"}.get(request.payment_scheme)
+        if payment_key and payment_key not in inferred:
+            inferred.append(payment_key)
+    subjects = {item.subject_id: item for item in understanding.subjects}
+    subject = subjects.get(request.subject_id) if request.subject_id else None
+    if (
+        subject is not None
+        and subject.age_group == "child"
+        and request.context != "past_history"
+        and "no_pediatric_dentistry" not in inferred
+        and "no_pediatric_dentistry" in answers
+    ):
+        inferred.append("no_pediatric_dentistry")
+
+    if not inferred:
+        # Ambiguous «по полису?» without typed id/scheme → clarify (B10).
+        return _d2_code_owned_answer(
+            session_key=session_key,
+            text=_POLICY_CLARIFY,
+            route="CLARIFY",
+        )
+
+    texts: list[str] = []
+    unknown = False
+    for key in inferred:
+        answer = answers.get(key)
+        if answer is None:
+            unknown = True
+            continue
+        texts.append(answer)
+    if texts:
+        return _d2_code_owned_answer(
+            session_key=session_key,
+            text="\n\n".join(texts),
+            route="ANSWER",
+        )
+    # Unknown policy id or empty pack → honest gap, not yes/no (D2-069).
+    assert unknown or not answers
+    return _d2_code_owned_answer(
+        session_key=session_key,
+        text=_INFO_GAP,
+        route="ANSWER",
+    )
+
+
+def build_d2_service_availability_response(
+    snapshot: D2TenantSnapshot,
+    *,
+    session_key: SessionKey,
+    service_id: str,
+) -> MaterializedResponseOutcome:
+    """B01/D2-024–025: authored alternative by typed service_id, else info gap.
+
+    Inactive catalog status alone never becomes «не оказываем».
+    """
+    if snapshot.client_id != session_key.client_id:
+        raise D2SnapshotBindingError("availability_client_mismatch")
+    authored = _authored_service_alternative(snapshot, service_id)
+    if authored is None:
+        return _d2_code_owned_answer(
+            session_key=session_key,
+            text=_INFO_GAP,
+            route="ANSWER",
+        )
+    approved_text, alt_ids = authored
+    bundle = build_d2_bundle(snapshot)
+    options: list[ServiceOptionEntry] = []
+    for alt_id in alt_ids:
+        service = bundle.services.get(alt_id)
+        if service is None or not service.active:
+            raise D2SnapshotBindingError("authored_alternative_unavailable")
+        options.append(ServiceOptionEntry(service_id=alt_id, display_name=service.name))
+    alt_block = AuthoredServiceAlternativeBlock(
+        source_client_id=snapshot.client_id,
+        requested_service_id=service_id,
+        approved_text=approved_text,
+        options=tuple(options),
+    )
+    plan = PreComposerPlan(
+        session_key=session_key,
+        context_strategy="full_context",
+        route_authority=ComposerSelectedRouteAuthority(
+            allowed_route_modes=(RouteModePair(route="ANSWER", mode="standard"),),
+            terminal_candidates=(),
+        ),
+        response_scope="service",
+        selected_service_id=service_id,
+        active_session_service_id=None,
+        selected_topic_id=None,
+        price_plan=PricePlan(kind="none"),
+        authored_service_alternative_block=alt_block,
+        ui_candidates=UiPlanCandidates(),
+        transport_kind="blocking",
+    )
+    composer = ComposerResult(
+        route="ANSWER",
+        mode="standard",
+        patient_text=None,
+        code_owned_answer=True,
+    )
+    resolved = resolve_response_plan(plan, composer)
+    return MaterializedResponseOutcome(
+        resolved=resolved,
+        rendered_text=render_response_text(resolved),
+        ui_projection=project_response_ui(resolved),
+        materialization_diagnostics=(),
+        selection_diagnostics=(),
+        adapter_diagnostics=(),
+        situation_delta=ResponseSituationDelta(action="keep"),
+        trace=MaterializationTrace(None, (), (), ()),
+    )
+
+
+def _d2_code_owned_answer(
+    *,
+    session_key: SessionKey,
+    text: str,
+    route: str,
+) -> MaterializedResponseOutcome:
+    plan = PreComposerPlan(
+        session_key=session_key,
+        context_strategy="full_context",
+        route_authority=ComposerSelectedRouteAuthority(
+            allowed_route_modes=(RouteModePair(route=route, mode="standard"),),  # type: ignore[arg-type]
+            terminal_candidates=(),
+        ),
+        response_scope="clinic",
+        selected_service_id=None,
+        active_session_service_id=None,
+        selected_topic_id=None,
+        price_plan=PricePlan(kind="none"),
+        ui_candidates=UiPlanCandidates(),
+        transport_kind="blocking",
+    )
+    composer = ComposerResult(
+        route=route,  # type: ignore[arg-type]
+        mode="standard",
+        patient_text=text,
+        code_owned_answer=(route == "ANSWER"),
+    )
     resolved = resolve_response_plan(plan, composer)
     return MaterializedResponseOutcome(
         resolved=resolved,

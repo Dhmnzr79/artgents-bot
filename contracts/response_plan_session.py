@@ -219,6 +219,7 @@ class PersistedShownCommercialIds(ResponsePlanModel):
     price_offer_ids: tuple[str, ...] = ()
     required_offer_condition_ids: tuple[str, ...] = ()
     shown_service_option_ids: tuple[str, ...] = ()
+    secondary_ref_ids: tuple[str, ...] = ()
 
     @model_validator(mode="after")
     def _validate_ids(self) -> Self:
@@ -229,6 +230,7 @@ class PersistedShownCommercialIds(ResponsePlanModel):
         _validate_unique_ids("price_offer_ids", self.price_offer_ids)
         _validate_unique_ids("required_offer_condition_ids", self.required_offer_condition_ids)
         _validate_unique_ids("shown_service_option_ids", self.shown_service_option_ids)
+        _validate_unique_ids("secondary_ref_ids", self.secondary_ref_ids)
         return self
 
 

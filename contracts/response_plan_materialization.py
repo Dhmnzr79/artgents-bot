@@ -231,6 +231,7 @@ class D2PartFailureAuthority(ResponsePlanModel):
         "d2_model_prose_empty",
         "d2_model_prose_money",
         "d2_model_prose_link",
+        "d2_content_source_missing",
     ]
     display_text: str
 

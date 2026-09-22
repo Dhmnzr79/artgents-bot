@@ -292,6 +292,7 @@ def resolve_d2_envelope_response(
     as_of: date,
     d2_plan_focus_seed: D2PlanFocusSeed | None = None,
     common_route_direct_service_only: bool = False,
+    common_route_content_lookup: bool = False,
 ) -> MaterializedResponseOutcome:
     """Resolve the D2 lower plan from an already validated D1R envelope.
 
@@ -308,6 +309,28 @@ def resolve_d2_envelope_response(
     price_parts = tuple(item for item in understanding.requests if item.kind == "price")
     content_parts = tuple(item for item in understanding.requests if item.kind == "content")
     direct_promotion = envelope.commercial_intent == "promotion"
+    direct_fact = (
+        envelope.commercial_intent == "payment"
+        and bool(envelope.references.direct_fact_ids)
+    )
+    comparison_lookup = len(content_parts) > 1 and (
+        any(part.content_ref is None for part in content_parts)
+        or len({part.content_ref for part in content_parts}) > 1
+    )
+    ready_comparison = (
+        len(content_parts) == 1
+        and content_parts[0].content_ref is not None
+        and content_parts[0].content_ref.startswith("comparison__")
+    )
+    auto_promo = (
+        common_route_content_lookup
+        and not direct_promotion
+        and not direct_fact
+        and not comparison_lookup
+        and not ready_comparison
+        and not price_parts
+    )
+    code_owned_null_content = direct_promotion or direct_fact
     unsupported = tuple(
         item.request_id
         for item in understanding.requests
@@ -330,18 +353,20 @@ def resolve_d2_envelope_response(
 
     # Resolve every content reference first. A later foreign/malformed material is
     # fatal and must not disappear behind an otherwise recoverable price failure.
+    allow_missing_content_ref = code_owned_null_content or comparison_lookup
     information_blocks, content_realizations = _d2_information_blocks(
         content_parts=content_parts,
         client_id=client_id,
         sources=sources,
-        allow_missing_content_ref=direct_promotion,
+        allow_missing_content_ref=allow_missing_content_ref,
+        code_owned_null_content=code_owned_null_content,
     )
     content_part_scopes = tuple(
         _d2_content_scope(
             part,
             client_id=client_id,
             sources=sources,
-            allow_missing_content_ref=direct_promotion,
+            allow_missing_content_ref=allow_missing_content_ref,
         )
         for part in content_parts
     )
@@ -433,7 +458,7 @@ def resolve_d2_envelope_response(
             content_parts[0],
             client_id=client_id,
             sources=sources,
-            allow_missing_content_ref=direct_promotion,
+            allow_missing_content_ref=allow_missing_content_ref,
         )
         trace = MaterializationTrace(
             price_lookup_mode=None,
@@ -503,22 +528,30 @@ def resolve_d2_envelope_response(
             ))
     frozen_failure_blocks = tuple(failure_blocks)
     frozen_deferred_blocks = tuple(deferred_blocks)
+    source_content_ref = None
+    if (
+        content_parts
+        and content_parts[0].content_ref is not None
+        and content_realizations[content_parts[0].request_id].outcome != "unavailable"
+    ):
+        source_content_ref = content_parts[0].content_ref
+    elif direct_fact:
+        source_content_ref = _d2_direct_fact_source_ref(
+            envelope.references.direct_fact_ids,
+            sources,
+        )
     source_ui, source_ui_diagnostics = _d2_source_ui(
-        primary_content_part=(
-            content_parts[0]
-            if (
-                content_parts
-                and content_parts[0].content_ref is not None
-                and content_realizations[content_parts[0].request_id].outcome != "unavailable"
-            )
-            else None
-        ),
+        content_ref=source_content_ref,
         sources=sources,
     )
     ui_candidates = _d2_select_ui(
         source_ui=source_ui,
         sources=sources,
-        suppress_secondary=bool(price_parts) or direct_promotion,
+        suppress_secondary=(
+            bool(price_parts)
+            or direct_promotion
+            or (common_route_content_lookup and comparison_lookup)
+        ),
     )
     if volume_choices:
         ui_candidates = ui_candidates.model_copy(
@@ -535,8 +568,10 @@ def resolve_d2_envelope_response(
         commercial_service_id = price_parts[0].service_id
     elif direct_promotion and envelope.promotion_scope == "general":
         commercial_service_id = None
-    else:
+    elif direct_promotion or auto_promo:
         commercial_service_id = content_parts[0].service_id
+    else:
+        commercial_service_id = None
     offer_ids = tuple(row.offer_id for row in price_block.rows) if price_block is not None else ()
     active_promo_ids = frozenset(
         fact.id
@@ -546,7 +581,7 @@ def resolve_d2_envelope_response(
     commercial = resolve_d2_commercial_plan(
         authority=sources.d2_commercial,
         service_id=commercial_service_id,
-        include_packages=price_block is not None and not direct_promotion,
+        include_packages=price_block is not None and not direct_promotion and not direct_fact,
         shown_promo_fact_ids=sources.shown_promo_fact_ids,
         offer_ids=offer_ids,
         promo_form="full" if direct_promotion else "short",
@@ -554,6 +589,13 @@ def resolve_d2_envelope_response(
         skip_shown=not direct_promotion,
         max_promo=4 if direct_promotion else 2,
         active_promo_ids=active_promo_ids,
+    )
+    requested_fact_ids = envelope.references.direct_fact_ids if direct_fact else ()
+    commercial_facts = _d2_requested_fact_candidates(
+        requested_fact_ids,
+        sources=sources,
+        client_id=client_id,
+        as_of=as_of,
     )
     plan = PreComposerPlan(
         session_key=sources.session_key,
@@ -584,6 +626,7 @@ def resolve_d2_envelope_response(
         d2_price_booster_block=commercial.price_booster_block,
         d2_also_list_block=commercial.also_list_block,
         d2_compatibility_blocks=commercial.compatibility_blocks,
+        commercial_facts=commercial_facts,
     )
     if direct_promotion and not commercial.promo_blocks:
         raise MaterializationContractError("d2_promotion_no_eligible_facts")
@@ -591,11 +634,15 @@ def resolve_d2_envelope_response(
         route="ANSWER",
         mode="standard",
         patient_text=None,
+        requested_fact_ids=requested_fact_ids,
         information_blocks=information_blocks,
         d2_part_failure_blocks=frozen_failure_blocks,
         d2_part_deferred_blocks=frozen_deferred_blocks,
         visible_price_block=price_block is not None,
-        code_owned_answer=direct_promotion and bool(commercial.promo_blocks),
+        code_owned_answer=(
+            (direct_promotion and bool(commercial.promo_blocks))
+            or (direct_fact and bool(requested_fact_ids))
+        ),
     )
     resolved = resolve_response_plan(plan, composer_result)
     finalized_trace = replace(trace, finalized_offers=_build_finalized_offer_trace(resolved))
@@ -848,10 +895,6 @@ def _d2_content_scope(
         if part.service_id is not None:
             if part.service_id not in sources.material_authority.bundle.services:
                 raise MaterializationOwnershipError("materialization_foreign_material")
-            if part.topic_id is not None:
-                direction = next((item for item in sources.d2_directions if item.topic_id == part.topic_id and item.source_client_id == client_id), None)
-                if direction is not None and part.service_id not in direction.service_ids:
-                    raise MaterializationContractError("d2_content_topic_mismatch")
             return (part.service_id,), "service", part.topic_id
         if part.topic_id is not None:
             for direction in sources.d2_directions:
@@ -870,10 +913,6 @@ def _d2_content_scope(
             raise MaterializationContractError("d2_content_service_mismatch")
         if part.service_id not in authority.allowed_service_ids:
             raise MaterializationContractError("d2_content_service_mismatch")
-        if part.topic_id is not None:
-            direction = next((item for item in sources.d2_directions if item.topic_id == part.topic_id and item.source_client_id == client_id), None)
-            if direction is None or part.service_id not in direction.service_ids:
-                raise MaterializationContractError("d2_content_topic_mismatch")
         return (part.service_id,), "service", part.topic_id
     if part.topic_id is not None:
         for direction in sources.d2_directions:
@@ -1049,6 +1088,7 @@ def _d2_content_failure_block(
         "d2_model_prose_empty",
         "d2_model_prose_money",
         "d2_model_prose_link",
+        "d2_content_source_missing",
     }:
         raise MaterializationContractError("d2_content_failure_reason_invalid")
     return D2PartFailureBlock(
@@ -1148,12 +1188,55 @@ def _d2_condition_texts(evidence: OfferConditionEvidence) -> tuple[str, ...]:
     return tuple(texts)
 
 
+def _d2_direct_fact_source_ref(
+    fact_ids: tuple[str, ...],
+    sources: ResponsePlanMaterializationSources,
+) -> str | None:
+    available = {item.content_ref for item in sources.d2_source_ui}
+    for fact_id in fact_ids:
+        fact = sources.material_authority.bundle.facts.get(fact_id)
+        detail = getattr(fact, "detail_ref", None) if fact is not None else None
+        if not isinstance(detail, str) or not detail.strip():
+            continue
+        content_ref = detail.split("#", 1)[0].strip()
+        if content_ref in available:
+            return content_ref
+    return None
+
+
+def _d2_requested_fact_candidates(
+    fact_ids: tuple[str, ...],
+    *,
+    sources: ResponsePlanMaterializationSources,
+    client_id: str,
+    as_of: date,
+) -> tuple:
+    if not fact_ids:
+        return ()
+    bundle = sources.material_authority.bundle
+    candidates = []
+    for fact_id in fact_ids:
+        fact = bundle.facts.get(fact_id)
+        if fact is None or not fact_active_as_of(fact, as_of):
+            continue
+        candidates.append(
+            project_commercial_fact_candidate(
+                bundle,
+                fact,
+                source_client_id=client_id,
+                allowed_roles=("requested_fact",),
+            )
+        )
+    return tuple(candidates)
+
+
 def _d2_information_blocks(
     *,
     content_parts: tuple[RequestUnderstandingRequest, ...],
     client_id: str,
     sources: ResponsePlanMaterializationSources,
     allow_missing_content_ref: bool = False,
+    code_owned_null_content: bool = False,
 ) -> tuple[tuple[InformationSourceBlock, ...], dict[str, D2ContentRealization]]:
     by_ref = {item.content_ref: item for item in sources.d2_authored_content}
     blocks: list[InformationSourceBlock] = []
@@ -1162,12 +1245,21 @@ def _d2_information_blocks(
         if part.content_ref is None:
             if not allow_missing_content_ref:
                 raise MaterializationContractError("d2_content_ref_required")
-            realizations[part.request_id] = D2ContentRealization(
-                outcome="answered",
-                publication=None,
-                display_text=None,
-                section_refs=(),
-            )
+            if code_owned_null_content:
+                realizations[part.request_id] = D2ContentRealization(
+                    outcome="answered",
+                    publication=None,
+                    display_text=None,
+                    section_refs=(),
+                )
+            else:
+                realizations[part.request_id] = D2ContentRealization(
+                    outcome="unavailable",
+                    publication=None,
+                    display_text=None,
+                    section_refs=(),
+                    reason="d2_content_source_missing",
+                )
             continue
         part_service_ids, _, part_topic_id = _d2_content_scope(
             part,
@@ -1214,14 +1306,11 @@ def _d2_information_blocks(
 
 def _d2_source_ui(
     *,
-    primary_content_part: RequestUnderstandingRequest | None,
+    content_ref: str | None,
     sources: ResponsePlanMaterializationSources,
 ) -> tuple[UiPlanCandidates, tuple[MaterializationDiagnostic, ...]]:
-    if primary_content_part is None:
-        return UiPlanCandidates(), ()
-    content_ref = primary_content_part.content_ref
     if content_ref is None:
-        raise MaterializationContractError("d2_content_ref_required")
+        return UiPlanCandidates(), ()
     authority = next(
         (item for item in sources.d2_source_ui if item.content_ref == content_ref),
         None,

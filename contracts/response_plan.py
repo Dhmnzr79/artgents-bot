@@ -365,6 +365,7 @@ D2PartFailureReason = Literal[
     "d2_model_prose_empty",
     "d2_model_prose_money",
     "d2_model_prose_link",
+    "d2_content_source_missing",
 ]
 D2ResultStatus = Literal["complete", "degraded", "failed"]
 D2ContentPublication = Literal["authored", "model_prose", "fallback"]
@@ -798,7 +799,10 @@ class D2ResolvedRequestPart(ResponsePlanModel):
             if self.status == "unavailable" and self.content_publication is not None:
                 raise ValueError("d2_content_part_unavailable_publication_forbidden")
             if self.status == "unavailable" and self.failure_reason not in {
-                "d2_model_prose_empty", "d2_model_prose_money", "d2_model_prose_link",
+                "d2_model_prose_empty",
+                "d2_model_prose_money",
+                "d2_model_prose_link",
+                "d2_content_source_missing",
             }:
                 raise ValueError("d2_content_part_failure_reason_invalid")
             if self.status != "unavailable" and self.snapshot_fingerprint is None:
@@ -1482,6 +1486,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
                 and not self.d2_part_failure_blocks
                 and not self.d2_part_deferred_blocks
                 and not self.promo_blocks
+                and not self.requested_fact_blocks
             ):
                 raise ValueError("answer_requires_patient_text")
             if self.terminal_text is not None:

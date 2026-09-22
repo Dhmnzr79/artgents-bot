@@ -21,6 +21,7 @@ ContentViolation = Literal[
     "d2_model_prose_empty",
     "d2_model_prose_money",
     "d2_model_prose_link",
+    "d2_content_source_missing",
 ]
 
 _MONEY = re.compile(
@@ -71,17 +72,24 @@ def realize_d2_content(
             section_refs=request.content_section_refs,
         )
 
-    fallback_ref = request.content_fallback_section_ref
-    if fallback_ref is not None:
-        section = next((item for item in authority.sections if item.section_ref == fallback_ref), None)
-        if section is not None:
-            return D2ContentRealization(
-                outcome="recovered",
-                publication="fallback",
-                display_text=section.display_text,
-                section_refs=(fallback_ref,),
-                reason=reason,
-            )
+    recovery_refs = _recovery_section_refs(request)
+    recovered: list[str] = []
+    used: list[str] = []
+    by_ref = {section.section_ref: section for section in authority.sections}
+    for ref in recovery_refs:
+        section = by_ref.get(ref)
+        if section is None:
+            continue
+        recovered.append(section.display_text)
+        used.append(ref)
+    if recovered:
+        return D2ContentRealization(
+            outcome="recovered",
+            publication="fallback",
+            display_text="\n\n".join(recovered),
+            section_refs=tuple(used),
+            reason=reason,
+        )
     return D2ContentRealization(
         outcome="unavailable",
         publication=None,
@@ -89,6 +97,24 @@ def realize_d2_content(
         section_refs=(),
         reason=reason,
     )
+
+
+def _is_korotko_section(ref: str) -> bool:
+    token = ref.rsplit(":", 1)[-1]
+    return token == "korotko" or ref.endswith("#korotko")
+
+
+def _recovery_section_refs(request: RequestUnderstandingRequest) -> tuple[str, ...]:
+    fallback = request.content_fallback_section_ref
+    if fallback is None:
+        return ()
+    if _is_korotko_section(fallback):
+        specific = tuple(
+            ref for ref in request.content_section_refs if not _is_korotko_section(ref)
+        )
+        if specific:
+            return specific
+    return (fallback,)
 
 
 def _exact_authored_text(

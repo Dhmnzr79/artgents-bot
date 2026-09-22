@@ -71,6 +71,15 @@ def _d2_supported_price_shape_failure_codes(*, part: object, subject: object) ->
     return tuple(failures)
 
 
+def _shown_secondary_ref_ids(response) -> tuple[str, ...]:
+    ui = response.ui_projection
+    shown: list[str] = []
+    if ui.video is not None:
+        shown.append(ui.video.video_id)
+    shown.extend(item.reply_id for item in ui.quick_replies)
+    return tuple(shown)
+
+
 def run_d2_dialogue_turn(
     *, session_key: SessionKey, user_message: str, provider: D2RawProvider,
     clients_root: Path, store: D2DialogueStore, now: datetime,
@@ -143,20 +152,36 @@ def _run_reserved_d2_dialogue_turn(
         commercial_fact_catalog=view.commercial_fact_catalog,
     )
     understanding = envelope.request_understanding
-    if envelope.route != "ANSWER" or understanding is None or len(understanding.requests) != 1:
+    if envelope.route != "ANSWER" or understanding is None or not understanding.requests:
         raise ValueError("d2_experiment_single_price_required")
-    part = understanding.requests[0]
+    parts = understanding.requests
+    part = parts[0]
     direct_promotion = (
         envelope.commercial_intent == "promotion"
         and envelope.promotion_scope in {"general", "service", "shown"}
+        and len(parts) == 1
         and part.kind == "content"
     )
-    if not direct_promotion:
+    direct_fact = (
+        envelope.commercial_intent == "payment"
+        and bool(envelope.references.direct_fact_ids)
+        and len(parts) == 1
+        and part.kind == "content"
+    )
+    content_lookup = (
+        envelope.commercial_intent == "none"
+        and 1 <= len(parts) <= 2
+        and all(item.kind == "content" for item in parts)
+        and (len(parts) == 2 or part.content_ref is not None)
+    )
+    if not (direct_promotion or direct_fact or content_lookup):
+        if len(parts) != 1:
+            raise ValueError("d2_experiment_single_price_required")
         subject = next((item for item in understanding.subjects if item.subject_id == part.subject_id), None)
         shape_failures = _d2_supported_price_shape_failure_codes(part=part, subject=subject)
         if shape_failures:
             raise ValueError("d2_experiment_a08_shape_required:" + ",".join(shape_failures))
-    elif envelope.promotion_scope == "service" and part.service_id is None:
+    elif direct_promotion and envelope.promotion_scope == "service" and part.service_id is None:
         raise ValueError("d2_experiment_promotion_service_required")
     if context.retained_terminal_state != "none":
         raise ValueError("d2_experiment_terminal_session_unsupported")
@@ -174,6 +199,7 @@ def _run_reserved_d2_dialogue_turn(
         envelope=envelope,
         session_key=session_key,
         shown_promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
+        shown_secondary_ref_ids=context.retained_shown_ids.secondary_ref_ids,
     )
     response = resolve_d2_envelope_response(
         envelope,
@@ -181,12 +207,21 @@ def _run_reserved_d2_dialogue_turn(
         as_of=now.date(),
         d2_plan_focus_seed=focus,
         common_route_direct_service_only=True,
+        common_route_content_lookup=True,
     )
     price = response.resolved.d2_price_block
     decision = response.resolved.d2_price_scope_decision
     if direct_promotion:
         if not response.rendered_text.strip() or not response.resolved.promo_blocks:
             raise ValueError("d2_experiment_promotion_not_resolved")
+    elif direct_fact:
+        if not response.rendered_text.strip() or not response.resolved.requested_fact_blocks:
+            raise ValueError("d2_experiment_fact_not_resolved")
+    elif content_lookup:
+        if not response.rendered_text.strip():
+            raise ValueError("d2_experiment_content_not_resolved")
+        if len(parts) == 1 and not response.resolved.information_blocks:
+            raise ValueError("d2_experiment_content_not_resolved")
     elif price is None or (part.service_id is None and decision is None) or not response.rendered_text.strip():
         raise ValueError("d2_experiment_price_not_resolved")
     turn = snapshot.current_turn_index
@@ -245,10 +280,22 @@ def _run_reserved_d2_dialogue_turn(
         situation_state=situation,
         shown_options_snapshot=shown_options_snapshot,
         accumulated_shown_ids=PersistedShownCommercialIds(
-            price_offer_ids=shown_offers,
+            requested_fact_ids=tuple(dict.fromkeys((
+                *context.retained_shown_ids.requested_fact_ids,
+                *response.resolved.session_delta.shown_requested_fact_ids,
+            ))),
             promo_fact_ids=tuple(dict.fromkeys((
                 *context.retained_shown_ids.promo_fact_ids,
                 *response.resolved.session_delta.shown_promo_ids,
+            ))),
+            amplifier_fact_ids=context.retained_shown_ids.amplifier_fact_ids,
+            service_value_ids=context.retained_shown_ids.service_value_ids,
+            price_offer_ids=shown_offers,
+            required_offer_condition_ids=context.retained_shown_ids.required_offer_condition_ids,
+            shown_service_option_ids=context.retained_shown_ids.shown_service_option_ids,
+            secondary_ref_ids=tuple(dict.fromkeys((
+                *context.retained_shown_ids.secondary_ref_ids,
+                *_shown_secondary_ref_ids(response),
             ))),
         ),
         terminal_state=context.retained_terminal_state,

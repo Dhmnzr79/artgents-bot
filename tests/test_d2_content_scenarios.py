@@ -1,4 +1,9 @@
-"""CP5-C1: assembled A03/A04/B04/B15 through the common D2 route."""
+"""CP5-C1: assembled A03/A04/B04/B15 through the common D2 route.
+
+Demo voice (D2-091): informational answers and direct warranty use model_prose
+grounded in an md content_ref plus that material's source UI. Code still owns
+prices/promos/packages. Direct warranty is not implant_warranty fact form.
+"""
 
 from __future__ import annotations
 
@@ -23,14 +28,26 @@ from core.one_call_envelope_protocol import production_envelope_template
 NOW = datetime(2026, 9, 22, 14, tzinfo=timezone.utc)
 KEY = SessionKey(client_id="demo", sid="c1-content-lookup")
 PAIN_KOROTKO = "Страх боли при имплантации — нормальная реакция"
+PAIN_LIVE = (
+    "Понимаю этот страх — при имплантации работаем с анестезией, "
+    "и обычно всё терпимее, чем кажется заранее."
+)
 PAIN_SEDATION = "Седация и наркоз"
+PAIN_ANESTHESIA_LIVE = (
+    "Для имплантации обычно хватает местной анестезии; "
+    "седацию или наркоз обсуждают отдельно, если так спокойнее."
+)
 PAIN_ANESTHESIA = "Какую анестезию используют"
+WARRANTY_LIVE = (
+    "Да, гарантия есть: на работу врача — год, на Nobel и Impro — пожизненно, "
+    "на Implantium — пять лет. Условия фиксируем в договоре."
+)
+WARRANTY_ALSO = "Гарантия на работу врача и импланты фиксируется в договоре."
+WARRANTY_BOOSTER = "Условия гарантии фиксируются в договоре."
 WARRANTY_FACT = (
     "Гарантия на работу врача — 1 год (корректировки и помощь бесплатно). "
     "На импланты Impro и Nobel — пожизненная, на Implantium — 5 лет."
 )
-WARRANTY_ALSO = "Гарантия на работу врача и импланты фиксируется в договоре."
-WARRANTY_BOOSTER = "Условия гарантии фиксируются в договоре."
 IMPLANT_SHORT = "Скидка до 15% при оплате в день обращения."
 CONSULT_SHORT = "Бесплатная консультация до 31.12.2026."
 COMPARISON_READY = "Ни один метод не «лучше всегда»"
@@ -201,6 +218,9 @@ def test_a03_pain_fear_is_ordinary_content_with_source_ui_and_short_promo(tmp_pa
                 service_id="classic",
                 topic_id="implantation",
                 section_refs=["a:korotko"],
+                realization="model_prose",
+                text=PAIN_LIVE,
+                fallback="a:korotko",
             ),
             scenario="pain_fear",
         ),
@@ -210,7 +230,8 @@ def test_a03_pain_fear_is_ordinary_content_with_source_ui_and_short_promo(tmp_pa
     text = first.response.rendered_text
     ui = first.response.ui_projection
     resolved = first.response.resolved
-    assert PAIN_KOROTKO in text
+    assert PAIN_LIVE in text
+    assert resolved.d2_request_parts[0].content_publication == "model_prose"
     assert resolved.d2_result_status == "complete"
     assert resolved.terminal_text is None
     assert resolved.d2_price_block is None
@@ -234,6 +255,9 @@ def test_a03_pain_fear_is_ordinary_content_with_source_ui_and_short_promo(tmp_pa
                 service_id="classic",
                 topic_id="implantation",
                 section_refs=["a:kakuyu-anesteziyu-ispolzuyut"],
+                realization="model_prose",
+                text=PAIN_ANESTHESIA_LIVE,
+                fallback="a:kakuyu-anesteziyu-ispolzuyut",
             )
         ),
         message="Какую анестезию используют?",
@@ -241,7 +265,7 @@ def test_a03_pain_fear_is_ordinary_content_with_source_ui_and_short_promo(tmp_pa
         clients=clients,
     )
     follow_ui = follow.response.ui_projection
-    assert PAIN_ANESTHESIA in follow.response.rendered_text
+    assert PAIN_ANESTHESIA_LIVE in follow.response.rendered_text
     assert follow_ui.video is None
     assert PAIN_FOLLOW not in {item.reply_id for item in follow_ui.quick_replies}
     assert PAIN_FOLLOW_AFTER in {item.reply_id for item in follow_ui.quick_replies}
@@ -255,6 +279,9 @@ def test_a03_pain_fear_is_ordinary_content_with_source_ui_and_short_promo(tmp_pa
                 service_id="classic",
                 topic_id="implantation",
                 section_refs=["a:korotko"],
+                realization="model_prose",
+                text=PAIN_LIVE,
+                fallback="a:korotko",
             )
         ),
         message="Ещё раз про боль",
@@ -262,7 +289,7 @@ def test_a03_pain_fear_is_ordinary_content_with_source_ui_and_short_promo(tmp_pa
         clients=clients,
     )
     back_ui = back.response.ui_projection
-    assert PAIN_KOROTKO in back.response.rendered_text
+    assert PAIN_LIVE in back.response.rendered_text
     assert back_ui.video is None
     assert PAIN_FOLLOW not in {item.reply_id for item in back_ui.quick_replies}
     assert PAIN_FOLLOW_AFTER not in {item.reply_id for item in back_ui.quick_replies}
@@ -271,13 +298,19 @@ def test_a03_pain_fear_is_ordinary_content_with_source_ui_and_short_promo(tmp_pa
     assert saved_follow.state.accumulated_shown_ids.promo_fact_ids
 
 
-def test_a04_direct_warranty_uses_fact_full_form_not_also_package(tmp_path: Path) -> None:
+def test_a04_direct_warranty_uses_md_document_not_also_package(tmp_path: Path) -> None:
     standalone, _, _, calls, _ = _run(
         tmp_path,
         _raw(
-            _content_part(content_ref=None, service_id="classic", topic_id="implantation"),
-            commercial_intent="payment",
-            direct_fact_ids=["implant_warranty"],
+            _content_part(
+                content_ref="clinic__info__warranty.md",
+                service_id=None,
+                topic_id="clinic",
+                section_refs=["a:korotko"],
+                realization="model_prose",
+                text=WARRANTY_LIVE,
+                fallback="a:korotko",
+            )
         ),
         message="А гарантия у вас есть?",
         key=SessionKey(client_id="demo", sid="c1-warranty"),
@@ -285,8 +318,10 @@ def test_a04_direct_warranty_uses_fact_full_form_not_also_package(tmp_path: Path
     text = standalone.response.rendered_text
     resolved = standalone.response.resolved
     ui = standalone.response.ui_projection
-    assert [block.display_text for block in resolved.requested_fact_blocks] == [WARRANTY_FACT]
-    assert WARRANTY_FACT in text
+    assert WARRANTY_LIVE in text
+    assert resolved.d2_request_parts[0].content_publication == "model_prose"
+    assert resolved.requested_fact_blocks == ()
+    assert WARRANTY_FACT not in text
     assert WARRANTY_ALSO not in text
     assert WARRANTY_BOOSTER not in text
     assert "Также" not in text
@@ -310,6 +345,9 @@ def test_a04_direct_warranty_uses_fact_full_form_not_also_package(tmp_path: Path
                 service_id="classic",
                 topic_id="implantation",
                 section_refs=["a:korotko"],
+                realization="model_prose",
+                text=PAIN_LIVE,
+                fallback="a:korotko",
             )
         ),
         message="Я боюсь боли при имплантации",
@@ -318,18 +356,25 @@ def test_a04_direct_warranty_uses_fact_full_form_not_also_package(tmp_path: Path
     after, _, _, _, _ = _run(
         tmp_path,
         _raw(
-            _content_part(content_ref=None, service_id="classic", topic_id="implantation"),
-            commercial_intent="payment",
-            direct_fact_ids=["implant_warranty"],
+            _content_part(
+                content_ref="clinic__info__warranty.md",
+                service_id=None,
+                topic_id="clinic",
+                section_refs=["a:korotko"],
+                realization="model_prose",
+                text=WARRANTY_LIVE,
+                fallback="a:korotko",
+            )
         ),
         message="А гарантия у вас есть?",
         key=SessionKey(client_id="demo", sid="c1-warranty-after"),
         now=NOW.replace(minute=1),
         clients=clients,
     )
-    assert PAIN_KOROTKO in first.response.rendered_text
-    assert WARRANTY_FACT in after.response.rendered_text
+    assert PAIN_LIVE in first.response.rendered_text
+    assert WARRANTY_LIVE in after.response.rendered_text
     assert WARRANTY_ALSO not in after.response.rendered_text
+    assert after.response.resolved.requested_fact_blocks == ()
     assert after.response.resolved.promo_blocks == ()
 
 

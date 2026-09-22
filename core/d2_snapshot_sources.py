@@ -9,6 +9,7 @@ import yaml
 from contracts.d2_tenant_snapshot import D2ModelView, D2TenantSnapshot
 from contracts.one_call_envelope import OneCallEnvelope
 from contracts.response_plan import (
+    CodeOwnedTerminalCandidate,
     ComposerResult,
     ComposerSelectedRouteAuthority,
     PreComposerPlan,
@@ -40,6 +41,10 @@ from contracts.response_plan_materialization import (
 )
 from contracts.response_plan_post_composer import PostComposerMaterialAuthority, ResponseSituationDelta
 from core.d2_tenant_snapshot import build_d2_bundle, build_d2_model_view
+from core.clinic_contact_policies import (
+    format_manual_contact_phone_suffix,
+    parse_clinic_contact_facts_from_policies_raw,
+)
 from core.response_plan_resolver import resolve_response_plan
 from core.response_text_renderer import render_response_text
 from core.response_ui_projection import project_response_ui
@@ -322,10 +327,92 @@ def build_d2_focus_clarify_response(
 
 _INFO_GAP = "К сожалению, у меня пока недостаточно информации по этому вопросу"
 _POLICY_CLARIFY = "Уточните, пожалуйста: вопрос про ОМС или ДМС?"
+_DEFAULT_MANUAL_CONTACT = (
+    "Такой вопрос лучше решить напрямую с клиникой — так будет быстрее и корректнее. "
+    "Пожалуйста, позвоните нам."
+)
 
 
 def _clinic_policies_raw(snapshot: D2TenantSnapshot) -> dict[str, object]:
     return _yaml_file(snapshot, "clinic_policies.yaml")
+
+
+def _manual_contact_text(snapshot: D2TenantSnapshot) -> tuple[str, str | None]:
+    """Build the single authored ADMIN stub + optional display phone."""
+    raw = _clinic_policies_raw(snapshot)
+    template = str(raw.get("manual_contact_template") or "").strip()
+    urgent = str(raw.get("manual_contact_urgent_suffix") or "").strip()
+    facts = parse_clinic_contact_facts_from_policies_raw(raw)
+    phone_suffix = format_manual_contact_phone_suffix(facts)
+    if template and "{phone_suffix}" in template:
+        text = template.format(phone_suffix=phone_suffix, urgent_suffix=urgent)
+    elif template:
+        text = template
+    else:
+        text = _DEFAULT_MANUAL_CONTACT
+        if phone_suffix:
+            text = f"{text}{phone_suffix}."
+        if urgent:
+            text = f"{text} {urgent}"
+    phone = facts.phone_display.strip() or None
+    if phone is None and facts.branches:
+        lines = []
+        for branch in facts.branches:
+            lines.extend(branch.phone_displays)
+        phone = lines[0] if lines else None
+    return " ".join(text.split()), phone
+
+
+def build_d2_manual_contact_terminal_response(
+    snapshot: D2TenantSnapshot,
+    *,
+    session_key: SessionKey,
+) -> MaterializedResponseOutcome:
+    """B03/D2-023: one authored manual-contact stub for all ADMIN problem cases.
+
+    Current pain, bleeding, complaint, director request — same text. No medical
+    advice, prices, promos, follow-up, or video. Future fear stays ordinary ANSWER.
+    """
+    if snapshot.client_id != session_key.client_id:
+        raise D2SnapshotBindingError("manual_contact_client_mismatch")
+    text, _phone = _manual_contact_text(snapshot)
+    # Phone stays in authored display_text only. Do not attach canonical_contact:
+    # resolver would emit a contact_call button, forbidden by D2-023.
+    terminal = CodeOwnedTerminalCandidate(
+        source_client_id=snapshot.client_id,
+        route="ADMIN",
+        mode="medical_terminal",
+        authority="deterministic_policy_terminal",
+        display_text=text,
+        canonical_contact=None,
+    )
+    plan = PreComposerPlan(
+        session_key=session_key,
+        context_strategy="full_context",
+        route_authority=ComposerSelectedRouteAuthority(
+            allowed_route_modes=(RouteModePair(route="ADMIN", mode="medical_terminal"),),
+            terminal_candidates=(terminal,),
+        ),
+        response_scope="clinic",
+        selected_service_id=None,
+        active_session_service_id=None,
+        selected_topic_id=None,
+        price_plan=PricePlan(kind="none"),
+        ui_candidates=UiPlanCandidates(),
+        transport_kind="blocking",
+    )
+    composer = ComposerResult(route="ADMIN", mode="medical_terminal", patient_text=None)
+    resolved = resolve_response_plan(plan, composer)
+    return MaterializedResponseOutcome(
+        resolved=resolved,
+        rendered_text=render_response_text(resolved),
+        ui_projection=project_response_ui(resolved),
+        materialization_diagnostics=(),
+        selection_diagnostics=(),
+        adapter_diagnostics=(),
+        situation_delta=ResponseSituationDelta(action="keep"),
+        trace=MaterializationTrace(None, (), (), ()),
+    )
 
 
 def _authored_policy_answers(snapshot: D2TenantSnapshot) -> dict[str, str]:

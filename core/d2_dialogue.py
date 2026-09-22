@@ -26,6 +26,7 @@ from core.d2_session_context import (
 )
 from core.d2_snapshot_sources import (
     build_d2_focus_clarify_response,
+    build_d2_manual_contact_terminal_response,
     build_d2_snapshot_sources,
     build_d2_clinic_policy_response,
     build_d2_service_availability_response,
@@ -196,122 +197,146 @@ def _run_reserved_d2_dialogue_turn(
         commercial_fact_catalog=view.commercial_fact_catalog,
     )
     understanding = envelope.request_understanding
-    if envelope.route != "ANSWER" or understanding is None or not understanding.requests:
-        raise ValueError("d2_experiment_single_price_required")
-    parts = understanding.requests
-    part = parts[0]
-    subjects_by_id = {item.subject_id: item for item in understanding.subjects}
-    multi_part = _d2_multipart_shape_ok(parts=parts, subjects_by_id=subjects_by_id)
-    clinic_policy = (
-        len(parts) == 1
-        and part.kind == "clinic_policy"
-    )
-    service_availability = (
-        envelope.commercial_intent == "none"
-        and len(parts) == 1
-        and part.kind == "content"
-        and part.content_ref is None
-        and part.service_id is not None
-    )
-    direct_promotion = (
-        envelope.commercial_intent == "promotion"
-        and envelope.promotion_scope in {"general", "service", "shown"}
-        and len(parts) == 1
-        and part.kind == "content"
-    )
-    direct_fact = (
-        envelope.commercial_intent == "payment"
-        and bool(envelope.references.direct_fact_ids)
-        and len(parts) == 1
-        and part.kind == "content"
-    )
-    content_lookup = (
-        envelope.commercial_intent == "none"
-        and 1 <= len(parts) <= 2
-        and all(item.kind == "content" for item in parts)
-        and (len(parts) == 2 or part.content_ref is not None)
-        and not service_availability
-    )
-    if not (
-        direct_promotion
-        or direct_fact
-        or content_lookup
-        or multi_part
-        or clinic_policy
-        or service_availability
-    ):
-        if len(parts) != 1:
-            raise ValueError("d2_experiment_single_price_required")
-        if part.kind != "price":
-            raise ValueError("d2_experiment_single_price_required")
-        subject = subjects_by_id.get(part.subject_id) if part.subject_id else None
-        shape_failures = _d2_supported_price_shape_failure_codes(part=part, subject=subject)
-        if shape_failures:
-            raise ValueError("d2_experiment_a08_shape_required:" + ",".join(shape_failures))
-    elif direct_promotion and envelope.promotion_scope == "service" and part.service_id is None:
-        raise ValueError("d2_experiment_promotion_service_required")
-    # Clarify is soft (A10); hard terminals remain unsupported on this route.
-    if context.retained_terminal_state not in {"none", "clarify"}:
-        raise ValueError("d2_experiment_terminal_session_unsupported")
-    binding = bind_d1r_envelope_to_d2_context(envelope, context)
-    focus = seed_d2_plan_focus(binding)
-    price_focus_clarify = (
-        focus.action == "clarify_focus"
-        and part.kind == "price"
-        and part.service_id is None
-        and part.topic_id is None
-        and binding.outcome == "ambiguous_focus"
-    )
-    if not (direct_promotion and envelope.promotion_scope == "general"):
-        if price_focus_clarify or multi_part or clinic_policy or service_availability:
-            # Policy/availability: typed ids only; no single-topic focus required.
-            pass
-        elif (
-            focus.action != "resolve_topic"
-            or binding.outcome not in {"explicit_new_topic", "clear_continuation"}
-        ):
-            raise ValueError("d2_experiment_resolved_topic_required")
-    if price_focus_clarify:
-        response = build_d2_focus_clarify_response(tenant, session_key=session_key)
+    admin_terminal = envelope.route == "ADMIN"
+    if admin_terminal:
+        # B03/D2-023: one authored stub; no ordinary parts / focus required.
+        if context.retained_terminal_state not in {"none", "clarify", "admin", "medical_terminal"}:
+            raise ValueError("d2_experiment_terminal_session_unsupported")
+        response = build_d2_manual_contact_terminal_response(tenant, session_key=session_key)
+        if response.resolved.route != "ADMIN" or not response.rendered_text.strip():
+            raise ValueError("d2_experiment_admin_terminal_not_resolved")
+        binding = bind_d1r_envelope_to_d2_context(envelope, context)
+        focus = seed_d2_plan_focus(binding)
         price = None
         decision = None
-    elif clinic_policy:
-        response = build_d2_clinic_policy_response(
-            tenant,
-            session_key=session_key,
-            understanding=understanding,
-        )
-        price = None
-        decision = None
-    elif service_availability:
-        assert part.service_id is not None
-        response = build_d2_service_availability_response(
-            tenant,
-            session_key=session_key,
-            service_id=part.service_id,
-        )
-        price = None
-        decision = None
+        part = None
+        price_focus_clarify = False
+        clinic_policy = False
+        service_availability = False
+        direct_promotion = False
+        direct_fact = False
+        content_lookup = False
+        multi_part = False
+        parts = ()
     else:
-        sources = build_d2_snapshot_sources(
-            tenant,
-            model_view=view,
-            envelope=envelope,
-            session_key=session_key,
-            shown_promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
-            shown_secondary_ref_ids=context.retained_shown_ids.secondary_ref_ids,
+        if envelope.route != "ANSWER" or understanding is None or not understanding.requests:
+            raise ValueError("d2_experiment_single_price_required")
+        parts = understanding.requests
+        part = parts[0]
+        subjects_by_id = {item.subject_id: item for item in understanding.subjects}
+        multi_part = _d2_multipart_shape_ok(parts=parts, subjects_by_id=subjects_by_id)
+        clinic_policy = (
+            len(parts) == 1
+            and part.kind == "clinic_policy"
         )
-        response = resolve_d2_envelope_response(
-            envelope,
-            sources,
-            as_of=now.date(),
-            d2_plan_focus_seed=focus,
-            common_route_direct_service_only=True,
-            common_route_content_lookup=True,
+        service_availability = (
+            envelope.commercial_intent == "none"
+            and len(parts) == 1
+            and part.kind == "content"
+            and part.content_ref is None
+            and part.service_id is not None
         )
-        price = response.resolved.d2_price_block
-        decision = response.resolved.d2_price_scope_decision
-    if price_focus_clarify:
+        direct_promotion = (
+            envelope.commercial_intent == "promotion"
+            and envelope.promotion_scope in {"general", "service", "shown"}
+            and len(parts) == 1
+            and part.kind == "content"
+        )
+        direct_fact = (
+            envelope.commercial_intent == "payment"
+            and bool(envelope.references.direct_fact_ids)
+            and len(parts) == 1
+            and part.kind == "content"
+        )
+        content_lookup = (
+            envelope.commercial_intent == "none"
+            and 1 <= len(parts) <= 2
+            and all(item.kind == "content" for item in parts)
+            and (len(parts) == 2 or part.content_ref is not None)
+            and not service_availability
+        )
+        if not (
+            direct_promotion
+            or direct_fact
+            or content_lookup
+            or multi_part
+            or clinic_policy
+            or service_availability
+        ):
+            if len(parts) != 1:
+                raise ValueError("d2_experiment_single_price_required")
+            if part.kind != "price":
+                raise ValueError("d2_experiment_single_price_required")
+            subject = subjects_by_id.get(part.subject_id) if part.subject_id else None
+            shape_failures = _d2_supported_price_shape_failure_codes(part=part, subject=subject)
+            if shape_failures:
+                raise ValueError("d2_experiment_a08_shape_required:" + ",".join(shape_failures))
+        elif direct_promotion and envelope.promotion_scope == "service" and part.service_id is None:
+            raise ValueError("d2_experiment_promotion_service_required")
+        # Clarify is soft (A10); hard terminals remain unsupported on ordinary answers.
+        if context.retained_terminal_state not in {"none", "clarify"}:
+            raise ValueError("d2_experiment_terminal_session_unsupported")
+        binding = bind_d1r_envelope_to_d2_context(envelope, context)
+        focus = seed_d2_plan_focus(binding)
+        price_focus_clarify = (
+            focus.action == "clarify_focus"
+            and part.kind == "price"
+            and part.service_id is None
+            and part.topic_id is None
+            and binding.outcome == "ambiguous_focus"
+        )
+        if not (direct_promotion and envelope.promotion_scope == "general"):
+            if price_focus_clarify or multi_part or clinic_policy or service_availability:
+                # Policy/availability: typed ids only; no single-topic focus required.
+                pass
+            elif (
+                focus.action != "resolve_topic"
+                or binding.outcome not in {"explicit_new_topic", "clear_continuation"}
+            ):
+                raise ValueError("d2_experiment_resolved_topic_required")
+        if price_focus_clarify:
+            response = build_d2_focus_clarify_response(tenant, session_key=session_key)
+            price = None
+            decision = None
+        elif clinic_policy:
+            response = build_d2_clinic_policy_response(
+                tenant,
+                session_key=session_key,
+                understanding=understanding,
+            )
+            price = None
+            decision = None
+        elif service_availability:
+            assert part.service_id is not None
+            response = build_d2_service_availability_response(
+                tenant,
+                session_key=session_key,
+                service_id=part.service_id,
+            )
+            price = None
+            decision = None
+        else:
+            sources = build_d2_snapshot_sources(
+                tenant,
+                model_view=view,
+                envelope=envelope,
+                session_key=session_key,
+                shown_promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
+                shown_secondary_ref_ids=context.retained_shown_ids.secondary_ref_ids,
+            )
+            response = resolve_d2_envelope_response(
+                envelope,
+                sources,
+                as_of=now.date(),
+                d2_plan_focus_seed=focus,
+                common_route_direct_service_only=True,
+                common_route_content_lookup=True,
+            )
+            price = response.resolved.d2_price_block
+            decision = response.resolved.d2_price_scope_decision
+    if admin_terminal:
+        pass
+    elif price_focus_clarify:
         if response.resolved.route != "CLARIFY" or not response.rendered_text.strip():
             raise ValueError("d2_experiment_focus_clarify_not_resolved")
     elif clinic_policy or service_availability:
@@ -351,7 +376,7 @@ def _run_reserved_d2_dialogue_turn(
     # Persist only finalized facts. Hypothetical/overview/unknown must not wipe
     # a previously reported or corrected situation (D2-003).
     situation = snapshot.state.situation_state
-    if price_focus_clarify or clinic_policy or service_availability:
+    if admin_terminal or price_focus_clarify or clinic_policy or service_availability:
         situation = snapshot.state.situation_state
     elif multi_part and (price is None or decision is None or decision.applied_extent is None):
         # Independent parts: do not invent a situation from deferred/unavailable price.
@@ -428,17 +453,21 @@ def _run_reserved_d2_dialogue_turn(
     shown_services = tuple(dict.fromkeys(row.service_id for row in price.rows)) if price is not None else ()
     extra_offers = tuple(row.offer_id for row in price.rows) if price is not None else ()
     shown_offers = tuple(dict.fromkeys((*context.retained_shown_ids.price_offer_ids, *extra_offers)))
-    active_topic = (
-        PersistedActiveTopic(topic_id=part.topic_id, provenance="explicit_topic", set_at_turn=turn)
-        if part.topic_id is not None
-        else snapshot.state.active_topic
-    )
-    shown_options_snapshot = snapshot.state.shown_options_snapshot
-    if price is not None and part.topic_id is not None:
-        shown_options_snapshot = PersistedShownOptionsSnapshot(
-            session_key=session_key, topic_id=part.topic_id, service_ids=shown_services,
-            shown_at_turn=turn, provenance="finalized_plan_price_offers",
+    if admin_terminal or part is None:
+        active_topic = snapshot.state.active_topic
+        shown_options_snapshot = snapshot.state.shown_options_snapshot
+    else:
+        active_topic = (
+            PersistedActiveTopic(topic_id=part.topic_id, provenance="explicit_topic", set_at_turn=turn)
+            if part.topic_id is not None
+            else snapshot.state.active_topic
         )
+        shown_options_snapshot = snapshot.state.shown_options_snapshot
+        if price is not None and part.topic_id is not None:
+            shown_options_snapshot = PersistedShownOptionsSnapshot(
+                session_key=session_key, topic_id=part.topic_id, service_ids=shown_services,
+                shown_at_turn=turn, provenance="finalized_plan_price_offers",
+            )
     state = ResponsePlanSessionState(
         schema_version=SESSION_SCHEMA_VERSION, session_key=session_key,
         revision=snapshot.state.revision + 1, last_committed_turn_index=turn,

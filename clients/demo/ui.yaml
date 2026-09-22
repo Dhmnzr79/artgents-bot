@@ -54,6 +54,8 @@ scope_nav:
       label: "Несколько зубов"
     full_arch:
       label: "Вся челюсть"
+    unknown:
+      label: "Не знаю"
   prosthetics:
     one_tooth:
       label: "Один зуб"
@@ -61,6 +63,8 @@ scope_nav:
       label: "Несколько зубов"
     full_arch:
       label: "Вся челюсть"
+    unknown:
+      label: "Не знаю"
 
 stage_nav:
   prosthetics:

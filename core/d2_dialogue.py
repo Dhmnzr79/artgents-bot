@@ -64,9 +64,14 @@ def _d2_supported_price_shape_failure_codes(*, part: object, subject: object) ->
                 failures.append("subject_relation_not_self")
             if subject.age_group == "child":
                 failures.append("subject_age_group_child")
-        if part.situation is None:
-            failures.append("situation_missing")
-        elif part.situation.scope_commitment not in {"reported", "unknown"}:
+        # situation=None is the direction overview turn (volume choices).
+        if part.situation is not None and part.situation.scope_commitment not in {
+            "reported",
+            "unknown",
+            "correction",
+            "hypothetical",
+            "reset",
+        }:
             failures.append("situation_scope_unsupported")
     return tuple(failures)
 
@@ -225,14 +230,15 @@ def _run_reserved_d2_dialogue_turn(
     elif price is None or (part.service_id is None and decision is None) or not response.rendered_text.strip():
         raise ValueError("d2_experiment_price_not_resolved")
     turn = snapshot.current_turn_index
-    situation = None
-    # Persist only finalized facts. A typed carry is retained only when the
-    # materialized price answer consumed its extent.
+    # Persist only finalized facts. Hypothetical/overview/unknown must not wipe
+    # a previously reported or corrected situation (D2-003).
+    situation = snapshot.state.situation_state
     if decision is not None and decision.applied_extent is not None:
         current = part.situation
         carried = focus.carried_situation
         if (
-            carried is not None
+            current is not None
+            and carried is not None
             and current.continuity == "same"
             and carried.situation_owner_id is not None
             and carried.session_key == session_key
@@ -244,11 +250,25 @@ def _run_reserved_d2_dialogue_turn(
                 jaw=carried.jaw, stage=carried.stage, modifiers=carried.modifiers, set_at_turn=turn,
                 situation_owner_id=carried.situation_owner_id, tooth_count=carried.tooth_count,
             )
-        elif current.scope_commitment == "reported" and current.extent == decision.applied_extent:
+        elif (
+            current is not None
+            and current.scope_commitment in {"reported", "correction"}
+            and current.extent == decision.applied_extent
+        ):
             situation = PersistedSituationState(
                 session_key=session_key, topic_id=part.topic_id, extent=current.extent,
                 jaw=current.jaw, stage="unknown", modifiers=(), set_at_turn=turn,
-                situation_owner_id=uuid4().hex, tooth_count=current.tooth_count,
+                situation_owner_id=(
+                    snapshot.state.situation_state.situation_owner_id
+                    if (
+                        current.scope_commitment == "correction"
+                        and snapshot.state.situation_state is not None
+                        and snapshot.state.situation_state.situation_owner_id is not None
+                        and snapshot.state.situation_state.topic_id == part.topic_id
+                    )
+                    else uuid4().hex
+                ),
+                tooth_count=current.tooth_count,
             )
         elif focus.cross_topic_carry is not None:
             source = focus.cross_topic_carry.source_situation
@@ -259,6 +279,14 @@ def _run_reserved_d2_dialogue_turn(
                 jaw=source.jaw, stage=source.stage, modifiers=source.modifiers, set_at_turn=turn,
                 situation_owner_id=source.situation_owner_id, tooth_count=source.tooth_count,
             )
+        elif current is not None and current.scope_commitment == "hypothetical":
+            situation = snapshot.state.situation_state
+    elif decision is not None and decision.reason == "overview":
+        current = part.situation
+        if current is not None and current.scope_commitment in {"unknown", "reset"}:
+            situation = None
+        else:
+            situation = snapshot.state.situation_state
     shown_services = tuple(dict.fromkeys(row.service_id for row in price.rows)) if price is not None else ()
     extra_offers = tuple(row.offer_id for row in price.rows) if price is not None else ()
     shown_offers = tuple(dict.fromkeys((*context.retained_shown_ids.price_offer_ids, *extra_offers)))

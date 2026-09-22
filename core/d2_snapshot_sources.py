@@ -20,6 +20,7 @@ from contracts.response_plan_materialization import (
     D2PartFailureAuthority,
     D2ServiceCommercialProfileAuthority,
     D2SourceUiAuthority,
+    D2VolumeChoice,
     ResponsePlanMaterializationSources,
 )
 from core.d2_tenant_snapshot import build_d2_bundle, build_d2_model_view
@@ -31,6 +32,13 @@ class D2SnapshotBindingError(ValueError):
 
 
 _PRICE_UNAVAILABLE = "К сожалению, у меня пока нет информации о стоимости этой услуги"
+_VOLUME_EXTENTS = ("one_tooth", "few_teeth", "full_arch", "unknown")
+_DEFAULT_VOLUME_LABELS = {
+    "one_tooth": "Один зуб",
+    "few_teeth": "Несколько зубов",
+    "full_arch": "Вся челюсть",
+    "unknown": "Не знаю",
+}
 
 
 def _yaml_file(snapshot: D2TenantSnapshot, name: str) -> dict[str, object]:
@@ -103,6 +111,8 @@ def build_d2_snapshot_sources(
         raise D2SnapshotBindingError("direction_overview_not_configured")
 
     tone = _yaml_file(snapshot, "tone.yaml")
+    ui_yaml = _yaml_file(snapshot, "ui.yaml")
+    scope_nav = ui_yaml.get("scope_nav") if isinstance(ui_yaml.get("scope_nav"), dict) else {}
     cta_variants = ((tone.get("lead") or {}) if isinstance(tone.get("lead"), dict) else {}).get("cta_variants", [])
     labels = {str(item.get("key")): str(item.get("label")) for item in cta_variants if isinstance(item, dict)}
     price_label = labels.get("price")
@@ -152,9 +162,17 @@ def build_d2_snapshot_sources(
         d2_authored_content=snapshot.content,
         d2_directions=directions,
         d2_direction_price_presentations=tuple(
-            D2DirectionPricePresentation(source_client_id=snapshot.client_id, topic_id=item.topic_id,
-                                         introduction_text=item.introduction_text,
-                                         unknown_extent_text=item.unknown_extent_text)
+            D2DirectionPricePresentation(
+                source_client_id=snapshot.client_id,
+                topic_id=item.topic_id,
+                introduction_text=item.introduction_text,
+                unknown_extent_text=item.unknown_extent_text,
+                volume_choices=_volume_choices_for_topic(
+                    snapshot.client_id,
+                    topic_id=item.topic_id,
+                    scope_nav=scope_nav,
+                ),
+            )
             for item in model_view.direction_prices
         ),
         d2_source_ui=tuple(ui_rows),
@@ -166,6 +184,34 @@ def build_d2_snapshot_sources(
         shown_promo_fact_ids=shown_promo_fact_ids,
         d2_snapshot_fingerprint=snapshot.fingerprint,
         d2_commercial=_commercial_authority(snapshot.client_id, model_view),
+    )
+
+
+def _volume_choices_for_topic(
+    client_id: str,
+    *,
+    topic_id: str,
+    scope_nav: dict[str, object],
+) -> tuple[D2VolumeChoice, ...]:
+    topic_nav = scope_nav.get(topic_id)
+    labels_by_extent: dict[str, str] = dict(_DEFAULT_VOLUME_LABELS)
+    if isinstance(topic_nav, dict):
+        for extent in _VOLUME_EXTENTS:
+            entry = topic_nav.get(extent)
+            if isinstance(entry, dict):
+                label = entry.get("label")
+                if isinstance(label, str) and label.strip():
+                    labels_by_extent[extent] = label.strip()
+    return tuple(
+        D2VolumeChoice(
+            extent=extent,  # type: ignore[arg-type]
+            candidate=UiQuickReplyCandidate(
+                source_client_id=client_id,
+                reply_id=f"volume:{topic_id}:{extent}",
+                label=labels_by_extent[extent],
+            ),
+        )
+        for extent in _VOLUME_EXTENTS
     )
 
 

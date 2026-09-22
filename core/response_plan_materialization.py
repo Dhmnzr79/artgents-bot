@@ -827,19 +827,14 @@ def _d2_price_scope_decision(
         return None, ()
     choices: tuple[D2PriceScopeChoice, ...] = ()
     situation = part.situation
+    # Volume buttons come from clinic presentation (D2-028). Offer-set diversity
+    # is not required: extents may share a price card and still need a choice.
     can_offer_choices = situation is None
-    if applied_extent is None and can_offer_choices:
-        offer_sets = {
-            extent: _d2_scope_offer_ids(
-                service_ids=service_ids, extent=extent, sources=sources
-            )
-            for extent in ("one_tooth", "few_teeth", "full_arch")
-        }
-        if len(set(offer_sets.values())) > 1:
-            choices = tuple(
-                D2PriceScopeChoice(extent=item.extent, candidate=item.candidate)
-                for item in presentation.volume_choices
-            )
+    if applied_extent is None and can_offer_choices and presentation.volume_choices:
+        choices = tuple(
+            D2PriceScopeChoice(extent=item.extent, candidate=item.candidate)
+            for item in presentation.volume_choices
+        )
     return (
         D2PriceScopeDecision(
             source_request_id=part.request_id,
@@ -848,7 +843,9 @@ def _d2_price_scope_decision(
             reason="known_situation" if applied_extent is not None else "overview",
             selected_offer_ids=selected_offer_ids,
             introduction_text=presentation.introduction_text,
-            unknown_extent_text=presentation.unknown_extent_text if applied_extent is None else None,
+            # Clarification copy only with volume buttons (D2-005/074). After
+            # «Не знаю» choices are empty: keep orienting prices, do not re-ask.
+            unknown_extent_text=presentation.unknown_extent_text if choices else None,
             volume_choices=choices,
         ),
         choices,
@@ -1000,7 +997,24 @@ def _d2_price_block(
                 raise MaterializationOwnershipError("d2_direction_service_unavailable")
             if applied_extent is None or _d2_offer_applies(offer, service, applied_extent):
                 offers.append(offer)
-        offers = offers[:3]
+        if applied_extent is None:
+            offers = offers[:3]
+        elif not offers:
+            # Known extent may need direction services outside the overview top-3
+            # cards; pick active offers by typed extent without strategy selectors.
+            for offer in bundle.offers:
+                if not offer.active or offer.service_id not in service_ids:
+                    continue
+                service = bundle.services.get(offer.service_id)
+                if service is None or not service.active:
+                    continue
+                if offer.option_id is not None and not any(
+                    option.option_id == offer.option_id and option.active for option in service.options
+                ):
+                    continue
+                if _d2_offer_applies(offer, service, applied_extent):
+                    offers.append(offer)
+            offers = offers[:3]
     for service_id in (() if ordered_offer_ids or direct_service_only else service_ids):
         if service_id not in bundle.services:
             raise MaterializationOwnershipError("materialization_foreign_material")

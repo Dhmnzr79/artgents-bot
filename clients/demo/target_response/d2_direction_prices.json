@@ -3,11 +3,13 @@
   "directions": [
     {
       "topic_id": "implantation",
-      "service_ids": ["classic"],
+      "service_ids": ["classic", "all_on_4", "pterygoid_implants"],
       "offer_ids": [
         "classic.one_tooth.impro",
         "classic.one_tooth.implantium",
-        "classic.one_tooth.nobel"
+        "classic.one_tooth.nobel",
+        "all_on_4.jaw.impro",
+        "pterygoid_implants.default"
       ],
       "introduction_text": "Понимаю, хочется сразу сориентироваться по вариантам восстановления одного зуба. Вот примеры стоимости.",
       "unknown_extent_text": "Подскажите, пожалуйста, речь об одном зубе, нескольких зубах или о всей челюсти?"

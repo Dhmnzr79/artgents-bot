@@ -9,7 +9,7 @@ from contracts.response_schema import RequestedDisplayPolicy
 from pydantic import AfterValidator, BaseModel, ConfigDict, Discriminator, Field, Tag, model_validator
 
 ResponseRoute = Literal["ANSWER", "ADMIN", "CLARIFY"]
-ResponseMode = Literal["standard", "contacts", "medical_terminal"]
+ResponseMode = Literal["standard", "contacts", "medical_terminal", "spam_warn", "spam_closed"]
 ContextStrategy = Literal["full_context", "hybrid"]
 ResponseScope = Literal["service", "topic", "clinic", "mixed"]
 FactApplicability = Literal["clinic_wide", "topic_scoped", "service_scoped"]
@@ -48,7 +48,15 @@ PlanDiagnosticCode = Literal[
     "materialization_optional_unavailable",
 ]
 TransportKind = Literal["blocking", "streaming"]
-TerminalState = Literal["none", "admin", "contacts", "clarify", "medical_terminal"]
+TerminalState = Literal[
+    "none",
+    "admin",
+    "contacts",
+    "clarify",
+    "medical_terminal",
+    "spam_warn",
+    "spam_closed",
+]
 
 ALLOWED_ROUTE_MODE_PAIRS: frozenset[tuple[ResponseRoute, ResponseMode]] = frozenset(
     {
@@ -56,6 +64,8 @@ ALLOWED_ROUTE_MODE_PAIRS: frozenset[tuple[ResponseRoute, ResponseMode]] = frozen
         ("ANSWER", "contacts"),
         ("ADMIN", "standard"),
         ("ADMIN", "medical_terminal"),
+        ("ADMIN", "spam_warn"),
+        ("ADMIN", "spam_closed"),
         ("CLARIFY", "standard"),
     }
 )
@@ -72,6 +82,8 @@ CODE_OWNED_ROUTE_MODE_PAIRS: frozenset[tuple[ResponseRoute, ResponseMode]] = fro
         ("ANSWER", "contacts"),
         ("ADMIN", "standard"),
         ("ADMIN", "medical_terminal"),
+        ("ADMIN", "spam_warn"),
+        ("ADMIN", "spam_closed"),
     }
 )
 COMPOSER_TERMINAL_OUTCOME_PAIRS: frozenset[tuple[ResponseRoute, ResponseMode]] = frozenset(
@@ -100,6 +112,8 @@ EXPECTED_TERMINAL_STATE: dict[tuple[ResponseRoute, ResponseMode], tuple[Terminal
     ("ANSWER", "contacts"): ("contacts", False),
     ("ADMIN", "standard"): ("admin", False),
     ("ADMIN", "medical_terminal"): ("medical_terminal", False),
+    ("ADMIN", "spam_warn"): ("spam_warn", False),
+    ("ADMIN", "spam_closed"): ("spam_closed", False),
     ("CLARIFY", "standard"): ("clarify", True),
 }
 

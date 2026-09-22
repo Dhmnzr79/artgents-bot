@@ -37,6 +37,7 @@ from core.d2_snapshot_sources import (
     build_d2_clinic_policy_response,
     build_d2_service_availability_response,
 )
+from core.d2_spam_gate import build_d2_spam_gate_response, is_d2_garbage_message
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
 from core.one_call_envelope_protocol import (
     parse_production_envelope_json,
@@ -176,6 +177,37 @@ def run_d2_dialogue_turn(
     if reservation.is_replay:
         return _turn_from_completion(reservation.completed, idempotent_replay=True)
     try:
+        tenant = load_d2_tenant_snapshot(session_key.client_id, clients_root=clients_root)
+        previous = store.read(session_key)
+        if previous and previous.tenant_fingerprint != tenant.fingerprint:
+            raise ValueError("d2_experiment_tenant_changed")
+        early_snapshot = (
+            ResponsePlanSessionSnapshot(state=previous.state, exists_in_store=True)
+            if previous else empty_session_snapshot(session_key)
+        )
+        early_context = project_d2_session_context(
+            early_snapshot,
+            expected_session_key=session_key,
+            activity=previous.activity if previous else None,
+            policy=ttl_policy,
+            now=now,
+        )
+        # D2-071: closed until a new chat/sid; beats lead and ordinary turns.
+        if early_context.retained_terminal_state == "spam_closed":
+            return _run_spam_gate_turn(
+                session_key=session_key,
+                clients_root=clients_root,
+                store=store,
+                now=now,
+                ttl_policy=ttl_policy,
+                request_id=effective_request_id,
+                request_fingerprint=fingerprint,
+                kind="closed",
+                tenant=tenant,
+                previous=previous,
+                snapshot=early_snapshot,
+                context=early_context,
+            )
         session_matched = d2_lead_session_client_matches(session_key)
         lead_gate = bool(
             lead_bridge
@@ -202,6 +234,31 @@ def run_d2_dialogue_turn(
                 lead_ui_ref=lead_ui_ref,
                 situation_action=situation_action,
             )
+        # D2-040: one authored chance, then hard-stop. Lead/medical terminals stay owners.
+        if is_d2_garbage_message(user_message) and early_context.retained_terminal_state in {
+            "none",
+            "clarify",
+            "spam_warn",
+        }:
+            kind = (
+                "closed"
+                if early_context.retained_terminal_state == "spam_warn"
+                else "warn"
+            )
+            return _run_spam_gate_turn(
+                session_key=session_key,
+                clients_root=clients_root,
+                store=store,
+                now=now,
+                ttl_policy=ttl_policy,
+                request_id=effective_request_id,
+                request_fingerprint=fingerprint,
+                kind=kind,
+                tenant=tenant,
+                previous=previous,
+                snapshot=early_snapshot,
+                context=early_context,
+            )
         safe_user_message = provider_safe_user_text(user_message)
         if not provider_message_has_substance(safe_user_message, raw_source=user_message):
             store.abandon_request(
@@ -227,6 +284,63 @@ def run_d2_dialogue_turn(
             session_key, request_id=effective_request_id, request_fingerprint=fingerprint,
         )
         raise
+
+
+def _run_spam_gate_turn(
+    *,
+    session_key: SessionKey,
+    clients_root: Path,
+    store: D2DialogueStore,
+    now: datetime,
+    ttl_policy: D2SessionTtlPolicy,
+    request_id: str,
+    request_fingerprint: str,
+    kind: str,
+    tenant,
+    previous,
+    snapshot,
+    context,
+) -> D2DialogueTurn:
+    """Authored spam warn/closed stub without a provider call."""
+    del clients_root, ttl_policy, previous  # already projected by caller
+    response = build_d2_spam_gate_response(tenant, session_key=session_key, kind=kind)
+    if response.resolved.route != "ADMIN" or not response.rendered_text.strip():
+        raise ValueError("d2_experiment_spam_gate_not_resolved")
+    raw = json.dumps(
+        production_envelope_template(
+            route="ADMIN",
+            patient_text=None,
+            commercial_intent="none",
+            promotion_scope="none",
+            scenario="none",
+            primary_price_request_id=None,
+            request_understanding={"subjects": [], "requests": []},
+        ),
+        ensure_ascii=False,
+    )
+    view = build_d2_model_view(tenant)
+    envelope = parse_production_envelope_json(
+        raw,
+        active_service_catalog=view.active_service_catalog,
+        service_reference_catalog=view.service_reference_catalog,
+        commercial_fact_catalog=view.commercial_fact_catalog,
+    )
+    binding = bind_d1r_envelope_to_d2_context(envelope, context)
+    focus = seed_d2_plan_focus(binding)
+    return _commit_non_price_d2_turn(
+        session_key=session_key,
+        store=store,
+        snapshot=snapshot,
+        context=context,
+        focus=focus,
+        response=response,
+        tenant_fingerprint=tenant.fingerprint,
+        now=now,
+        request_id=request_id,
+        request_fingerprint=request_fingerprint,
+        lead_effect_id=None,
+        lead_effect_dispatcher=None,
+    )
 
 
 def _run_lead_pre_provider_turn(
@@ -535,8 +649,8 @@ def _run_reserved_d2_dialogue_turn(
                 raise ValueError("d2_experiment_a08_shape_required:" + ",".join(shape_failures))
         elif direct_promotion and envelope.promotion_scope == "service" and part.service_id is None:
             raise ValueError("d2_experiment_promotion_service_required")
-        # Clarify is soft (A10); hard terminals remain unsupported on ordinary answers.
-        if context.retained_terminal_state not in {"none", "clarify"}:
+        # Clarify and spam_warn are soft; hard terminals remain unsupported on ordinary answers.
+        if context.retained_terminal_state not in {"none", "clarify", "spam_warn"}:
             raise ValueError("d2_experiment_terminal_session_unsupported")
         binding = bind_d1r_envelope_to_d2_context(envelope, context)
         focus = seed_d2_plan_focus(binding)

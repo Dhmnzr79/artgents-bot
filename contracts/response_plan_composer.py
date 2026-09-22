@@ -131,6 +131,8 @@ _ROUTE_PURPOSES: dict[tuple[ResponseRoute, ResponseMode], str] = {
     ("ANSWER", "contacts"): "explicit_contact_request_code_owned_visible",
     ("ADMIN", "standard"): "complaint_or_escalation_code_owned_visible",
     ("ADMIN", "medical_terminal"): "medical_safety_terminal_code_owned_visible",
+    ("ADMIN", "spam_warn"): "spam_one_chance_code_owned_visible",
+    ("ADMIN", "spam_closed"): "spam_hard_stop_code_owned_visible",
     ("CLARIFY", "standard"): "clarification_question",
 }
 _TERMINAL_CODE_OWNED_PAIRS: frozenset[tuple[ResponseRoute, ResponseMode]] = frozenset(
@@ -138,6 +140,8 @@ _TERMINAL_CODE_OWNED_PAIRS: frozenset[tuple[ResponseRoute, ResponseMode]] = froz
         ("ANSWER", "contacts"),
         ("ADMIN", "standard"),
         ("ADMIN", "medical_terminal"),
+        ("ADMIN", "spam_warn"),
+        ("ADMIN", "spam_closed"),
     }
 )
 _SOURCE_REF_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")

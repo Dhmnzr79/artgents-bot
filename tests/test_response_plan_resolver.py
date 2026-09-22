@@ -1005,6 +1005,25 @@ def test_route_mode_terminal_state_matrix(
             ),
             None,
         )
+    elif route == "ADMIN" and mode in {"spam_warn", "spam_closed"}:
+        resolved = resolve_response_plan(
+            make_plan(
+                route_authority=deterministic_route_authority(
+                    route="ADMIN",
+                    mode=mode,
+                    terminal=admin_terminal(mode=mode, text="TERMINAL"),
+                ),
+                price_plan=PricePlan(kind="none"),
+                response_scope="clinic",
+                selected_service_id=None,
+                selected_topic_id=None,
+                textual_cta_candidate=None,
+                service_value_candidate=None,
+                promo_candidate_ids=(),
+                automatic_amplifier_candidate_ids=(),
+            ),
+            None,
+        )
     elif route == "ADMIN":
         resolved = resolve_response_plan(
             make_plan(

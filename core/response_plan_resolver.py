@@ -63,7 +63,12 @@ def resolve_response_plan(
     if selected_pair == ("ANSWER", "contacts"):
         terminal = _require_terminal_candidate(authority, selected_pair)
         return _resolve_composer_contacts(precomposer_plan, composer_result, terminal)
-    if selected_pair in {("ADMIN", "standard"), ("ADMIN", "medical_terminal")}:
+    if selected_pair in {
+        ("ADMIN", "standard"),
+        ("ADMIN", "medical_terminal"),
+        ("ADMIN", "spam_warn"),
+        ("ADMIN", "spam_closed"),
+    }:
         terminal = _require_terminal_candidate(authority, selected_pair)
         return _resolve_composer_admin(precomposer_plan, composer_result, terminal)
     if selected_pair == ("CLARIFY", "standard"):
@@ -194,6 +199,10 @@ def _resolve_code_owned_terminal(
         terminal_state = "contacts"
     elif terminal.mode == "medical_terminal":
         terminal_state = "medical_terminal"
+    elif terminal.mode == "spam_warn":
+        terminal_state = "spam_warn"
+    elif terminal.mode == "spam_closed":
+        terminal_state = "spam_closed"
     else:
         terminal_state = "admin"
     ui_plan = _resolve_terminal_ui(plan, terminal)
@@ -244,9 +253,15 @@ def _resolve_composer_admin(
     composer: ComposerResult,
     terminal: CodeOwnedTerminalCandidate,
 ) -> ResolvedResponsePlan:
-    terminal_state: TerminalState = (
-        "medical_terminal" if composer.mode == "medical_terminal" else "admin"
-    )
+    if composer.mode == "medical_terminal":
+        terminal_state: TerminalState = "medical_terminal"
+    elif composer.mode == "spam_warn":
+        terminal_state = "spam_warn"
+    elif composer.mode == "spam_closed":
+        terminal_state = "spam_closed"
+    else:
+        terminal_state = "admin"
+
     ui_plan = _resolve_terminal_ui(plan, terminal)
     finalized = FinalizedCommercialIds()
     session_delta = _build_session_delta(plan, finalized, terminal_state=terminal_state)

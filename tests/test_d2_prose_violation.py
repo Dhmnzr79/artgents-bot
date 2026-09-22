@@ -5,7 +5,7 @@ from datetime import date
 import pytest
 
 from contracts.response_plan import UiQuickReplyCandidate
-from contracts.response_plan_materialization import D2SourceUiAuthority, MaterializationOwnershipError
+from contracts.response_plan_materialization import D2SourceUiAuthority
 from core.response_plan_materialization import resolve_d2_envelope_response
 from tests.test_d2_prose_realization import _AS_OF, _content_authority, _prose_request, _resolve
 from tests.test_d2_single_request import _parsed_envelope, _price_request, _sources
@@ -94,10 +94,13 @@ def test_integrity_errors_are_not_recovered() -> None:
     bad = _prose_request(fallback="s:anesthesia")
     bad["content_ref"] = "missing.md"
     envelope = _parsed_envelope(requests=[bad], commercial_intent="none")
-    with pytest.raises(MaterializationOwnershipError):
-        resolve_d2_envelope_response(
-            envelope, _sources(content=(_content_authority(),)), as_of=_AS_OF
-        )
+    outcome = resolve_d2_envelope_response(
+        envelope, _sources(content=(_content_authority(),)), as_of=_AS_OF
+    )
+    assert outcome.resolved.d2_result_status == "failed"
+    assert outcome.resolved.d2_request_parts[0].status == "unavailable"
+    assert outcome.resolved.d2_request_parts[0].failure_reason == "d2_content_source_missing"
+    assert "недостаточно информации" in outcome.rendered_text
 
 
 def test_unavailable_primary_source_ui_is_not_transferred() -> None:

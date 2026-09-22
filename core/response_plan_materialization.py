@@ -351,8 +351,8 @@ def resolve_d2_envelope_response(
         understanding, client_id=client_id, sources=sources
     )
 
-    # Resolve every content reference first. A later foreign/malformed material is
-    # fatal and must not disappear behind an otherwise recoverable price failure.
+    # Resolve content first. Wrong/missing refs soft-fail as part gaps (D2-078);
+    # foreign tenant material remains fatal and must not hide behind price recovery.
     allow_missing_content_ref = code_owned_null_content or comparison_lookup
     information_blocks, content_realizations = _d2_information_blocks(
         content_parts=content_parts,
@@ -367,6 +367,10 @@ def resolve_d2_envelope_response(
             client_id=client_id,
             sources=sources,
             allow_missing_content_ref=allow_missing_content_ref,
+            allow_missing_content_authority=(
+                content_realizations[part.request_id].outcome == "unavailable"
+                and content_realizations[part.request_id].reason == "d2_content_source_missing"
+            ),
         )
         for part in content_parts
     )
@@ -454,11 +458,17 @@ def resolve_d2_envelope_response(
                 selected_offer_ids=tuple(row.offer_id for row in price_block.rows),
             )
     else:
+        first = content_parts[0]
+        first_realization = content_realizations[first.request_id]
         service_ids, response_scope, selected_topic_id = _d2_content_scope(
-            content_parts[0],
+            first,
             client_id=client_id,
             sources=sources,
             allow_missing_content_ref=allow_missing_content_ref,
+            allow_missing_content_authority=(
+                first_realization.outcome == "unavailable"
+                and first_realization.reason == "d2_content_source_missing"
+            ),
         )
         trace = MaterializationTrace(
             price_lookup_mode=None,
@@ -617,7 +627,15 @@ def resolve_d2_envelope_response(
         d2_part_deferred_blocks=frozen_deferred_blocks,
         d2_result_status=result_status,
         textual_cta_candidate=(
-            _materialize_textual_cta(sources) if price_block is not None else None
+            _materialize_textual_cta(sources)
+            if (
+                price_block is not None
+                or any(
+                    part.status == "answered" and part.kind == "content"
+                    for part in request_parts
+                )
+            )
+            else None
         ),
         ui_candidates=ui_candidates,
         transport_kind=sources.transport_kind,
@@ -879,26 +897,44 @@ def _d2_offer_applies(offer: TargetOffer, service: TargetService, extent: str) -
     return offer_applies_to_extent(offer, service, extent)  # type: ignore[arg-type]
 
 
+def _d2_typed_content_scope_from_part(
+    part: RequestUnderstandingRequest,
+    *,
+    client_id: str,
+    sources: ResponsePlanMaterializationSources,
+) -> tuple[tuple[str, ...], str, str | None]:
+    """Scope for a recoverable content gap — only typed IDs, never invented cards."""
+    if part.service_id is not None:
+        if part.service_id not in sources.material_authority.bundle.services:
+            raise MaterializationOwnershipError("materialization_foreign_material")
+        return (part.service_id,), "service", part.topic_id
+    if part.topic_id is not None:
+        for direction in sources.d2_directions:
+            if direction.topic_id == part.topic_id and direction.source_client_id == client_id:
+                return direction.service_ids, "topic", part.topic_id
+        return (), "topic", part.topic_id
+    return (), "clinic", None
+
+
 def _d2_content_scope(
     part: RequestUnderstandingRequest,
     *,
     client_id: str,
     sources: ResponsePlanMaterializationSources,
     allow_missing_content_ref: bool = False,
+    allow_missing_content_authority: bool = False,
 ) -> tuple[tuple[str, ...], str, str | None]:
     if part.content_ref is None:
         if not allow_missing_content_ref:
             raise MaterializationContractError("d2_content_ref_required")
-        if part.service_id is not None:
-            if part.service_id not in sources.material_authority.bundle.services:
-                raise MaterializationOwnershipError("materialization_foreign_material")
-            return (part.service_id,), "service", part.topic_id
-        if part.topic_id is not None:
-            for direction in sources.d2_directions:
-                if direction.topic_id == part.topic_id and direction.source_client_id == client_id:
-                    return direction.service_ids, "topic", part.topic_id
-            return (), "topic", part.topic_id
-        return (), "clinic", None
+        return _d2_typed_content_scope_from_part(
+            part, client_id=client_id, sources=sources
+        )
+    if allow_missing_content_authority:
+        # Recoverable content gap: never invent cards; scope only from typed IDs.
+        return _d2_typed_content_scope_from_part(
+            part, client_id=client_id, sources=sources
+        )
     authority = next(
         (item for item in sources.d2_authored_content if item.content_ref == part.content_ref),
         None,
@@ -1279,28 +1315,80 @@ def _d2_information_blocks(
                     reason="d2_content_source_missing",
                 )
             continue
+        authority = by_ref.get(part.content_ref)
+        if authority is None:
+            # Wrong model ref for this tenant snapshot — recoverable gap (D2-078).
+            realizations[part.request_id] = D2ContentRealization(
+                outcome="unavailable",
+                publication=None,
+                display_text=None,
+                section_refs=(),
+                reason="d2_content_source_missing",
+            )
+            continue
+        if authority.source_client_id != client_id:
+            raise MaterializationOwnershipError("materialization_foreign_material")
+        section_by_ref = {section.section_ref: section for section in authority.sections}
+        if any(ref not in section_by_ref for ref in part.content_section_refs):
+            realizations[part.request_id] = D2ContentRealization(
+                outcome="unavailable",
+                publication=None,
+                display_text=None,
+                section_refs=(),
+                reason="d2_content_source_missing",
+            )
+            continue
+        if part.service_id is not None and part.service_id not in authority.allowed_service_ids:
+            realizations[part.request_id] = D2ContentRealization(
+                outcome="unavailable",
+                publication=None,
+                display_text=None,
+                section_refs=(),
+                reason="d2_content_source_missing",
+            )
+            continue
+        if part.topic_id is not None and authority.allowed_service_ids:
+            content_topics = {
+                item.topic_id
+                for item in sources.d2_directions
+                if item.source_client_id == client_id
+                and set(authority.allowed_service_ids).intersection(item.service_ids)
+            }
+            if content_topics and part.topic_id not in content_topics:
+                realizations[part.request_id] = D2ContentRealization(
+                    outcome="unavailable",
+                    publication=None,
+                    display_text=None,
+                    section_refs=(),
+                    reason="d2_content_source_missing",
+                )
+                continue
         part_service_ids, _, part_topic_id = _d2_content_scope(
             part,
             client_id=client_id,
             sources=sources,
             allow_missing_content_ref=allow_missing_content_ref,
         )
-        authority = by_ref.get(part.content_ref)
-        if authority is None:
-            raise MaterializationOwnershipError("materialization_foreign_material")
-        if authority.source_client_id != client_id:
-            raise MaterializationOwnershipError("materialization_foreign_material")
-        if part.service_id is not None and part.service_id not in authority.allowed_service_ids:
-            raise MaterializationContractError("d2_content_service_mismatch")
         if authority.allowed_service_ids and not set(part_service_ids).intersection(authority.allowed_service_ids):
             raise MaterializationOwnershipError("materialization_foreign_material")
         if part.service_id is not None and part.service_id not in part_service_ids:
-            raise MaterializationContractError("d2_content_service_mismatch")
+            realizations[part.request_id] = D2ContentRealization(
+                outcome="unavailable",
+                publication=None,
+                display_text=None,
+                section_refs=(),
+                reason="d2_content_source_missing",
+            )
+            continue
         if part.topic_id is not None and part.topic_id != part_topic_id:
-            raise MaterializationContractError("d2_content_topic_mismatch")
-        section_by_ref = {section.section_ref: section for section in authority.sections}
-        if any(ref not in section_by_ref for ref in part.content_section_refs):
-            raise MaterializationContractError("d2_content_section_ref_required")
+            realizations[part.request_id] = D2ContentRealization(
+                outcome="unavailable",
+                publication=None,
+                display_text=None,
+                section_refs=(),
+                reason="d2_content_source_missing",
+            )
+            continue
         realization = realize_d2_content(part, authority)
         realizations[part.request_id] = realization
         if realization.outcome == "unavailable":

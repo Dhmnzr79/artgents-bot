@@ -103,22 +103,9 @@ def build_d2_snapshot_sources(
     understanding = envelope.request_understanding
     if understanding is None:
         raise D2SnapshotBindingError("request_understanding_required")
-    by_ref = {item.content_ref: item for item in snapshot.content}
-    for request in understanding.requests:
-        if request.kind != "content" or request.content_ref is None:
-            continue
-        authority = by_ref.get(request.content_ref)
-        if authority is None:
-            raise D2SnapshotBindingError("content_ref_unavailable")
-        available = {section.section_ref for section in authority.sections}
-        if any(ref not in available for ref in request.content_section_refs):
-            raise D2SnapshotBindingError("content_section_ref_unavailable")
-        metadata = _frontmatter(snapshot, request.content_ref)
-        document_topic = metadata.get("topic")
-        if request.topic_id is not None and document_topic != request.topic_id:
-            raise D2SnapshotBindingError("content_topic_scope_unavailable")
-        if request.service_id is not None and request.service_id not in authority.allowed_service_ids:
-            raise D2SnapshotBindingError("content_service_scope_unavailable")
+    # Wrong/missing content refs are recoverable part failures (D2-078), not
+    # snapshot-binding hard errors. Foreign tenant identity stays fatal above.
+    # Soft-fail happens in the materializer as d2_content_source_missing.
 
     # Broad prices require explicit authored direction membership and order.
     configured_topics = {item.topic_id for item in model_view.direction_prices}

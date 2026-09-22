@@ -138,10 +138,21 @@ def test_tenant_view_and_source_binding() -> None:
         "service_id": "veneers", "topic_id": None,
     }
     scoped = _envelope(snapshot, view, content, commercial_intent="none")
-    with pytest.raises(D2SnapshotBindingError, match="content_service_scope_unavailable"):
-        build_d2_snapshot_sources(snapshot, model_view=view, envelope=scoped, session_key=SessionKey(client_id="demo", sid="scope"))
+    sources = build_d2_snapshot_sources(
+        snapshot, model_view=view, envelope=scoped, session_key=SessionKey(client_id="demo", sid="scope")
+    )
+    outcome = resolve_d2_envelope_response(scoped, sources, as_of=_AS_OF)
+    assert outcome.resolved.d2_result_status == "failed"
+    assert outcome.resolved.d2_request_parts[0].status == "unavailable"
+    assert outcome.resolved.d2_request_parts[0].failure_reason == "d2_content_source_missing"
+    assert "недостаточно информации" in outcome.rendered_text
 
     wrong_topic = {**content, "service_id": "classic", "topic_id": "prosthetics"}
     scoped = _envelope(snapshot, view, wrong_topic, commercial_intent="none")
-    with pytest.raises(D2SnapshotBindingError, match="content_topic_scope_unavailable"):
-        build_d2_snapshot_sources(snapshot, model_view=view, envelope=scoped, session_key=SessionKey(client_id="demo", sid="topic"))
+    sources = build_d2_snapshot_sources(
+        snapshot, model_view=view, envelope=scoped, session_key=SessionKey(client_id="demo", sid="topic")
+    )
+    outcome = resolve_d2_envelope_response(scoped, sources, as_of=_AS_OF)
+    assert outcome.resolved.d2_request_parts[0].status == "unavailable"
+    assert outcome.resolved.d2_request_parts[0].failure_reason == "d2_content_source_missing"
+    assert "недостаточно информации" in outcome.rendered_text

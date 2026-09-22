@@ -40,6 +40,7 @@ from core.d2_snapshot_sources import (
 from core.d2_spam_gate import build_d2_spam_gate_response, is_d2_garbage_message
 from core.d2_directory import build_d2_directory_response, classify_d2_directory_request
 from core.d2_contacts_cta import build_d2_contact_response
+from core.d2_offtopic import build_d2_offtopic_response, is_d2_offtopic_envelope
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
 from core.one_call_envelope_protocol import (
     parse_production_envelope_json,
@@ -563,6 +564,7 @@ def _run_reserved_d2_dialogue_turn(
         clinic_policy = False
         service_availability = False
         clinic_contact = False
+        offtopic = False
         direct_promotion = False
         direct_fact = False
         content_lookup = False
@@ -572,6 +574,29 @@ def _run_reserved_d2_dialogue_turn(
     else:
         if envelope.route != "ANSWER" or understanding is None or not understanding.requests:
             raise ValueError("d2_experiment_single_price_required")
+        offtopic = is_d2_offtopic_envelope(envelope)
+        if offtopic:
+            if context.retained_terminal_state not in {"none", "clarify", "spam_warn"}:
+                raise ValueError("d2_experiment_terminal_session_unsupported")
+            response = build_d2_offtopic_response(tenant, session_key=session_key)
+            if not response.rendered_text.strip():
+                raise ValueError("d2_experiment_offtopic_not_resolved")
+            binding = bind_d1r_envelope_to_d2_context(envelope, context)
+            focus = seed_d2_plan_focus(binding)
+            return _commit_non_price_d2_turn(
+                session_key=session_key,
+                store=store,
+                snapshot=snapshot,
+                context=context,
+                focus=focus,
+                response=response,
+                tenant_fingerprint=tenant.fingerprint,
+                now=now,
+                request_id=request_id,
+                request_fingerprint=request_fingerprint,
+                lead_effect_id=lead_effect_id,
+                lead_effect_dispatcher=lead_effect_dispatcher,
+            )
         booking_entry = None
         if lead_bridge:
             if not d2_lead_session_client_matches(session_key):

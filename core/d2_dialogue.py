@@ -80,6 +80,36 @@ def _d2_supported_price_shape_failure_codes(*, part: object, subject: object) ->
     return tuple(failures)
 
 
+def _d2_multipart_shape_ok(*, parts: tuple, subjects_by_id: dict) -> bool:
+    """True when the envelope is an assembled multi-part turn (A05/A06/B14 / D2-080).
+
+    Each part must already carry typed refs. Multi-topic is allowed: parts stay
+    independent (D2-042 / T2). No patient_text / regex inference.
+    """
+    if len(parts) < 2 or len(parts) > 3:
+        return False
+    if any(item.kind not in {"price", "content"} for item in parts):
+        return False
+    price_parts = tuple(item for item in parts if item.kind == "price")
+    content_parts = tuple(item for item in parts if item.kind == "content")
+    if not price_parts:
+        return False
+    # At least one price; optional independent content; extra prices are deferred.
+    if len(price_parts) + len(content_parts) != len(parts):
+        return False
+    for item in price_parts:
+        subject = subjects_by_id.get(item.subject_id) if item.subject_id else None
+        if _d2_supported_price_shape_failure_codes(part=item, subject=subject):
+            return False
+        # Direct service or typed topic overview (A05 prices); never empty focus.
+        if item.service_id is None and item.topic_id is None:
+            return False
+    for item in content_parts:
+        if item.content_ref is None:
+            return False
+    return True
+
+
 def _shown_secondary_ref_ids(response) -> tuple[str, ...]:
     ui = response.ui_projection
     shown: list[str] = []
@@ -165,6 +195,8 @@ def _run_reserved_d2_dialogue_turn(
         raise ValueError("d2_experiment_single_price_required")
     parts = understanding.requests
     part = parts[0]
+    subjects_by_id = {item.subject_id: item for item in understanding.subjects}
+    multi_part = _d2_multipart_shape_ok(parts=parts, subjects_by_id=subjects_by_id)
     direct_promotion = (
         envelope.commercial_intent == "promotion"
         and envelope.promotion_scope in {"general", "service", "shown"}
@@ -183,10 +215,10 @@ def _run_reserved_d2_dialogue_turn(
         and all(item.kind == "content" for item in parts)
         and (len(parts) == 2 or part.content_ref is not None)
     )
-    if not (direct_promotion or direct_fact or content_lookup):
+    if not (direct_promotion or direct_fact or content_lookup or multi_part):
         if len(parts) != 1:
             raise ValueError("d2_experiment_single_price_required")
-        subject = next((item for item in understanding.subjects if item.subject_id == part.subject_id), None)
+        subject = subjects_by_id.get(part.subject_id) if part.subject_id else None
         shape_failures = _d2_supported_price_shape_failure_codes(part=part, subject=subject)
         if shape_failures:
             raise ValueError("d2_experiment_a08_shape_required:" + ",".join(shape_failures))
@@ -205,7 +237,9 @@ def _run_reserved_d2_dialogue_turn(
         and binding.outcome == "ambiguous_focus"
     )
     if not (direct_promotion and envelope.promotion_scope == "general"):
-        if price_focus_clarify:
+        if price_focus_clarify or multi_part:
+            # Multi-part: each request carries its own typed topic/service (D2-042/T2).
+            # Session bind may be ambiguous across topics; parts stay independent.
             pass
         elif (
             focus.action != "resolve_topic"
@@ -249,6 +283,23 @@ def _run_reserved_d2_dialogue_turn(
             raise ValueError("d2_experiment_content_not_resolved")
         if len(parts) == 1 and not response.resolved.information_blocks:
             raise ValueError("d2_experiment_content_not_resolved")
+    elif multi_part:
+        resolved_parts = response.resolved.d2_request_parts
+        if not response.rendered_text.strip():
+            raise ValueError("d2_experiment_multipart_not_resolved")
+        if not any(item.status in {"answered", "recovered"} for item in resolved_parts):
+            raise ValueError("d2_experiment_multipart_not_resolved")
+        # Anchor persistence on the first answered price part when present (D2-080).
+        answered_price = next(
+            (
+                item
+                for item in resolved_parts
+                if item.kind == "price" and item.status == "answered"
+            ),
+            None,
+        )
+        if answered_price is not None:
+            part = next(item for item in parts if item.request_id == answered_price.request_id)
     elif price is None or (part.service_id is None and decision is None) or not response.rendered_text.strip():
         raise ValueError("d2_experiment_price_not_resolved")
     turn = snapshot.current_turn_index
@@ -257,6 +308,15 @@ def _run_reserved_d2_dialogue_turn(
     situation = snapshot.state.situation_state
     if price_focus_clarify:
         situation = snapshot.state.situation_state
+    elif multi_part and (price is None or decision is None or decision.applied_extent is None):
+        # Independent parts: do not invent a situation from deferred/unavailable price.
+        if (
+            snapshot.state.situation_state is not None
+            and part.topic_id is not None
+            and snapshot.state.situation_state.topic_id != part.topic_id
+            and focus.cross_topic_carry is None
+        ):
+            situation = None
     elif decision is not None and decision.applied_extent is not None:
         current = part.situation
         carried = focus.carried_situation

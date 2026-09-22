@@ -981,6 +981,10 @@ def _d2_price_block(
             )
             and (applied_extent is None or _d2_offer_applies(offer, service, applied_extent))
         ]
+        if not offers:
+            # Recoverable empty catalog for this service (C02 / D2-065): keep
+            # independent content parts alive instead of hard-failing the turn.
+            raise MaterializationContractError("d2_no_price_candidates")
         if len(offers) != 1:
             raise MaterializationContractError("d2_direct_service_offer_selection_unsupported")
     elif ordered_offer_ids:

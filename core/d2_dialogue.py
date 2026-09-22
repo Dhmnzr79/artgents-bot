@@ -21,6 +21,12 @@ from contracts.response_plan_session import (
     ResponsePlanSessionState, empty_session_snapshot,
 )
 from core.d2_dialogue_store import D2DialogueStore
+from core.d2_lead_bridge import (
+    d2_lead_needs_pre_provider,
+    d2_lead_session_client_matches,
+    resolve_d2_booking_lead_entry,
+    resolve_d2_lead_pre_provider,
+)
 from core.d2_session_context import (
     bind_d1r_envelope_to_d2_context, project_d2_session_context, seed_d2_plan_focus,
 )
@@ -32,9 +38,13 @@ from core.d2_snapshot_sources import (
     build_d2_service_availability_response,
 )
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
-from core.one_call_envelope_protocol import parse_production_envelope_json
+from core.one_call_envelope_protocol import (
+    parse_production_envelope_json,
+    production_envelope_template,
+)
 from core.response_plan_materialization import resolve_d2_envelope_response
 from core.user_text_privacy import provider_message_has_substance, provider_safe_user_text
+import json
 
 
 def _request_fingerprint(*, session_key: SessionKey, user_message: str) -> str:
@@ -132,26 +142,72 @@ def run_d2_dialogue_turn(
     request_id: str | None = None,
     lead_effect_id: str | None = None,
     lead_effect_dispatcher: D2LeadEffectDispatcher | None = None,
+    lead_ui_ref: str | None = None,
+    situation_action: str | None = None,
+    lead_bridge: bool = False,
 ) -> D2DialogueTurn:
-    """Complete one D2 turn with one state/result owner and no legacy memory."""
+    """Complete one D2 turn with one state/result owner.
+
+    Ordinary dialogue state lives in ``D2DialogueStore``. Active lead/privacy
+    slots stay with the existing session owner (CP5-LEAD / D2-036); only a
+    PII-free effect receipt may be recorded on the D2 completion.
+
+    ``lead_bridge=True`` enables pre-provider lead/situation short-circuit via
+    session mem. Ordinary D2 scenarios leave it False and stay session-free.
+    """
     effective_request_id = (request_id or uuid4().hex).strip()
     if not effective_request_id:
         raise ValueError("d2_request_id_required")
     if (lead_effect_id is None) != (lead_effect_dispatcher is None):
         raise ValueError("d2_lead_effect_pair_required")
-    fingerprint = _request_fingerprint(session_key=session_key, user_message=user_message)
+    fingerprint = _request_fingerprint(
+        session_key=session_key,
+        user_message="\x1f".join(
+            (
+                user_message,
+                (lead_ui_ref or "").strip(),
+                (situation_action or "").strip(),
+            )
+        ),
+    )
     reservation = store.reserve_request(
         session_key, request_id=effective_request_id, request_fingerprint=fingerprint,
     )
     if reservation.is_replay:
         return _turn_from_completion(reservation.completed, idempotent_replay=True)
-    safe_user_message = provider_safe_user_text(user_message)
-    if not provider_message_has_substance(safe_user_message, raw_source=user_message):
-        store.abandon_request(
-            session_key, request_id=effective_request_id, request_fingerprint=fingerprint,
-        )
-        raise ValueError("d2_provider_input_privacy_only")
     try:
+        session_matched = d2_lead_session_client_matches(session_key)
+        lead_gate = bool(
+            lead_bridge
+            or session_matched
+            or (situation_action or "").strip()
+            or (lead_ui_ref or "").strip()
+        )
+        if lead_gate and d2_lead_needs_pre_provider(
+            session_key=session_key,
+            situation_action=situation_action,
+            lead_ui_ref=lead_ui_ref,
+        ):
+            return _run_lead_pre_provider_turn(
+                session_key=session_key,
+                user_message=user_message,
+                clients_root=clients_root,
+                store=store,
+                now=now,
+                ttl_policy=ttl_policy,
+                request_id=effective_request_id,
+                request_fingerprint=fingerprint,
+                lead_effect_id=lead_effect_id,
+                lead_effect_dispatcher=lead_effect_dispatcher,
+                lead_ui_ref=lead_ui_ref,
+                situation_action=situation_action,
+            )
+        safe_user_message = provider_safe_user_text(user_message)
+        if not provider_message_has_substance(safe_user_message, raw_source=user_message):
+            store.abandon_request(
+                session_key, request_id=effective_request_id, request_fingerprint=fingerprint,
+            )
+            raise ValueError("d2_provider_input_privacy_only")
         return _run_reserved_d2_dialogue_turn(
             session_key=session_key,
             safe_user_message=safe_user_message,
@@ -164,6 +220,7 @@ def run_d2_dialogue_turn(
             request_fingerprint=fingerprint,
             lead_effect_id=lead_effect_id,
             lead_effect_dispatcher=lead_effect_dispatcher,
+            lead_bridge=lead_bridge,
         )
     except Exception:
         store.abandon_request(
@@ -172,11 +229,187 @@ def run_d2_dialogue_turn(
         raise
 
 
+def _run_lead_pre_provider_turn(
+    *,
+    session_key: SessionKey,
+    user_message: str,
+    clients_root: Path,
+    store: D2DialogueStore,
+    now: datetime,
+    ttl_policy: D2SessionTtlPolicy,
+    request_id: str,
+    request_fingerprint: str,
+    lead_effect_id: str | None,
+    lead_effect_dispatcher: D2LeadEffectDispatcher | None,
+    lead_ui_ref: str | None,
+    situation_action: str | None,
+) -> D2DialogueTurn:
+    """Situation intake / active lead slots: no provider, existing privacy owners."""
+    if not d2_lead_session_client_matches(session_key):
+        raise ValueError("d2_lead_session_client_required")
+    tenant = load_d2_tenant_snapshot(session_key.client_id, clients_root=clients_root)
+    previous = store.read(session_key)
+    if previous and previous.tenant_fingerprint != tenant.fingerprint:
+        raise ValueError("d2_experiment_tenant_changed")
+    snapshot = (
+        ResponsePlanSessionSnapshot(state=previous.state, exists_in_store=True)
+        if previous else empty_session_snapshot(session_key)
+    )
+    context = project_d2_session_context(
+        snapshot, expected_session_key=session_key,
+        activity=previous.activity if previous else None, policy=ttl_policy, now=now,
+    )
+    bridge = resolve_d2_lead_pre_provider(
+        snapshot=tenant,
+        session_key=session_key,
+        user_message=user_message,
+        situation_action=situation_action,
+        lead_ui_ref=lead_ui_ref,
+    )
+    if not bridge.response.rendered_text.strip():
+        raise ValueError("d2_experiment_lead_not_resolved")
+    effect_id = lead_effect_id
+    effect_dispatcher = lead_effect_dispatcher
+    if bridge.request_effect:
+        if effect_id is None:
+            effect_id = f"lead-{request_id}"
+
+            class _DemoStubDispatcher:
+                def dispatch(self, *, effect_id: str):
+                    return "demo_stub"
+
+            effect_dispatcher = effect_dispatcher or _DemoStubDispatcher()
+    # Synthetic empty envelope: lead does not reinterpret ordinary focus.
+    raw = json.dumps(
+        production_envelope_template(
+            route="ANSWER",
+            patient_text=None,
+            commercial_intent="none",
+            promotion_scope="none",
+            scenario="none",
+            primary_price_request_id=None,
+            request_understanding={
+                "subjects": [],
+                "requests": [
+                    {
+                        "request_id": "r1",
+                        "kind": "other",
+                        "subject_id": None,
+                        "context": "general_information",
+                        "policy_ids": [],
+                        "payment_scheme": "unspecified",
+                        "payment_scheme_intent": "not_requested",
+                        "contact_fields": [],
+                        "content_text": None,
+                    }
+                ],
+            },
+        ),
+        ensure_ascii=False,
+    )
+    view = build_d2_model_view(tenant)
+    envelope = parse_production_envelope_json(
+        raw, active_service_catalog=view.active_service_catalog,
+        service_reference_catalog=view.service_reference_catalog,
+        commercial_fact_catalog=view.commercial_fact_catalog,
+    )
+    binding = bind_d1r_envelope_to_d2_context(envelope, context)
+    focus = seed_d2_plan_focus(binding)
+    return _commit_non_price_d2_turn(
+        session_key=session_key,
+        store=store,
+        snapshot=snapshot,
+        context=context,
+        focus=focus,
+        response=bridge.response,
+        tenant_fingerprint=tenant.fingerprint,
+        now=now,
+        request_id=request_id,
+        request_fingerprint=request_fingerprint,
+        lead_effect_id=effect_id if bridge.request_effect else lead_effect_id,
+        lead_effect_dispatcher=(
+            effect_dispatcher if bridge.request_effect else lead_effect_dispatcher
+        ),
+    )
+
+
+def _commit_non_price_d2_turn(
+    *,
+    session_key: SessionKey,
+    store: D2DialogueStore,
+    snapshot,
+    context,
+    focus,
+    response,
+    tenant_fingerprint: str,
+    now: datetime,
+    request_id: str,
+    request_fingerprint: str,
+    lead_effect_id: str | None,
+    lead_effect_dispatcher: D2LeadEffectDispatcher | None,
+) -> D2DialogueTurn:
+    """Persist lead/terminal/clarify-style turns without mutating price situation."""
+    turn = snapshot.current_turn_index
+    state = ResponsePlanSessionState(
+        schema_version=SESSION_SCHEMA_VERSION, session_key=session_key,
+        revision=snapshot.state.revision + 1, last_committed_turn_index=turn,
+        active_topic=snapshot.state.active_topic,
+        situation_state=snapshot.state.situation_state,
+        shown_options_snapshot=snapshot.state.shown_options_snapshot,
+        accumulated_shown_ids=PersistedShownCommercialIds(
+            requested_fact_ids=context.retained_shown_ids.requested_fact_ids,
+            promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
+            amplifier_fact_ids=context.retained_shown_ids.amplifier_fact_ids,
+            service_value_ids=context.retained_shown_ids.service_value_ids,
+            price_offer_ids=context.retained_shown_ids.price_offer_ids,
+            required_offer_condition_ids=context.retained_shown_ids.required_offer_condition_ids,
+            shown_service_option_ids=context.retained_shown_ids.shown_service_option_ids,
+            secondary_ref_ids=tuple(dict.fromkeys((
+                *context.retained_shown_ids.secondary_ref_ids,
+                *_shown_secondary_ref_ids(response),
+            ))),
+        ),
+        terminal_state=response.resolved.session_delta.terminal_state,
+        clarify_pending=response.resolved.session_delta.clarify_pending,
+    )
+    initial_effect = (
+        D2LeadEffect(effect_id=lead_effect_id, status="pending")
+        if lead_effect_id is not None else D2LeadEffect()
+    )
+    completion = D2CompletedTurn(
+        request_id=request_id,
+        request_fingerprint=request_fingerprint,
+        response=response,
+        context=context,
+        focus=focus,
+        committed_revision=state.revision,
+        lead_effect=initial_effect,
+    )
+    store.complete(D2DialogueRecord(
+        state=state, activity=D2SessionActivity(session_key=session_key, last_user_turn_at=now),
+        tenant_fingerprint=tenant_fingerprint,
+    ), expected_revision=snapshot.state.revision, completion=completion)
+    if lead_effect_dispatcher is not None and lead_effect_id is not None:
+        try:
+            effect_status = lead_effect_dispatcher.dispatch(effect_id=lead_effect_id)
+            if effect_status not in {"sent", "failed", "unknown", "demo_stub"}:
+                raise ValueError("d2_lead_effect_dispatch_status_invalid")
+        except Exception:
+            effect_status = "unknown"
+        completion = store.update_lead_effect(
+            session_key,
+            request_id=request_id,
+            effect=D2LeadEffect(effect_id=lead_effect_id, status=effect_status),
+        )
+    return _turn_from_completion(completion, idempotent_replay=False)
+
+
 def _run_reserved_d2_dialogue_turn(
     *, session_key: SessionKey, safe_user_message: str, provider: D2RawProvider,
     clients_root: Path, store: D2DialogueStore, now: datetime,
     ttl_policy: D2SessionTtlPolicy, request_id: str, request_fingerprint: str,
     lead_effect_id: str | None, lead_effect_dispatcher: D2LeadEffectDispatcher | None,
+    lead_bridge: bool = False,
 ) -> D2DialogueTurn:
     """Build a final result only after ``reserve_request`` made this turn owner."""
     tenant = load_d2_tenant_snapshot(session_key.client_id, clients_root=clients_root)
@@ -221,6 +454,35 @@ def _run_reserved_d2_dialogue_turn(
     else:
         if envelope.route != "ANSWER" or understanding is None or not understanding.requests:
             raise ValueError("d2_experiment_single_price_required")
+        booking_entry = None
+        if lead_bridge:
+            if not d2_lead_session_client_matches(session_key):
+                raise ValueError("d2_lead_session_client_required")
+            booking_entry = resolve_d2_booking_lead_entry(
+                snapshot=tenant,
+                session_key=session_key,
+                understanding=understanding,
+            )
+        if booking_entry is not None:
+            response = booking_entry.response
+            if not response.rendered_text.strip():
+                raise ValueError("d2_experiment_lead_not_resolved")
+            binding = bind_d1r_envelope_to_d2_context(envelope, context)
+            focus = seed_d2_plan_focus(binding)
+            return _commit_non_price_d2_turn(
+                session_key=session_key,
+                store=store,
+                snapshot=snapshot,
+                context=context,
+                focus=focus,
+                response=response,
+                tenant_fingerprint=tenant.fingerprint,
+                now=now,
+                request_id=request_id,
+                request_fingerprint=request_fingerprint,
+                lead_effect_id=lead_effect_id,
+                lead_effect_dispatcher=lead_effect_dispatcher,
+            )
         parts = understanding.requests
         part = parts[0]
         subjects_by_id = {item.subject_id: item for item in understanding.subjects}

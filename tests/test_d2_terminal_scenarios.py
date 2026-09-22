@@ -143,7 +143,15 @@ def observed_common_route():
             "core.response_strategy",
         )), f"legacy runtime/selector called: {module}"
         assert module != "core.target_marketing_selector", "legacy marketing selector called"
+        # CP5-LEAD privacy probe: only the exact client-binding read is allowed.
+        # mem_get / lead mutations must not appear on ordinary terminal turns.
+        if module == "session":
+            assert frame.f_code.co_name == "current_session_client_id", (
+                f"unexpected session use on terminal route: {frame.f_code.co_name}"
+            )
+            return
         assert module != "session", "second ordinary memory called"
+        assert module != "orchestration.sales_one_plus_ask_turn", "legacy ask turn called"
 
     sys.setprofile(observe)
     try:

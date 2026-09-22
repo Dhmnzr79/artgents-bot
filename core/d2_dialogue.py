@@ -39,6 +39,7 @@ from core.d2_snapshot_sources import (
 )
 from core.d2_spam_gate import build_d2_spam_gate_response, is_d2_garbage_message
 from core.d2_directory import build_d2_directory_response, classify_d2_directory_request
+from core.d2_contacts_cta import build_d2_contact_response
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
 from core.one_call_envelope_protocol import (
     parse_production_envelope_json,
@@ -561,6 +562,7 @@ def _run_reserved_d2_dialogue_turn(
         price_focus_clarify = False
         clinic_policy = False
         service_availability = False
+        clinic_contact = False
         direct_promotion = False
         direct_fact = False
         content_lookup = False
@@ -607,6 +609,11 @@ def _run_reserved_d2_dialogue_turn(
             len(parts) == 1
             and part.kind == "clinic_policy"
         )
+        clinic_contact = (
+            envelope.commercial_intent == "none"
+            and len(parts) == 1
+            and part.kind == "contact"
+        )
         service_availability = (
             envelope.commercial_intent == "none"
             and len(parts) == 1
@@ -651,6 +658,7 @@ def _run_reserved_d2_dialogue_turn(
             or content_lookup
             or multi_part
             or clinic_policy
+            or clinic_contact
             or service_availability
             or directory_kind is not None
         ):
@@ -677,8 +685,15 @@ def _run_reserved_d2_dialogue_turn(
             and binding.outcome == "ambiguous_focus"
         )
         if not (direct_promotion and envelope.promotion_scope == "general"):
-            if price_focus_clarify or multi_part or clinic_policy or service_availability or directory_kind is not None:
-                # Policy/availability/directory: typed ids only; no single-topic focus required.
+            if (
+                price_focus_clarify
+                or multi_part
+                or clinic_policy
+                or clinic_contact
+                or service_availability
+                or directory_kind is not None
+            ):
+                # Policy/contact/availability/directory: typed ids only; no single-topic focus required.
                 pass
             elif (
                 focus.action != "resolve_topic"
@@ -697,6 +712,14 @@ def _run_reserved_d2_dialogue_turn(
             )
             price = None
             decision = None
+        elif clinic_contact:
+            response = build_d2_contact_response(
+                tenant,
+                session_key=session_key,
+                contact_fields=tuple(part.contact_fields),
+            )
+            price = None
+            decision = None
         elif directory_kind is not None:
             response = build_d2_directory_response(
                 tenant,
@@ -705,6 +728,7 @@ def _run_reserved_d2_dialogue_turn(
                 service_id=part.service_id,
                 topic_id=part.topic_id,
                 content_ref=part.content_ref,
+                as_of=now.date(),
             )
             price = None
             decision = None
@@ -741,7 +765,7 @@ def _run_reserved_d2_dialogue_turn(
     elif price_focus_clarify:
         if response.resolved.route != "CLARIFY" or not response.rendered_text.strip():
             raise ValueError("d2_experiment_focus_clarify_not_resolved")
-    elif clinic_policy or service_availability or directory_kind is not None:
+    elif clinic_policy or clinic_contact or service_availability or directory_kind is not None:
         if not response.rendered_text.strip():
             raise ValueError("d2_experiment_directory_or_availability_not_resolved")
     elif direct_promotion:
@@ -778,7 +802,14 @@ def _run_reserved_d2_dialogue_turn(
     # Persist only finalized facts. Hypothetical/overview/unknown must not wipe
     # a previously reported or corrected situation (D2-003).
     situation = snapshot.state.situation_state
-    if admin_terminal or price_focus_clarify or clinic_policy or service_availability or directory_kind is not None:
+    if (
+        admin_terminal
+        or price_focus_clarify
+        or clinic_policy
+        or clinic_contact
+        or service_availability
+        or directory_kind is not None
+    ):
         situation = snapshot.state.situation_state
     elif multi_part and (price is None or decision is None or decision.applied_extent is None):
         # Independent parts: do not invent a situation from deferred/unavailable price.

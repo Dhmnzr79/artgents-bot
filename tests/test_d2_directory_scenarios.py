@@ -1,7 +1,9 @@
 """CP5-DIR A: doctors / protocols directory on common D2 route.
 
 Fake raw → directory builders → D2DialogueStore.
-Provider/live/network forbidden on directory turns. Contacts/CTA FUTURE (slice B).
+Provider/live/network forbidden on directory turns.
+Contacts covered in test_d2_directory_ui_scenarios.py (DIR-B).
+Doctors list may attach one CTA (DIR-B); protocols stay without CTA.
 """
 
 from __future__ import annotations
@@ -150,7 +152,7 @@ def test_doctors_for_implantation_service_from_catalog(tmp_path: Path) -> None:
     assert KUZNETSOV in text
     assert "лучш" not in text.lower()
     assert outcome.response.resolved.d2_price_block is None
-    assert ui.buttons == ()
+    assert any(b.action_kind == "cta" for b in ui.buttons)
     assert ui.contact is None
     assert saved is not None
     assert saved.state.terminal_state == "none"

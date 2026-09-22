@@ -1,12 +1,15 @@
-"""CP5-DIR A: doctors and protocols directory on the common D2 route.
+"""CP5-DIR: doctors/protocols (A) + CTA on doctors list (B) on the common D2 route.
 
-D2-035 / D2-055 narrow slice: approved doctor↔service links, one doctor card,
-active protocols only (not CT/supporting). No ranking, no price, no CTA (B later).
+D2-035 / D2-055: approved doctor↔service links, one doctor card,
+active protocols only (not CT/supporting). No ranking, no price.
+DIR-B: doctors_for_service may attach one lead CTA (free label gated by fact).
+Protocols stay without CTA.
 """
 
 from __future__ import annotations
 
 import json
+from datetime import date
 from typing import Literal
 
 from contracts.doctor_schema import TargetDoctor, TargetDoctorCatalog
@@ -20,6 +23,7 @@ from contracts.response_plan import (
     ServiceOptionEntry,
     ServiceOptionsBlock,
     SessionKey,
+    UiButtonCandidate,
     UiPlanCandidates,
     UiQuickReplyCandidate,
 )
@@ -28,6 +32,7 @@ from contracts.response_plan_materialization import (
     MaterializedResponseOutcome,
 )
 from contracts.response_plan_post_composer import ResponseSituationDelta
+from core.d2_contacts_cta import resolve_d2_lead_cta_button
 from core.d2_tenant_snapshot import build_d2_bundle
 from core.response_plan_resolver import resolve_response_plan
 from core.response_text_renderer import render_response_text
@@ -124,6 +129,7 @@ def _answer(
     selected_topic_id: str | None,
     service_options_block: ServiceOptionsBlock | None = None,
     quick_replies: tuple[UiQuickReplyCandidate, ...] = (),
+    buttons: tuple[UiButtonCandidate, ...] = (),
 ) -> MaterializedResponseOutcome:
     if snapshot.client_id != session_key.client_id:
         raise ValueError("d2_directory_client_mismatch")
@@ -140,7 +146,7 @@ def _answer(
         selected_topic_id=selected_topic_id,
         price_plan=PricePlan(kind="none"),
         service_options_block=service_options_block,
-        ui_candidates=UiPlanCandidates(quick_replies=quick_replies),
+        ui_candidates=UiPlanCandidates(quick_replies=quick_replies, buttons=buttons),
         transport_kind="blocking",
     )
     composer = ComposerResult(
@@ -167,6 +173,7 @@ def build_d2_directory_response(
     *,
     session_key: SessionKey,
     kind: DirectoryKind,
+    as_of: date,
     service_id: str | None = None,
     topic_id: str | None = None,
     content_ref: str | None = None,
@@ -192,6 +199,12 @@ def build_d2_directory_response(
                     f"({doctor.experience_years} лет опыта)"
                 )
             text = "\n".join(lines)
+        cta = resolve_d2_lead_cta_button(
+            snapshot,
+            as_of=as_of,
+            cta_key="doctor",
+            prefer_free_consult=True,
+        )
         return _answer(
             session_key=session_key,
             snapshot=snapshot,
@@ -199,6 +212,7 @@ def build_d2_directory_response(
             response_scope="service",
             selected_service_id=service_id,
             selected_topic_id="doctors",
+            buttons=(cta,) if cta is not None else (),
         )
 
     if kind == "doctor_profile":

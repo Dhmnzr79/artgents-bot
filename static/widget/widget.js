@@ -1,6 +1,5 @@
-﻿import { postAsk, streamAsk } from "./api.js";
+﻿import { streamAsk } from "./api.js";
 import { setBotAnswerBody } from "./answer_format.js";
-import { mergeFollowupControls } from "./followup_controls.js";
 
 const STORAGE_SID = "clinic_widget_sid";
 const STORAGE_LAUNCHER_TEASER = "clinic_widget_launcher_teaser_shown";
@@ -43,10 +42,6 @@ const PLAIN_ATTRIBUTION_ROUTES = new Set([
   "target_fullcontext_verifier_blocked",
   "target_fullcontext_followup_unknown",
 ]);
-/** Синхронно с config.BOOKING_INTENT_RE — до ответа сервера не показываем «базу знаний». */
-const BOOKING_INTENT_RE =
-  /(?:запишите\s+меня|хочу\s+запис(?:аться|ать)\b|запись\s+на\s+(?:консультац|приём|прием)|остав(?:ить|лю)\s+заявку|(?<!\bкак\s)(?<!\bгде\s)(?<!\bкуда\s)\bзапис(?:аться|ать)\b(?:\s+на\s+(?:консультац|приём|прием))?)/iu;
-
 /** Скрытый сброс сессии: «::reset <token>» (только demoLauncher / dev-хост). */
 const SECRET_SESSION_RESET_RE = /^::reset\s+(\S+)\s*$/i;
 const SECRET_SESSION_RESET_TOKEN = "x7k9m2p4";
@@ -214,10 +209,8 @@ function leadMetaPhoneStep(meta) {
 
 /** @param {unknown} payload */
 function isActiveLeadFlowPayload(payload) {
-  const m = payload?.meta;
-  if (!m || typeof m !== "object" || !m.lead_flow) return false;
-  const step = String(m.lead_step || "");
-  return Boolean(step && step !== "done");
+  return Array.isArray(payload?.ui?.quick_replies) &&
+    payload.ui.quick_replies.some((item) => String(item?.reply_id || "").startsWith("lead:"));
 }
 
 /** 10 цифр после «7» (пользователь может ввести 9… или 8… или уже +7…) */
@@ -281,45 +274,37 @@ function ruPhoneToBackendE164(inputVal) {
  */
 
 /**
- * @param {import("./api.js").postAsk} _
- * @param {unknown} data
+ * @param {unknown} data D2 HTTP payload saved for this turn.
+ * @param {string} expectedClientId
  */
-function botTurnFromPayload(data) {
+function botTurnFromPayload(data, expectedClientId) {
   if (!data || typeof data !== "object") return null;
-  const meta = /** @type {Record<string, unknown>} */ (data.meta || {});
-  const followups = Array.isArray(meta.followups) ? meta.followups : [];
-  const quickReplies = Array.isArray(data.quick_replies) ? data.quick_replies : [];
-  const sit = data.situation && typeof data.situation === "object" ? data.situation : null;
-  const ctaRaw = data.cta;
-  const cta =
-    ctaRaw && typeof ctaRaw === "object" && ctaRaw.text
-      ? {
-          text: String(ctaRaw.text),
-          action: String(ctaRaw.action || "lead"),
-          key: ctaRaw.key ? String(ctaRaw.key) : "",
-        }
-      : null;
-  const vp = data.video && typeof data.video === "object" ? data.video : null;
-  const vk = vp?.key ? String(vp.key).trim() : "";
-  const vSrc = vp?.src ? String(vp.src).trim() : "";
-  const vTit = vp?.title ? String(vp.title).trim() : "";
-  const hasPlayableVideo = Boolean(vSrc);
+  if (data.client_id !== expectedClientId || !Number.isInteger(data.revision)) return null;
+  const ui = data.ui && typeof data.ui === "object" ? data.ui : {};
+  const quickReplies = (Array.isArray(ui.quick_replies) ? ui.quick_replies : [])
+    .filter((x) => x && x.source_client_id === expectedClientId && x.reply_id && x.label)
+    .map((x) => ({ ref: String(x.reply_id), label: String(x.label) }));
+  const ctaRaw = (Array.isArray(ui.buttons) ? ui.buttons : [])
+    .find((x) => x && x.source_client_id === expectedClientId && x.action_kind === "cta");
+  const cta = ctaRaw ? { text: String(ctaRaw.label), ref: `button:${ctaRaw.button_id}` } : null;
+  const vk = ui.video?.source_client_id === expectedClientId ? String(ui.video.video_id || "") : "";
 
   return {
     role: "bot",
     text: String(data.answer || "").trim(),
-    followups: followups.filter((x) => x && x.ref),
-    quickReplies: quickReplies.filter((x) => x && x.ref),
+    followups: [],
+    quickReplies,
+    revision: data.revision,
     linksDismissed: false,
-    videoKey: hasPlayableVideo ? vk : "",
-    videoSrc: hasPlayableVideo ? vSrc : "",
-    videoTitleText: hasPlayableVideo ? vTit : "",
+    videoKey: vk,
+    videoSrc: "",
+    videoTitleText: "",
     videoRevealed: false,
-    situation: sit ? { show: Boolean(sit.show), mode: sit.mode || "normal" } : null,
+    situation: null,
     cta,
     trailingDismissed: false,
-    attributionKind: resolveTurnAttributionKind(meta),
-    serviceRoute: String(meta.service_route || ""),
+    attributionKind: quickReplies.some((item) => item.ref.startsWith("lead:")) ? "lead" : "content",
+    serviceRoute: "",
   };
 }
 
@@ -382,9 +367,8 @@ function isLeadFlowBotMeta(meta) {
  * @param {unknown} lastPayload
  */
 function isLeadFlowAskBody(body, lastPayload) {
-  if (body?.cta_action === "lead") return true;
   const ref = String(body?.ref || "");
-  if (ref.startsWith("lead:")) return true;
+  if (ref.startsWith("lead:") || ref.startsWith("button:")) return true;
   return isActiveLeadFlowPayload(lastPayload);
 }
 
@@ -726,6 +710,7 @@ export function mountWidget(root, config) {
     isOpen: false,
     messages: [],
     lastPayload: null,
+    retryBody: null,
     pending: false,
     /** @type {"searching"|"writing"} */
     typingPhase: "searching",
@@ -1170,6 +1155,7 @@ export function mountWidget(root, config) {
     clearStoredSid();
     state.messages = [];
     state.lastPayload = null;
+    state.retryBody = null;
     state.typingPhase = "searching";
     state.started = false;
     state.unread = false;
@@ -1182,17 +1168,9 @@ export function mountWidget(root, config) {
 
   async function runSecretSessionReset() {
     if (state.pending) return;
-    const sid = getSid();
     input.value = "";
     autoResizeTextarea(input);
     syncSendState();
-    if (sid) {
-      try {
-        await postAsk(apiBase, { client_id: clientId, sid, q: "/reset" });
-      } catch {
-        /* best-effort server cleanup */
-      }
-    }
     resetSession();
   }
 
@@ -1328,22 +1306,9 @@ export function mountWidget(root, config) {
     updateTypingIndicatorText();
   }
 
-  /** @param {Record<string, unknown>} body */
-  function shouldShowKbSearchTyping(body) {
-    if (body.cta_action === "lead") return false;
-    const ref = String(body.ref || "");
-    if (ref.startsWith("lead:")) return false;
-    if (body.situation_action || body.action === "situation") return false;
-    if (isActiveLeadFlowPayload(state.lastPayload)) return false;
-    const q = String(body.q || "").trim();
-    if (q.length >= 2 && BOOKING_INTENT_RE.test(q)) return false;
-    return true;
-  }
-
-  /** @param {Record<string, unknown>} [body] */
-  function beginPendingRequest(body = {}) {
+  function beginPendingRequest() {
     state.pending = true;
-    state.typingPhase = shouldShowKbSearchTyping(body) ? "searching" : "writing";
+    state.typingPhase = "writing";
     state.perfPendingStartMs = performance.now();
     state.perfFirstLocalStatusLogged = false;
     state.statusMessage = null;
@@ -1455,12 +1420,13 @@ export function mountWidget(root, config) {
       clearStreamTimers();
       const streamedText = fullText.trim();
       if (uiData) {
-        if (uiData.meta && uiData.meta.sid) setSid(uiData.meta.sid);
-        const turn = botTurnFromPayload(uiData);
+        if (uiData.sid) setSid(uiData.sid);
+        const turn = botTurnFromPayload(uiData, clientId);
         if (turn) {
           state.messages.push(turn);
         }
         state.lastPayload = uiData;
+        state.retryBody = null;
         if (!state.isOpen) state.unread = true;
       } else if (streamedText) {
         state.messages.push({
@@ -1536,7 +1502,7 @@ export function mountWidget(root, config) {
         commitFinalTurn();
         return;
       }
-      const turn = botTurnFromPayload(uiData);
+      const turn = botTurnFromPayload(uiData, clientId);
       const finalText = turn ? String(turn.text || "") : "";
       if (!finalText) {
         commitFinalTurn();
@@ -1610,10 +1576,11 @@ export function mountWidget(root, config) {
       onDone() {
         finalizeTurn();
       },
-      onError(msg) {
+      onError(msg, retryable) {
         if (turnFinalized) return;
         streamAborted = true;
         clearStreamTimers();
+        state.retryBody = retryable ? body : null;
         setError(msg);
         endPendingRequest();
         renderFeed();
@@ -1626,6 +1593,19 @@ export function mountWidget(root, config) {
     state.errorLine = msg || "";
     if (msg) {
       errBox.textContent = msg;
+      if (state.retryBody) {
+        const retry = document.createElement("button");
+        retry.type = "button";
+        retry.textContent = "Повторить запрос";
+        retry.addEventListener("click", () => {
+          const body = state.retryBody;
+          if (!body || state.pending) return;
+          setError("");
+          beginPendingRequest(body);
+          void runStreamAsk(feed, apiBase, body);
+        });
+        errBox.appendChild(retry);
+      }
       errBox.hidden = false;
     } else {
       errBox.textContent = "";
@@ -1639,8 +1619,8 @@ export function mountWidget(root, config) {
    * @param {number} msgIndex
    */
   function renderInlineLinks(bubble, m, msgIndex) {
-    if (m.linksDismissed) return;
-    const items = mergeFollowupControls(m.followups, m.quickReplies);
+    if (m.linksDismissed || m.revision !== state.lastPayload?.revision) return;
+    const items = m.quickReplies || [];
     if (!items.length) return;
 
     const box = getOrCreateLinksBox(bubble);
@@ -1663,7 +1643,7 @@ export function mountWidget(root, config) {
         if (target && target.role === "bot") target.linksDismissed = true;
         dismissTrailingsAll(state.messages);
         const echo = (it.label || it.ref || "").trim();
-        void sendAsk({ ref: it.ref, q: "", userEcho: echo, _linkOnly: true });
+        void sendAsk({ ref: it.ref, ui_revision: m.revision, q: "", userEcho: echo });
       });
       box.appendChild(btn);
     }
@@ -1707,7 +1687,7 @@ export function mountWidget(root, config) {
       trail.appendChild(back);
     }
 
-    if (m.cta && m.cta.text) {
+    if (m.cta && m.cta.text && m.revision === state.lastPayload?.revision) {
       const c = document.createElement("button");
       c.type = "button";
       c.className = "clinic-turn__btn clinic-turn__btn--cta-primary";
@@ -1717,13 +1697,7 @@ export function mountWidget(root, config) {
         dismissTrailingsAll(state.messages);
         dismissLinksAll(state.messages);
         const echo = (m.cta.text || "Запись").trim();
-        void sendAsk({
-          cta_action: "lead",
-          cta_key: m.cta.key || "",
-          cta_label: ctaLabel,
-          q: "",
-          userEcho: echo,
-        });
+        void sendAsk({ ref: m.cta.ref, ui_revision: m.revision, q: "", userEcho: echo });
       });
       trail.appendChild(c);
     }
@@ -1898,12 +1872,11 @@ export function mountWidget(root, config) {
   }
 
   async function sendAsk(extra = {}) {
+    if (state.pending || state.retryBody) return;
     const userEcho =
       typeof extra.userEcho === "string" ? extra.userEcho.trim() : "";
-    const linkOnly = Boolean(extra._linkOnly);
     const apiFields = { ...extra };
     delete apiFields.userEcho;
-    delete apiFields._linkOnly;
 
     if (userEcho) {
       const applyUserEcho = () => {
@@ -1932,6 +1905,7 @@ export function mountWidget(root, config) {
     const body = {
       client_id: clientId,
       sid,
+      request_id: crypto.randomUUID(),
       q: "",
       ...apiFields,
     };
@@ -1943,7 +1917,7 @@ export function mountWidget(root, config) {
   }
 
   async function sendFromComposer() {
-    if (state.pending) return;
+    if (state.pending || state.retryBody) return;
 
     const raw = input.value.trim();
     if (isSecretSessionResetCommand(raw, config)) {
@@ -1973,7 +1947,7 @@ export function mountWidget(root, config) {
       setError("");
 
       const sid = getSid();
-      const askBody = { client_id: clientId, sid, q };
+      const askBody = { client_id: clientId, sid, request_id: crypto.randomUUID(), q };
       beginPendingRequest(askBody);
       await runStreamAsk(feed, apiBase, askBody);
     };
@@ -2016,7 +1990,7 @@ export function mountWidget(root, config) {
   }
 
   function syncSendState() {
-    if (state.pending) {
+    if (state.pending || state.retryBody) {
       sendBtn.disabled = true;
       return;
     }

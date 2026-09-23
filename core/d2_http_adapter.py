@@ -12,10 +12,6 @@ from core.client_runtime import per_client_data_dir
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore, D2RequestIdConflict, D2RequestInProgress
 from core.d2_live_provider import D2HttpProvider
-from lead_interrupt import (
-    LEAD_CANCEL_REF, LEAD_PENDING_ANSWER_REF, LEAD_PENDING_CONTINUE_NAME_REF,
-    LEAD_PENDING_RETRY_PHONE_REF,
-)
 from session import (
     bind_session_client, capture_lead_session_row, restore_lead_session_row, sid_from_body,
 )
@@ -54,17 +50,21 @@ def _response_payload(turn, *, session_key: SessionKey) -> dict:
 
 
 def run_d2_ask_json(data: dict, *, client_id: str) -> dict:
-    supported = {"client_id", "sid", "request_id", "q", "ref", "situation_action"}
+    supported = {"client_id", "sid", "request_id", "q", "ref", "ui_revision", "situation_action"}
     if set(data) - supported:
         raise ValueError("d2_unsupported_request_fields")
     for name in ("sid", "ref", "situation_action"):
         if name in data and data[name] is not None and not isinstance(data[name], str):
             raise ValueError("d2_request_field_invalid")
-    if data.get("ref") and data["ref"] not in {
-        LEAD_CANCEL_REF, LEAD_PENDING_ANSWER_REF,
-        LEAD_PENDING_CONTINUE_NAME_REF, LEAD_PENDING_RETRY_PHONE_REF,
-    }:
+    if data.get("ref") is not None and not data["ref"].strip():
         raise ValueError("d2_stale_or_unsupported_ref")
+    if data.get("ref"):
+        if type(data.get("ui_revision")) is not int or data["ui_revision"] < 1:
+            raise ValueError("d2_ui_revision_required")
+        if data.get("q"):
+            raise ValueError("d2_ui_action_requires_empty_question")
+    elif "ui_revision" in data:
+        raise ValueError("d2_ui_revision_without_action")
     if data.get("situation_action") and data["situation_action"] not in {"start", "back"}:
         raise ValueError("d2_situation_action_invalid")
     sid = sid_from_body(data)
@@ -92,6 +92,7 @@ def run_d2_ask_json(data: dict, *, client_id: str) -> dict:
                 now=datetime.now(timezone.utc),
                 request_id=request_id,
                 lead_ui_ref=data.get("ref"),
+                ui_revision=data.get("ui_revision"),
                 situation_action=data.get("situation_action"),
                 lead_bridge=True,
             )

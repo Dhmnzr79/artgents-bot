@@ -149,6 +149,7 @@ def run_d2_dialogue_turn(
     lead_effect_id: str | None = None,
     lead_effect_dispatcher: D2LeadEffectDispatcher | None = None,
     lead_ui_ref: str | None = None,
+    ui_revision: int | None = None,
     situation_action: str | None = None,
     lead_bridge: bool = False,
 ) -> D2DialogueTurn:
@@ -173,6 +174,7 @@ def run_d2_dialogue_turn(
             (
                 user_message,
                 (lead_ui_ref or "").strip(),
+                str(ui_revision or ""),
                 (situation_action or "").strip(),
             )
         ),
@@ -198,6 +200,27 @@ def run_d2_dialogue_turn(
             policy=ttl_policy,
             now=now,
         )
+        if lead_ui_ref and ui_revision is not None:
+            shown = store.read_latest_completion(session_key)
+            if (
+                previous is None or shown is None or early_context.freshness != "fresh"
+                or previous.state.revision != ui_revision
+                or shown.committed_revision != ui_revision
+            ):
+                raise ValueError("d2_stale_ui_action")
+            ui = shown.response.ui_projection
+            if lead_ui_ref.startswith("button:"):
+                button_id = lead_ui_ref.removeprefix("button:")
+                button = next((item for item in ui.buttons if item.button_id == button_id), None)
+                if button is None or button.source_client_id != session_key.client_id or button.action_kind != "cta":
+                    raise ValueError("d2_unauthorized_ui_action")
+                lead_ui_ref = "d2:booking_cta"
+            else:
+                reply = next((item for item in ui.quick_replies if item.reply_id == lead_ui_ref), None)
+                if reply is None or reply.source_client_id != session_key.client_id:
+                    raise ValueError("d2_unauthorized_ui_action")
+                if not lead_ui_ref.startswith("lead:"):
+                    user_message = reply.label
         # D2-071: closed until a new chat/sid; beats lead and ordinary turns.
         if early_context.retained_terminal_state == "spam_closed":
             return _run_spam_gate_turn(

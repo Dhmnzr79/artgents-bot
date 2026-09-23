@@ -72,6 +72,15 @@ class D2DialogueStore:
             raise ValueError("d2_stored_owner_mismatch")
         return record
 
+    def read_latest_completion(self, key: SessionKey) -> D2CompletedTurn | None:
+        """The currently displayed result that may own the next typed UI click."""
+        row = self._connection.execute(
+            "SELECT payload FROM d2_turn_request WHERE client_id=? AND sid=? "
+            "AND status='complete' ORDER BY rowid DESC LIMIT 1",
+            (key.client_id, key.sid),
+        ).fetchone()
+        return D2CompletedTurn.model_validate_json(row[0]) if row and row[0] else None
+
     def reserve_request(
         self, key: SessionKey, *, request_id: str, request_fingerprint: str,
     ) -> D2RequestReservation:

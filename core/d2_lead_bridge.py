@@ -108,6 +108,8 @@ def d2_lead_needs_pre_provider(
     if action in {"start", "back"}:
         return True
     ref = (lead_ui_ref or "").strip()
+    if ref == "d2:booking_cta":
+        return True
     if ref in {
         LEAD_CANCEL_REF,
         LEAD_PENDING_ANSWER_REF,
@@ -189,6 +191,14 @@ def resolve_d2_lead_pre_provider(
     ref = (lead_ui_ref or "").strip()
     q = (user_message or "").strip()
     st = mem_get(sid)
+
+    if ref == "d2:booking_cta":
+        mark_booking_intent_ever(sid)
+        set_lead_intent(sid, "collecting_name")
+        return D2LeadBridgeResult(
+            kind="collecting_name",
+            response=_name_prompt_response(snapshot, session_key=session_key),
+        )
 
     if action == "back":
         set_situation_pending(sid, False)

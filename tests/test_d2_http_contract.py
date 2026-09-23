@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import socket
 import sqlite3
@@ -11,6 +12,7 @@ import pytest
 
 from contracts.response_plan import SessionKey
 from core.d2_dialogue_store import D2DialogueStore
+from core.one_call_envelope_protocol import production_envelope_template
 from tests.d1r_envelope_fixtures import envelope_adult_booking_only, envelope_clinic_policy_only
 
 
@@ -77,6 +79,19 @@ def http_env(monkeypatch, tmp_path):
 def post(client, *, sid="cp6a", request_id="r1", q="Можно ли детям?", client_id="demo", **extra):
     return client.post("/ask", json={"sid": sid, "request_id": request_id,
                                      "q": q, "client_id": client_id, **extra})
+
+
+def post_sse(client, *, sid="cp6a", request_id="r1", q="Можно ли детям?",
+             client_id="demo", buffered=True, **extra):
+    return client.post("/ask/stream", json={"sid": sid, "request_id": request_id,
+                                            "q": q, "client_id": client_id, **extra},
+                       buffered=buffered)
+
+
+def sse_events(response):
+    frames = response.get_data(as_text=True).split("\n\n")
+    return [(lines[0][7:], json.loads(lines[1][6:]))
+            for frame in frames if (lines := frame.splitlines()) and len(lines) >= 2]
 
 
 def test_endpoint_persists_exact_final_text_ui_actions_and_replays(http_env):
@@ -176,3 +191,85 @@ def test_phone_commit_failure_keeps_lead_pending_without_effect(http_env, monkey
             (sid,)).fetchone()[0] == 0
     monkeypatch.setattr(D2DialogueStore, "complete", original_complete)
     assert post(client, sid=sid, request_id="phone", q="+7 999 123 45 67").status_code == 200
+
+
+def test_json_sse_parity_in_both_replay_directions(http_env):
+    client, db, use_provider, _ = http_env
+    fake = use_provider(FakeProvider(envelope_clinic_policy_only("no_pediatric_dentistry")))
+    json_result = post(client, sid="json-first", request_id="shared").get_json()
+    events = sse_events(post_sse(client, sid="json-first", request_id="shared"))
+    assert [kind for kind, _ in events] == ["status", "typing", "ui", "done"]
+    assert events[2][1] == json_result
+    assert len(fake.inputs) == 1
+
+    events = sse_events(post_sse(client, sid="sse-first", request_id="shared"))
+    assert [kind for kind, _ in events] == ["status", "typing", "ui", "done"]
+    assert post(client, sid="sse-first", request_id="shared").get_json() == events[2][1]
+    assert len(fake.inputs) == 2
+    conflict = sse_events(post_sse(client, sid="sse-first", request_id="shared",
+                                   q="Другой вопрос"))
+    assert [kind for kind, _ in conflict] == ["status", "error"]
+    assert conflict[1][1]["error"] == "request_id_payload_conflict"
+    assert len(fake.inputs) == 2
+    with D2DialogueStore(db) as store:
+        assert store.read(SessionKey(client_id="demo", sid="json-first")).state.revision == 1
+        assert store.read(SessionKey(client_id="demo", sid="sse-first")).state.revision == 1
+
+
+def test_sse_terminal_and_error_are_single_outcomes(http_env):
+    client, db, use_provider, _ = http_env
+    admin = json.dumps(production_envelope_template(
+        route="ADMIN", patient_text=None, commercial_intent="none",
+        promotion_scope="none", scenario="none", primary_price_request_id=None,
+        request_understanding={"subjects": [], "requests": []},
+    ), ensure_ascii=False)
+    fake = use_provider(FakeProvider(admin))
+    terminal = sse_events(post_sse(client, sid="terminal", request_id="terminal",
+                                   q="Срочная медицинская проблема"))
+    assert [kind for kind, _ in terminal] == ["status", "typing", "ui", "done"]
+    assert terminal[2][1]["answer"]
+    assert terminal[2][1]["ui"]["buttons"] == []
+    fake.raw = "{invalid"
+    error = sse_events(post_sse(client, sid="error-sse", request_id="invalid"))
+    assert [kind for kind, _ in error] == ["status", "error"]
+    assert error[1][1]["error"] == "d2_invalid_turn"
+    with D2DialogueStore(db) as store:
+        assert store.read(SessionKey(client_id="demo", sid="error-sse")) is None
+
+
+def test_sse_commit_refusal_is_error_then_retry_can_complete(http_env, monkeypatch):
+    client, db, use_provider, _ = http_env
+    fake = use_provider(FakeProvider(envelope_clinic_policy_only("no_pediatric_dentistry")))
+    original_complete = D2DialogueStore.complete
+
+    def fail_commit(*_args, **_kwargs):
+        raise RuntimeError("commit refused")
+
+    monkeypatch.setattr(D2DialogueStore, "complete", fail_commit)
+    events = sse_events(post_sse(client, sid="sse-commit", request_id="commit"))
+    assert [kind for kind, _ in events] == ["status", "error"]
+    assert events[1][1]["error"] == "d2_turn_failed"
+    with D2DialogueStore(db) as store:
+        assert store.read(SessionKey(client_id="demo", sid="sse-commit")) is None
+    monkeypatch.setattr(D2DialogueStore, "complete", original_complete)
+    assert post(client, sid="sse-commit", request_id="commit").status_code == 200
+    assert len(fake.inputs) == 2
+
+
+def test_sse_framing_error_preserves_saved_result_for_replay(http_env, monkeypatch):
+    client, db, use_provider, _ = http_env
+    fake = use_provider(FakeProvider(envelope_clinic_policy_only("no_pediatric_dentistry")))
+    import app
+
+    def fail_framing(*_args, **_kwargs):
+        raise RuntimeError("transport framing failed")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(app, "_sse_typing_line", fail_framing)
+        events = sse_events(post_sse(client, sid="framing", request_id="saved"))
+    assert [kind for kind, _ in events] == ["status", "error"]
+    assert events[1][1]["error"] == "d2_stream_transport_failed"
+    with D2DialogueStore(db) as store:
+        assert store.read(SessionKey(client_id="demo", sid="framing")).state.revision == 1
+    assert post(client, sid="framing", request_id="saved").status_code == 200
+    assert len(fake.inputs) == 1

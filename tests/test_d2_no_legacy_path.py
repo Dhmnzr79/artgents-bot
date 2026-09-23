@@ -7,7 +7,7 @@ import sys
 from contextlib import contextmanager
 
 from tests.d1r_envelope_fixtures import envelope_clinic_policy_only
-from tests.test_d2_http_contract import FakeProvider, http_env, post
+from tests.test_d2_http_contract import FakeProvider, http_env, post, post_sse, sse_events
 
 
 FORBIDDEN_MODULES = (
@@ -73,4 +73,28 @@ def test_json_route_dependency_is_direct_d2_adapter():
     assert "run_d2_ask_json(data, client_id=client_id)" in source
     for old in ("_orchestrate_ask_turn", "_dispatch_orchestration_json",
                 "_service_reply", "finalize_ask", "mem_get"):
+        assert old not in source
+
+
+def test_sse_success_error_and_lead_action_never_call_legacy(http_env):
+    client, _, use_provider, _ = http_env
+    fake = use_provider(FakeProvider(envelope_clinic_policy_only("no_pediatric_dentistry")))
+    with no_legacy_calls(ordinary=True) as calls:
+        assert sse_events(post_sse(client, sid="sse-ordinary"))[-1][0] == "done"
+    assert ("core.d2_dialogue", "run_d2_dialogue_turn") in calls
+    fake.raw = "{invalid"
+    with no_legacy_calls(ordinary=True):
+        assert sse_events(post_sse(client, sid="sse-error", request_id="error"))[-1][0] == "error"
+    with no_legacy_calls(ordinary=False) as calls:
+        assert sse_events(post_sse(client, sid="sse-action", request_id="action",
+                                   q="", situation_action="start"))[-1][0] == "done"
+    assert ("core.d2_dialogue", "run_d2_dialogue_turn") in calls
+
+
+def test_sse_route_dependency_is_direct_d2_adapter():
+    import app
+    source = inspect.getsource(app.ask_stream)
+    assert "run_d2_ask_json(data, client_id=client_id)" in source
+    for old in ("_orchestrate_ask_turn", "_stream_ask_turn_response",
+                "_dispatch_orchestration_sse", "finalize_ask", "mem_get"):
         assert old not in source

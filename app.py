@@ -1098,75 +1098,53 @@ def _dispatch_orchestration_sse(orch_r: AskOrchestrationResult):
 
 @app.post("/ask/stream")
 def ask_stream():
-    """Стриминговый вариант /ask. Протокол SSE:
-      event: status      data: {"message": "..."}   — PERF-1 честный ранний статус (опционален для клиента)
-      event: typing      data: {"phase":"searching"|"writing"} — фаза индикатора (перед ui, как раньше)
-      event: text_delta  data: {"delta": "..."}   — токены ответа (пока не используется)
-      event: ui          data: {полный payload}    — UI элементы после генерации
-      event: done        data: {}                  — конец стрима
-    Direct-ответы (цены, контакты, flow) отдают typing + ui + done без text_delta.
-    /reset и /новая — тот же быстрый детерминированный путь, что и раньше, без early-status
-    (PERF-1 не относится к административным командам).
-    """
-    q = ""
-    client_id: str | None = None
-    request.ctx["turn_t0_monotonic"] = time.monotonic()
-    try:
-        data = request.get_json(force=True) or {}
-        client_id = resolve_request_client_id(data.get("client_id"), host=request.host)
-        if client_id is None:
-            return safe_jsonify({"error": "unknown_client"}), 403
-        blocked = _widget_origin_forbidden(client_id)
-        if blocked:
-            return blocked
+    """SSE framing of the same durable D2 result returned by JSON /ask."""
+    data = request.get_json(force=True, silent=True)
+    if not isinstance(data, dict):
+        return safe_jsonify({"error": "invalid_request"}), 400
+    client_id = resolve_request_client_id(data.get("client_id"), host=request.host)
+    if client_id is None:
+        return safe_jsonify({"error": "unknown_client"}), 403
+    blocked = _widget_origin_forbidden(client_id)
+    if blocked:
+        return blocked
 
-        q_raw = str(data.get("q") or "").strip()
-        if q_raw.lower() in ("/reset", "/новая"):
-            orch_r = _orchestrate_ask_turn(data)
-            turn_timing.mark("orchestrate_done")
-            q = orch_r.q or ""
-            resp = _dispatch_orchestration_sse(orch_r)
-            _emit_runtime_turn_diagnostic_once(
-                status="completed",
-                route=_route_from_orch_result(orch_r),
-                transport="sse",
-            )
-            return resp
+    # The generator holds only captured values, never Flask's request context.
+    # Closing before the first status leaves the D2 store untouched; closing
+    # during the synchronous turn allows its atomic completion to finish.
+    def _gen():
+        from session import clear_session_client_binding
 
-        return _stream_ask_turn_response(data, client_id)
-    except Exception as e:
-        if _runtime_turn_diagnostic_ready():
-            _emit_runtime_turn_diagnostic_once(
-                status="error",
-                route="error",
-                transport="sse",
-            )
-        logger.exception("ask_stream_failed", extra={"err": str(e)[:500]})
-        sid_err = str(request.ctx.get("sid") or "").strip()
-        if sid_err and (q or "").strip():
-            emit_bot_event(
-                logger,
-                "turn_complete",
-                status="error",
-                details=error_turn_complete_details(
-                    q,
-                    fallback_reason="ask_stream_failed",
-                    meta=_error_observability_meta(sid_err),
-                ),
-            )
-        from core.user_text_privacy import observability_safe_user_text
+        try:
+            yield _sse_status_line(_SSE_INITIAL_STATUS_PHRASE)
+            try:
+                out = run_d2_ask_json(data, client_id=client_id)
+            except D2RequestIdConflict:
+                error = "request_id_payload_conflict"
+            except D2RequestInProgress:
+                error = "request_in_progress"
+            except ValueError:
+                error = "d2_invalid_turn"
+            except Exception:
+                logger.error("d2_ask_stream_failed")
+                error = "d2_turn_failed"
+            else:
+                try:
+                    typing_line = _sse_typing_line("writing")
+                    ui_line = f"event: ui\ndata: {json.dumps(out, ensure_ascii=False)}\n\n"
+                except Exception:
+                    logger.error("d2_ask_stream_framing_failed")
+                    yield 'event: error\ndata: {"error":"d2_stream_transport_failed"}\n\n'
+                    return
+                yield typing_line
+                yield ui_line
+                yield "event: done\ndata: {}\n\n"
+                return
+            yield f"event: error\ndata: {json.dumps({'error': error})}\n\n"
+        finally:
+            clear_session_client_binding()
 
-        emit_bot_event(
-            logger,
-            "ask_stream_failed",
-            status="error",
-            details={
-                "error": str(e)[:500],
-                "question_preview": observability_safe_user_text(q or "", max_len=200),
-                **_error_observability_meta(sid_err),
-            },
-        )
-        return safe_jsonify(internal_error_response(client_id=client_id)), 200
+    return app.response_class(_gen(), mimetype="text/event-stream", headers=_SSE_HEADERS)
 
 
 @app.get("/api/video-catalog")

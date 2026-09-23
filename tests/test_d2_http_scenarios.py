@@ -10,7 +10,7 @@ from session import mem_add_user, mem_get, session_client_scope
 from tests.d1r_envelope_fixtures import (
     envelope_adult_booking_only, envelope_clinic_policy_only,
 )
-from tests.test_d2_http_contract import FakeProvider, http_env, post
+from tests.test_d2_http_contract import FakeProvider, http_env, post, post_sse, sse_events
 
 
 def test_two_concurrent_turns_only_one_commits(http_env):
@@ -105,3 +105,67 @@ def test_booking_name_pending_question_phone_and_replay(http_env, monkeypatch):
     replay = post(client, sid=sid, request_id="phone", q="+7 999 123 45 67")
     assert replay.get_json() == phone.get_json()
     assert len(fake.inputs) == 1
+
+
+def test_sse_disconnect_before_work_and_after_commit_replays_without_provider(http_env):
+    client, db, use_provider, _ = http_env
+    fake = use_provider(FakeProvider(envelope_clinic_policy_only("no_pediatric_dentistry")))
+
+    before = post_sse(client, sid="before-close", request_id="once", buffered=False)
+    assert next(before.response).decode().startswith("event: status\n")
+    before.close()
+    assert fake.inputs == []
+    with D2DialogueStore(db) as store:
+        assert store.read(SessionKey(client_id="demo", sid="before-close")) is None
+    recovered = post(client, sid="before-close", request_id="once")
+    assert recovered.status_code == 200 and len(fake.inputs) == 1
+
+    after = post_sse(client, sid="after-close", request_id="once", buffered=False)
+    assert next(after.response).decode().startswith("event: status\n")
+    assert next(after.response).decode().startswith("event: typing\n")
+    after.close()  # D2 has committed; ui/done never reached this client.
+    assert len(fake.inputs) == 2
+    replay = post(client, sid="after-close", request_id="once")
+    assert replay.status_code == 200 and len(fake.inputs) == 2
+    with D2DialogueStore(db) as store:
+        assert store.read(SessionKey(client_id="demo", sid="after-close")).state.revision == 1
+
+
+def test_sse_lead_effect_and_cross_transport_replay(http_env, monkeypatch):
+    client, db, use_provider, _ = http_env
+    fake = use_provider(FakeProvider(envelope_adult_booking_only()))
+    sid = "sse-lead"
+    assert sse_events(post_sse(client, sid=sid, request_id="book", q="Хочу записаться"))[-1][0] == "done"
+    assert sse_events(post_sse(client, sid=sid, request_id="name", q="Анна"))[-1][0] == "done"
+    submitted = sse_events(post_sse(client, sid=sid, request_id="phone",
+                                    q="+7 999 123 45 67"))
+    assert [kind for kind, _ in submitted] == ["status", "typing", "ui", "done"]
+    assert submitted[2][1]["lead_effect"]["status"] == "demo_stub"
+    assert len(fake.inputs) == 1
+
+    def duplicate_effect(*_args, **_kwargs):
+        raise AssertionError("effect updated on replay")
+    monkeypatch.setattr(D2DialogueStore, "update_lead_effect", duplicate_effect)
+    assert post(client, sid=sid, request_id="phone", q="+7 999 123 45 67").get_json() == submitted[2][1]
+    assert len(fake.inputs) == 1
+    with D2DialogueStore(db) as store:
+        assert store.read(SessionKey(client_id="demo", sid=sid)).state.revision == 3
+
+
+def test_sse_tenant_isolation_and_frozen_replay(http_env):
+    client, db, use_provider, tmp_path = http_env
+    fake = use_provider(FakeProvider(envelope_clinic_policy_only("no_pediatric_dentistry")))
+    demo = sse_events(post_sse(client, sid="shared-tenant", request_id="same",
+                               client_id="demo"))[2][1]
+    nika = sse_events(post_sse(client, sid="shared-tenant", request_id="same",
+                               client_id="nikadent"))[2][1]
+    assert demo["client_id"] == "demo" and nika["client_id"] == "nikadent"
+    assert len(fake.inputs) == 2
+    (tmp_path / "clients" / "demo" / "clinic_policies.yaml").write_text(
+        "policies: {}\n", encoding="utf-8"
+    )
+    replay = post(client, sid="shared-tenant", request_id="same", client_id="demo")
+    assert replay.get_json() == demo and len(fake.inputs) == 2
+    with D2DialogueStore(db) as store:
+        assert store.read(SessionKey(client_id="demo", sid="shared-tenant")).state.revision == 1
+        assert store.read(SessionKey(client_id="nikadent", sid="shared-tenant")).state.revision == 1

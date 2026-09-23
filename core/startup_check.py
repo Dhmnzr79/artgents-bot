@@ -70,7 +70,7 @@ def run_startup_check(logger: logging.Logger) -> None:
     log_json(
         logger,
         "runtime_provenance_startup",
-        architecture="fullcontext_one_call",
+        architecture="d2_dialogue",
         model=DEFAULT_LLM_MODEL,
         single_model=True,
         qwen_enable_thinking=QWEN_ENABLE_THINKING,

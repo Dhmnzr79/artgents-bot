@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import inspect
 import sys
 from contextlib import contextmanager
@@ -98,3 +99,34 @@ def test_sse_route_dependency_is_direct_d2_adapter():
     for old in ("_orchestrate_ask_turn", "_stream_ask_turn_response",
                 "_dispatch_orchestration_sse", "finalize_ask", "mem_get"):
         assert old not in source
+
+
+def test_app_has_no_legacy_semantic_wiring():
+    import app
+
+    tree = ast.parse(inspect.getsource(app))
+    imports = {
+        alias.name for node in tree.body if isinstance(node, ast.Import)
+        for alias in node.names
+    } | {
+        node.module for node in tree.body if isinstance(node, ast.ImportFrom)
+    }
+    assert not imports.intersection({
+        "contracts.ask_orchestration",
+        "orchestration.sales_one_plus_ask_turn",
+        "orchestration.finalize_turn",
+        "orchestration.helpers",
+        "core.sales_fast_widget_runtime",
+        "core.target_composer_executor",
+        "core.target_sse_worker_context",
+    })
+    functions = {
+        node.name for node in tree.body if isinstance(node, ast.FunctionDef)
+    }
+    assert not functions.intersection({
+        "_orchestrate_ask_turn", "_orchestrate_ask_turn_inner",
+        "_dispatch_orchestration_json", "_dispatch_orchestration_sse",
+        "_service_reply", "_build_sse_payload", "_run_sse_worker_turn",
+        "_stream_ask_turn_response", "_sse_service_reply",
+    })
+    assert {"ask", "ask_stream", "create_lead"} <= functions

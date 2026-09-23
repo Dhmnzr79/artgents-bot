@@ -37,6 +37,7 @@ from core.d2_snapshot_sources import (
     build_d2_clinic_policy_response,
     build_d2_service_availability_response,
     build_d2_unknown_brand_response,
+    build_d2_unknown_term_response,
 )
 from core.d2_spam_gate import build_d2_spam_gate_response, is_d2_garbage_message
 from core.d2_directory import build_d2_directory_response, classify_d2_directory_request
@@ -566,6 +567,7 @@ def _run_reserved_d2_dialogue_turn(
         clinic_policy = False
         service_availability = False
         unknown_brand = False
+        unknown_term = False
         clinic_contact = False
         offtopic = False
         direct_promotion = False
@@ -656,6 +658,15 @@ def _run_reserved_d2_dialogue_turn(
             and part.brand_id is not None
             and part.brand_id not in view.brand_catalog.brands
         )
+        unknown_term = (
+            envelope.commercial_intent == "none"
+            and envelope.service_reference_status == "unresolved"
+            and len(parts) == 1
+            and part.kind == "content"
+            and part.content_ref is None
+            and part.service_id is None
+            and part.topic_id is None
+        )
         directory_kind = None
         if (
             envelope.commercial_intent == "none"
@@ -696,6 +707,7 @@ def _run_reserved_d2_dialogue_turn(
             or clinic_contact
             or service_availability
             or unknown_brand
+            or unknown_term
             or directory_kind is not None
         ):
             if len(parts) != 1:
@@ -729,6 +741,7 @@ def _run_reserved_d2_dialogue_turn(
                 or clinic_contact
                 or service_availability
                 or unknown_brand
+                or unknown_term
                 or directory_kind is not None
             ):
                 # Independent content parts and typed special routes need no single-topic focus.
@@ -762,6 +775,14 @@ def _run_reserved_d2_dialogue_turn(
             assert part.brand_id is not None
             response = build_d2_unknown_brand_response(
                 tenant, session_key=session_key, brand_id=part.brand_id,
+            )
+            price = None
+            decision = None
+        elif unknown_term:
+            response = build_d2_unknown_term_response(
+                tenant,
+                session_key=session_key,
+                already_clarified=context.ordinary.clarify_pending,
             )
             price = None
             decision = None
@@ -810,7 +831,7 @@ def _run_reserved_d2_dialogue_turn(
     elif price_focus_clarify:
         if response.resolved.route != "CLARIFY" or not response.rendered_text.strip():
             raise ValueError("d2_experiment_focus_clarify_not_resolved")
-    elif clinic_policy or clinic_contact or service_availability or unknown_brand or directory_kind is not None:
+    elif clinic_policy or clinic_contact or service_availability or unknown_brand or unknown_term or directory_kind is not None:
         if not response.rendered_text.strip():
             raise ValueError("d2_experiment_directory_or_availability_not_resolved")
     elif direct_promotion:
@@ -863,6 +884,7 @@ def _run_reserved_d2_dialogue_turn(
         or clinic_contact
         or service_availability
         or unknown_brand
+        or unknown_term
         or directory_kind is not None
     ):
         situation = snapshot.state.situation_state

@@ -326,6 +326,8 @@ def build_d2_focus_clarify_response(
 
 
 _INFO_GAP = "К сожалению, у меня пока недостаточно информации по этому вопросу"
+_UNKNOWN_TERM_CLARIFY = "Уточните, пожалуйста, что вы имеете в виду под этим названием?"
+_UNKNOWN_TERM_GAP = _INFO_GAP + ". Могу помочь записаться на консультацию."
 _POLICY_CLARIFY = "Уточните, пожалуйста: вопрос про ОМС или ДМС?"
 _DEFAULT_MANUAL_CONTACT = (
     "Такой вопрос лучше решить напрямую с клиникой — так будет быстрее и корректнее. "
@@ -656,4 +658,20 @@ def _d2_code_owned_answer(
         adapter_diagnostics=(),
         situation_delta=ResponseSituationDelta(action="keep"),
         trace=MaterializationTrace(None, (), (), ()),
+    )
+
+
+def build_d2_unknown_term_response(
+    snapshot: D2TenantSnapshot,
+    *,
+    session_key: SessionKey,
+    already_clarified: bool,
+) -> MaterializedResponseOutcome:
+    """One clarification, then an honest gap; no term-specific memory or guess."""
+    if snapshot.client_id != session_key.client_id:
+        raise D2SnapshotBindingError("unknown_term_client_mismatch")
+    return _d2_code_owned_answer(
+        session_key=session_key,
+        text=_UNKNOWN_TERM_GAP if already_clarified else _UNKNOWN_TERM_CLARIFY,
+        route="ANSWER" if already_clarified else "CLARIFY",
     )

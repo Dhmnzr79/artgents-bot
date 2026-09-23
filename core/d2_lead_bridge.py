@@ -48,6 +48,7 @@ from session import (
     is_active_lead_flow,
     mark_booking_intent_ever,
     mem_get,
+    peek_lead_activity,
     set_lead_intent,
     set_lead_pending_interruption,
     set_situation_note,
@@ -117,14 +118,10 @@ def d2_lead_needs_pre_provider(
     if not d2_lead_session_client_matches(session_key):
         return False
     try:
-        st = mem_get(session_key.sid)
+        situation_pending, active_lead = peek_lead_activity(session_key.sid)
     except SessionClientNotBoundError:
         return False
-    if st.get("situation_pending"):
-        return True
-    if is_active_lead_flow(st):
-        return True
-    return False
+    return situation_pending or active_lead
 
 
 def resolve_d2_booking_lead_entry(

@@ -249,6 +249,39 @@ def mem_get(session_id: str) -> dict:
         return st
 
 
+def peek_lead_activity(session_id: str) -> tuple[bool, bool]:
+    """Read existing lead flags without creating an ordinary session row."""
+    with _lock:
+        row = _connect().execute(
+            "SELECT payload, updated_at FROM sessions WHERE sid = ?", (session_id,)
+        ).fetchone()
+    if row is None or _now() - float(row[1]) > MAX_IDLE_SEC:
+        return False, False
+    state = json.loads(row[0])
+    return bool(state.get("situation_pending")), is_active_lead_flow(state)
+
+
+def capture_lead_session_row(session_id: str) -> tuple[str, float] | None:
+    """Hold the existing lead owner's row for rollback before D2 publication."""
+    with _lock:
+        return _connect().execute(
+            "SELECT payload, updated_at FROM sessions WHERE sid = ?", (session_id,)
+        ).fetchone()
+
+
+def restore_lead_session_row(session_id: str, row: tuple[str, float] | None) -> None:
+    """Undo lead slot changes when D2 could not publish any completion."""
+    with _lock:
+        conn = _connect()
+        if row is None:
+            conn.execute("DELETE FROM sessions WHERE sid = ?", (session_id,))
+        else:
+            conn.execute(
+                "INSERT OR REPLACE INTO sessions (sid, payload, updated_at) VALUES (?, ?, ?)",
+                (session_id, row[0], row[1]),
+            )
+
+
 def mem_add_user(session_id: str, text: str) -> None:
     from core.user_text_privacy import provider_safe_user_text
 

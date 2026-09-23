@@ -24,6 +24,8 @@ from pg_sink import enqueue_v5_turn_trace, init_pg_sink
 from config import DEBUG_TOKEN, PORT
 from core import turn_timing
 from core.client_host import resolve_request_client_id
+from core.d2_http_adapter import run_d2_ask_json
+from core.d2_dialogue_store import D2RequestIdConflict, D2RequestInProgress
 from core.provider_call_budget import http_provider_budget_scope
 from contracts.ask_orchestration import AskOrchestrationResult
 from core.client_config_loader import (
@@ -605,70 +607,32 @@ def _dispatch_orchestration_json(orch_r: AskOrchestrationResult):
 
 @app.post("/ask")
 def ask():
-    q = ""
-    client_id: str | None = None
-    request.ctx["turn_t0_monotonic"] = time.monotonic()
+    """Return the durable D2 final result through the JSON transport."""
     try:
-        data = request.get_json(force=True) or {}
+        data = request.get_json(force=True)
+        if not isinstance(data, dict):
+            return safe_jsonify({"error": "invalid_request"}), 400
         client_id = resolve_request_client_id(data.get("client_id"), host=request.host)
         if client_id is None:
             return safe_jsonify({"error": "unknown_client"}), 403
         blocked = _widget_origin_forbidden(client_id)
         if blocked:
             return blocked
-        orch_r = _orchestrate_ask_turn(data)
-        from core.turn_timing import mark
-
-        mark("orchestrate_done")
-        q = orch_r.q or ""
-        try:
-            resp = _dispatch_orchestration_json(orch_r)
-            _emit_runtime_turn_diagnostic_once(
-                status="completed",
-                route=_route_from_orch_result(orch_r),
-                transport="json",
-            )
-            return resp
-        except Exception:
-            _emit_runtime_turn_diagnostic_once(
-                status="error",
-                route=_route_from_orch_result(orch_r),
-                transport="json",
-            )
-            raise
-    except Exception as e:
-        if _runtime_turn_diagnostic_ready():
-            _emit_runtime_turn_diagnostic_once(
-                status="error",
-                route="error",
-                transport="json",
-            )
-        logger.exception("ask_failed", extra={"err": str(e)[:500]})
-        sid_err = str(request.ctx.get("sid") or "").strip()
-        if sid_err and (q or "").strip():
-            emit_bot_event(
-                logger,
-                "turn_complete",
-                status="error",
-                details=error_turn_complete_details(
-                    q,
-                    fallback_reason="ask_failed",
-                    meta=_error_observability_meta(sid_err),
-                ),
-            )
-        from core.user_text_privacy import observability_safe_user_text
-
-        emit_bot_event(
-            logger,
-            "ask_failed",
-            status="error",
-            details={
-                "error": str(e)[:500],
-                "question_preview": observability_safe_user_text(q or "", max_len=200),
-                **_error_observability_meta(sid_err),
-            },
-        )
-        return safe_jsonify(internal_error_response(client_id=client_id)), 200
+        result = run_d2_ask_json(data, client_id=client_id)
+        request.ctx["sid"] = result["sid"]
+        request.ctx["session_id"] = result["sid"]
+        request.ctx["client_id"] = client_id
+        request.ctx["request_id"] = result["request_id"]
+        return safe_jsonify(result)
+    except D2RequestIdConflict:
+        return safe_jsonify({"error": "request_id_payload_conflict"}), 409
+    except D2RequestInProgress:
+        return safe_jsonify({"error": "request_in_progress"}), 409
+    except ValueError:
+        return safe_jsonify({"error": "d2_invalid_turn"}), 400
+    except Exception:
+        logger.error("d2_ask_failed")
+        return safe_jsonify({"error": "d2_turn_failed"}), 503
 
 _SSE_HEADERS = {
     "Cache-Control": "no-cache",

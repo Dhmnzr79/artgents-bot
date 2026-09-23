@@ -132,3 +132,28 @@ class D2Cp3LiveProvider:
             duration_ms=max(0, int((time.monotonic() - started) * 1000)),
         ))
         return content.strip()
+
+
+class D2HttpProvider:
+    """The HTTP turn's single raw D1R call using the existing D2 prompt."""
+
+    def __init__(self, *, model: str = DEFAULT_LLM_MODEL,
+                 transport: Callable[..., object] = chat_completions_create) -> None:
+        self.model = model
+        self._transport = transport
+
+    def generate(self, request: D2ProviderInput) -> str:
+        system, user = build_d2_d1r_messages(request)
+        response = self._transport(
+            model=self.model, temperature=0, max_completion_tokens=1024,
+            timeout=LLM_REQUEST_TIMEOUT_SEC, messages=(system, user),
+            response_format={"type": "json_object"},
+            provider_call_source="d2_http",
+        )
+        choices = getattr(response, "choices", None) or ()
+        if not choices:
+            raise D2LiveProviderError("d2_http_response_choices_missing")
+        content = getattr(getattr(choices[0], "message", None), "content", None)
+        if not isinstance(content, str) or not content.strip():
+            raise D2LiveProviderError("d2_http_response_content_missing")
+        return content.strip()

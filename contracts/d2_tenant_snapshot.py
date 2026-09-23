@@ -10,7 +10,7 @@ from pydantic import field_validator, model_validator
 from contracts.response_plan import ResponsePlanModel
 
 from contracts.response_plan_materialization import D2AuthoredContentAuthority, D2PublishedOfferTerms
-from contracts.response_schema import ResponseSchemaBundle
+from contracts.response_schema import ResponseSchemaBundle, TargetBrandCatalog
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
@@ -157,6 +157,7 @@ class D2ModelView:
     service_reference_catalog: ServiceReferenceCatalogSnapshot
     commercial_fact_catalog: CommercialFactCatalogSnapshot
     content: tuple[D2AuthoredContentAuthority, ...]
+    brand_catalog: TargetBrandCatalog
     published_terms: tuple[D2PublishedOfferTerms, ...]
     direction_prices: tuple[D2DirectionPriceConfig, ...] = ()
     commercial: D2CommercialPack = field(default_factory=lambda: D2CommercialPack(version=1))

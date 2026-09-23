@@ -109,6 +109,7 @@ class RequestUnderstandingRequest(BaseModel):
     content_fallback_section_ref: str | None = None
     service_id: str | None = None
     topic_id: str | None = None
+    brand_id: str | None = None
     statement_mode: RequestStatementMode = "question"
     situation: RequestTreatmentSituation | None = None
 
@@ -150,7 +151,7 @@ class RequestUnderstandingRequest(BaseModel):
             raise ValueError("content_ref_invalid")
         return token
 
-    @field_validator("service_id", "topic_id")
+    @field_validator("service_id", "topic_id", "brand_id")
     @classmethod
     def _validate_semantic_ref(cls, value: str | None) -> str | None:
         if value is None:

@@ -464,6 +464,75 @@ def test_b04_comparison_ready_two_materials_and_missing_side(tmp_path: Path) -> 
     assert missing.response.resolved.d2_result_status == "degraded"
 
 
+def test_b04_two_independent_information_questions_keep_both_answers_without_source_ui(tmp_path: Path) -> None:
+    outcome, saved, provider, _, _ = _run(
+        tmp_path,
+        _raw(
+            _content_part(
+                request_id="r1",
+                content_ref="implantation__faq__pain.md",
+                service_id="classic",
+                topic_id="implantation",
+                section_refs=["a:korotko"],
+                realization="model_prose",
+                text=PAIN_LIVE,
+                fallback="a:korotko",
+            ),
+            _content_part(
+                request_id="r2",
+                content_ref="clinic__info__warranty.md",
+                service_id=None,
+                topic_id="clinic",
+                section_refs=["a:korotko"],
+                realization="model_prose",
+                text=WARRANTY_LIVE,
+                fallback="a:korotko",
+            ),
+        ),
+        message="Больно ли ставить имплант и какая у вас гарантия?",
+        key=SessionKey(client_id="demo", sid="c1-two-info"),
+    )
+    text = outcome.response.rendered_text
+    ui = outcome.response.ui_projection
+    assert text.index(PAIN_LIVE) < text.index(WARRANTY_LIVE)
+    assert [part.status for part in outcome.response.resolved.d2_request_parts] == ["answered", "answered"]
+    assert outcome.response.resolved.d2_result_status == "complete"
+    assert ui.video is None and ui.quick_replies == ()
+    assert saved is not None and len(provider.inputs) == 1
+
+
+def test_b04_two_independent_questions_same_topic_distinct_services_have_no_source_ui(tmp_path: Path) -> None:
+    outcome, _, _, _, _ = _run(
+        tmp_path,
+        _raw(
+            _content_part(
+                request_id="r1",
+                content_ref="implantation__faq__pain.md",
+                service_id="classic",
+                topic_id="implantation",
+                section_refs=["a:korotko"],
+                realization="model_prose",
+                text=PAIN_LIVE,
+                fallback="a:korotko",
+            ),
+            _content_part(
+                request_id="r2",
+                content_ref="implantation__service__one_stage.md",
+                service_id="one_stage",
+                topic_id="implantation",
+                section_refs=["a:korotko"],
+            ),
+        ),
+        message="Больно ли при классической имплантации и как проходит одномоментная?",
+        key=SessionKey(client_id="demo", sid="c1-two-info-same-topic"),
+    )
+    text = outcome.response.rendered_text
+    ui = outcome.response.ui_projection
+    assert PAIN_LIVE in text and ONE_STAGE_FACT in text
+    assert [part.status for part in outcome.response.resolved.d2_request_parts] == ["answered", "answered"]
+    assert ui.video is None and ui.quick_replies == ()
+
+
 def test_b15_section_without_korotko_and_irrelevant_fallback(tmp_path: Path) -> None:
     clients = _clients(tmp_path)
     (clients / "demo" / "md" / "implantation__info__hygiene.md").write_text(

@@ -313,10 +313,9 @@ def resolve_d2_envelope_response(
         envelope.commercial_intent == "payment"
         and bool(envelope.references.direct_fact_ids)
     )
-    comparison_lookup = len(content_parts) > 1 and (
-        any(part.content_ref is None for part in content_parts)
-        or len({part.content_ref for part in content_parts}) > 1
-    )
+    # The same multi-document presentation applies to comparisons and to
+    # independent questions. Neither borrows one document's secondary UI.
+    multiple_content_parts = len(content_parts) > 1
     ready_comparison = (
         len(content_parts) == 1
         and content_parts[0].content_ref is not None
@@ -326,7 +325,7 @@ def resolve_d2_envelope_response(
         common_route_content_lookup
         and not direct_promotion
         and not direct_fact
-        and not comparison_lookup
+        and not multiple_content_parts
         and not ready_comparison
         and not price_parts
     )
@@ -353,7 +352,7 @@ def resolve_d2_envelope_response(
 
     # Resolve content first. Wrong/missing refs soft-fail as part gaps (D2-078);
     # foreign tenant material remains fatal and must not hide behind price recovery.
-    allow_missing_content_ref = code_owned_null_content or comparison_lookup
+    allow_missing_content_ref = code_owned_null_content or multiple_content_parts
     information_blocks, content_realizations = _d2_information_blocks(
         content_parts=content_parts,
         client_id=client_id,
@@ -417,9 +416,11 @@ def resolve_d2_envelope_response(
                 client_id=client_id,
                 service_ids=service_ids,
                 published_terms=sources.d2_published_terms_by_offer,
+                brand_id=price_part.brand_id,
                 applied_extent=applied_extent,
                 ordered_offer_ids=next((item.ordered_offer_ids for item in sources.d2_directions
-                                        if price_part.service_id is None and item.topic_id == selected_topic_id), ()),
+                                        if price_part.service_id is None
+                                        and item.topic_id == selected_topic_id), ()),
                 direct_service_only=(
                     common_route_direct_service_only
                     and price_part.service_id is not None
@@ -560,7 +561,7 @@ def resolve_d2_envelope_response(
         suppress_secondary=(
             bool(price_parts)
             or direct_promotion
-            or (common_route_content_lookup and comparison_lookup)
+            or multiple_content_parts
         ),
     )
     if volume_choices:
@@ -575,7 +576,10 @@ def resolve_d2_envelope_response(
         else "degraded"
     )
     if price_parts:
-        commercial_service_id = price_parts[0].service_id
+        commercial_service_id = (
+            None if price_block is None and price_parts[0].brand_id is not None
+            else price_parts[0].service_id
+        )
     elif direct_promotion and envelope.promotion_scope == "general":
         commercial_service_id = None
     elif direct_promotion or auto_promo:
@@ -843,6 +847,7 @@ def _d2_price_scope_decision(
     )
     if presentation is None or presentation.source_client_id != client_id:
         return None, ()
+    brand = sources.material_authority.bundle.brands.brands.get(part.brand_id) if part.brand_id else None
     choices: tuple[D2PriceScopeChoice, ...] = ()
     situation = part.situation
     # Volume buttons come from clinic presentation (D2-028). Offer-set diversity
@@ -860,7 +865,10 @@ def _d2_price_scope_decision(
             applied_extent=applied_extent,
             reason="known_situation" if applied_extent is not None else "overview",
             selected_offer_ids=selected_offer_ids,
-            introduction_text=presentation.introduction_text,
+            introduction_text=(
+                f"Вот опубликованные цены для {brand.canonical_name}."
+                if brand is not None else presentation.introduction_text
+            ),
             # Clarification copy only with volume buttons (D2-005/074). After
             # «Не знаю» choices are empty: keep orienting prices, do not re-ask.
             unknown_extent_text=presentation.unknown_extent_text if choices else None,
@@ -968,6 +976,17 @@ def _d2_price_scope(
         return (part.service_id,), "service", part.topic_id
     if part.topic_id is None:
         raise MaterializationContractError("d2_price_scope_required")
+    if part.brand_id is not None and part.topic_id == "implantation":
+        bundle = sources.material_authority.bundle
+        service_ids = tuple(dict.fromkeys(
+            offer.service_id for offer in bundle.offers
+            if offer.active and offer.brand_id == part.brand_id
+            and offer.service_id in bundle.services
+            and bundle.services[offer.service_id].active
+            and bundle.services[offer.service_id].family == "implantology"
+        ))
+        if service_ids:
+            return service_ids, "topic", part.topic_id
     for direction in sources.d2_directions:
         if direction.topic_id == part.topic_id and direction.source_client_id == client_id:
             return direction.service_ids, "topic", direction.topic_id
@@ -990,10 +1009,13 @@ def _d2_price_block(
     client_id: str,
     service_ids: tuple[str, ...],
     published_terms: dict[str, D2PublishedOfferTerms],
+    brand_id: str | None = None,
     applied_extent: str | None = None,
     ordered_offer_ids: tuple[str, ...] = (),
     direct_service_only: bool = False,
 ) -> tuple[D2FrozenPriceBlock, MaterializationTrace]:
+    if brand_id is not None and brand_id not in bundle.brands.brands:
+        raise MaterializationContractError("d2_no_price_candidates")
     offers: list[TargetOffer] = []
     if direct_service_only:
         # A direct D2 service-price request has no authored direction ordering.
@@ -1010,6 +1032,7 @@ def _d2_price_block(
             offer
             for offer in bundle.offers
             if offer.service_id == service_ids[0]
+            and (brand_id is None or offer.brand_id == brand_id)
             and offer.active
             and (
                 offer.option_id is None
@@ -1023,6 +1046,40 @@ def _d2_price_block(
             raise MaterializationContractError("d2_no_price_candidates")
         if len(offers) != 1:
             raise MaterializationContractError("d2_direct_service_offer_selection_unsupported")
+    elif brand_id is not None:
+        candidates: list[TargetOffer] = []
+        for service_id in service_ids:
+            service = bundle.services.get(service_id)
+            if service is None or not service.active:
+                continue
+            active_options = {item.option_id for item in service.options if item.active}
+            candidates.extend(
+                offer for offer in bundle.offers
+                if offer.service_id == service_id and offer.brand_id == brand_id and offer.active
+                and (offer.option_id is None or offer.option_id in active_options)
+                and (applied_extent is None or _d2_offer_applies(offer, service, applied_extent))
+            )
+        authored_rank = {offer_id: index for index, offer_id in enumerate(ordered_offer_ids)}
+        service_rank = {
+            offer.service_id: min(
+                (authored_rank[item.offer_id] for item in bundle.offers
+                 if item.service_id == offer.service_id and item.offer_id in authored_rank),
+                default=len(authored_rank),
+            )
+            for offer in candidates
+        }
+        candidates.sort(key=lambda offer: service_rank[offer.service_id])
+        if applied_extent is None:
+            # Unknown volume: one published example per scale is enough.
+            seen_scales: set[str] = set()
+            for offer in candidates:
+                scale = next(iter(offer.applies_to_extents or ()), offer.service_id)
+                if scale not in seen_scales:
+                    offers.append(offer)
+                    seen_scales.add(scale)
+            offers = offers[:3]
+        else:
+            offers = candidates[:3]
     elif ordered_offer_ids:
         # Authored D2 direction order bypasses legacy strategy/semantic selectors.
         by_id = {offer.offer_id: offer for offer in bundle.offers}
@@ -1055,7 +1112,7 @@ def _d2_price_block(
                 if _d2_offer_applies(offer, service, applied_extent):
                     offers.append(offer)
             offers = offers[:3]
-    for service_id in (() if ordered_offer_ids or direct_service_only else service_ids):
+    for service_id in (() if ordered_offer_ids or direct_service_only or brand_id is not None else service_ids):
         if service_id not in bundle.services:
             raise MaterializationOwnershipError("materialization_foreign_material")
         context = build_service_data_context(bundle, TargetDoctorCatalog(doctors={}), service_id)

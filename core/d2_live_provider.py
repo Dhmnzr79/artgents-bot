@@ -23,6 +23,10 @@ D2_DIALOGUE_FOLLOW_UP_INSTRUCTIONS = """=== D2_DIALOGUE_FOLLOW_UP ===
 D2_SESSION_CONTEXT is authoritative typed context, not prose to repeat. When its freshness is fresh, ordinary.situation_state is non-null, and the user explicitly names a different D2 direction, emit one price request for that direction: set topic_id to that direction id and service_id=null. Declare a subject with relation=self and age_group=unknown. Set that request's situation to {scope_commitment:"unknown",extent:"unknown",tooth_count:null,jaw:"unknown",continuity:"same"}. The application, not the model, carries the stored situation. Do not select a concrete service merely because the user named a direction.
 """
 
+D2_BRAND_INSTRUCTIONS = """=== D2_BRAND_REQUESTS ===
+For an implant brand or country question, use BRAND_CATALOG and IMPLANT_SYSTEMS_DOCUMENT. Set requests[].brand_id to the exact brand ID from BRAND_CATALOG when one brand is identified, including a country-only reference. For a named brand or country absent from BRAND_CATALOG, set brand_id to the lower-case named term; do not claim that the clinic does not offer it. Use brand_id=null when no single brand is requested. On a brand price question, emit kind=price, topic_id=implantation, and the exact service_id if one is named. Never put prices into prose or substitute another brand. On a brand information question, use the approved implant systems content_ref and grounded section refs; do not infer which brand is best for this patient. For Osstem, emit brand_id=osstem; code supplies the authored availability answer. Country and availability claims must come only from BRAND_CATALOG or an authored clinic policy.
+"""
+
 
 class D2LiveProviderError(RuntimeError):
     pass
@@ -51,6 +55,8 @@ def _usage_int(usage: object, key: str) -> int | None:
 def build_d2_d1r_messages(request: D2ProviderInput) -> tuple[dict[str, str], dict[str, str]]:
     """Reuse the sole production D1R contract with the captured D2 input."""
     directions = [item.model_dump(mode="json") for item in request.model_view.direction_prices]
+    implant_systems = next((item for item in request.model_view.content
+                            if item.content_ref == "implantation__info__implant_systems.md"), None)
     system = "\n\n".join((
         one_call_contract_header(),
         "=== TYPED_ENVELOPE_INSTRUCTIONS ===\n" + ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS,
@@ -59,6 +65,11 @@ def build_d2_d1r_messages(request: D2ProviderInput) -> tuple[dict[str, str], dic
         "=== D2_DIRECTION_PRICES ===\n" + json.dumps(
             directions, ensure_ascii=False, separators=(",", ":"),
         ),
+        "=== BRAND_CATALOG ===\n" + request.model_view.brand_catalog.model_dump_json(),
+        "=== IMPLANT_SYSTEMS_DOCUMENT ===\n" + (
+            implant_systems.model_dump_json() if implant_systems is not None else "null"
+        ),
+        D2_BRAND_INSTRUCTIONS,
         D2_DIALOGUE_FOLLOW_UP_INSTRUCTIONS,
     ))
     user = "\n\n".join((

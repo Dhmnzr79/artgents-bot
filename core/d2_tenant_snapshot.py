@@ -196,6 +196,7 @@ def build_d2_model_view(snapshot: D2TenantSnapshot) -> D2ModelView:
         service_reference_catalog=ServiceReferenceCatalogSnapshot.from_bundle(bundle),
         commercial_fact_catalog=CommercialFactCatalogSnapshot.from_bundle(bundle),
         content=snapshot.content,
+        brand_catalog=bundle.brands,
         published_terms=tuple(build_d2_published_offer_terms(offer=offer, source_client_id=snapshot.client_id) for offer in bundle.offers),
         direction_prices=_direction_prices(snapshot.files, bundle),
         commercial=_commercial_contract(snapshot.files, bundle, snapshot.client_id),

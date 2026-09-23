@@ -96,15 +96,13 @@ def test_two_content_services_are_mixed_and_render_each_source_once() -> None:
 
 
 @pytest.mark.parametrize(
-    ("request_refs", "expected_first_reply", "expected_first_video"),
+    "request_refs",
     [
-        (("therapy.md", "pain-two.md"), "therapy_follow", "therapy_video"),
-        (("pain-two.md", "therapy.md"), "implant_follow", "implant_video"),
+        ("therapy.md", "pain-two.md"),
+        ("pain-two.md", "therapy.md"),
     ],
 )
-def test_two_content_sources_use_only_first_source_secondary_ui(
-    request_refs: tuple[str, str], expected_first_reply: str, expected_first_video: str,
-) -> None:
+def test_two_content_sources_keep_order_without_source_secondary_ui(request_refs: tuple[str, str]) -> None:
     base = _sources_ab()
     payload = base.model_dump()
     payload["d2_authored_content"] = [
@@ -140,9 +138,8 @@ def test_two_content_sources_use_only_first_source_secondary_ui(
     assert outcome.rendered_text.count("Материал терапии.") == 1
     assert outcome.rendered_text.count("Материал имплантации.") == 1
     assert outcome.resolved.ui_plan.source_content_ref == request_refs[0]
-    assert [reply.reply_id for reply in outcome.ui_projection.quick_replies] == [expected_first_reply]
-    assert outcome.ui_projection.video is not None
-    assert outcome.ui_projection.video.video_id == expected_first_video
+    assert outcome.ui_projection.quick_replies == ()
+    assert outcome.ui_projection.video is None
 
 
 def test_same_confirmed_service_keeps_unambiguous_focus_despite_missing_topic() -> None:

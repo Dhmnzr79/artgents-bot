@@ -466,7 +466,9 @@ class InformationSourceBlock(ResponsePlanModel):
 
     request_id: NonBlankStr
     source_client_id: NonBlankStr
-    content_ref: NonBlankStr
+    # FullContext prose may have no single document provenance.  In that case
+    # this is deliberately null; it must not be invented from the question.
+    content_ref: NonBlankStr | None
     display_text: NonBlankStr
     source_section_refs: tuple[NonBlankStr, ...] = ()
     publication: D2ContentPublication = "authored"
@@ -483,6 +485,15 @@ class InformationSourceBlock(ResponsePlanModel):
         elif self.replacement_reason is not None:
             raise ValueError("d2_content_replacement_reason_forbidden")
         return self
+
+
+class D2ContactFactBlock(ResponsePlanModel):
+    """Exact tenant contact data attached to one D2 request part."""
+
+    request_id: NonBlankStr
+    source_client_id: NonBlankStr
+    display_text: NonBlankStr
+    phone: NonBlankStr
 
 
 class D2PartFailureBlock(ResponsePlanModel):
@@ -756,7 +767,7 @@ class D2PriceScopeChoice(ResponsePlanModel):
 
 class D2ResolvedRequestPart(ResponsePlanModel):
     request_id: NonBlankStr
-    kind: Literal["price", "content"]
+    kind: Literal["price", "content", "contact"]
     status: Literal["answered", "recovered", "unavailable", "deferred"]
     failure_reason: D2PartFailureReason | None = None
     subject_id: NonBlankStr | None = None
@@ -770,9 +781,9 @@ class D2ResolvedRequestPart(ResponsePlanModel):
 
     @model_validator(mode="after")
     def _validate_d2_part(self) -> Self:
-        if self.kind == "price" and self.content_ref is not None:
+        if self.kind in {"price", "contact"} and self.content_ref is not None:
             raise ValueError("d2_price_part_content_ref_forbidden")
-        if self.kind == "price" and self.content_section_refs:
+        if self.kind in {"price", "contact"} and self.content_section_refs:
             raise ValueError("d2_price_part_section_refs_forbidden")
         if self.content_section_refs and self.content_ref is None:
             raise ValueError("d2_section_refs_require_content_ref")
@@ -781,7 +792,7 @@ class D2ResolvedRequestPart(ResponsePlanModel):
         if (
             self.kind == "content"
             and self.content_ref is None
-            and self.content_publication is not None
+            and self.content_publication not in {None, "model_prose"}
         ):
             raise ValueError("d2_content_part_content_ref_required")
         if self.status == "answered" and self.failure_reason is not None:
@@ -799,7 +810,7 @@ class D2ResolvedRequestPart(ResponsePlanModel):
             raise ValueError("d2_price_part_failure_reason_invalid")
         if self.kind == "content":
             if self.status == "answered" and self.content_ref is None:
-                if self.content_publication is not None:
+                if self.content_publication != "model_prose":
                     raise ValueError("d2_content_part_publication_required")
             elif self.status == "answered" and self.content_publication not in {"authored", "model_prose"}:
                 raise ValueError("d2_content_part_publication_required")
@@ -821,6 +832,11 @@ class D2ResolvedRequestPart(ResponsePlanModel):
                 raise ValueError("d2_content_part_failure_reason_invalid")
             if self.status != "unavailable" and self.snapshot_fingerprint is None:
                 raise ValueError("d2_content_part_snapshot_required")
+        elif self.kind == "contact":
+            if self.status != "answered" or self.failure_reason is not None:
+                raise ValueError("d2_contact_part_status_invalid")
+            if self.content_publication is not None or self.snapshot_fingerprint is not None:
+                raise ValueError("d2_contact_part_content_provenance_forbidden")
         elif self.content_publication is not None or self.snapshot_fingerprint is not None:
             raise ValueError("d2_price_part_content_provenance_forbidden")
         if self.status == "unavailable":
@@ -909,6 +925,7 @@ class PreComposerPlan(ResponsePlanModel):
     d2_request_parts: tuple[D2ResolvedRequestPart, ...] = ()
     d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()
     d2_part_deferred_blocks: tuple[D2PartDeferredBlock, ...] = ()
+    d2_contact_blocks: tuple[D2ContactFactBlock, ...] = ()
     d2_result_status: D2ResultStatus | None = None
     required_offer_conditions: UniqueRequiredOfferConditions = ()
     commercial_facts: UniqueCommercialFacts = ()
@@ -1335,11 +1352,13 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
     if len(block_ids) != len(set(block_ids)):
         raise ValueError("d2_request_part_content_block_duplicate")
     content_by_request = {block.request_id: block for block in plan.information_blocks}
+    contact_ids = [block.request_id for block in plan.d2_contact_blocks]
+    if len(contact_ids) != len(set(contact_ids)):
+        raise ValueError("d2_request_part_contact_block_duplicate")
+    contact_by_request = {block.request_id: block for block in plan.d2_contact_blocks}
     published_content_parts = [
         part for part in parts
-        if part.kind == "content"
-        and part.status in {"answered", "recovered"}
-        and part.content_ref is not None
+        if part.kind == "content" and part.status in {"answered", "recovered"}
     ]
     if len(published_content_parts) != len(content_by_request):
         raise ValueError("d2_request_part_content_linkage_invalid")
@@ -1354,6 +1373,13 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
             or block.replacement_reason != part.failure_reason
         ):
             raise ValueError("d2_request_part_content_linkage_invalid")
+    contact_parts = [part for part in parts if part.kind == "contact"]
+    if len(contact_parts) != len(contact_by_request):
+        raise ValueError("d2_request_part_contact_linkage_invalid")
+    for part in contact_parts:
+        block = contact_by_request.get(part.request_id)
+        if block is None or block.source_client_id != plan.session_delta.session_key.client_id:
+            raise ValueError("d2_request_part_contact_linkage_invalid")
 
 
 def _validate_terminal_state(plan: ResolvedResponsePlan) -> None:
@@ -1464,6 +1490,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
     d2_request_parts: tuple[D2ResolvedRequestPart, ...] = ()
     d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()
     d2_part_deferred_blocks: tuple[D2PartDeferredBlock, ...] = ()
+    d2_contact_blocks: tuple[D2ContactFactBlock, ...] = ()
     d2_result_status: D2ResultStatus | None = None
     information_blocks: tuple[InformationSourceBlock, ...] = ()
     required_offer_conditions: tuple[RequiredOfferConditionBlock, ...] = ()

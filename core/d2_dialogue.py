@@ -4,6 +4,7 @@ This is deliberately an internal experiment, not an HTTP adapter or the full
 product. Unsupported inputs fail explicitly; there is no legacy fallback.
 """
 
+from dataclasses import replace
 from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
@@ -14,9 +15,9 @@ from contracts.d2_dialogue import (
     D2LeadEffectDispatcher, D2ProviderInput, D2RawProvider,
 )
 from contracts.d2_session_context import D2SessionActivity, D2SessionTtlPolicy
-from contracts.response_plan import SessionKey
+from contracts.response_plan import D2ResolvedRequestPart, SessionKey
 from contracts.response_plan_session import (
-    SESSION_SCHEMA_VERSION, PersistedActiveTopic, PersistedShownCommercialIds,
+    SESSION_SCHEMA_VERSION, PersistedActiveService, PersistedActiveTopic, PersistedShownCommercialIds,
     PersistedShownOptionsSnapshot, PersistedSituationState, ResponsePlanSessionSnapshot,
     ResponsePlanSessionState, empty_session_snapshot,
 )
@@ -35,13 +36,13 @@ from core.d2_snapshot_sources import (
     build_d2_manual_contact_terminal_response,
     build_d2_snapshot_sources,
     build_d2_clinic_policy_response,
+    build_d2_brand_policy_response,
     build_d2_service_availability_response,
-    build_d2_unknown_brand_response,
-    build_d2_unknown_term_response,
+    build_d2_unknown_reference_response,
+    resolve_d2_clarify_service_topic,
 )
 from core.d2_spam_gate import build_d2_spam_gate_response, is_d2_garbage_message
-from core.d2_directory import build_d2_directory_response, classify_d2_directory_request
-from core.d2_contacts_cta import build_d2_contact_response
+from core.d2_contacts_cta import build_d2_contact_fact_block, build_d2_contact_response
 from core.d2_offtopic import build_d2_offtopic_response, is_d2_offtopic_envelope
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
 from core.one_call_envelope_protocol import (
@@ -49,6 +50,8 @@ from core.one_call_envelope_protocol import (
     production_envelope_template,
 )
 from core.response_plan_materialization import resolve_d2_envelope_response
+from core.response_text_renderer import render_response_text
+from core.response_ui_projection import project_response_ui
 from core.user_text_privacy import provider_message_has_substance, provider_safe_user_text
 import json
 
@@ -110,14 +113,15 @@ def _d2_multipart_shape_ok(*, parts: tuple, subjects_by_id: dict) -> bool:
     """
     if len(parts) < 2 or len(parts) > 3:
         return False
-    if any(item.kind not in {"price", "content"} for item in parts):
+    if any(item.kind not in {"price", "content", "contact"} for item in parts):
         return False
     price_parts = tuple(item for item in parts if item.kind == "price")
     content_parts = tuple(item for item in parts if item.kind == "content")
-    if not price_parts:
+    contact_parts = tuple(item for item in parts if item.kind == "contact")
+    if not price_parts and not content_parts:
         return False
-    # At least one price; optional independent content; extra prices are deferred.
-    if len(price_parts) + len(content_parts) != len(parts):
+    # Typed exact facts may be added to an ordinary FullContext/price answer.
+    if len(price_parts) + len(content_parts) + len(contact_parts) != len(parts):
         return False
     for item in price_parts:
         subject = subjects_by_id.get(item.subject_id) if item.subject_id else None
@@ -126,9 +130,8 @@ def _d2_multipart_shape_ok(*, parts: tuple, subjects_by_id: dict) -> bool:
         # Direct service or typed topic overview (A05 prices); never empty focus.
         if item.service_id is None and item.topic_id is None:
             return False
-    for item in content_parts:
-        if item.content_ref is None:
-            return False
+    # FullContext prose has optional provenance. A missing content_ref must not
+    # prevent it from being combined with a typed price request.
     return True
 
 
@@ -139,6 +142,74 @@ def _shown_secondary_ref_ids(response) -> tuple[str, ...]:
         shown.append(ui.video.video_id)
     shown.extend(item.reply_id for item in ui.quick_replies)
     return tuple(shown)
+
+
+def _append_d2_exact_contact_parts(
+    *, response, tenant, session_key: SessionKey, all_parts: tuple, contact_parts: tuple,
+):
+    """Attach tenant-owned contacts to an already materialized ordinary D2 answer.
+
+    This is composition of a typed fact, not a separate conversational route:
+    model prose and price blocks remain untouched, while each contact value is
+    read only from the bound tenant snapshot.
+    """
+    if not contact_parts:
+        return response
+    blocks = []
+    buttons = list(response.resolved.ui_plan.buttons)
+    contact = response.resolved.ui_plan.contact
+    for part in contact_parts:
+        block, button, canonical_contact = build_d2_contact_fact_block(
+            tenant,
+            session_key=session_key,
+            request_id=part.request_id,
+            contact_fields=tuple(part.contact_fields),
+        )
+        blocks.append(block)
+        if button.button_id not in {item.button_id for item in buttons}:
+            buttons.append(button)
+        if contact is None:
+            contact = canonical_contact
+    contact_results = {
+        part.request_id: D2ResolvedRequestPart(
+            request_id=part.request_id,
+            kind="contact",
+            status="answered",
+            scope="clinic",
+        )
+        for part in contact_parts
+    }
+    ordinary_results = {part.request_id: part for part in response.resolved.d2_request_parts}
+    merged_parts = tuple(
+        contact_results[part.request_id] if part.kind == "contact" else ordinary_results[part.request_id]
+        for part in all_parts
+    )
+    unavailable_count = sum(part.status == "unavailable" for part in merged_parts)
+    deferred_count = sum(part.status == "deferred" for part in merged_parts)
+    result_status = (
+        "complete" if not unavailable_count and not deferred_count
+        and not any(part.status == "recovered" for part in merged_parts)
+        else "failed" if unavailable_count == len(merged_parts)
+        else "degraded"
+    )
+    resolved = response.resolved.model_copy(
+        update={
+            "d2_request_parts": merged_parts,
+            "d2_contact_blocks": tuple(blocks),
+            "d2_result_status": result_status,
+            "ui_plan": response.resolved.ui_plan.model_copy(
+                update={"buttons": tuple(buttons), "contact": contact}
+            ),
+        }
+    )
+    # Validate the merged frozen plan: the renderer must never be its validator.
+    resolved = type(resolved).model_validate(resolved.model_dump())
+    return replace(
+        response,
+        resolved=resolved,
+        rendered_text=render_response_text(resolved),
+        ui_projection=project_response_ui(resolved),
+    )
 
 
 def run_d2_dialogue_turn(
@@ -307,6 +378,11 @@ def run_d2_dialogue_turn(
             lead_effect_id=lead_effect_id,
             lead_effect_dispatcher=lead_effect_dispatcher,
             lead_bridge=lead_bridge,
+            selected_service_id=(
+                lead_ui_ref.removeprefix("service:")
+                if lead_ui_ref and lead_ui_ref.startswith("service:") and ui_revision is not None
+                else None
+            ),
         )
     except Exception:
         store.abandon_request(
@@ -490,15 +566,39 @@ def _commit_non_price_d2_turn(
     request_fingerprint: str,
     lead_effect_id: str | None,
     lead_effect_dispatcher: D2LeadEffectDispatcher | None,
+    shown_service_options: tuple[str, ...] = (),
+    shown_service_topic: str | None = None,
+    selected_service_id: str | None = None,
+    selected_service_topic: str | None = None,
+    clear_active_service: bool = False,
+    clear_situation: bool = False,
 ) -> D2DialogueTurn:
     """Persist lead/terminal/clarify-style turns without mutating price situation."""
     turn = snapshot.current_turn_index
     state = ResponsePlanSessionState(
         schema_version=SESSION_SCHEMA_VERSION, session_key=session_key,
         revision=snapshot.state.revision + 1, last_committed_turn_index=turn,
-        active_topic=snapshot.state.active_topic,
-        situation_state=snapshot.state.situation_state,
-        shown_options_snapshot=snapshot.state.shown_options_snapshot,
+        active_service=(
+            PersistedActiveService(
+                service_id=selected_service_id, provenance="explicit_current", set_at_turn=turn,
+            ) if selected_service_id is not None else (
+                None if clear_active_service else snapshot.state.active_service
+            )
+        ),
+        active_topic=(
+            PersistedActiveTopic(
+                topic_id=selected_service_topic, provenance="explicit_topic", set_at_turn=turn,
+            ) if selected_service_topic is not None else snapshot.state.active_topic
+        ),
+        situation_state=None if clear_situation else snapshot.state.situation_state,
+        shown_options_snapshot=(
+            PersistedShownOptionsSnapshot(
+                session_key=session_key, topic_id=shown_service_topic,
+                service_ids=shown_service_options, shown_at_turn=turn,
+            )
+            if shown_service_options and shown_service_topic is not None
+            else snapshot.state.shown_options_snapshot
+        ),
         accumulated_shown_ids=PersistedShownCommercialIds(
             requested_fact_ids=context.retained_shown_ids.requested_fact_ids,
             promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
@@ -506,7 +606,10 @@ def _commit_non_price_d2_turn(
             service_value_ids=context.retained_shown_ids.service_value_ids,
             price_offer_ids=context.retained_shown_ids.price_offer_ids,
             required_offer_condition_ids=context.retained_shown_ids.required_offer_condition_ids,
-            shown_service_option_ids=context.retained_shown_ids.shown_service_option_ids,
+            shown_service_option_ids=tuple(dict.fromkeys((
+                *context.retained_shown_ids.shown_service_option_ids,
+                *shown_service_options,
+            ))),
             secondary_ref_ids=tuple(dict.fromkeys((
                 *context.retained_shown_ids.secondary_ref_ids,
                 *_shown_secondary_ref_ids(response),
@@ -553,6 +656,7 @@ def _run_reserved_d2_dialogue_turn(
     ttl_policy: D2SessionTtlPolicy, request_id: str, request_fingerprint: str,
     lead_effect_id: str | None, lead_effect_dispatcher: D2LeadEffectDispatcher | None,
     lead_bridge: bool = False,
+    selected_service_id: str | None = None,
 ) -> D2DialogueTurn:
     """Build a final result only after ``reserve_request`` made this turn owner."""
     tenant = load_d2_tenant_snapshot(session_key.client_id, clients_root=clients_root)
@@ -572,7 +676,43 @@ def _run_reserved_d2_dialogue_turn(
         service_reference_catalog=view.service_reference_catalog,
         commercial_fact_catalog=view.commercial_fact_catalog,
     )
+    selected_topic = None
+    if selected_service_id is not None:
+        selected_topic = resolve_d2_clarify_service_topic(tenant, (selected_service_id,))
+        understanding_for_click = envelope.request_understanding
+        if selected_topic is None or envelope.route not in {"ANSWER", "CLARIFY"} or understanding_for_click is None or len(understanding_for_click.requests) != 1:
+            raise ValueError("d2_ui_service_selection_unresolved")
+        if envelope.route == "CLARIFY" and envelope.clarify_axis == "service":
+            raise ValueError("d2_ui_service_selection_unresolved")
+        selected_part = understanding_for_click.requests[0]
+        if (
+            selected_part.kind not in {"content", "price"}
+            or selected_part.service_id not in {None, selected_service_id}
+            or selected_part.topic_id not in {None, selected_topic}
+        ):
+            raise ValueError("d2_ui_service_selection_mismatch")
+        selected_part = selected_part.model_copy(update={
+            "service_id": selected_service_id, "topic_id": selected_topic,
+        })
+        understanding_for_click = understanding_for_click.model_copy(update={
+            "requests": (selected_part,),
+        })
+        envelope = envelope.model_copy(update={"request_understanding": understanding_for_click})
     understanding = envelope.request_understanding
+    # ``other`` with actual prose is an ordinary answer, not a menu route.
+    # Keep empty ``other`` for the explicit off-topic response below.
+    if (
+        envelope.route == "ANSWER"
+        and understanding is not None
+        and len(understanding.requests) == 1
+        and understanding.requests[0].kind == "other"
+        and (understanding.requests[0].content_text or "").strip()
+    ):
+        ordinary = understanding.requests[0].model_copy(update={"kind": "content"})
+        envelope = envelope.model_copy(update={
+            "request_understanding": understanding.model_copy(update={"requests": (ordinary,)})
+        })
+        understanding = envelope.request_understanding
     admin_terminal = envelope.route == "ADMIN"
     if admin_terminal:
         # B03/D2-023: one authored stub; no ordinary parts / focus required.
@@ -599,6 +739,43 @@ def _run_reserved_d2_dialogue_turn(
         multi_part = False
         parts = ()
         directory_kind = None
+    elif envelope.route == "CLARIFY":
+        if context.retained_terminal_state not in {"none", "clarify", "spam_warn"}:
+            raise ValueError("d2_experiment_terminal_session_unsupported")
+        response = build_d2_focus_clarify_response(
+            tenant,
+            session_key=session_key,
+            clarify_axis=envelope.clarify_axis,
+            service_options=envelope.clarify_service_options,
+        )
+        if response.resolved.route != "CLARIFY" or not response.rendered_text.strip():
+            raise ValueError("d2_experiment_clarify_not_resolved")
+        binding = bind_d1r_envelope_to_d2_context(envelope, context)
+        focus = seed_d2_plan_focus(binding)
+        shown_topic = (
+            resolve_d2_clarify_service_topic(tenant, envelope.clarify_service_options)
+            if envelope.clarify_service_options else None
+        )
+        return _commit_non_price_d2_turn(
+            session_key=session_key, store=store, snapshot=snapshot, context=context,
+            focus=focus, response=response, tenant_fingerprint=tenant.fingerprint,
+            now=now, request_id=request_id, request_fingerprint=request_fingerprint,
+            lead_effect_id=lead_effect_id, lead_effect_dispatcher=lead_effect_dispatcher,
+            shown_service_options=(
+                envelope.clarify_service_options
+                or ((selected_service_id,) if selected_service_id is not None else ())
+            ),
+            shown_service_topic=(shown_topic or selected_topic),
+            selected_service_id=(selected_service_id if selected_service_id is not None else None),
+            selected_service_topic=(selected_topic if selected_service_id is not None else shown_topic),
+            clear_active_service=(selected_service_id is None and shown_topic is not None),
+            clear_situation=(
+                (selected_topic if selected_service_id is not None else shown_topic) is not None
+                and snapshot.state.situation_state is not None
+                and snapshot.state.situation_state.topic_id
+                != (selected_topic if selected_service_id is not None else shown_topic)
+            ),
+        )
     else:
         if envelope.route != "ANSWER" or understanding is None or not understanding.requests:
             raise ValueError("d2_experiment_single_price_required")
@@ -656,6 +833,7 @@ def _run_reserved_d2_dialogue_turn(
             )
         parts = understanding.requests
         part = parts[0]
+        contact_parts = tuple(item for item in parts if item.kind == "contact")
         subjects_by_id = {item.subject_id: item for item in understanding.subjects}
         multi_part = _d2_multipart_shape_ok(parts=parts, subjects_by_id=subjects_by_id)
         clinic_policy = (
@@ -667,13 +845,12 @@ def _run_reserved_d2_dialogue_turn(
             and len(parts) == 1
             and part.kind == "contact"
         )
+        # Ordinary FullContext prose is the default. These narrow exceptions
+        # are driven by typed IDs/statuses, never by a second pass over text.
         service_availability = (
-            envelope.commercial_intent == "none"
-            and len(parts) == 1
-            and part.kind == "content"
-            and part.content_ref is None
-            and part.service_id is not None
-            and part.topic_id != "doctors"
+            envelope.service_reference_status == "resolved"
+            and envelope.requested_service_id is not None
+            and envelope.requested_service_id in view.service_reference_catalog.inactive_service_ids
         )
         unknown_brand = (
             len(parts) == 1
@@ -681,25 +858,12 @@ def _run_reserved_d2_dialogue_turn(
             and part.brand_id is not None
             and part.brand_id not in view.brand_catalog.brands
         )
-        unknown_term = (
-            envelope.commercial_intent == "none"
-            and envelope.service_reference_status == "unresolved"
-            and len(parts) == 1
-            and part.kind == "content"
-            and part.content_ref is None
-            and part.service_id is None
-            and part.topic_id is None
+        unknown_term = envelope.service_reference_status == "unresolved"
+        brand_policy = (
+            build_d2_brand_policy_response(tenant, session_key=session_key, brand_id=part.brand_id)
+            if part.brand_id is not None else None
         )
         directory_kind = None
-        if (
-            envelope.commercial_intent == "none"
-            and len(parts) == 1
-            and part.kind == "content"
-        ):
-            directory_kind = classify_d2_directory_request(
-                part=part,
-                envelope_commercial_intent=envelope.commercial_intent,
-            )
         direct_promotion = (
             envelope.commercial_intent == "promotion"
             and envelope.promotion_scope in {"general", "service", "shown"}
@@ -709,17 +873,13 @@ def _run_reserved_d2_dialogue_turn(
         direct_fact = (
             envelope.commercial_intent == "payment"
             and bool(envelope.references.direct_fact_ids)
-            and len(parts) == 1
-            and part.kind == "content"
+            and 1 <= len(parts) <= 3
+            and all(item.kind == "content" for item in parts)
         )
         content_lookup = (
             envelope.commercial_intent == "none"
             and 1 <= len(parts) <= 2
             and all(item.kind == "content" for item in parts)
-            and (len(parts) == 2 or part.content_ref is not None)
-            and not service_availability
-            and not unknown_brand
-            and directory_kind is None
         )
         if not (
             direct_promotion
@@ -731,6 +891,7 @@ def _run_reserved_d2_dialogue_turn(
             or service_availability
             or unknown_brand
             or unknown_term
+            or brand_policy is not None
             or directory_kind is not None
         ):
             if len(parts) != 1:
@@ -759,12 +920,13 @@ def _run_reserved_d2_dialogue_turn(
             if (
                 price_focus_clarify
                 or multi_part
-                or (content_lookup and len(parts) == 2)
+                or content_lookup
                 or clinic_policy
                 or clinic_contact
                 or service_availability
                 or unknown_brand
                 or unknown_term
+                or brand_policy is not None
                 or directory_kind is not None
             ):
                 # Independent content parts and typed special routes need no single-topic focus.
@@ -794,39 +956,23 @@ def _run_reserved_d2_dialogue_turn(
             )
             price = None
             decision = None
-        elif unknown_brand:
-            assert part.brand_id is not None
-            response = build_d2_unknown_brand_response(
-                tenant, session_key=session_key, brand_id=part.brand_id,
-            )
-            price = None
-            decision = None
-        elif unknown_term:
-            response = build_d2_unknown_term_response(
-                tenant,
-                session_key=session_key,
-                already_clarified=context.ordinary.clarify_pending,
-            )
-            price = None
-            decision = None
-        elif directory_kind is not None:
-            response = build_d2_directory_response(
-                tenant,
-                session_key=session_key,
-                kind=directory_kind,
-                service_id=part.service_id,
-                topic_id=part.topic_id,
-                content_ref=part.content_ref,
-                as_of=now.date(),
-            )
-            price = None
-            decision = None
         elif service_availability:
-            assert part.service_id is not None
+            assert envelope.requested_service_id is not None
             response = build_d2_service_availability_response(
                 tenant,
                 session_key=session_key,
-                service_id=part.service_id,
+                service_id=envelope.requested_service_id,
+            )
+            price = None
+            decision = None
+        elif brand_policy is not None:
+            response = brand_policy
+            price = None
+            decision = None
+        elif unknown_brand or unknown_term:
+            response = build_d2_unknown_reference_response(
+                tenant,
+                session_key=session_key,
             )
             price = None
             decision = None
@@ -839,13 +985,34 @@ def _run_reserved_d2_dialogue_turn(
                 shown_promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
                 shown_secondary_ref_ids=context.retained_shown_ids.secondary_ref_ids,
             )
+            # The common lower materializer owns free prose and price. Contacts
+            # are exact tenant facts attached afterwards; do not make their
+            # presence change the meaning of the ordinary parts.
+            resolution_envelope = envelope
+            if contact_parts:
+                resolution_envelope = envelope.model_copy(
+                    update={
+                        "request_understanding": understanding.model_copy(
+                            update={
+                                "requests": tuple(item for item in parts if item.kind != "contact")
+                            }
+                        )
+                    }
+                )
             response = resolve_d2_envelope_response(
-                envelope,
+                resolution_envelope,
                 sources,
                 as_of=now.date(),
                 d2_plan_focus_seed=focus,
                 common_route_direct_service_only=True,
                 common_route_content_lookup=True,
+            )
+            response = _append_d2_exact_contact_parts(
+                response=response,
+                tenant=tenant,
+                session_key=session_key,
+                all_parts=parts,
+                contact_parts=contact_parts,
             )
             price = response.resolved.d2_price_block
             decision = response.resolved.d2_price_scope_decision
@@ -854,7 +1021,7 @@ def _run_reserved_d2_dialogue_turn(
     elif price_focus_clarify:
         if response.resolved.route != "CLARIFY" or not response.rendered_text.strip():
             raise ValueError("d2_experiment_focus_clarify_not_resolved")
-    elif clinic_policy or clinic_contact or service_availability or unknown_brand or unknown_term or directory_kind is not None:
+    elif clinic_policy or clinic_contact or service_availability or brand_policy is not None or unknown_brand or unknown_term or directory_kind is not None:
         if not response.rendered_text.strip():
             raise ValueError("d2_experiment_directory_or_availability_not_resolved")
     elif direct_promotion:
@@ -1004,6 +1171,26 @@ def _run_reserved_d2_dialogue_turn(
     state = ResponsePlanSessionState(
         schema_version=SESSION_SCHEMA_VERSION, session_key=session_key,
         revision=snapshot.state.revision + 1, last_committed_turn_index=turn,
+        active_service=(
+            PersistedActiveService(
+                service_id=selected_service_id, provenance="explicit_current", set_at_turn=turn,
+            ) if selected_service_id is not None else (
+                PersistedActiveService(
+                    service_id=part.service_id, provenance="explicit_current", set_at_turn=turn,
+                )
+                if part is not None and part.service_id is not None
+                and active_topic is not None and focus.action == "resolve_topic"
+                and focus.topic_id == active_topic.topic_id
+                else (
+                    snapshot.state.active_service
+                    if (
+                        active_topic is not None
+                        and snapshot.state.active_topic is not None
+                        and active_topic.topic_id == snapshot.state.active_topic.topic_id
+                    ) else None
+                )
+            )
+        ),
         active_topic=active_topic,
         situation_state=situation,
         shown_options_snapshot=shown_options_snapshot,

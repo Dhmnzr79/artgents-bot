@@ -99,6 +99,38 @@ def realize_d2_content(
     )
 
 
+def realize_d2_unattributed_content(
+    request: RequestUnderstandingRequest,
+) -> D2ContentRealization:
+    """Publish ordinary FullContext prose without a document-route requirement.
+
+    The model has already received the complete approved corpus.  Unlike a
+    cited section, this prose cannot recover from a rejected money/link check;
+    it simply remains unavailable for the same D2 turn.
+    """
+
+    text = (request.content_text or "").strip()
+    if not text:
+        return D2ContentRealization(
+            outcome="unavailable", publication=None, display_text=None,
+            section_refs=(), reason="d2_model_prose_empty",
+        )
+    if _MONEY.search(text):
+        return D2ContentRealization(
+            outcome="unavailable", publication=None, display_text=None,
+            section_refs=(), reason="d2_model_prose_money",
+        )
+    if _LINK.search(text):
+        return D2ContentRealization(
+            outcome="unavailable", publication=None, display_text=None,
+            section_refs=(), reason="d2_model_prose_link",
+        )
+    return D2ContentRealization(
+        outcome="answered", publication="model_prose", display_text=text,
+        section_refs=(),
+    )
+
+
 def _is_korotko_section(ref: str) -> bool:
     token = ref.rsplit(":", 1)[-1]
     return token == "korotko" or ref.endswith("#korotko")

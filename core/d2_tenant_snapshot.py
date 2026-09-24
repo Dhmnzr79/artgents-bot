@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from pathlib import Path
 
@@ -196,10 +197,73 @@ def build_d2_model_view(snapshot: D2TenantSnapshot) -> D2ModelView:
         service_reference_catalog=ServiceReferenceCatalogSnapshot.from_bundle(bundle),
         commercial_fact_catalog=CommercialFactCatalogSnapshot.from_bundle(bundle),
         content=snapshot.content,
+        approved_md_corpus=_approved_md_corpus(snapshot),
+        clinic_policy_catalog_json=_clinic_policy_catalog_json(snapshot),
         brand_catalog=bundle.brands,
         published_terms=tuple(build_d2_published_offer_terms(offer=offer, source_client_id=snapshot.client_id) for offer in bundle.offers),
         direction_prices=_direction_prices(snapshot.files, bundle),
         commercial=_commercial_contract(snapshot.files, bundle, snapshot.client_id),
+    )
+
+
+def _approved_md_corpus(snapshot: D2TenantSnapshot) -> str:
+    """Return every captured MD file verbatim, with stable document boundaries."""
+    documents: list[str] = []
+    for path, raw in snapshot.files:
+        if not path.startswith("md/"):
+            continue
+        try:
+            text = raw.decode("utf-8").rstrip("\n")
+        except UnicodeDecodeError as exc:
+            raise D2TenantSnapshotError("fullcontext_document_decode_failed") from exc
+        if not text.strip():
+            raise D2TenantSnapshotError("fullcontext_document_empty")
+        ref = path.removeprefix("md/")
+        documents.append(
+            f"---BEGIN APPROVED MD:{ref}---\n{text}\n---END APPROVED MD:{ref}---"
+        )
+    if not documents:
+        raise D2TenantSnapshotError("fullcontext_corpus_empty")
+    return "\n".join(documents)
+
+
+def _clinic_policy_catalog_json(snapshot: D2TenantSnapshot) -> str:
+    """Expose policy IDs and authored answers from the captured tenant pack only."""
+    raw = dict(snapshot.files).get("clinic_policies.yaml")
+    if raw is None:
+        return json.dumps(
+            {"client_id": snapshot.client_id, "policies_available": False},
+            ensure_ascii=False, separators=(",", ":"), sort_keys=True,
+        )
+    try:
+        parsed = yaml.safe_load(raw.decode("utf-8"))
+    except (UnicodeDecodeError, yaml.YAMLError) as exc:
+        raise D2TenantSnapshotError("clinic_policy_catalog_invalid") from exc
+    policies = parsed.get("policies") if isinstance(parsed, dict) else None
+    rows: list[dict[str, str]] = []
+    if isinstance(policies, dict):
+        for policy_id, body in sorted(policies.items()):
+            answer = body.get("answer") if isinstance(body, dict) else None
+            if isinstance(policy_id, str) and policy_id.strip() and isinstance(answer, str) and answer.strip():
+                rows.append({"policy_id": policy_id, "answer": answer.strip()})
+    brand_rows: list[dict[str, str]] = []
+    raw_brands = parsed.get("brand_alternatives") if isinstance(parsed, dict) else None
+    if isinstance(raw_brands, list):
+        for body in raw_brands:
+            if not isinstance(body, dict):
+                continue
+            brand_id = body.get("requested_brand_id")
+            answer = body.get("approved_text")
+            if isinstance(brand_id, str) and brand_id.strip() and isinstance(answer, str) and answer.strip():
+                brand_rows.append({"brand_id": brand_id.strip(), "answer": answer.strip()})
+    return json.dumps(
+        {
+            "client_id": snapshot.client_id,
+            "policies_available": bool(rows),
+            "policies": rows,
+            "brand_policies": brand_rows,
+        },
+        ensure_ascii=False, separators=(",", ":"), sort_keys=True,
     )
 
 

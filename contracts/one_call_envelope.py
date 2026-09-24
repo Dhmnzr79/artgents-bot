@@ -29,7 +29,7 @@ OneCallCommercialIntent = Literal[
     "promotion",
 ]
 OneCallPromotionScope = Literal["none", "general", "service", "shown"]
-OneCallClarifyAxis = Literal["service", "extent", "jaw", "stage"]
+OneCallClarifyAxis = Literal["service", "term", "extent", "jaw", "stage"]
 
 _REQUIRED_FIELD_NAMES = frozenset(
     {

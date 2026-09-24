@@ -157,6 +157,8 @@ class D2ModelView:
     service_reference_catalog: ServiceReferenceCatalogSnapshot
     commercial_fact_catalog: CommercialFactCatalogSnapshot
     content: tuple[D2AuthoredContentAuthority, ...]
+    approved_md_corpus: str
+    clinic_policy_catalog_json: str
     brand_catalog: TargetBrandCatalog
     published_terms: tuple[D2PublishedOfferTerms, ...]
     direction_prices: tuple[D2DirectionPriceConfig, ...] = ()

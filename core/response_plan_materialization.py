@@ -78,7 +78,11 @@ from contracts.response_schema import (
 )
 from contracts.response_schema_refs import ResponseSchemaExternalIndex
 from core.response_plan_authored_alternative_policy import unambiguous_topic_for_service_ids
-from core.d2_content_realization import D2ContentRealization, realize_d2_content
+from core.d2_content_realization import (
+    D2ContentRealization,
+    realize_d2_content,
+    realize_d2_unattributed_content,
+)
 from core.d2_commercial_plan import resolve_d2_commercial_plan
 from core.response_plan_condition_evidence import materialization_price_scope_label
 from core.response_plan_fact_projection import (
@@ -329,7 +333,9 @@ def resolve_d2_envelope_response(
         and not ready_comparison
         and not price_parts
     )
-    code_owned_null_content = direct_promotion or direct_fact
+    # A direct commercial fact is an exact addition, not a replacement for
+    # ordinary FullContext prose in the same turn. Promotions remain code-only.
+    code_owned_null_content = direct_promotion
     unsupported = tuple(
         item.request_id
         for item in understanding.requests
@@ -352,7 +358,10 @@ def resolve_d2_envelope_response(
 
     # Resolve content first. Wrong/missing refs soft-fail as part gaps (D2-078);
     # foreign tenant material remains fatal and must not hide behind price recovery.
-    allow_missing_content_ref = code_owned_null_content or multiple_content_parts
+    # FullContext prose is the ordinary answer path.  A content_ref remains
+    # useful provenance for source UI, but it does not decide whether the user
+    # asked an informational question or whether the prose may be published.
+    allow_missing_content_ref = True
     information_blocks, content_realizations = _d2_information_blocks(
         content_parts=content_parts,
         client_id=client_id,
@@ -1354,8 +1363,6 @@ def _d2_information_blocks(
     realizations: dict[str, D2ContentRealization] = {}
     for part in content_parts:
         if part.content_ref is None:
-            if not allow_missing_content_ref:
-                raise MaterializationContractError("d2_content_ref_required")
             if code_owned_null_content:
                 realizations[part.request_id] = D2ContentRealization(
                     outcome="answered",
@@ -1363,7 +1370,8 @@ def _d2_information_blocks(
                     display_text=None,
                     section_refs=(),
                 )
-            else:
+            elif not (part.content_text or "").strip():
+                # No prose and no optional provenance is still a real gap.
                 realizations[part.request_id] = D2ContentRealization(
                     outcome="unavailable",
                     publication=None,
@@ -1371,6 +1379,21 @@ def _d2_information_blocks(
                     section_refs=(),
                     reason="d2_content_source_missing",
                 )
+            else:
+                realization = realize_d2_unattributed_content(part)
+                realizations[part.request_id] = realization
+                if realization.outcome != "unavailable":
+                    assert realization.display_text is not None
+                    blocks.append(InformationSourceBlock(
+                        request_id=part.request_id,
+                        source_client_id=client_id,
+                        content_ref=None,
+                        display_text=realization.display_text,
+                        source_section_refs=(),
+                        publication="model_prose",
+                        snapshot_fingerprint=sources.d2_snapshot_fingerprint,
+                        replacement_reason=None,
+                    ))
             continue
         authority = by_ref.get(part.content_ref)
         if authority is None:

@@ -391,6 +391,7 @@ def _resolve_composer_answer(
         d2_request_parts=plan.d2_request_parts,
         d2_part_failure_blocks=plan.d2_part_failure_blocks,
         d2_part_deferred_blocks=plan.d2_part_deferred_blocks,
+        d2_contact_blocks=plan.d2_contact_blocks,
         d2_result_status=plan.d2_result_status,
         price_block=price_block,
         d2_price_block=d2_price_block,

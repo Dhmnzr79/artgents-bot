@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -53,6 +54,45 @@ def test_cp3_prompt_reuses_v19_contract_and_typed_d2_snapshot() -> None:
     assert "continuity:\"same\"" in system["content"]
     assert "sales_fast" not in system["content"]
     assert "D2_SESSION_CONTEXT" in user["content"]
+
+
+def test_prompt_contains_the_complete_tenant_fullcontext_corpus_and_policies() -> None:
+    request = _request()
+    system, _ = build_d2_d1r_messages(request)
+    prompt = system["content"]
+
+    assert "=== APPROVED_MD_CORPUS ===" in prompt
+    assert "DOCUMENT_INDEX" not in prompt
+    assert "content_ref: exact filename from an APPROVED_MD_CORPUS document boundary or null." in prompt
+    snapshot = load_d2_tenant_snapshot("demo", clients_root=Path("clients"))
+    markdown_files = tuple((path, raw) for path, raw in snapshot.files if path.startswith("md/"))
+    assert prompt.count("---BEGIN APPROVED MD:") == len(markdown_files)
+    for path, raw in markdown_files:
+        ref = path.removeprefix("md/")
+        assert f"---BEGIN APPROVED MD:{ref}---" in prompt
+        assert raw.decode("utf-8").rstrip("\n") in prompt
+    assert "=== CLINIC_BUSINESS_POLICIES ===" in prompt
+    assert '"policy_id":"no_oms"' in prompt
+    assert '"client_id":"demo"' in prompt
+
+
+def test_named_direction_price_uses_answer_overview_in_d2_prompt() -> None:
+    request = replace(_request(), user_message="Сколько стоит имплантация?")
+    system, user = build_d2_d1r_messages(request)
+    prompt = system["content"]
+    instruction = prompt.split("=== D2_DIRECTION_PRICE ===", 1)[1]
+
+    assert "Сколько стоит имплантация?" in user["content"]
+    assert "D2_DIRECTION_PRICES" in prompt
+    assert "route=ANSWER" in instruction
+    assert "kind=price" in instruction
+    assert "topic_id=implantation" in instruction
+    assert "service_id=null" in instruction
+    assert "subjects=[{subject_id:s1,relation:self,age_group:unknown}]" in instruction
+    assert "price request's subject_id=s1" in instruction
+    assert "primary_price_request_id" in instruction
+    assert "do not return CLARIFY merely because several services" in instruction
+    assert "genuinely ambiguous question without a named direction" in instruction.lower()
 
 
 def test_cp3_provider_has_one_shared_two_call_budget() -> None:

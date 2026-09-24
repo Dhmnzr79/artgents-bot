@@ -13,6 +13,7 @@ from contracts.response_plan import (
     CanonicalContactCandidate,
     ComposerResult,
     ComposerSelectedRouteAuthority,
+    D2ContactFactBlock,
     PreComposerPlan,
     PricePlan,
     RouteModePair,
@@ -153,23 +154,7 @@ def build_d2_contact_response(
     """
     if snapshot.client_id != session_key.client_id:
         raise ValueError("d2_contact_client_mismatch")
-    facts = parse_clinic_contact_facts_from_policies_raw(_policies_raw(snapshot))
-    phone = (facts.phone_display or "").strip()
-    if not phone:
-        raise ValueError("d2_contact_phone_missing")
-    wanted = contact_fields or ("contacts",)
-    lines: list[str] = []
-    for field in wanted:
-        attr = _FIELD_TO_ATTR.get(field)
-        if attr is None:
-            continue
-        value = getattr(facts, attr, None)
-        if isinstance(value, str) and value.strip():
-            title = _FIELD_LABEL.get(field, field)
-            lines.append(f"{title}: {value.strip()}")
-    if not lines:
-        lines.append(f"Телефон: {phone}")
-    text = "\n".join(dict.fromkeys(lines))
+    text, phone = _d2_contact_text(snapshot, contact_fields=contact_fields)
     contact_btn = UiButtonCandidate(
         source_client_id=snapshot.client_id,
         button_id="contact_call",
@@ -222,3 +207,55 @@ def build_d2_contact_response(
         situation_delta=ResponseSituationDelta(action="keep"),
         trace=MaterializationTrace(None, (), (), ()),
     )
+
+
+def build_d2_contact_fact_block(
+    snapshot: D2TenantSnapshot,
+    *,
+    session_key: SessionKey,
+    request_id: str,
+    contact_fields: tuple[str, ...],
+) -> tuple[D2ContactFactBlock, UiButtonCandidate, CanonicalContactCandidate]:
+    """Make a typed exact-contact part which can compose with a normal D2 answer."""
+    if snapshot.client_id != session_key.client_id:
+        raise ValueError("d2_contact_client_mismatch")
+    text, phone = _d2_contact_text(snapshot, contact_fields=contact_fields)
+    return (
+        D2ContactFactBlock(
+            request_id=request_id,
+            source_client_id=snapshot.client_id,
+            display_text=text,
+            phone=phone,
+        ),
+        UiButtonCandidate(
+            source_client_id=snapshot.client_id,
+            button_id="contact_call",
+            label="Позвонить",
+            action_kind="contact",
+        ),
+        CanonicalContactCandidate(source_client_id=snapshot.client_id, phone=phone),
+    )
+
+
+def _d2_contact_text(
+    snapshot: D2TenantSnapshot,
+    *,
+    contact_fields: tuple[str, ...],
+) -> tuple[str, str]:
+    facts = parse_clinic_contact_facts_from_policies_raw(_policies_raw(snapshot))
+    phone = (facts.phone_display or "").strip()
+    if not phone:
+        raise ValueError("d2_contact_phone_missing")
+    wanted = contact_fields or ("contacts",)
+    lines: list[str] = []
+    for field in wanted:
+        attr = _FIELD_TO_ATTR.get(field)
+        if attr is None:
+            continue
+        value = getattr(facts, attr, None)
+        if isinstance(value, str) and value.strip():
+            title = _FIELD_LABEL.get(field, field)
+            lines.append(f"{title}: {value.strip()}")
+    if not lines:
+        lines.append(f"Телефон: {phone}")
+    return "\n".join(dict.fromkeys(lines)), phone

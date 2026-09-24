@@ -40,7 +40,7 @@ _ALLOWED_COMMERCIAL_INTENT = frozenset(
     {"none", "price", "payment", "payment_stages", "included", "promotion"}
 )
 _ALLOWED_PROMOTION_SCOPE = frozenset({"none", "general", "service", "shown"})
-_ALLOWED_CLARIFY_AXIS = frozenset({"service", "extent", "jaw", "stage"})
+_ALLOWED_CLARIFY_AXIS = frozenset({"service", "term", "extent", "jaw", "stage"})
 _ALLOWED_SERVICE_REFERENCE_STATUS = frozenset({"none", "resolved", "unresolved"})
 ENVELOPE_NORMALIZED_UNEXPECTED_PRICE_TEXT = "envelope_normalized_unexpected_price_text"
 ENVELOPE_NORMALIZED_NESTED_PRIMARY_PRICE_REQUEST_ID = (

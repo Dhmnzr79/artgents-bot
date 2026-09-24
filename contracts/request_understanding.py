@@ -113,6 +113,21 @@ class RequestUnderstandingRequest(BaseModel):
     statement_mode: RequestStatementMode = "question"
     situation: RequestTreatmentSituation | None = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _default_fullcontext_content_to_model_prose(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        if (
+            value.get("kind") == "content"
+            and "content_realization" not in value
+            and isinstance(value.get("content_text"), str)
+            and value["content_text"].strip()
+        ):
+            value = dict(value)
+            value["content_realization"] = "model_prose"
+        return value
+
     @field_validator("request_id")
     @classmethod
     def _validate_request_id(cls, value: str) -> str:
@@ -198,8 +213,10 @@ class RequestUnderstandingRequest(BaseModel):
         if self.content_realization == "model_prose":
             if self.kind != "content":
                 raise ValueError("model_prose_forbidden")
-            if self.content_ref is None or not self.content_section_refs:
-                raise ValueError("model_prose_grounding_required")
+            if self.content_text is None or not self.content_text.strip():
+                raise ValueError("model_prose_text_required")
+            # A FullContext answer may cite a document, but provenance is
+            # optional and never changes the published ordinary prose.
         if self.content_fallback_section_ref is not None:
             if self.content_realization != "model_prose":
                 raise ValueError("content_fallback_forbidden")

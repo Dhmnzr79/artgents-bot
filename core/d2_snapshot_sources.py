@@ -56,6 +56,13 @@ class D2SnapshotBindingError(ValueError):
 
 _PRICE_UNAVAILABLE = "К сожалению, у меня пока нет информации о стоимости этой услуги"
 _DEFAULT_FOCUS_CLARIFY = "Могу подсказать по услугам, ценам, врачам или записи. Что вас интересует?"
+_TYPED_CLARIFY_QUESTIONS = {
+    "service": "Какую услугу вы имеете в виду?",
+    "term": "Уточните, пожалуйста, что именно вы имеете в виду?",
+    "extent": "Уточните, пожалуйста, речь об одном зубе, нескольких зубах или всей челюсти?",
+    "jaw": "Уточните, пожалуйста, речь о верхней или нижней челюсти?",
+    "stage": "Уточните, пожалуйста, на каком этапе лечения вы сейчас?",
+}
 _VOLUME_EXTENTS = ("one_tooth", "few_teeth", "full_arch", "unknown")
 _DEFAULT_VOLUME_LABELS = {
     "one_tooth": "Один зуб",
@@ -269,6 +276,8 @@ def build_d2_focus_clarify_response(
     snapshot: D2TenantSnapshot,
     *,
     session_key: SessionKey,
+    clarify_axis: str | None = None,
+    service_options: tuple[str, ...] | None = None,
 ) -> MaterializedResponseOutcome:
     """A10/D2-077: short focus clarify from clinic ui.yaml, no invented price."""
     if snapshot.client_id != session_key.client_id:
@@ -276,11 +285,26 @@ def build_d2_focus_clarify_response(
     ui_yaml = _yaml_file(snapshot, "ui.yaml")
     clarify = ui_yaml.get("continuation_clarify") if isinstance(ui_yaml.get("continuation_clarify"), dict) else {}
     answer = clarify.get("answer") if isinstance(clarify, dict) else None
-    text = answer.strip() if isinstance(answer, str) and answer.strip() else _DEFAULT_FOCUS_CLARIFY
+    if clarify_axis is not None and clarify_axis not in _TYPED_CLARIFY_QUESTIONS:
+        raise D2SnapshotBindingError("clarify_axis_unsupported")
+    text = _TYPED_CLARIFY_QUESTIONS[clarify_axis] if clarify_axis is not None else (
+        answer.strip() if isinstance(answer, str) and answer.strip() else _DEFAULT_FOCUS_CLARIFY
+    )
     guided = ui_yaml.get("guided_menu") if isinstance(ui_yaml.get("guided_menu"), dict) else {}
     quick: list[UiQuickReplyCandidate] = []
     raw_replies = guided.get("quick_replies") if isinstance(guided, dict) else None
-    if isinstance(raw_replies, list):
+    if service_options is not None:
+        services = snapshot.bundle.services
+        for service_id in service_options:
+            service = services.get(service_id)
+            if service is None or not service.active:
+                raise D2SnapshotBindingError("clarify_service_option_missing")
+            quick.append(UiQuickReplyCandidate(
+                source_client_id=snapshot.client_id,
+                reply_id=f"service:{service_id}",
+                label=service.name,
+            ))
+    elif clarify_axis is None and isinstance(raw_replies, list):
         for item in raw_replies:
             if not isinstance(item, dict):
                 continue
@@ -325,7 +349,39 @@ def build_d2_focus_clarify_response(
     )
 
 
+def build_d2_other_response(
+    snapshot: D2TenantSnapshot,
+    *,
+    session_key: SessionKey,
+) -> MaterializedResponseOutcome:
+    """Clinic-authored general help for non-factual ``other`` model prose."""
+    if snapshot.client_id != session_key.client_id:
+        raise D2SnapshotBindingError("other_client_mismatch")
+    guided = _yaml_file(snapshot, "ui.yaml").get("guided_menu")
+    answer = guided.get("answer") if isinstance(guided, dict) else None
+    text = answer.strip() if isinstance(answer, str) and answer.strip() else _DEFAULT_FOCUS_CLARIFY
+    return _d2_code_owned_answer(session_key=session_key, text=text, route="ANSWER")
+
+
+def resolve_d2_clarify_service_topic(
+    snapshot: D2TenantSnapshot,
+    service_options: tuple[str, ...],
+) -> str | None:
+    """Use exact tenant service-document metadata, never model prose or labels."""
+    topics: set[str] = set()
+    for service_id in service_options:
+        service = snapshot.bundle.services.get(service_id)
+        if service is None or not service.active or not service.content_ref:
+            return None
+        topic = _frontmatter(snapshot, service.content_ref).get("topic")
+        if not isinstance(topic, str) or not topic.strip():
+            return None
+        topics.add(topic)
+    return next(iter(topics)) if len(topics) == 1 else None
+
+
 _INFO_GAP = "К сожалению, у меня пока недостаточно информации по этому вопросу"
+_UNKNOWN_REFERENCE_GAP = "У меня нет информации по этому названию в утверждённых материалах клиники."
 _UNKNOWN_TERM_CLARIFY = "Уточните, пожалуйста, что вы имеете в виду под этим названием?"
 _UNKNOWN_TERM_GAP = _INFO_GAP + ". Могу помочь записаться на консультацию."
 _POLICY_CLARIFY = "Уточните, пожалуйста: вопрос про ОМС или ДМС?"
@@ -551,6 +607,43 @@ def build_d2_unknown_brand_response(
                     text = approved.strip()
                 break
     return _d2_code_owned_answer(session_key=session_key, text=text, route="ANSWER")
+
+
+def build_d2_unknown_reference_response(
+    snapshot: D2TenantSnapshot,
+    *,
+    session_key: SessionKey,
+) -> MaterializedResponseOutcome:
+    """Return the tenant-owned gap for a clearly named absent entity.
+
+    The caller has already received the model's typed ``unresolved`` result.
+    This function intentionally neither inspects nor normalizes patient prose.
+    """
+    if snapshot.client_id != session_key.client_id:
+        raise D2SnapshotBindingError("unknown_reference_client_mismatch")
+    return _d2_code_owned_answer(
+        session_key=session_key,
+        text=_UNKNOWN_REFERENCE_GAP,
+        route="ANSWER",
+    )
+
+
+def build_d2_brand_policy_response(
+    snapshot: D2TenantSnapshot, *, session_key: SessionKey, brand_id: str,
+) -> MaterializedResponseOutcome | None:
+    """Resolve an explicit tenant brand policy by exact typed ID only."""
+    if snapshot.client_id != session_key.client_id:
+        raise D2SnapshotBindingError("brand_policy_client_mismatch")
+    raw = _clinic_policies_raw(snapshot).get("brand_alternatives")
+    if not isinstance(raw, list):
+        return None
+    for row in raw:
+        if not isinstance(row, dict) or row.get("requested_brand_id") != brand_id:
+            continue
+        text = row.get("approved_text")
+        if isinstance(text, str) and text.strip():
+            return _d2_code_owned_answer(session_key=session_key, text=text.strip(), route="ANSWER")
+    return None
 
 
 def build_d2_service_availability_response(

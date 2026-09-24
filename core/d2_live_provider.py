@@ -11,6 +11,7 @@ from typing import Any
 from config import DEFAULT_LLM_MODEL
 from contracts.d2_dialogue import D2ProviderInput
 from core.one_call_prompt_contract import (
+    ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS,
     ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS,
     one_call_contract_header,
 )
@@ -97,12 +98,20 @@ def build_d2_d1r_messages(request: D2ProviderInput) -> tuple[dict[str, str], dic
         ),
         "=== BRAND_CATALOG ===\n" + request.model_view.brand_catalog.model_dump_json(),
         _approved_md_corpus_block(request),
+        ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS,
         D2_BRAND_INSTRUCTIONS,
         D2_DIALOGUE_FOLLOW_UP_INSTRUCTIONS,
         D2_DIRECTION_PRICE_INSTRUCTIONS,
     ))
     user = "\n\n".join((
         "=== D2_SESSION_CONTEXT ===\n" + request.context.model_dump_json(),
+        "=== D2_SELECTED_UI_REF ===\n" + json.dumps(
+            request.selected_ui_ref.model_dump(mode="json")
+            if request.selected_ui_ref is not None
+            else None,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
         "=== USER_MESSAGE ===\n" + request.user_message,
     ))
     return {"role": "system", "content": system}, {"role": "user", "content": user}

@@ -74,7 +74,9 @@ def project_d2_session_context(
             situation_state=source.situation_state,
             shown_options_snapshot=source.shown_options_snapshot,
             historical_price_offers=source.historical_price_offers,
+            d2_shown_price_offer_refs=source.d2_shown_price_offer_refs,
             clarify_pending=source.clarify_pending,
+            clarify_task=source.clarify_task,
         ),
     )
 

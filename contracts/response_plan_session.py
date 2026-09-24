@@ -192,7 +192,8 @@ class PersistedActiveTopic(ResponsePlanModel):
 
 
 class SessionDialoguePair(ResponsePlanModel):
-    patient_text: str
+    patient_text: str | None = None
+    selected_ui_ref: D2SelectedUiRef | None = None
     assistant_text: str
     committed_at_turn: int
 
@@ -204,10 +205,50 @@ class SessionDialoguePair(ResponsePlanModel):
     @model_validator(mode="after")
     def _validate(self) -> Self:
         require_strict_non_negative_int("committed_at_turn", self.committed_at_turn)
-        if not self.patient_text or not self.patient_text.strip():
+        if (self.patient_text is None) == (self.selected_ui_ref is None):
+            raise ValueError("dialogue_requires_text_or_selected_ui_ref")
+        if self.patient_text is not None and not self.patient_text.strip():
             raise ValueError("dialogue_patient_blank")
         if not self.assistant_text or not self.assistant_text.strip():
             raise ValueError("dialogue_assistant_blank")
+        return self
+
+
+class D2SelectedUiRef(ResponsePlanModel):
+    """Server-validated UI identity retained without copying its label."""
+
+    reply_id: str
+    source_revision: int
+
+    @model_validator(mode="after")
+    def _validate(self) -> Self:
+        require_exact_nonblank_id("d2_selected_ui_reply_id", self.reply_id)
+        require_strict_positive_int("d2_selected_ui_revision", self.source_revision)
+        return self
+
+
+class PersistedClarifyTask(ResponsePlanModel):
+    """Typed source task retained while a D2 clarification is unfinished."""
+
+    axis: str
+    request_ids: tuple[str, ...]
+    request_kinds: tuple[str, ...]
+    topic_ids: tuple[str, ...] = ()
+    service_ids: tuple[str, ...] = ()
+    requested_extents: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _validate(self) -> Self:
+        require_exact_nonblank_id("clarify_axis", self.axis)
+        if not self.request_kinds:
+            raise ValueError("clarify_task_requests_empty")
+        _validate_unique_ids("clarify_task_request_id", self.request_ids)
+        if not self.request_ids:
+            raise ValueError("clarify_task_request_ids_empty")
+        _validate_unique_ids("clarify_task_request_kind", self.request_kinds)
+        _validate_unique_ids("clarify_task_topic_id", self.topic_ids)
+        _validate_unique_ids("clarify_task_service_id", self.service_ids)
+        _validate_unique_ids("clarify_task_requested_extent", self.requested_extents)
         return self
 
 
@@ -387,11 +428,13 @@ class ResponsePlanSessionState(ResponsePlanModel):
     situation_state: PersistedSituationState | None = None
     shown_options_snapshot: PersistedShownOptionsSnapshot | None = None
     historical_price_offers: HistoricalPriceOffersSnapshot | None = None
+    d2_shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...] = ()
     accumulated_shown_ids: PersistedShownCommercialIds = Field(
         default_factory=PersistedShownCommercialIds
     )
     terminal_state: TerminalState = "none"
     clarify_pending: bool = False
+    clarify_task: PersistedClarifyTask | None = None
 
     @field_validator("schema_version", "revision", "last_committed_turn_index", mode="before")
     @classmethod
@@ -419,9 +462,33 @@ class ResponsePlanSessionState(ResponsePlanModel):
             for row in self.historical_price_offers.rows:
                 if row.source_client_id != client_id:
                     raise ValueError("historical_price_row_client_mismatch")
+        _validate_unique_ids(
+            "d2_shown_price_offer_id",
+            tuple(item.offer_id for item in self.d2_shown_price_offer_refs),
+        )
+        for item in self.d2_shown_price_offer_refs:
+            if item.source_client_id != self.session_key.client_id:
+                raise ValueError("d2_shown_price_offer_client_mismatch")
         for pair in self.dialogue_pairs:
             if pair.committed_at_turn > self.last_committed_turn_index:
                 raise ValueError("dialogue_pair_future_turn")
+        if self.clarify_task is not None and not self.clarify_pending:
+            raise ValueError("clarify_task_requires_pending")
+        return self
+
+
+class D2ShownPriceOfferRef(ResponsePlanModel):
+    """One verified D2 price variant, deliberately without display price text."""
+
+    source_client_id: str
+    offer_id: str
+    service_id: str
+
+    @model_validator(mode="after")
+    def _validate(self) -> Self:
+        require_exact_nonblank_id("d2_price_offer_client_id", self.source_client_id)
+        require_exact_nonblank_id("d2_price_offer_id", self.offer_id)
+        require_exact_nonblank_id("d2_price_offer_service_id", self.service_id)
         return self
 
 

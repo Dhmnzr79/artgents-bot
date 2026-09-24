@@ -14,17 +14,21 @@ from pydantic import field_validator, model_validator
 
 from contracts.response_plan import ResponsePlanModel, SessionKey, TerminalState
 from contracts.response_plan_session import (
+    D2ShownPriceOfferRef,
     HistoricalPriceOffersSnapshot,
     PersistedActiveService,
     PersistedActiveTopic,
     PersistedShownCommercialIds,
     PersistedShownOptionsSnapshot,
     PersistedSituationState,
+    PersistedClarifyTask,
     ResponsePlanSessionSnapshot,
     SessionDialoguePair,
 )
 
 DEFAULT_D2_SESSION_IDLE_TTL_SECONDS = 30 * 60
+DEFAULT_D2_HISTORY_PAIR_LIMIT = 3
+DEFAULT_D2_HISTORY_TEXT_MAX_CHARS = 1000
 D2SessionContextFreshness = Literal["fresh", "expired", "unknown"]
 D2SemanticContinuationOutcome = Literal[
     "clear_continuation", "ambiguous_focus", "explicit_new_topic"
@@ -40,8 +44,10 @@ class D2SessionTtlPolicy(ResponsePlanModel):
     """Clinic-configurable inactivity limit; the helper never reads a clock."""
 
     idle_ttl_seconds: int = DEFAULT_D2_SESSION_IDLE_TTL_SECONDS
+    history_pair_limit: int = DEFAULT_D2_HISTORY_PAIR_LIMIT
+    history_text_max_chars: int = DEFAULT_D2_HISTORY_TEXT_MAX_CHARS
 
-    @field_validator("idle_ttl_seconds", mode="before")
+    @field_validator("idle_ttl_seconds", "history_pair_limit", "history_text_max_chars", mode="before")
     @classmethod
     def _require_strict_positive_int(cls, value: object) -> object:
         if type(value) is not int:
@@ -50,8 +56,9 @@ class D2SessionTtlPolicy(ResponsePlanModel):
 
     @model_validator(mode="after")
     def _validate_ttl(self) -> Self:
-        if self.idle_ttl_seconds <= 0:
-            raise ValueError("idle_ttl_seconds_not_positive")
+        for field in ("idle_ttl_seconds", "history_pair_limit", "history_text_max_chars"):
+            if getattr(self, field) <= 0:
+                raise ValueError(f"{field}_not_positive")
         return self
 
 
@@ -80,7 +87,9 @@ class D2OrdinarySessionContext(ResponsePlanModel):
     situation_state: PersistedSituationState | None = None
     shown_options_snapshot: PersistedShownOptionsSnapshot | None = None
     historical_price_offers: HistoricalPriceOffersSnapshot | None = None
+    d2_shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...] = ()
     clarify_pending: bool = False
+    clarify_task: PersistedClarifyTask | None = None
 
 
 class D2SessionContextProjection(ResponsePlanModel):

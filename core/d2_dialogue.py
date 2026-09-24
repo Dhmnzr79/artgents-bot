@@ -12,14 +12,15 @@ from uuid import uuid4
 
 from contracts.d2_dialogue import (
     D2CompletedTurn, D2DialogueRecord, D2DialogueTurn, D2LeadEffect,
-    D2LeadEffectDispatcher, D2ProviderInput, D2RawProvider,
+    D2LeadEffectDispatcher, D2ProviderInput, D2RawProvider, D2SelectedUiRef,
 )
 from contracts.d2_session_context import D2SessionActivity, D2SessionTtlPolicy
 from contracts.response_plan import D2ResolvedRequestPart, SessionKey
 from contracts.response_plan_session import (
-    SESSION_SCHEMA_VERSION, PersistedActiveService, PersistedActiveTopic, PersistedShownCommercialIds,
-    PersistedShownOptionsSnapshot, PersistedSituationState, ResponsePlanSessionSnapshot,
-    ResponsePlanSessionState, empty_session_snapshot,
+    SESSION_SCHEMA_VERSION, D2ShownPriceOfferRef, PersistedActiveService, PersistedActiveTopic,
+    PersistedClarifyTask, PersistedShownCommercialIds, PersistedShownOptionsSnapshot,
+    PersistedSituationState, ResponsePlanSessionSnapshot, ResponsePlanSessionState,
+    SessionDialoguePair, empty_session_snapshot,
 )
 from core.d2_dialogue_store import D2DialogueStore
 from core.d2_lead_bridge import (
@@ -140,6 +141,99 @@ def _shown_secondary_ref_ids(response) -> tuple[str, ...]:
         shown.append(ui.video.video_id)
     shown.extend(item.reply_id for item in ui.quick_replies)
     return tuple(shown)
+
+
+def _bounded_d2_text(value: str, *, limit: int) -> str:
+    """Keep only bounded, provider-safe prose in the D2 dialogue memory."""
+    return value.strip()[:limit].strip()
+
+
+def _d2_live_prose_for_history(response) -> str | None:
+    """Return only free model prose; frozen price and authored blocks are excluded."""
+    resolved = response.resolved
+    if resolved.route != "ANSWER" or resolved.is_price_answer:
+        return None
+    if resolved.patient_text is not None:
+        return resolved.patient_text
+    blocks = tuple(
+        block.display_text
+        for block in resolved.information_blocks
+        if block.publication == "model_prose"
+    )
+    return "\n\n".join(blocks) if blocks else None
+
+
+def _next_d2_dialogue_pairs(
+    *, snapshot: ResponsePlanSessionSnapshot, safe_user_message: str,
+    selected_ui_ref: D2SelectedUiRef | None, response, turn: int,
+    ttl_policy: D2SessionTtlPolicy, context,
+) -> tuple[SessionDialoguePair, ...]:
+    """Append one live-prose pair; code-owned prices and terminal stubs stay out."""
+    assistant_text = _d2_live_prose_for_history(response)
+    previous_pairs = (
+        snapshot.state.dialogue_pairs if context.freshness == "fresh" else ()
+    )
+    if assistant_text is None:
+        return previous_pairs
+    assistant_text = _bounded_d2_text(
+        assistant_text, limit=ttl_policy.history_text_max_chars,
+    )
+    if not assistant_text:
+        return previous_pairs
+    patient_text = _bounded_d2_text(
+        safe_user_message, limit=ttl_policy.history_text_max_chars,
+    )
+    if selected_ui_ref is None and not patient_text:
+        return previous_pairs
+    pair = SessionDialoguePair(
+        patient_text=patient_text if selected_ui_ref is None else None,
+        selected_ui_ref=selected_ui_ref,
+        assistant_text=assistant_text,
+        committed_at_turn=turn,
+    )
+    return (*previous_pairs, pair)[-ttl_policy.history_pair_limit:]
+
+
+def _d2_clarify_task(*, envelope) -> PersistedClarifyTask:
+    """Persist the unresolved typed request; never derive it from dialogue prose."""
+    understanding = envelope.request_understanding
+    if understanding is None:
+        raise ValueError("d2_clarify_task_understanding_required")
+    requests = understanding.requests
+    return PersistedClarifyTask(
+        axis=envelope.clarify_axis or "focus",
+        request_ids=tuple(item.request_id for item in requests),
+        request_kinds=tuple(dict.fromkeys(item.kind for item in requests)),
+        topic_ids=tuple(dict.fromkeys(
+            item.topic_id for item in requests if item.topic_id is not None
+        )),
+        service_ids=tuple(dict.fromkeys(
+            item.service_id for item in requests if item.service_id is not None
+        )),
+        requested_extents=tuple(dict.fromkeys(
+            item.situation.extent
+            for item in requests
+            if item.situation is not None
+        )),
+    )
+
+
+def _next_d2_shown_price_offer_refs(*, snapshot, price, context):
+    """Retain only verified D2 offer IDs and display order, never price prose."""
+    if price is None:
+        return (
+            snapshot.state.d2_shown_price_offer_refs
+            if context.freshness == "fresh"
+            else ()
+        )
+    return tuple(
+        D2ShownPriceOfferRef(
+            source_client_id=row.source_client_id,
+            offer_id=row.offer_id,
+            service_id=row.service_id,
+        )
+        for row in price.rows
+    )
 
 
 def _append_d2_exact_contact_parts(
@@ -269,6 +363,7 @@ def run_d2_dialogue_turn(
             policy=ttl_policy,
             now=now,
         )
+        selected_ui_ref: D2SelectedUiRef | None = None
         if lead_ui_ref and ui_revision is not None:
             shown = store.read_latest_completion(session_key)
             if (
@@ -289,7 +384,10 @@ def run_d2_dialogue_turn(
                 if reply is None or reply.source_client_id != session_key.client_id:
                     raise ValueError("d2_unauthorized_ui_action")
                 if not lead_ui_ref.startswith("lead:"):
-                    user_message = reply.label
+                    selected_ui_ref = D2SelectedUiRef(
+                        reply_id=reply.reply_id,
+                        source_revision=ui_revision,
+                    )
         # D2-071: closed until a new chat/sid; beats lead and ordinary turns.
         if early_context.retained_terminal_state == "spam_closed":
             return _run_spam_gate_turn(
@@ -333,11 +431,15 @@ def run_d2_dialogue_turn(
                 situation_action=situation_action,
             )
         # D2-040: one authored chance, then hard-stop. Lead/medical terminals stay owners.
-        if is_d2_garbage_message(user_message) and early_context.retained_terminal_state in {
+        if (
+            selected_ui_ref is None
+            and is_d2_garbage_message(user_message)
+            and early_context.retained_terminal_state in {
             "none",
             "clarify",
             "spam_warn",
-        }:
+            }
+        ):
             kind = (
                 "closed"
                 if early_context.retained_terminal_state == "spam_warn"
@@ -358,7 +460,10 @@ def run_d2_dialogue_turn(
                 context=early_context,
             )
         safe_user_message = provider_safe_user_text(user_message)
-        if not provider_message_has_substance(safe_user_message, raw_source=user_message):
+        if (
+            selected_ui_ref is None
+            and not provider_message_has_substance(safe_user_message, raw_source=user_message)
+        ):
             store.abandon_request(
                 session_key, request_id=effective_request_id, request_fingerprint=fingerprint,
             )
@@ -376,6 +481,7 @@ def run_d2_dialogue_turn(
             lead_effect_id=lead_effect_id,
             lead_effect_dispatcher=lead_effect_dispatcher,
             lead_bridge=lead_bridge,
+            selected_ui_ref=selected_ui_ref,
             selected_service_id=(
                 lead_ui_ref.removeprefix("service:")
                 if lead_ui_ref and lead_ui_ref.startswith("service:") and ui_revision is not None
@@ -510,7 +616,7 @@ def _run_lead_pre_provider_turn(
                 "requests": [
                     {
                         "request_id": "r1",
-                        "kind": "other",
+                        "kind": "booking",
                         "subject_id": None,
                         "context": "general_information",
                         "policy_ids": [],
@@ -570,6 +676,9 @@ def _commit_non_price_d2_turn(
     selected_service_topic: str | None = None,
     clear_active_service: bool = False,
     clear_situation: bool = False,
+    dialogue_pairs: tuple[SessionDialoguePair, ...] | None = None,
+    d2_shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...] | None = None,
+    clarify_task: PersistedClarifyTask | None = None,
 ) -> D2DialogueTurn:
     """Persist lead/terminal/clarify-style turns without mutating price situation."""
     turn = snapshot.current_turn_index
@@ -597,6 +706,24 @@ def _commit_non_price_d2_turn(
             if shown_service_options and shown_service_topic is not None
             else snapshot.state.shown_options_snapshot
         ),
+        dialogue_pairs=(
+            (
+                snapshot.state.dialogue_pairs
+                if context.freshness == "fresh"
+                else ()
+            )
+            if dialogue_pairs is None
+            else dialogue_pairs
+        ),
+        d2_shown_price_offer_refs=(
+            (
+                snapshot.state.d2_shown_price_offer_refs
+                if context.freshness == "fresh"
+                else ()
+            )
+            if d2_shown_price_offer_refs is None
+            else d2_shown_price_offer_refs
+        ),
         accumulated_shown_ids=PersistedShownCommercialIds(
             requested_fact_ids=context.retained_shown_ids.requested_fact_ids,
             promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
@@ -615,6 +742,9 @@ def _commit_non_price_d2_turn(
         ),
         terminal_state=response.resolved.session_delta.terminal_state,
         clarify_pending=response.resolved.session_delta.clarify_pending,
+        clarify_task=(
+            clarify_task if response.resolved.session_delta.clarify_pending else None
+        ),
     )
     initial_effect = (
         D2LeadEffect(effect_id=lead_effect_id, status="pending")
@@ -654,6 +784,7 @@ def _run_reserved_d2_dialogue_turn(
     ttl_policy: D2SessionTtlPolicy, request_id: str, request_fingerprint: str,
     lead_effect_id: str | None, lead_effect_dispatcher: D2LeadEffectDispatcher | None,
     lead_bridge: bool = False,
+    selected_ui_ref: D2SelectedUiRef | None = None,
     selected_service_id: str | None = None,
 ) -> D2DialogueTurn:
     """Build a final result only after ``reserve_request`` made this turn owner."""
@@ -668,7 +799,12 @@ def _run_reserved_d2_dialogue_turn(
         snapshot, expected_session_key=session_key,
         activity=previous.activity if previous else None, policy=ttl_policy, now=now,
     )
-    raw = provider.generate(D2ProviderInput(user_message=safe_user_message, model_view=view, context=context))
+    raw = provider.generate(D2ProviderInput(
+        user_message=safe_user_message,
+        model_view=view,
+        context=context,
+        selected_ui_ref=selected_ui_ref,
+    ))
     envelope = parse_production_envelope_json(
         raw, active_service_catalog=view.active_service_catalog,
         service_reference_catalog=view.service_reference_catalog,
@@ -773,6 +909,19 @@ def _run_reserved_d2_dialogue_turn(
                 and snapshot.state.situation_state.topic_id
                 != (selected_topic if selected_service_id is not None else shown_topic)
             ),
+            dialogue_pairs=_next_d2_dialogue_pairs(
+                snapshot=snapshot,
+                safe_user_message=safe_user_message,
+                selected_ui_ref=selected_ui_ref,
+                response=response,
+                turn=snapshot.current_turn_index,
+                ttl_policy=ttl_policy,
+                context=context,
+            ),
+            d2_shown_price_offer_refs=_next_d2_shown_price_offer_refs(
+                snapshot=snapshot, price=None, context=context,
+            ),
+            clarify_task=_d2_clarify_task(envelope=envelope),
         )
     else:
         if envelope.route != "ANSWER" or understanding is None or not understanding.requests:
@@ -1196,6 +1345,18 @@ def _run_reserved_d2_dialogue_turn(
         active_topic=active_topic,
         situation_state=situation,
         shown_options_snapshot=shown_options_snapshot,
+        dialogue_pairs=_next_d2_dialogue_pairs(
+            snapshot=snapshot,
+            safe_user_message=safe_user_message,
+            selected_ui_ref=selected_ui_ref,
+            response=response,
+            turn=turn,
+            ttl_policy=ttl_policy,
+            context=context,
+        ),
+        d2_shown_price_offer_refs=_next_d2_shown_price_offer_refs(
+            snapshot=snapshot, price=price, context=context,
+        ),
         accumulated_shown_ids=PersistedShownCommercialIds(
             requested_fact_ids=tuple(dict.fromkeys((
                 *context.retained_shown_ids.requested_fact_ids,
@@ -1217,6 +1378,11 @@ def _run_reserved_d2_dialogue_turn(
         ),
         terminal_state=response.resolved.session_delta.terminal_state,
         clarify_pending=response.resolved.session_delta.clarify_pending,
+        clarify_task=(
+            _d2_clarify_task(envelope=envelope)
+            if response.resolved.session_delta.clarify_pending
+            else None
+        ),
     )
     initial_effect = (
         D2LeadEffect(effect_id=lead_effect_id, status="pending")

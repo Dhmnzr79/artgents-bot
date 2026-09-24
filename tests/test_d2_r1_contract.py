@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from contracts.d2_dialogue import D2ProviderInput
+from contracts.d2_dialogue import D2ProviderInput, D2SelectedUiRef
 from contracts.d2_session_context import D2SessionTtlPolicy
 from contracts.response_plan import SessionKey
 from core.d2_dialogue import run_d2_dialogue_turn
@@ -26,9 +26,11 @@ class RawProvider:
     def __init__(self, payload: dict) -> None:
         self.raw = json.dumps(payload, ensure_ascii=False)
         self.calls = 0
+        self.inputs: list[D2ProviderInput] = []
 
-    def generate(self, _request) -> str:
+    def generate(self, request: D2ProviderInput) -> str:
         self.calls += 1
+        self.inputs.append(request)
         return self.raw
 
 
@@ -114,7 +116,33 @@ def test_real_fullcontext_prompt_contains_every_snapshot_document() -> None:
             assert f"---BEGIN APPROVED MD:{content_ref}---" in system["content"]
             assert body in system["content"]
     assert "=== D2_SESSION_CONTEXT ===" in user["content"]
+    assert "=== D2_SELECTED_UI_REF ===\nnull" in user["content"]
     assert "Расскажите о лечении." in user["content"]
+
+
+def test_selected_ui_ref_is_a_separate_typed_prompt_block() -> None:
+    tenant = load_d2_tenant_snapshot("demo", clients_root=Path("clients"))
+    key = SessionKey(client_id="demo", sid="r1-selected-ref")
+    context = project_d2_session_context(
+        empty_session_snapshot(key),
+        expected_session_key=key,
+        activity=None,
+        policy=D2SessionTtlPolicy(),
+        now=datetime(2026, 9, 23, tzinfo=timezone.utc),
+    )
+    _, user = build_d2_d1r_messages(D2ProviderInput(
+        user_message="",
+        model_view=build_d2_model_view(tenant),
+        context=context,
+        selected_ui_ref=D2SelectedUiRef(
+            reply_id="volume:implantation:one_tooth",
+            source_revision=7,
+        ),
+    ))
+
+    assert '=== D2_SELECTED_UI_REF ===\n{"reply_id":"volume:implantation:one_tooth","source_revision":7}' in user["content"]
+    assert "=== USER_MESSAGE ===\n" in user["content"]
+    assert "Один зуб" not in user["content"]
 
 
 @pytest.mark.parametrize("prose", [
@@ -441,6 +469,11 @@ def test_clarify_service_click_uses_authorized_ref_and_retained_topic(tmp_path: 
             now=datetime(2026, 9, 23, tzinfo=timezone.utc),
         )
         after_click = store.read(key)
+        assert second.inputs[0].user_message == ""
+        assert second.inputs[0].selected_ui_ref == D2SelectedUiRef(
+            reply_id="service:all_on_4",
+            source_revision=clarify.committed_revision,
+        )
         answer = run_d2_dialogue_turn(
             session_key=key, user_message="Вся челюсть", provider=third,
             clients_root=root, store=store,

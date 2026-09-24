@@ -84,6 +84,26 @@ def _raw(
     )
 
 
+def _content(*, text: str) -> str:
+    return json.dumps(
+        production_envelope_template(
+            patient_text=None,
+            commercial_intent="none",
+            request_understanding={
+                "subjects": [],
+                "requests": [{
+                    "request_id": "r1",
+                    "kind": "content",
+                    "subject_id": None,
+                    "context": "general_information",
+                    "content_text": text,
+                }],
+            },
+        ),
+        ensure_ascii=False,
+    )
+
+
 class RawFakeProvider:
     def __init__(self, raw: str) -> None:
         self.raw = raw
@@ -350,10 +370,103 @@ def test_a10_empty_session_price_ask_clarifies_without_inventing_price(tmp_path:
     assert outcome.response.resolved.d2_price_block is None
     assert outcome.response.resolved.session_delta.clarify_pending is True
     assert saved.state.clarify_pending is True
+    assert saved.state.clarify_task is not None
+    assert saved.state.dialogue_pairs == ()
     assert saved.state.terminal_state == "clarify"
     assert saved.state.situation_state is None
     assert CLARIFY_TEXT in outcome.response.rendered_text
     assert outcome.response.ui_projection.quick_replies
+
+
+def test_stage2_keeps_ordered_price_refs_without_price_text_for_second_option_followup(
+    tmp_path: Path,
+) -> None:
+    key = SessionKey(client_id="demo", sid="c2-stage2-second-option")
+    store_path = tmp_path / "shared-dialogue.sqlite"
+    first, saved, _, _, clients = _run(
+        tmp_path,
+        _raw("implantation", _situation()),
+        key=key,
+        message="Нет одного зуба, сколько стоит?",
+        store_path=store_path,
+    )
+    offer_ids = _offer_ids(first)
+    assert len(offer_ids) == 3
+    assert [item.offer_id for item in saved.state.d2_shown_price_offer_refs] == list(offer_ids)
+    assert saved.state.dialogue_pairs == ()
+
+    _, saved, provider, _, _ = _run(
+        tmp_path,
+        _raw("implantation", _situation(continuity="same")),
+        key=key,
+        message="Что входит во второй?",
+        now=NOW + timedelta(minutes=1),
+        clients=clients,
+        store_path=store_path,
+    )
+    carried = provider.inputs[0].context.ordinary.d2_shown_price_offer_refs
+    assert [item.offer_id for item in carried] == list(offer_ids)
+    assert [item.service_id for item in carried] == [
+        row.service_id for row in first.response.resolved.d2_price_block.rows
+    ]
+    assert provider.inputs[0].context.ordinary.historical_price_offers is None
+    assert all(not hasattr(item, "display_text") for item in carried)
+    assert [item.offer_id for item in saved.state.d2_shown_price_offer_refs] == list(offer_ids)
+
+
+def test_stage2_bounds_live_prose_pairs_and_expires_them_with_context(tmp_path: Path) -> None:
+    key = SessionKey(client_id="demo", sid="c2-stage2-history")
+    store_path = tmp_path / "history-dialogue.sqlite"
+    clients = None
+    saved = None
+    for index in range(4):
+        _, saved, _, _, clients = _run(
+            tmp_path,
+            _content(text=f"Проверенная модельная проза {index}."),
+            key=key,
+            message=(f"Запрос {index}: " + "т" * 1_200),
+            now=NOW + timedelta(minutes=index),
+            clients=clients,
+            store_path=store_path,
+        )
+    assert saved is not None
+    assert len(saved.state.dialogue_pairs) == 3
+    assert all(len(pair.patient_text or "") <= 1_000 for pair in saved.state.dialogue_pairs)
+    assert all(len(pair.assistant_text) <= 1_000 for pair in saved.state.dialogue_pairs)
+
+    _, saved, provider, _, _ = _run(
+        tmp_path,
+        _content(text="Проверенная модельная проза fresh follow-up."),
+        key=key,
+        message="Свежий follow-up.",
+        now=NOW + timedelta(minutes=4),
+        clients=clients,
+        store_path=store_path,
+    )
+    carried_pairs = provider.inputs[0].context.ordinary.dialogue_pairs
+    assert [pair.patient_text for pair in carried_pairs] == [
+        (f"Запрос {index}: " + "т" * 1_200)[:1_000]
+        for index in range(1, 4)
+    ]
+    assert [pair.assistant_text for pair in carried_pairs] == [
+        f"Проверенная модельная проза {index}."
+        for index in range(1, 4)
+    ]
+    assert all("Авторский" not in pair.assistant_text for pair in carried_pairs)
+    assert len(saved.state.dialogue_pairs) == 3
+
+    _, saved, provider, _, _ = _run(
+        tmp_path,
+        _content(text="Проверенная модельная проза после TTL."),
+        key=key,
+        message="Сколько стоит?",
+        now=NOW + timedelta(minutes=34),
+        clients=clients,
+        store_path=store_path,
+    )
+    assert provider.inputs[0].context.freshness == "expired"
+    assert provider.inputs[0].context.ordinary.dialogue_pairs == ()
+    assert len(saved.state.dialogue_pairs) == 1
 
 
 def test_a10_switch_to_whitening_does_not_carry_implant_prices(tmp_path: Path) -> None:

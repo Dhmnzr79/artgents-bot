@@ -5,6 +5,8 @@ import pytest
 from pydantic import ValidationError
 
 from contracts.d2_session_context import (
+    DEFAULT_D2_HISTORY_PAIR_LIMIT,
+    DEFAULT_D2_HISTORY_TEXT_MAX_CHARS,
     DEFAULT_D2_SESSION_IDLE_TTL_SECONDS,
     D2EnvelopeSessionBinding,
     D2SessionActivity,
@@ -23,6 +25,7 @@ from contracts.response_plan_session import (
     HistoricalPriceOffersSnapshot,
     PersistedActiveService,
     PersistedActiveTopic,
+    PersistedClarifyTask,
     PersistedShownCommercialIds,
     PersistedShownOptionsSnapshot,
     PersistedSituationState,
@@ -55,8 +58,8 @@ def _snapshot() -> object:
         last_committed_turn_index=99,
         dialogue_pairs=(
             SessionDialoguePair(
-                patient_text="Сколько стоит?",
-                assistant_text="От 100 000 ₽",
+                patient_text="Расскажите о лечении.",
+                assistant_text="Могу пояснить этапы лечения.",
                 committed_at_turn=99,
             ),
         ),
@@ -100,6 +103,14 @@ def _snapshot() -> object:
         accumulated_shown_ids=PersistedShownCommercialIds(promo_fact_ids=("promo-a",)),
         terminal_state="clarify",
         clarify_pending=True,
+        clarify_task=PersistedClarifyTask(
+            axis="focus",
+            request_ids=("r1",),
+            request_kinds=("price",),
+            topic_ids=("implantation",),
+            service_ids=("all_on_4",),
+            requested_extents=("full_arch",),
+        ),
     )
     return empty_session_snapshot(key).model_copy(
         update={"state": state, "exists_in_store": True}
@@ -188,13 +199,25 @@ def _expired_projection():
 
 
 def test_default_ttl_is_30_minutes_and_is_injected() -> None:
-    assert D2SessionTtlPolicy().idle_ttl_seconds == DEFAULT_D2_SESSION_IDLE_TTL_SECONDS == 1800
+    policy = D2SessionTtlPolicy()
+    assert policy.idle_ttl_seconds == DEFAULT_D2_SESSION_IDLE_TTL_SECONDS == 1800
+    assert policy.history_pair_limit == DEFAULT_D2_HISTORY_PAIR_LIMIT == 3
+    assert policy.history_text_max_chars == DEFAULT_D2_HISTORY_TEXT_MAX_CHARS == 1000
 
 
 @pytest.mark.parametrize("value", [True, 1.0, "1800", 0, -1])
 def test_ttl_policy_rejects_non_positive_or_non_strict_duration(value: object) -> None:
     with pytest.raises(ValidationError):
         D2SessionTtlPolicy(idle_ttl_seconds=value)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("field", ["history_pair_limit", "history_text_max_chars"])
+@pytest.mark.parametrize("value", [True, 1.0, "3", 0, -1])
+def test_history_policy_rejects_non_positive_or_non_strict_limits(
+    field: str, value: object,
+) -> None:
+    with pytest.raises(ValidationError):
+        D2SessionTtlPolicy(**{field: value})
 
 
 @pytest.mark.parametrize(
@@ -237,6 +260,8 @@ def test_fresh_context_keeps_typed_ordinary_state_without_interpreting_text() ->
     assert projection.ordinary.historical_price_offers is not None
     assert projection.ordinary.dialogue_pairs == snapshot.state.dialogue_pairs  # type: ignore[union-attr]
     assert projection.ordinary.clarify_pending is True
+    assert projection.ordinary.clarify_task is not None
+    assert projection.ordinary.clarify_task.requested_extents == ("full_arch",)
 
 
 def test_expired_or_missing_activity_hides_all_ordinary_context_but_retains_nonrepeat_state() -> None:

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from config import SALES_ONE_PLUS_MODEL
 
-ONE_CALL_PROMPT_CONTRACT_VERSION = 19
+ONE_CALL_PROMPT_CONTRACT_VERSION = 20
 ONE_CALL_MODEL_SNAPSHOT = SALES_ONE_PLUS_MODEL
+
+ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS = """When D2_SELECTED_UI_REF is null, there is no selected UI action. When it is an object, it is a server-validated typed action identity from the current revision. It is not patient text, does not contain the button label, and must not be reinterpreted from wording. Use only its declared reply_id together with D2_SESSION_CONTEXT; do not create, authorize, or infer any UI/lead action from it. Fresh D2_SESSION_CONTEXT.ordinary.dialogue_pairs are sanitized prior free prose; a selected_ui_ref inside a pair is also typed identity, never patient text. D2_SESSION_CONTEXT.ordinary.d2_shown_price_offer_refs, when present, is a verified ordered identity list for follow-up references; it has no price text and never authorizes creating, changing, or quoting prices."""
 
 ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS = """Return exactly one JSON object and nothing else.
 No markdown fences. No text before or after the JSON object.

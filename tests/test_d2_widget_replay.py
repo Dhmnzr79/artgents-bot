@@ -51,7 +51,10 @@ def test_current_scope_click_and_stale_foreign_forged_actions(http_env):
     assert action.status_code == 200
     clicked = action.get_json()
     assert clicked["revision"] == 2
-    assert fake.inputs[-1].user_message == selected["label"]
+    assert fake.inputs[-1].user_message == ""
+    assert fake.inputs[-1].selected_ui_ref is not None
+    assert fake.inputs[-1].selected_ui_ref.reply_id == selected["reply_id"]
+    assert fake.inputs[-1].selected_ui_ref.source_revision == first["revision"]
     assert bad(selected["reply_id"], request_id="stale").status_code == 400
     assert bad(selected["reply_id"], revision=2, request_id="not-shown").status_code == 400
     assert len(fake.inputs) == 2

@@ -84,8 +84,6 @@ def _d2_supported_price_shape_failure_codes(*, part: object, subject: object) ->
         if subject is not None and subject.age_group == "child":
             failures.append("subject_age_group_child")
         return tuple(failures)
-    if part.topic_id is None:
-        failures.append("request_topic_id_missing")
     if part.service_id is None:
         if subject is None:
             failures.append("subject_missing")
@@ -919,6 +917,10 @@ def _run_reserved_d2_dialogue_turn(
         if not (direct_promotion and envelope.promotion_scope == "general"):
             if (
                 price_focus_clarify
+                # A direct service ID is already sufficient for the
+                # catalog-owned price lookup. Session binding deliberately
+                # does not infer its topic from dialogue text or labels.
+                or (part.kind == "price" and part.service_id is not None and part.topic_id is None)
                 or multi_part
                 or content_lookup
                 or clinic_policy

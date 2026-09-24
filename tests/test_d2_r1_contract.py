@@ -10,10 +10,16 @@ from pathlib import Path
 
 import pytest
 
+from contracts.d2_dialogue import D2ProviderInput
+from contracts.d2_session_context import D2SessionTtlPolicy
 from contracts.response_plan import SessionKey
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore
-from core.one_call_envelope_protocol import production_envelope_template
+from core.d2_live_provider import build_d2_d1r_messages
+from core.d2_session_context import project_d2_session_context
+from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
+from core.one_call_envelope_protocol import parse_production_envelope_json, production_envelope_template
+from contracts.response_plan_session import empty_session_snapshot
 
 
 class RawProvider:
@@ -67,6 +73,131 @@ def _other(*, content_text: str | None) -> dict:
             }],
         },
     )
+
+
+def _ordinary_content(*, content_text: str | None, content_ref: str | None = None) -> dict:
+    return production_envelope_template(
+        patient_text=None,
+        commercial_intent="none",
+        request_understanding={
+            "subjects": [],
+            "requests": [{
+                "request_id": "r1", "kind": "content", "subject_id": None,
+                "context": "general_information", "content_text": content_text,
+                "content_ref": content_ref,
+            }],
+        },
+    )
+
+
+def test_real_fullcontext_prompt_contains_every_snapshot_document() -> None:
+    tenant = load_d2_tenant_snapshot("demo", clients_root=Path("clients"))
+    key = SessionKey(client_id="demo", sid="r1-fullcontext")
+    context = project_d2_session_context(
+        empty_session_snapshot(key),
+        expected_session_key=key,
+        activity=None,
+        policy=D2SessionTtlPolicy(),
+        now=datetime(2026, 9, 23, tzinfo=timezone.utc),
+    )
+    system, user = build_d2_d1r_messages(D2ProviderInput(
+        user_message="Расскажите о лечении.",
+        model_view=build_d2_model_view(tenant),
+        context=context,
+    ))
+
+    assert "=== APPROVED_MD_CORPUS ===" in system["content"]
+    for path, raw in tenant.files:
+        if path.startswith("md/"):
+            content_ref = path.removeprefix("md/")
+            body = raw.decode("utf-8").rstrip("\n")
+            assert f"---BEGIN APPROVED MD:{content_ref}---" in system["content"]
+            assert body in system["content"]
+    assert "=== D2_SESSION_CONTEXT ===" in user["content"]
+    assert "Расскажите о лечении." in user["content"]
+
+
+@pytest.mark.parametrize("prose", [
+    "Здравствуйте! Чем могу помочь?",
+    "Могу объяснить, какие варианты обычно обсуждают на консультации.",
+])
+def test_unattributed_fullcontext_prose_with_null_legacy_text_commits(
+    tmp_path: Path,
+    prose: str,
+) -> None:
+    payload = _ordinary_content(content_text=prose)
+    model_view = build_d2_model_view(load_d2_tenant_snapshot("demo", clients_root=Path("clients")))
+    parsed = parse_production_envelope_json(
+        json.dumps(payload, ensure_ascii=False),
+        active_service_catalog=model_view.active_service_catalog,
+        service_reference_catalog=model_view.service_reference_catalog,
+        commercial_fact_catalog=model_view.commercial_fact_catalog,
+    )
+    turn, saved, provider = _run(tmp_path, payload, sid=f"r1-prose-{len(prose)}")
+
+    assert parsed.patient_text is None
+    assert parsed.request_understanding is not None
+    assert parsed.request_understanding.requests[0].content_ref is None
+    assert turn.response.resolved.route == "ANSWER"
+    assert prose in turn.response.rendered_text
+    part = turn.response.resolved.d2_request_parts[0]
+    assert part.status == "answered"
+    assert part.content_ref is None
+    assert saved is not None and saved.state.revision == 1
+    assert provider.calls == 1
+
+
+def test_direct_service_price_without_optional_topic_reaches_common_turn(tmp_path: Path) -> None:
+    payload = production_envelope_template(
+        patient_text=None,
+        commercial_intent="price",
+        primary_price_request_id="r1",
+        request_understanding={
+            "subjects": [],
+            "requests": [{
+                "request_id": "r1", "kind": "price", "subject_id": None,
+                "context": "general_information", "service_id": "professional_whitening",
+                "topic_id": None, "situation": None,
+            }],
+        },
+    )
+    turn, saved, provider = _run(tmp_path, payload, sid="r1-direct-service")
+
+    assert turn.response.resolved.d2_price_block is not None
+    assert turn.response.resolved.d2_request_parts[0].status == "answered"
+    assert turn.focus.action == "clarify_focus"
+    assert saved is not None and saved.state.revision == 1
+    assert saved.state.active_topic is None
+    assert provider.calls == 1
+
+
+def test_malformed_optional_content_provenance_does_not_discard_fullcontext_prose(
+    tmp_path: Path,
+) -> None:
+    prose = "Отвечу по общей информации, которую подготовила клиника."
+    payload = _ordinary_content(content_text=prose, content_ref="bad/path.md")
+    model_view = build_d2_model_view(load_d2_tenant_snapshot("demo", clients_root=Path("clients")))
+    parsed = parse_production_envelope_json(
+        json.dumps(payload, ensure_ascii=False),
+        active_service_catalog=model_view.active_service_catalog,
+        service_reference_catalog=model_view.service_reference_catalog,
+        commercial_fact_catalog=model_view.commercial_fact_catalog,
+    )
+    turn, saved, provider = _run(tmp_path, payload, sid="r1-malformed-provenance")
+
+    assert parsed.request_understanding is not None
+    assert parsed.request_understanding.requests[0].content_ref is None
+    assert prose in turn.response.rendered_text
+    part = turn.response.resolved.d2_request_parts[0]
+    assert part.status == "answered"
+    assert part.content_ref is None
+    assert saved is not None and saved.state.revision == 1
+    assert provider.calls == 1
+
+
+def test_empty_ordinary_prose_is_not_promoted_to_a_completed_answer(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="patient_text_required"):
+        _run(tmp_path, _ordinary_content(content_text=None), sid="r1-empty-prose")
 
 
 def test_other_with_prose_gets_authored_help_not_price_gate(tmp_path: Path) -> None:

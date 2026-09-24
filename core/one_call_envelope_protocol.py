@@ -49,6 +49,9 @@ ENVELOPE_NORMALIZED_NESTED_PRIMARY_PRICE_REQUEST_ID = (
 ENVELOPE_NORMALIZED_DUPLICATE_PATIENT_TEXT = (
     "envelope_normalized_duplicate_patient_text"
 )
+ENVELOPE_NORMALIZED_INVALID_CONTENT_PROVENANCE_DROPPED = (
+    "envelope_normalized_invalid_content_provenance_dropped"
+)
 
 
 class OneCallEnvelopeProtocolError(ValueError):
@@ -106,6 +109,47 @@ def _normalize_production_payload(
     required = required_envelope_field_names()
     keys = set(payload.keys())
     understanding = payload.get("request_understanding")
+    requests = understanding.get("requests") if isinstance(understanding, dict) else None
+    if isinstance(requests, list):
+        normalized_requests: list[object] = []
+        dropped_provenance = False
+        for request in requests:
+            if not isinstance(request, dict):
+                normalized_requests.append(request)
+                continue
+            content_text = request.get("content_text")
+            content_ref = request.get("content_ref")
+            valid_content_ref = (
+                content_ref is None
+                or (
+                    isinstance(content_ref, str)
+                    and content_ref == content_ref.strip().replace("\\", "/")
+                    and content_ref.endswith(".md")
+                    and "/" not in content_ref
+                    and ".." not in content_ref
+                )
+            )
+            if (
+                request.get("kind") in {"content", "other"}
+                and isinstance(content_text, str)
+                and content_text.strip()
+                and not valid_content_ref
+            ):
+                # A malformed optional source cannot authorize source UI, but
+                # it must not discard useful FullContext prose. Preserve no
+                # unverified source fields for the later typed validation.
+                request = dict(request)
+                request["content_ref"] = None
+                request["content_section_refs"] = []
+                request["content_fallback_section_ref"] = None
+                dropped_provenance = True
+            normalized_requests.append(request)
+        if dropped_provenance:
+            payload = dict(payload)
+            understanding = dict(understanding)
+            understanding["requests"] = normalized_requests
+            payload["request_understanding"] = understanding
+            codes.append(ENVELOPE_NORMALIZED_INVALID_CONTENT_PROVENANCE_DROPPED)
     if isinstance(understanding, dict) and "primary_price_request_id" in understanding:
         nested_value = _optional_nonblank_string(
             understanding["primary_price_request_id"],
@@ -369,7 +413,10 @@ def _validate_structure(
         if not isinstance(patient_text_raw, str):
             raise OneCallEnvelopeProtocolError("patient_text_invalid")
         patient_text = patient_text_raw
-        if route in {"ANSWER", "CLARIFY"} and not patient_text.strip():
+        # Ordinary FullContext prose belongs to request_understanding.content_text.
+        # ``patient_text`` is therefore optional for ANSWER and must not make a
+        # usable typed response fail merely because the legacy duplicate is null.
+        if route == "CLARIFY" and not patient_text.strip():
             raise OneCallEnvelopeProtocolError("patient_text_required")
 
     price_text_raw = payload["price_text"]
@@ -453,6 +500,21 @@ def _validate_structure(
         )
         if not has_understanding:
             raise OneCallEnvelopeProtocolError("request_understanding_required")
+        has_fullcontext_prose = any(
+            request.kind in {"content", "other"}
+            and bool((request.content_text or "").strip())
+            for request in request_understanding.requests
+        )
+        has_code_owned_surface = any(
+            request.kind in {"clinic_policy", "booking", "price", "contact"}
+            for request in request_understanding.requests
+        )
+        if (
+            not (patient_text or "").strip()
+            and not has_fullcontext_prose
+            and not has_code_owned_surface
+        ):
+            raise OneCallEnvelopeProtocolError("patient_text_required")
         if clarify_axis is not None:
             raise OneCallEnvelopeProtocolError("clarify_axis_forbidden_for_answer")
         if clarify_service_options is not None:

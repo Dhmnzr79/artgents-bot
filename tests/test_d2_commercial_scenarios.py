@@ -29,7 +29,7 @@ COMPAT_TEXT = "Скидка и рассрочка не суммируются: �
 WARRANTY_ALSO = "Гарантия на работу врача и импланты фиксируется в договоре."
 
 
-def _raw_price(service_id: str, topic_id: str) -> str:
+def _raw_price(service_id: str, topic_id: str | None) -> str:
     return json.dumps(
         production_envelope_template(
             commercial_intent="price",
@@ -204,6 +204,17 @@ def test_a02_whitening_and_veneers_share_price_profile(tmp_path: Path) -> None:
     assert veneers.response.ui_projection.quick_replies == ()
     assert "35 000" in veneers.response.rendered_text.replace("\u00a0", " ").replace("\u202f", " ")
     assert sum(name == "select_target_marketing" for _, name in calls) == 0
+
+
+def test_direct_whitening_price_needs_no_separate_topic_id(tmp_path: Path) -> None:
+    outcome, saved, provider, _, _ = _run(
+        tmp_path,
+        _raw_price("professional_whitening", None),
+        message="Сколько стоит отбеливание?",
+    )
+    assert "18 000" in outcome.response.rendered_text.replace("\u00a0", " ").replace("\u202f", " ")
+    assert saved.state.revision == 1
+    assert len(provider.inputs) == 1
 
 
 def test_a11_direct_promotion_uses_full_form_and_can_repeat(tmp_path: Path) -> None:

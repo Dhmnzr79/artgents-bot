@@ -141,13 +141,14 @@ def test_two_content_parts_keep_distinct_sources() -> None:
     ]
 
 
-def test_authored_text_is_not_rewritten() -> None:
+def test_authored_flag_cannot_publish_verbatim_document_text() -> None:
     authored = _prose_request()
     authored.update({"content_realization": "authored", "content_fallback_section_ref": None})
     outcome, _ = _resolve(authored)
 
-    assert outcome.rendered_text == "Точная цитата об анестезии.\n\nТочная цитата о подготовке."
-    assert outcome.resolved.information_blocks[0].publication == "authored"
+    assert outcome.rendered_text == authored["content_text"]
+    assert outcome.resolved.information_blocks[0].publication == "model_prose"
+    assert "Точная цитата" not in outcome.rendered_text
 
 
 def test_frozen_content_linkage_is_validated() -> None:

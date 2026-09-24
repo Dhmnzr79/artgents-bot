@@ -29,7 +29,7 @@ const leadButton = second.ui.buttons.find((item) => item.action_kind === "cta");
 if (!scopeChoice || !leadButton) throw new Error("real D2 fixture lacks required typed actions");
 function response(payload, failAt) {
   const full = sse([["status", { message: "Проверяю вопрос" }], ["typing", { phase: "writing" }],
-                    ["ui", payload], ["done", {}]]);
+                    ["ui", payload], ["done", { outcome: "final", committed: true }]]);
   const partial = failAt === "before" ? sse([["status", { message: "Проверяю вопрос" }]])
     : failAt === "after" ? sse([["status", { message: "Проверяю вопрос" }], ["ui", payload]]) : full;
   const bytes = new TextEncoder().encode(partial);
@@ -59,7 +59,7 @@ globalThis.fetch = async (url, options = {}) => {
   if (body.q === "terminal") return response(forRequest(terminal));
   if (body.q === "video") return response(forRequest(video));
   if (body.q === "error") return new Response(sse([["status", { message: "Проверяю вопрос" }],
-    ["error", { error: "d2_invalid_turn" }]]),
+    ["error", { error: "ui_action_invalid", stage: "d2_gate", committed: false }]]),
     { status: 200, headers: { "content-type": "text/event-stream" } });
   if (body.q === "первый") {
     const distinct = new Set(sent.filter((item) => item.q === "первый").map((item) => item.request_id));
@@ -138,7 +138,7 @@ try {
   if ([...root.querySelectorAll(".clinic-turn")].at(-1).querySelector(".clinic-turn__btn--cta-primary"))
     throw new Error("terminal gained an unplanned CTA");
   await send("error");
-  await waitUntil(() => root.querySelector("[data-clinic-err]")?.textContent.includes("d2_invalid_turn"));
+  await waitUntil(() => root.querySelector("[data-clinic-err]")?.textContent.includes("Не удалось обработать запрос"));
   if (botBodies().length !== 1 || root.querySelector("[data-clinic-err] button"))
     throw new Error("terminal SSE error created UI or retry");
   widget.resetSession();

@@ -12,6 +12,7 @@ from core.client_runtime import per_client_data_dir
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore, D2RequestIdConflict, D2RequestInProgress
 from core.d2_live_provider import D2HttpProvider
+from core.d2_outcome import D2OutcomeError, classify_d2_error, safe_diagnostic_code, safe_failure_site
 from session import (
     bind_session_client, capture_lead_session_row, restore_lead_session_row, sid_from_body,
 )
@@ -96,15 +97,24 @@ def run_d2_ask_json(data: dict, *, client_id: str) -> dict:
                 situation_action=data.get("situation_action"),
                 lead_bridge=True,
             )
-        except (D2RequestIdConflict, D2RequestInProgress):
-            raise
-        except Exception:
-            completed = store._connection.execute(
-                "SELECT 1 FROM d2_turn_request WHERE client_id=? AND sid=? "
-                "AND request_id=? AND status='complete'",
-                (client_id, sid, request_id),
-            ).fetchone()
+        except Exception as exc:
+            try:
+                completed = store._connection.execute(
+                    "SELECT 1 FROM d2_turn_request WHERE client_id=? AND sid=? "
+                    "AND request_id=? AND status='complete'",
+                    (client_id, sid, request_id),
+                ).fetchone()
+            except Exception as store_error:
+                raise D2OutcomeError("store", "store_failed", "storage",
+                                     diagnostic_code=safe_diagnostic_code(store_error),
+                                     diagnostic_site=safe_failure_site(store_error)) from None
             if completed is None:
                 restore_lead_session_row(sid, lead_before)
-            raise
-    return _response_payload(turn, session_key=key)
+            raise classify_d2_error(
+                exc, committed=completed is not None and not isinstance(exc, (D2RequestIdConflict, D2RequestInProgress)),
+            ) from exc
+    try:
+        return _response_payload(turn, session_key=key)
+    except Exception as exc:
+        raise D2OutcomeError("transport", "transport_failed", "unexpected", True,
+                             safe_diagnostic_code(exc), safe_failure_site(exc)) from exc

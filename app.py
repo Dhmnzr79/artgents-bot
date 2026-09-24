@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import uuid
 from collections import deque
 
 from flask import (
@@ -16,7 +17,8 @@ from pg_sink import init_pg_sink
 from config import DEBUG_TOKEN, PORT
 from core.client_host import resolve_request_client_id
 from core.d2_http_adapter import run_d2_ask_json
-from core.d2_dialogue_store import D2RequestIdConflict, D2RequestInProgress
+from core.d2_full_audit import full_audit, full_audit_exception, full_audit_trace
+from core.d2_outcome import D2OutcomeError, classify_d2_error, safe_diagnostic_code, safe_failure_site
 from core.client_config_loader import (
     WidgetPresentationLoadError,
     build_public_widget_config,
@@ -28,7 +30,7 @@ from core.widget_cors import (
 )
 from core.video_catalog_loader import catalog_for_widget, get_external_video_src
 from lead_service import handle_lead
-from logging_setup import LOG_FILE, get_logger, log_json, make_request_context
+from logging_setup import LOG_FILE, get_logger, log_json, log_json_no_context, make_request_context
 from session import (
     bind_client_id,
     clear_session_client_binding,
@@ -119,6 +121,21 @@ def _before():
     request.ctx["path"] = request.path
     request.ctx["method"] = request.method
     request.ctx["t0"] = time.time()
+    if request.path in {"/ask", "/ask/stream"}:
+        request.ctx["d2_trace_id"] = uuid.uuid4().hex
+
+
+def _record_d2_http_error(error: D2OutcomeError) -> None:
+    """Keep diagnostic metadata in local logs, never in the public payload."""
+    request.ctx["d2_outcome"] = error.reason_code
+    request.ctx["d2_stage"] = error.stage
+    request.ctx["d2_category"] = error.category
+    request.ctx["d2_committed"] = error.committed
+    request.ctx["d2_diagnostic_code"] = error.diagnostic_code
+    request.ctx["d2_diagnostic_site"] = error.diagnostic_site
+    full_audit("http_error", trace_id=request.ctx["d2_trace_id"],
+               error=error.payload(), diagnostic_code=error.diagnostic_code,
+               diagnostic_site=error.diagnostic_site)
 
 
 @app.before_request
@@ -138,14 +155,29 @@ def _after(resp):
     if request.path.startswith("/dashboard") or _is_health_probe_path():
         return resp
     latency = int((time.time() - request.ctx["t0"]) * 1000)
-    log_json(
+    is_d2_route = request.path in {"/ask", "/ask/stream"}
+    if is_d2_route:
+        resp.headers["X-D2-Trace-Id"] = request.ctx["d2_trace_id"]
+    public_ctx = (
+        {"path": request.path, "method": request.method,
+         "trace_id": request.ctx["d2_trace_id"],
+         "d2_outcome": request.ctx.get("d2_outcome", "pending"),
+         "stage": request.ctx.get("d2_stage"),
+         "category": request.ctx.get("d2_category"),
+         "committed": request.ctx.get("d2_committed"),
+         "diagnostic_code": request.ctx.get("d2_diagnostic_code"),
+         "diagnostic_site": request.ctx.get("d2_diagnostic_site")}
+        if request.path in {"/ask", "/ask/stream"} else request.ctx
+    )
+    log_fn = log_json_no_context if request.path in {"/ask", "/ask/stream"} else log_json
+    log_fn(
         logger,
         "http_request",
         **{
-            **request.ctx,
+            **public_ctx,
             "status": resp.status_code,
             "latency_ms": latency,
-            "ip": request.remote_addr,
+            **({} if request.path in {"/ask", "/ask/stream"} else {"ip": request.remote_addr}),
         },
     )
     return apply_widget_cors_headers(resp)
@@ -229,30 +261,39 @@ def dashboard_events_api():
 def ask():
     """Return the durable D2 final result through the JSON transport."""
     try:
-        data = request.get_json(force=True)
+        data = request.get_json(force=True, silent=True)
+        full_audit("http_request", trace_id=request.ctx["d2_trace_id"],
+                   route="/ask", body=data if isinstance(data, dict) else request.get_data(as_text=True))
         if not isinstance(data, dict):
-            return safe_jsonify({"error": "invalid_request"}), 400
+            err = D2OutcomeError("transport", "request_invalid", "validation")
+            _record_d2_http_error(err)
+            return safe_jsonify(err.payload()), err.http_status
         client_id = resolve_request_client_id(data.get("client_id"), host=request.host)
         if client_id is None:
-            return safe_jsonify({"error": "unknown_client"}), 403
+            err = D2OutcomeError("tenant_binding", "tenant_binding_failed", "state")
+            _record_d2_http_error(err)
+            return safe_jsonify(err.payload()), 403
         blocked = _widget_origin_forbidden(client_id)
         if blocked:
-            return blocked
-        result = run_d2_ask_json(data, client_id=client_id)
+            err = D2OutcomeError("transport", "request_invalid", "validation")
+            _record_d2_http_error(err)
+            return safe_jsonify(err.payload()), 403
+        with full_audit_trace(request.ctx["d2_trace_id"]):
+            result = run_d2_ask_json(data, client_id=client_id)
+        full_audit("http_result", trace_id=request.ctx["d2_trace_id"],
+                   route="/ask", payload=result)
         request.ctx["sid"] = result["sid"]
         request.ctx["session_id"] = result["sid"]
         request.ctx["client_id"] = client_id
         request.ctx["request_id"] = result["request_id"]
+        request.ctx["d2_outcome"] = "final"
+        request.ctx["d2_committed"] = True
         return safe_jsonify(result)
-    except D2RequestIdConflict:
-        return safe_jsonify({"error": "request_id_payload_conflict"}), 409
-    except D2RequestInProgress:
-        return safe_jsonify({"error": "request_in_progress"}), 409
-    except ValueError:
-        return safe_jsonify({"error": "d2_invalid_turn"}), 400
-    except Exception:
-        logger.error("d2_ask_failed")
-        return safe_jsonify({"error": "d2_turn_failed"}), 503
+    except Exception as exc:
+        full_audit_exception("transport", exc, trace_id=request.ctx["d2_trace_id"])
+        err = classify_d2_error(exc, stage="transport")
+        _record_d2_http_error(err)
+        return safe_jsonify(err.payload()), err.http_status
 
 _SSE_HEADERS = {
     "Cache-Control": "no-cache",
@@ -275,48 +316,94 @@ def _sse_status_line(message: str) -> str:
 def ask_stream():
     """SSE framing of the same durable D2 result returned by JSON /ask."""
     data = request.get_json(force=True, silent=True)
+    full_audit("http_request", trace_id=request.ctx["d2_trace_id"],
+               route="/ask/stream", body=data if isinstance(data, dict) else request.get_data(as_text=True))
     if not isinstance(data, dict):
-        return safe_jsonify({"error": "invalid_request"}), 400
-    client_id = resolve_request_client_id(data.get("client_id"), host=request.host)
-    if client_id is None:
-        return safe_jsonify({"error": "unknown_client"}), 403
-    blocked = _widget_origin_forbidden(client_id)
-    if blocked:
-        return blocked
+        err = D2OutcomeError("transport", "request_invalid", "validation")
+        _record_d2_http_error(err)
+        return safe_jsonify(err.payload()), err.http_status
+    try:
+        client_id = resolve_request_client_id(data.get("client_id"), host=request.host)
+        if client_id is None:
+            err = D2OutcomeError("tenant_binding", "tenant_binding_failed", "state")
+            _record_d2_http_error(err)
+            return safe_jsonify(err.payload()), 403
+        blocked = _widget_origin_forbidden(client_id)
+        if blocked:
+            err = D2OutcomeError("transport", "request_invalid", "validation")
+            _record_d2_http_error(err)
+            return safe_jsonify(err.payload()), 403
+    except Exception as exc:
+        full_audit_exception("transport", exc, trace_id=request.ctx["d2_trace_id"])
+        err = classify_d2_error(exc, stage="transport")
+        _record_d2_http_error(err)
+        return safe_jsonify(err.payload()), err.http_status
 
     # The generator holds only captured values, never Flask's request context.
     # Closing before the first status leaves the D2 store untouched; closing
     # during the synchronous turn allows its atomic completion to finish.
+    trace_id = request.ctx["d2_trace_id"]
+
     def _gen():
         from session import clear_session_client_binding
 
+        outcome_recorded = False
+        turn_committed = False
         try:
             yield _sse_status_line(_SSE_INITIAL_STATUS_PHRASE)
             try:
-                out = run_d2_ask_json(data, client_id=client_id)
-            except D2RequestIdConflict:
-                error = "request_id_payload_conflict"
-            except D2RequestInProgress:
-                error = "request_in_progress"
-            except ValueError:
-                error = "d2_invalid_turn"
-            except Exception:
-                logger.error("d2_ask_stream_failed")
-                error = "d2_turn_failed"
+                with full_audit_trace(trace_id):
+                    out = run_d2_ask_json(data, client_id=client_id)
+            except Exception as exc:
+                full_audit_exception("transport", exc, trace_id=trace_id)
+                error = classify_d2_error(exc, stage="transport")
             else:
+                turn_committed = True
+                full_audit("http_result", trace_id=trace_id, route="/ask/stream", payload=out)
                 try:
                     typing_line = _sse_typing_line("writing")
                     ui_line = f"event: ui\ndata: {json.dumps(out, ensure_ascii=False)}\n\n"
-                except Exception:
-                    logger.error("d2_ask_stream_framing_failed")
-                    yield 'event: error\ndata: {"error":"d2_stream_transport_failed"}\n\n'
+                except Exception as exc:
+                    full_audit_exception("transport_serialization", exc, trace_id=trace_id)
+                    error = D2OutcomeError(
+                        "transport", "transport_failed", "unexpected", True,
+                        safe_diagnostic_code(exc), safe_failure_site(exc),
+                    )
+                    full_audit("http_error", trace_id=trace_id, error=error.payload(),
+                               diagnostic_code=error.diagnostic_code,
+                               diagnostic_site=error.diagnostic_site)
+                    log_json_no_context(logger, "d2_sse_outcome", stage=error.stage,
+                                        reason_code=error.reason_code, category=error.category,
+                                        committed=error.committed, outcome="error",
+                                        trace_id=trace_id, diagnostic_code=error.diagnostic_code,
+                                        diagnostic_site=error.diagnostic_site)
+                    outcome_recorded = True
+                    yield f"event: error\ndata: {json.dumps(error.payload())}\n\n"
                     return
                 yield typing_line
                 yield ui_line
-                yield "event: done\ndata: {}\n\n"
+                log_json_no_context(logger, "d2_sse_outcome", outcome="final",
+                                    committed=True, trace_id=trace_id)
+                outcome_recorded = True
+                yield 'event: done\ndata: {"outcome":"final","committed":true}\n\n'
                 return
-            yield f"event: error\ndata: {json.dumps({'error': error})}\n\n"
+            full_audit("http_error", trace_id=trace_id, error=error.payload(),
+                       diagnostic_code=error.diagnostic_code,
+                       diagnostic_site=error.diagnostic_site)
+            log_json_no_context(logger, "d2_sse_outcome", stage=error.stage,
+                                reason_code=error.reason_code, category=error.category,
+                                committed=error.committed, outcome="error",
+                                diagnostic_code=error.diagnostic_code, trace_id=trace_id,
+                                diagnostic_site=error.diagnostic_site)
+            outcome_recorded = True
+            yield f"event: error\ndata: {json.dumps(error.payload())}\n\n"
         finally:
+            if not outcome_recorded:
+                full_audit("disconnect", trace_id=trace_id, committed=turn_committed)
+                log_json_no_context(logger, "d2_sse_outcome", stage="transport",
+                                    reason_code="transport_failed", category="unexpected",
+                                    committed=turn_committed, outcome="disconnect",
+                                    trace_id=trace_id)
             clear_session_client_binding()
 
     return app.response_class(_gen(), mimetype="text/event-stream", headers=_SSE_HEADERS)

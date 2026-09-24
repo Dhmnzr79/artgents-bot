@@ -43,7 +43,8 @@ export async function postAsk(apiBase, body) {
  *   event: typing      data: {"phase":"searching"|"writing"} — фаза индикатора
  *   event: text_delta  data: {"delta": "..."}   — токен ответа (пока не используется)
  *   event: ui          data: {полный payload}    — UI после генерации
- *   event: done        data: {}                  — конец стрима
+ *   event: done        data: {"outcome":"final","committed":true} — успех
+ *   event: error       data: {safe diagnostic}   — ошибка, даже при HTTP 200
  *
  * @param {string} apiBase
  * @param {Record<string, unknown>} body
@@ -79,6 +80,7 @@ export async function streamAsk(apiBase, body, { onStatus, onTyping, onDelta, on
 
   let uiAccepted = false;
   let finalized = false;
+  const neutralError = "Не удалось обработать запрос. Попробуйте ещё раз.";
 
   /** @param {unknown} data */
   const acceptUiOnce = (data) => {
@@ -104,24 +106,18 @@ export async function streamAsk(apiBase, body, { onStatus, onTyping, onDelta, on
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        let errMsg = res.statusText || "request_failed";
+        let code = "";
         try {
           const d = await res.json();
-          if (typeof d.error === "string") errMsg = d.error;
+          if (typeof d.error === "string") code = d.error;
         } catch { /* ignore */ }
-        if (uiAccepted) finalizeOnce();
-        else onError?.(errMsg, false);
+        const terminal = new Set(["request_invalid", "ui_action_invalid", "request_id_payload_conflict", "tenant_binding_failed"]);
+        onError?.(neutralError, !terminal.has(code) && res.status !== 403);
         return;
       }
 
       const contentType = res.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        const data = await res.json();
-        if (!isValidUiPayload(data)) throw new Error("Некорректный ответ сервера");
-        acceptUiOnce(data);
-        finalizeOnce();
-        return;
-      }
+      if (!contentType.includes("text/event-stream")) throw new Error("unexpected_stream_content_type");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -157,10 +153,10 @@ export async function streamAsk(apiBase, body, { onStatus, onTyping, onDelta, on
               } else if (currentEvent === "ui") {
                 acceptUiOnce(data);
               } else if (currentEvent === "error") {
-                if (uiAccepted) finalizeOnce();
-                else onError?.(typeof data.error === "string" ? data.error : "d2_turn_failed", false);
+                const terminal = new Set(["request_invalid", "ui_action_invalid", "request_id_payload_conflict", "tenant_binding_failed"]);
+                onError?.(neutralError, !terminal.has(data.error));
                 return;
-              } else if (currentEvent === "done" && uiAccepted) {
+              } else if (currentEvent === "done" && uiAccepted && data.outcome === "final" && data.committed === true) {
                 finalizeOnce();
               }
             } catch { /* ignore malformed SSE data */ }
@@ -174,11 +170,10 @@ export async function streamAsk(apiBase, body, { onStatus, onTyping, onDelta, on
         console.debug("[perf] ask_stream_client_ms", perfMs);
       }
     } catch (e) {
-      lastTransportError = e instanceof Error ? e.message : "Ошибка сети";
+      lastTransportError = neutralError;
     }
   }
   if (!finalized) {
-    if (uiAccepted) finalizeOnce();
-    else onError?.(lastTransportError, true);
+    onError?.(lastTransportError, true);
   }
 }

@@ -246,7 +246,11 @@ def _d2_contact_text(
     phone = (facts.phone_display or "").strip()
     if not phone:
         raise ValueError("d2_contact_phone_missing")
-    wanted = contact_fields or ("contacts",)
+    wanted = tuple(
+        field
+        for requested in (contact_fields or ("contacts",))
+        for field in (("contact_address", "contact_phone") if requested == "contacts" else (requested,))
+    )
     lines: list[str] = []
     for field in wanted:
         attr = _FIELD_TO_ATTR.get(field)

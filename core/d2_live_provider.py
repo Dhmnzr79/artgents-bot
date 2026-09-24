@@ -10,6 +10,7 @@ from typing import Any
 
 from config import DEFAULT_LLM_MODEL
 from contracts.d2_dialogue import D2ProviderInput
+from core.d2_full_audit import full_audit
 from core.one_call_prompt_contract import (
     ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS,
     one_call_contract_header,
@@ -30,6 +31,19 @@ D2_SESSION_CONTEXT is authoritative typed context, not prose to repeat. When its
 
 D2_DIRECTION_PRICE_INSTRUCTIONS = """=== D2_DIRECTION_PRICE ===
 For a direct price question naming a D2 direction in D2_DIRECTION_PRICES, such as "Сколько стоит имплантация?", return route=ANSWER with one kind=price request for that direction: topic_id=implantation for this example, service_id=null, situation=null, and primary_price_request_id naming that request. Declare subjects=[{subject_id:s1,relation:self,age_group:unknown}] and set the price request's subject_id=s1; unknown age does not mean child. Set commercial_intent=price, clarify_axis=null, and clarify_service_options=null. This is the approved direction price overview, not an ambiguity among individual services: do not return CLARIFY merely because several services or offers exist in the direction. Do not select a concrete service, infer treatment scope, or put amounts in prose; the application renders published direction prices. A genuinely ambiguous question without a named direction may still require CLARIFY under the normal typed contract.
+For a price question naming one active service outside D2_DIRECTION_PRICES, such as "Сколько стоит отбеливание?", use that exact service_id (professional_whitening in this example), kind=price, commercial_intent=price, and primary_price_request_id naming the request. topic_id may be null for this direct service. If no patient is named, subjects=[] and subject_id=null are valid. Do not put an amount in prose; the application reads the tenant's published offer.
+"""
+
+D2_CONTACT_INSTRUCTIONS = """=== D2_CONTACT_FIELDS ===
+For a location or address question such as "Где вы находитесь?", emit kind=contact with contact_fields=["contact_address"]. A phone question uses ["contact_phone"]. A general request for clinic contacts uses ["contacts"] (address and phone). Do not replace a requested address with a phone number. Contact values come only from the bound tenant snapshot; do not write them in model prose.
+"""
+
+D2_SELECTED_SECTION_INSTRUCTIONS = """=== D2_SELECTED_SECTION_RULE ===
+When D2_SELECTED_SECTION is present, it is a verified navigation action from the displayed UI. Answer the selected section in your own grounded conversational prose using the full approved corpus. Return one ANSWER content request with nonempty content_text and content_realization=model_prose. The application already owns the selected content_ref and section_ref; you do not need to repeat them. Do not infer a different source from the button label or copy the Markdown heading or section body verbatim into the reply.
+"""
+
+D2_INFORMATION_SECTION_INSTRUCTIONS = """=== D2_INFORMATION_SECTIONS ===
+For a direct informational question, write a fresh conversational content_text grounded in the approved corpus. If a particular section below #korotko answers the question, cite that document in content_ref and its exact a:section ID in content_section_refs; do not substitute #korotko or paste section text as the answer. content_ref and content_section_refs are provenance, not a request to display document text. If the grounded answer has no single document source, leave those refs empty and still write the answer.
 """
 
 D2_BRAND_INSTRUCTIONS = """=== D2_BRAND_REQUESTS ===
@@ -100,11 +114,20 @@ def build_d2_d1r_messages(request: D2ProviderInput) -> tuple[dict[str, str], dic
         D2_BRAND_INSTRUCTIONS,
         D2_DIALOGUE_FOLLOW_UP_INSTRUCTIONS,
         D2_DIRECTION_PRICE_INSTRUCTIONS,
+        D2_CONTACT_INSTRUCTIONS,
+        D2_SELECTED_SECTION_INSTRUCTIONS,
+        D2_INFORMATION_SECTION_INSTRUCTIONS,
     ))
-    user = "\n\n".join((
-        "=== D2_SESSION_CONTEXT ===\n" + request.context.model_dump_json(),
-        "=== USER_MESSAGE ===\n" + request.user_message,
-    ))
+    if (request.selected_content_ref is None) != (request.selected_section_ref is None):
+        raise D2LiveProviderError("d2_selected_section_pair_required")
+    user_parts = ["=== D2_SESSION_CONTEXT ===\n" + request.context.model_dump_json()]
+    if request.selected_content_ref is not None:
+        user_parts.append("=== D2_SELECTED_SECTION ===\n" + json.dumps({
+            "content_ref": request.selected_content_ref,
+            "section_ref": request.selected_section_ref,
+        }, ensure_ascii=False, separators=(",", ":")))
+    user_parts.append("=== USER_MESSAGE ===\n" + request.user_message)
+    user = "\n\n".join(user_parts)
     return {"role": "system", "content": system}, {"role": "user", "content": user}
 
 
@@ -173,6 +196,7 @@ class D2HttpProvider:
 
     def generate(self, request: D2ProviderInput) -> str:
         system, user = build_d2_d1r_messages(request)
+        full_audit("provider_messages", model=self.model, system=system, user=user)
         response = self._transport(
             model=self.model, temperature=0, max_completion_tokens=1024,
             timeout=LLM_REQUEST_TIMEOUT_SEC, messages=(system, user),
@@ -180,9 +204,11 @@ class D2HttpProvider:
             provider_call_source="d2_http",
         )
         choices = getattr(response, "choices", None) or ()
+        content = getattr(getattr(choices[0], "message", None), "content", None) if choices else None
+        full_audit("provider_response", model=getattr(response, "model", None),
+                   usage=getattr(response, "usage", None), choices_count=len(choices), raw=content)
         if not choices:
             raise D2LiveProviderError("d2_http_response_choices_missing")
-        content = getattr(getattr(choices[0], "message", None), "content", None)
         if not isinstance(content, str) or not content.strip():
             raise D2LiveProviderError("d2_http_response_content_missing")
         return content.strip()

@@ -201,8 +201,11 @@ def test_standalone_price_ignores_legacy_unknown_condition_evidence() -> None:
 
 
 def test_standalone_global_content_has_no_price_and_is_frozen() -> None:
+    live_text = "Врач подбирает обезболивание индивидуально после осмотра."
+    request = _content_request(content_ref="pain.md", service_id=None, topic_id=None)
+    request["content_text"] = live_text
     envelope = _parsed_envelope(
-        requests=[_content_request(content_ref="pain.md", service_id=None, topic_id=None)],
+        requests=[request],
         commercial_intent="none",
     )
     source = _sources(
@@ -220,7 +223,7 @@ def test_standalone_global_content_has_no_price_and_is_frozen() -> None:
     assert outcome.resolved.d2_price_block is None
     assert outcome.resolved.price_block is None
     assert outcome.resolved.response_scope == "clinic"
-    assert outcome.rendered_text == "Одобренный текст о боли."
+    assert outcome.rendered_text == live_text
     assert outcome.trace.selected_offers == ()
     assert render_response_text(outcome.resolved) == outcome.rendered_text
     assert project_response_ui(outcome.resolved) == outcome.ui_projection
@@ -288,8 +291,10 @@ def test_visible_price_cannot_weaken_terminal_or_clarify_invariants(
 
 
 def test_restricted_content_without_a_service_or_topic_is_rejected() -> None:
+    authored_request = _content_request(content_ref="warranty.md", service_id=None, topic_id=None)
+    authored_request["content_realization"] = "authored"
     envelope = _parsed_envelope(
-        requests=[_content_request(content_ref="warranty.md", service_id=None, topic_id=None)],
+        requests=[authored_request],
         commercial_intent="none",
     )
     source = _sources(

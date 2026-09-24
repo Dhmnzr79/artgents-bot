@@ -232,7 +232,9 @@ def test_sse_terminal_and_error_are_single_outcomes(http_env):
     fake.raw = "{invalid"
     error = sse_events(post_sse(client, sid="error-sse", request_id="invalid"))
     assert [kind for kind, _ in error] == ["status", "error"]
-    assert error[1][1]["error"] == "d2_invalid_turn"
+    assert error[1][1]["error"] == "parser_invalid_envelope"
+    assert error[1][1]["stage"] == "parser"
+    assert error[1][1]["committed"] is False
     with D2DialogueStore(db) as store:
         assert store.read(SessionKey(client_id="demo", sid="error-sse")) is None
 
@@ -248,7 +250,8 @@ def test_sse_commit_refusal_is_error_then_retry_can_complete(http_env, monkeypat
     monkeypatch.setattr(D2DialogueStore, "complete", fail_commit)
     events = sse_events(post_sse(client, sid="sse-commit", request_id="commit"))
     assert [kind for kind, _ in events] == ["status", "error"]
-    assert events[1][1]["error"] == "d2_turn_failed"
+    assert events[1][1]["error"] == "store_failed"
+    assert events[1][1]["stage"] == "store"
     with D2DialogueStore(db) as store:
         assert store.read(SessionKey(client_id="demo", sid="sse-commit")) is None
     monkeypatch.setattr(D2DialogueStore, "complete", original_complete)
@@ -268,7 +271,8 @@ def test_sse_framing_error_preserves_saved_result_for_replay(http_env, monkeypat
         patch.setattr(app, "_sse_typing_line", fail_framing)
         events = sse_events(post_sse(client, sid="framing", request_id="saved"))
     assert [kind for kind, _ in events] == ["status", "error"]
-    assert events[1][1]["error"] == "d2_stream_transport_failed"
+    assert events[1][1]["error"] == "transport_failed"
+    assert events[1][1]["committed"] is True
     with D2DialogueStore(db) as store:
         assert store.read(SessionKey(client_id="demo", sid="framing")).state.revision == 1
     assert post(client, sid="framing", request_id="saved").status_code == 200

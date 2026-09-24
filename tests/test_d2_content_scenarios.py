@@ -53,6 +53,11 @@ CONSULT_SHORT = "Бесплатная консультация до 31.12.2026."
 COMPARISON_READY = "Ни один метод не «лучше всегда»"
 CLASSIC_FACT = "Классическая имплантация проводится в два этапа"
 ONE_STAGE_FACT = "удаление зуба и установка импланта за один визит"
+COMPARISON_LIVE = "Оба метода применяют по показаниям; подходящий вариант врач определит после обследования."
+CLASSIC_LIVE = "При классическом подходе имплант устанавливают после подготовки места."
+ONE_STAGE_LIVE = "Одномоментный подход объединяет удаление зуба и установку импланта."
+SEDATION_LIVE = "При имплантации обычно используют местное обезболивание; седацию обсуждают отдельно."
+HYGIENE_LIVE = "Врач объяснит, как аккуратно очищать область импланта после операции."
 GAP = "недостаточно информации"
 PAIN_VIDEO = "pain-doctor-explains"
 PAIN_FOLLOW = "implantation__faq__pain.md#kakuyu-anesteziyu-ispolzuyut"
@@ -391,13 +396,16 @@ def test_b04_comparison_ready_two_materials_and_missing_side(tmp_path: Path) -> 
                 service_id=None,
                 topic_id="implantation",
                 section_refs=["a:korotko"],
+                realization="model_prose",
+                text=COMPARISON_LIVE,
             )
         ),
         message="Классическая или одномоментная?",
         key=SessionKey(client_id="demo", sid="c1-compare-ready"),
     )
     ready_ui = ready.response.ui_projection
-    assert COMPARISON_READY in ready.response.rendered_text
+    assert COMPARISON_LIVE in ready.response.rendered_text
+    assert COMPARISON_READY not in ready.response.rendered_text
     assert ready.response.resolved.ui_plan.source_content_ref == "comparison__classic_vs_one_stage.md"
     assert ready_ui.quick_replies
     assert [item.button_id for item in ready_ui.buttons] == ["consult"]
@@ -411,6 +419,8 @@ def test_b04_comparison_ready_two_materials_and_missing_side(tmp_path: Path) -> 
                 service_id="classic",
                 topic_id="implantation",
                 section_refs=["a:korotko"],
+                realization="model_prose",
+                text=CLASSIC_LIVE,
             ),
             _content_part(
                 request_id="r2",
@@ -418,6 +428,8 @@ def test_b04_comparison_ready_two_materials_and_missing_side(tmp_path: Path) -> 
                 service_id="one_stage",
                 topic_id="implantation",
                 section_refs=["a:korotko"],
+                realization="model_prose",
+                text=ONE_STAGE_LIVE,
             ),
         ),
         message="Сравните классическую и одномоментную",
@@ -425,8 +437,8 @@ def test_b04_comparison_ready_two_materials_and_missing_side(tmp_path: Path) -> 
     )
     two_text = two.response.rendered_text
     two_ui = two.response.ui_projection
-    assert CLASSIC_FACT in two_text
-    assert ONE_STAGE_FACT in two_text
+    assert CLASSIC_LIVE in two_text
+    assert ONE_STAGE_LIVE in two_text
     assert COMPARISON_READY not in two_text
     assert "рекомендую" not in two_text.lower()
     assert two_ui.quick_replies == ()
@@ -442,6 +454,8 @@ def test_b04_comparison_ready_two_materials_and_missing_side(tmp_path: Path) -> 
                 service_id="classic",
                 topic_id="implantation",
                 section_refs=["a:korotko"],
+                realization="model_prose",
+                text=CLASSIC_LIVE,
             ),
             _content_part(
                 request_id="r2",
@@ -454,8 +468,8 @@ def test_b04_comparison_ready_two_materials_and_missing_side(tmp_path: Path) -> 
         key=SessionKey(client_id="demo", sid="c1-compare-gap"),
     )
     missing_text = missing.response.rendered_text
-    assert CLASSIC_FACT in missing_text
-    assert ONE_STAGE_FACT not in missing_text
+    assert CLASSIC_LIVE in missing_text
+    assert ONE_STAGE_LIVE not in missing_text
     assert COMPARISON_READY not in missing_text
     assert GAP in missing_text
     assert missing.response.ui_projection.quick_replies == ()
@@ -521,6 +535,8 @@ def test_b04_two_independent_questions_same_topic_distinct_services_have_no_sour
                 service_id="one_stage",
                 topic_id="implantation",
                 section_refs=["a:korotko"],
+                realization="model_prose",
+                text=ONE_STAGE_LIVE,
             ),
         ),
         message="Больно ли при классической имплантации и как проходит одномоментная?",
@@ -528,7 +544,7 @@ def test_b04_two_independent_questions_same_topic_distinct_services_have_no_sour
     )
     text = outcome.response.rendered_text
     ui = outcome.response.ui_projection
-    assert PAIN_LIVE in text and ONE_STAGE_FACT in text
+    assert PAIN_LIVE in text and ONE_STAGE_LIVE in text
     assert [part.status for part in outcome.response.resolved.d2_request_parts] == ["answered", "answered"]
     assert ui.video is None and ui.quick_replies == ()
 
@@ -559,13 +575,16 @@ def test_b15_section_without_korotko_and_irrelevant_fallback(tmp_path: Path) -> 
                 service_id="classic",
                 topic_id="implantation",
                 section_refs=["a:sedatsiya-i-narkoz"],
+                realization="model_prose",
+                text=SEDATION_LIVE,
             )
         ),
         message="Нужен ли наркоз при имплантации?",
         key=SessionKey(client_id="demo", sid="c1-b15-section"),
         clients=clients,
     )
-    assert PAIN_SEDATION in section.response.rendered_text
+    assert SEDATION_LIVE in section.response.rendered_text
+    assert PAIN_SEDATION not in section.response.rendered_text
     assert PAIN_KOROTKO not in section.response.rendered_text
     assert section.response.resolved.d2_request_parts[0].content_section_refs == (
         "a:sedatsiya-i-narkoz",
@@ -581,17 +600,19 @@ def test_b15_section_without_korotko_and_irrelevant_fallback(tmp_path: Path) -> 
                 service_id="classic",
                 topic_id="implantation",
                 section_refs=["a:kak-uhazhivat"],
+                realization="model_prose",
+                text=HYGIENE_LIVE,
             )
         ),
         message="Как ухаживать после имплантации?",
         key=SessionKey(client_id="demo", sid="c1-b15-no-korotko"),
         clients=clients,
     )
-    assert "ирригатором" in no_korotko.response.rendered_text
+    assert HYGIENE_LIVE in no_korotko.response.rendered_text
     assert "Коротко" not in no_korotko.response.rendered_text
     assert no_korotko.response.resolved.d2_result_status == "complete"
 
-    recovered, _, _, _, _ = _run(
+    numbered, _, _, _, _ = _run(
         tmp_path,
         _raw(
             _content_part(
@@ -608,11 +629,5 @@ def test_b15_section_without_korotko_and_irrelevant_fallback(tmp_path: Path) -> 
         key=SessionKey(client_id="demo", sid="c1-b15-fallback"),
         clients=clients,
     )
-    recovered_text = recovered.response.rendered_text
-    assert PAIN_SEDATION in recovered_text
-    assert PAIN_KOROTKO not in recovered_text
-    assert "5 000" not in recovered_text
-    assert recovered.response.resolved.d2_request_parts[0].status == "recovered"
-    assert recovered.response.resolved.information_blocks[0].source_section_refs == (
-        "a:sedatsiya-i-narkoz",
-    )
+    assert "Наркоз стоит 5 000 ₽" in numbered.response.rendered_text
+    assert numbered.response.resolved.d2_result_status == "complete"

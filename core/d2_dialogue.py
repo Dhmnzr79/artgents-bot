@@ -21,7 +21,7 @@ from contracts.response_plan_session import (
     PersistedShownOptionsSnapshot, PersistedSituationState, ResponsePlanSessionSnapshot,
     ResponsePlanSessionState, empty_session_snapshot,
 )
-from core.d2_dialogue_store import D2DialogueStore
+from core.d2_dialogue_store import D2DialogueStore, D2RequestInProgress
 from core.d2_lead_bridge import (
     d2_lead_needs_pre_provider,
     d2_lead_session_client_matches,
@@ -43,8 +43,11 @@ from core.d2_snapshot_sources import (
 )
 from core.d2_spam_gate import build_d2_spam_gate_response, is_d2_garbage_message
 from core.d2_contacts_cta import build_d2_contact_fact_block, build_d2_contact_response
+from core.d2_content_realization import d2_content_review_flags
 from core.d2_offtopic import build_d2_offtopic_response, is_d2_offtopic_envelope
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
+from core.d2_outcome import D2OutcomeError, safe_diagnostic_code, safe_failure_site
+from core.d2_full_audit import full_audit
 from core.one_call_envelope_protocol import (
     parse_production_envelope_json,
     production_envelope_template,
@@ -54,6 +57,8 @@ from core.response_text_renderer import render_response_text
 from core.response_ui_projection import project_response_ui
 from core.user_text_privacy import provider_message_has_substance, provider_safe_user_text
 import json
+import re
+from logging_setup import emit_bot_event, get_logger
 
 
 def _request_fingerprint(*, session_key: SessionKey, user_message: str) -> str:
@@ -84,8 +89,8 @@ def _d2_supported_price_shape_failure_codes(*, part: object, subject: object) ->
         if subject is not None and subject.age_group == "child":
             failures.append("subject_age_group_child")
         return tuple(failures)
-    if part.topic_id is None:
-        failures.append("request_topic_id_missing")
+    # A direct typed service owns its own published offers; it need not carry
+    # a separate topic ID. A direction overview has service_id=None below.
     if part.service_id is None:
         if subject is None:
             failures.append("subject_missing")
@@ -144,8 +149,23 @@ def _shown_secondary_ref_ids(response) -> tuple[str, ...]:
     return tuple(shown)
 
 
+_LOCATION_QUESTION = re.compile(
+    r"где\s+(?:вы\s+)?находитесь|где\s+находится|ваш\s+адрес|адрес\s+клиники|"
+    r"как\s+(?:к\s+вам\s+)?добраться|местоположени",
+    re.IGNORECASE,
+)
+
+
+def _d2_effective_contact_fields(fields: tuple[str, ...], user_message: str) -> tuple[str, ...]:
+    """An explicit location question must include the tenant's exact address."""
+    if _LOCATION_QUESTION.search(user_message) and not {"contacts", "contact_address"}.intersection(fields):
+        return ("contact_address", *fields)
+    return fields
+
+
 def _append_d2_exact_contact_parts(
     *, response, tenant, session_key: SessionKey, all_parts: tuple, contact_parts: tuple,
+    user_message: str,
 ):
     """Attach tenant-owned contacts to an already materialized ordinary D2 answer.
 
@@ -163,7 +183,7 @@ def _append_d2_exact_contact_parts(
             tenant,
             session_key=session_key,
             request_id=part.request_id,
-            contact_fields=tuple(part.contact_fields),
+            contact_fields=_d2_effective_contact_fields(tuple(part.contact_fields), user_message),
         )
         blocks.append(block)
         if button.button_id not in {item.button_id for item in buttons}:
@@ -253,7 +273,13 @@ def run_d2_dialogue_turn(
     reservation = store.reserve_request(
         session_key, request_id=effective_request_id, request_fingerprint=fingerprint,
     )
+    full_audit("reservation", request_id=effective_request_id,
+               replay=reservation.is_replay, user_message=user_message,
+               ui_ref=lead_ui_ref, ui_revision=ui_revision,
+               situation_action=situation_action)
     if reservation.is_replay:
+        full_audit("replay", response=reservation.completed.response,
+                   committed_revision=reservation.completed.committed_revision)
         return _turn_from_completion(reservation.completed, idempotent_replay=True)
     try:
         tenant = load_d2_tenant_snapshot(session_key.client_id, clients_root=clients_root)
@@ -271,6 +297,10 @@ def run_d2_dialogue_turn(
             policy=ttl_policy,
             now=now,
         )
+        full_audit("session_before", context=early_context,
+                   state=early_snapshot.state)
+        selected_content_ref: str | None = None
+        selected_section_ref: str | None = None
         if lead_ui_ref and ui_revision is not None:
             shown = store.read_latest_completion(session_key)
             if (
@@ -292,6 +322,22 @@ def run_d2_dialogue_turn(
                     raise ValueError("d2_unauthorized_ui_action")
                 if not lead_ui_ref.startswith("lead:"):
                     user_message = reply.label
+                    if ".md#" in lead_ui_ref:
+                        content_ref, section_id = lead_ui_ref.rsplit("#", 1)
+                        section_ref = f"a:{section_id}"
+                        content = next(
+                            (item for item in tenant.content if item.content_ref == content_ref), None
+                        )
+                        if content is None or not any(
+                            section.section_ref == section_ref for section in content.sections
+                        ):
+                            raise ValueError("d2_unauthorized_ui_action")
+                        selected_content_ref = content_ref
+                        selected_section_ref = section_ref
+                        user_message = "Расскажите подробнее по выбранному разделу."
+        full_audit("effective_input", user_message=user_message,
+                   selected_content_ref=selected_content_ref,
+                   selected_section_ref=selected_section_ref)
         # D2-071: closed until a new chat/sid; beats lead and ordinary turns.
         if early_context.retained_terminal_state == "spam_closed":
             return _run_spam_gate_turn(
@@ -383,6 +429,8 @@ def run_d2_dialogue_turn(
                 if lead_ui_ref and lead_ui_ref.startswith("service:") and ui_revision is not None
                 else None
             ),
+            selected_content_ref=selected_content_ref,
+            selected_section_ref=selected_section_ref,
         )
     except Exception:
         store.abandon_request(
@@ -657,6 +705,8 @@ def _run_reserved_d2_dialogue_turn(
     lead_effect_id: str | None, lead_effect_dispatcher: D2LeadEffectDispatcher | None,
     lead_bridge: bool = False,
     selected_service_id: str | None = None,
+    selected_content_ref: str | None = None,
+    selected_section_ref: str | None = None,
 ) -> D2DialogueTurn:
     """Build a final result only after ``reserve_request`` made this turn owner."""
     tenant = load_d2_tenant_snapshot(session_key.client_id, clients_root=clients_root)
@@ -670,12 +720,70 @@ def _run_reserved_d2_dialogue_turn(
         snapshot, expected_session_key=session_key,
         activity=previous.activity if previous else None, policy=ttl_policy, now=now,
     )
-    raw = provider.generate(D2ProviderInput(user_message=safe_user_message, model_view=view, context=context))
-    envelope = parse_production_envelope_json(
-        raw, active_service_catalog=view.active_service_catalog,
-        service_reference_catalog=view.service_reference_catalog,
-        commercial_fact_catalog=view.commercial_fact_catalog,
-    )
+    full_audit("model_context", context=context, state=snapshot.state,
+               selected_content_ref=selected_content_ref,
+               selected_section_ref=selected_section_ref)
+    try:
+        full_audit("provider_input", user_message=safe_user_message,
+                   selected_content_ref=selected_content_ref,
+                   selected_section_ref=selected_section_ref)
+        raw = provider.generate(D2ProviderInput(
+            user_message=safe_user_message, model_view=view, context=context,
+            selected_content_ref=selected_content_ref,
+            selected_section_ref=selected_section_ref,
+        ))
+        full_audit("raw_model_response", raw=raw)
+    except Exception as exc:
+        raise D2OutcomeError("provider", "provider_failed", "provider",
+                             diagnostic_code=safe_diagnostic_code(exc),
+                             diagnostic_site=safe_failure_site(exc)) from exc
+    try:
+        envelope = parse_production_envelope_json(
+            raw, active_service_catalog=view.active_service_catalog,
+            service_reference_catalog=view.service_reference_catalog,
+            commercial_fact_catalog=view.commercial_fact_catalog,
+        )
+        full_audit("parsed_envelope", envelope=envelope)
+    except Exception as exc:
+        raise D2OutcomeError("parser", "parser_invalid_envelope", "protocol",
+                             diagnostic_code=safe_diagnostic_code(exc),
+                             diagnostic_site=safe_failure_site(exc)) from exc
+    if envelope.request_understanding is not None:
+        requests = tuple(
+            part.model_copy(update={"content_realization": "model_prose"})
+            if part.kind == "content" and (part.content_text or "").strip()
+            else part
+            for part in envelope.request_understanding.requests
+        )
+        envelope = envelope.model_copy(update={
+            "request_understanding": envelope.request_understanding.model_copy(
+                update={"requests": requests}
+            )
+        })
+    if selected_content_ref is not None:
+        selected_understanding = envelope.request_understanding
+        if (envelope.route != "ANSWER" or selected_understanding is None
+                or len(selected_understanding.requests) != 1):
+            raise ValueError("d2_ui_section_selection_mismatch")
+        selected_part = selected_understanding.requests[0]
+        if (selected_part.kind not in {"content", "other"}
+                or not (selected_part.content_text or "").strip()):
+            raise ValueError("d2_ui_section_selection_mismatch")
+        # The UI action was verified against the tenant document before the
+        # provider call. Model-authored source IDs cannot override that choice.
+        selected_part = selected_part.model_copy(update={
+            "kind": "content", "content_realization": "model_prose",
+            "content_ref": selected_content_ref,
+            "content_section_refs": (selected_section_ref,),
+            "content_fallback_section_ref": None,
+            "service_id": None, "topic_id": None, "brand_id": None,
+        })
+        envelope = envelope.model_copy(update={
+            "commercial_intent": "none",
+            "request_understanding": selected_understanding.model_copy(
+                update={"requests": (selected_part,)}
+            ),
+        })
     selected_topic = None
     if selected_service_id is not None:
         selected_topic = resolve_d2_clarify_service_topic(tenant, (selected_service_id,))
@@ -713,6 +821,7 @@ def _run_reserved_d2_dialogue_turn(
             "request_understanding": understanding.model_copy(update={"requests": (ordinary,)})
         })
         understanding = envelope.request_understanding
+    full_audit("normalized_envelope", envelope=envelope)
     admin_terminal = envelope.route == "ADMIN"
     if admin_terminal:
         # B03/D2-023: one authored stub; no ordinary parts / focus required.
@@ -916,9 +1025,18 @@ def _run_reserved_d2_dialogue_turn(
             and part.topic_id is None
             and binding.outcome == "ambiguous_focus"
         )
+        full_audit("focus_binding", binding=binding, focus=focus,
+                   request_parts=parts, commercial_intent=envelope.commercial_intent,
+                   content_lookup=content_lookup, multi_part=multi_part,
+                   clinic_policy=clinic_policy, clinic_contact=clinic_contact,
+                   service_availability=service_availability,
+                   unknown_brand=unknown_brand, unknown_term=unknown_term,
+                   direct_promotion=direct_promotion, direct_fact=direct_fact,
+                   price_focus_clarify=price_focus_clarify)
         if not (direct_promotion and envelope.promotion_scope == "general"):
             if (
                 price_focus_clarify
+                or (part.kind == "price" and part.service_id is not None and part.topic_id is None)
                 or multi_part
                 or content_lookup
                 or clinic_policy
@@ -952,7 +1070,7 @@ def _run_reserved_d2_dialogue_turn(
             response = build_d2_contact_response(
                 tenant,
                 session_key=session_key,
-                contact_fields=tuple(part.contact_fields),
+                contact_fields=_d2_effective_contact_fields(tuple(part.contact_fields), safe_user_message),
             )
             price = None
             decision = None
@@ -999,21 +1117,28 @@ def _run_reserved_d2_dialogue_turn(
                         )
                     }
                 )
-            response = resolve_d2_envelope_response(
-                resolution_envelope,
-                sources,
-                as_of=now.date(),
-                d2_plan_focus_seed=focus,
-                common_route_direct_service_only=True,
-                common_route_content_lookup=True,
-            )
-            response = _append_d2_exact_contact_parts(
-                response=response,
-                tenant=tenant,
-                session_key=session_key,
-                all_parts=parts,
-                contact_parts=contact_parts,
-            )
+            try:
+                response = resolve_d2_envelope_response(
+                    resolution_envelope,
+                    sources,
+                    as_of=now.date(),
+                    d2_plan_focus_seed=focus,
+                    common_route_direct_service_only=True,
+                    common_route_content_lookup=True,
+                )
+                full_audit("materialized_response", response=response)
+                response = _append_d2_exact_contact_parts(
+                    response=response,
+                    tenant=tenant,
+                    session_key=session_key,
+                    all_parts=parts,
+                    contact_parts=contact_parts,
+                    user_message=safe_user_message,
+                )
+            except Exception as exc:
+                raise D2OutcomeError("materializer", "materializer_failed", "state",
+                                     diagnostic_code=safe_diagnostic_code(exc),
+                                     diagnostic_site=safe_failure_site(exc)) from exc
             price = response.resolved.d2_price_block
             decision = response.resolved.d2_price_scope_decision
     if admin_terminal:
@@ -1229,10 +1354,37 @@ def _run_reserved_d2_dialogue_turn(
         committed_revision=state.revision,
         lead_effect=initial_effect,
     )
-    store.complete(D2DialogueRecord(
-        state=state, activity=D2SessionActivity(session_key=session_key, last_user_turn_at=now),
-        tenant_fingerprint=tenant.fingerprint,
-    ), expected_revision=snapshot.state.revision, completion=completion)
+    try:
+        store.complete(D2DialogueRecord(
+            state=state, activity=D2SessionActivity(session_key=session_key, last_user_turn_at=now),
+            tenant_fingerprint=tenant.fingerprint,
+        ), expected_revision=snapshot.state.revision, completion=completion)
+    except D2RequestInProgress:
+        raise
+    except Exception as exc:
+        raise D2OutcomeError("store", "store_failed", "storage",
+                             diagnostic_code=safe_diagnostic_code(exc),
+                             diagnostic_site=safe_failure_site(exc)) from exc
+    # Review signals never change the committed answer. Keep patient text and
+    # session identifiers out of the event, including on the streaming route.
+    try:
+        answered = {
+            item.request_id for item in response.resolved.d2_request_parts
+            if item.kind == "content" and item.status == "answered"
+        }
+        review_flags = sorted({
+            flag for item in parts if item.kind == "content" and item.request_id in answered
+            for flag in d2_content_review_flags(item.content_text or "")
+        })
+        if review_flags:
+            emit_bot_event(
+                get_logger("d2_content_review"), "d2_content_review",
+                status="review", client_id=session_key.client_id,
+                request_id=request_id, sid="", session_id="",
+                details={"reason_codes": review_flags},
+            )
+    except Exception:
+        pass
     if lead_effect_dispatcher is not None and lead_effect_id is not None:
         try:
             effect_status = lead_effect_dispatcher.dispatch(effect_id=lead_effect_id)

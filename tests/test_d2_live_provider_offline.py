@@ -95,6 +95,32 @@ def test_named_direction_price_uses_answer_overview_in_d2_prompt() -> None:
     assert "genuinely ambiguous question without a named direction" in instruction.lower()
 
 
+def test_prompt_distinguishes_location_from_phone_and_direct_service_price() -> None:
+    system, _ = build_d2_d1r_messages(_request())
+    prompt = system["content"]
+    assert '"Где вы находитесь?"' in prompt
+    assert 'contact_fields=["contact_address"]' in prompt
+    assert 'A general request for clinic contacts uses ["contacts"]' in prompt
+    assert 'service_id (professional_whitening in this example)' in prompt
+    assert "topic_id may be null for this direct service" in prompt
+
+
+def test_selected_section_is_typed_prompt_context_with_full_corpus() -> None:
+    request = replace(
+        _request(), user_message="Какую анестезию используют",
+        selected_content_ref="implantation__faq__pain.md",
+        selected_section_ref="a:kakuyu-anesteziyu-ispolzuyut",
+    )
+    system, user = build_d2_d1r_messages(request)
+    assert "=== APPROVED_MD_CORPUS ===" in system["content"]
+    assert "=== D2_SELECTED_SECTION_RULE ===" in system["content"]
+    assert "content_realization=model_prose" in system["content"]
+    assert "=== D2_INFORMATION_SECTIONS ===" in system["content"]
+    assert "section below #korotko" in system["content"]
+    assert '"content_ref":"implantation__faq__pain.md"' in user["content"]
+    assert '"section_ref":"a:kakuyu-anesteziyu-ispolzuyut"' in user["content"]
+
+
 def test_cp3_provider_has_one_shared_two_call_budget() -> None:
     calls: list[dict[str, object]] = []
 

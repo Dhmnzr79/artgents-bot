@@ -13,7 +13,7 @@ from contracts.response_plan_materialization import (
 from core.response_plan_materialization import resolve_d2_envelope_response
 from core.response_text_renderer import render_response_text
 from core.response_ui_projection import project_response_ui
-from tests.test_d2_independent_request_parts import _envelope, _part, _sources_ab
+from tests.test_d2_independent_request_parts import _LIVE_BY_REF, _envelope, _part, _sources_ab
 
 
 _AS_OF = date(2026, 9, 18)
@@ -79,9 +79,9 @@ def test_price_content_price_preserves_independent_content_and_request_order() -
     )
 
     assert outcome.resolved.d2_result_status == "degraded"
-    assert outcome.rendered_text.count("Материал терапии.") == 1
-    assert outcome.rendered_text.index("Exact package") < outcome.rendered_text.index("Материал терапии.")
-    assert outcome.rendered_text.index("Материал терапии.") < outcome.rendered_text.index(D2_PRICE_DEFERRAL_TEXT)
+    assert outcome.rendered_text.count(_LIVE_BY_REF["therapy.md"]) == 1
+    assert outcome.rendered_text.index("Exact package") < outcome.rendered_text.index(_LIVE_BY_REF["therapy.md"])
+    assert outcome.rendered_text.index(_LIVE_BY_REF["therapy.md"]) < outcome.rendered_text.index(D2_PRICE_DEFERRAL_TEXT)
     assert [row.service_id for row in outcome.resolved.d2_price_block.rows] == ["service_one"] * 3
 
 

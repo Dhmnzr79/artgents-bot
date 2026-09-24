@@ -50,6 +50,8 @@ class D2ProviderInput:
     user_message: str
     model_view: D2ModelView
     context: D2SessionContextProjection
+    selected_content_ref: str | None = None
+    selected_section_ref: str | None = None
 
 
 class D2RawProvider(Protocol):

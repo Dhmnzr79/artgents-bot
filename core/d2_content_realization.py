@@ -1,8 +1,8 @@
-"""Mechanical publication checks for D2 model-authored prose.
+"""Publication of D2 model-authored prose and non-blocking review signals.
 
 This module deliberately has no access to the raw question, model flags beyond the
-typed request, or tenant files.  It only decides whether one already-grounded prose
-block can be frozen, recovered from its explicitly named section, or unavailable.
+typed request, or tenant files. A nonempty model answer is published without
+copying a document section into the reply.
 """
 
 from __future__ import annotations
@@ -46,56 +46,17 @@ def realize_d2_content(
     request: RequestUnderstandingRequest,
     authority: D2AuthoredContentAuthority,
 ) -> D2ContentRealization:
-    """Return one frozen content result without interpreting prose semantics."""
-
-    if request.content_realization == "authored":
-        return D2ContentRealization(
-            outcome="answered",
-            publication="authored",
-            display_text=_exact_authored_text(request, authority),
-            section_refs=request.content_section_refs,
-        )
+    """Publish the model's answer; a document is evidence, never reply copy."""
 
     text = (request.content_text or "").strip()
-    reason: ContentViolation | None = None
     if not text:
-        reason = "d2_model_prose_empty"
-    elif _MONEY.search(text):
-        reason = "d2_model_prose_money"
-    elif _LINK.search(text):
-        reason = "d2_model_prose_link"
-    if reason is None:
         return D2ContentRealization(
-            outcome="answered",
-            publication="model_prose",
-            display_text=text,
-            section_refs=request.content_section_refs,
-        )
-
-    recovery_refs = _recovery_section_refs(request)
-    recovered: list[str] = []
-    used: list[str] = []
-    by_ref = {section.section_ref: section for section in authority.sections}
-    for ref in recovery_refs:
-        section = by_ref.get(ref)
-        if section is None:
-            continue
-        recovered.append(section.display_text)
-        used.append(ref)
-    if recovered:
-        return D2ContentRealization(
-            outcome="recovered",
-            publication="fallback",
-            display_text="\n\n".join(recovered),
-            section_refs=tuple(used),
-            reason=reason,
+            outcome="unavailable", publication=None, display_text=None,
+            section_refs=(), reason="d2_model_prose_empty",
         )
     return D2ContentRealization(
-        outcome="unavailable",
-        publication=None,
-        display_text=None,
-        section_refs=(),
-        reason=reason,
+        outcome="answered", publication="model_prose", display_text=text,
+        section_refs=request.content_section_refs,
     )
 
 
@@ -104,9 +65,8 @@ def realize_d2_unattributed_content(
 ) -> D2ContentRealization:
     """Publish ordinary FullContext prose without a document-route requirement.
 
-    The model has already received the complete approved corpus.  Unlike a
-    cited section, this prose cannot recover from a rejected money/link check;
-    it simply remains unavailable for the same D2 turn.
+    The model has already received the complete approved corpus. Numbers and
+    links in its answer are review signals, not reasons to hide the answer.
     """
 
     text = (request.content_text or "").strip()
@@ -115,45 +75,17 @@ def realize_d2_unattributed_content(
             outcome="unavailable", publication=None, display_text=None,
             section_refs=(), reason="d2_model_prose_empty",
         )
-    if _MONEY.search(text):
-        return D2ContentRealization(
-            outcome="unavailable", publication=None, display_text=None,
-            section_refs=(), reason="d2_model_prose_money",
-        )
-    if _LINK.search(text):
-        return D2ContentRealization(
-            outcome="unavailable", publication=None, display_text=None,
-            section_refs=(), reason="d2_model_prose_link",
-        )
     return D2ContentRealization(
         outcome="answered", publication="model_prose", display_text=text,
         section_refs=(),
     )
 
 
-def _is_korotko_section(ref: str) -> bool:
-    token = ref.rsplit(":", 1)[-1]
-    return token == "korotko" or ref.endswith("#korotko")
-
-
-def _recovery_section_refs(request: RequestUnderstandingRequest) -> tuple[str, ...]:
-    fallback = request.content_fallback_section_ref
-    if fallback is None:
-        return ()
-    if _is_korotko_section(fallback):
-        specific = tuple(
-            ref for ref in request.content_section_refs if not _is_korotko_section(ref)
-        )
-        if specific:
-            return specific
-    return (fallback,)
-
-
-def _exact_authored_text(
-    request: RequestUnderstandingRequest,
-    authority: D2AuthoredContentAuthority,
-) -> str:
-    if not request.content_section_refs:
-        return authority.display_text
-    by_ref = {section.section_ref: section for section in authority.sections}
-    return "\n\n".join(by_ref[ref].display_text for ref in request.content_section_refs)
+def d2_content_review_flags(text: str) -> tuple[ContentViolation, ...]:
+    """Flag prose for later review without changing what the visitor sees."""
+    flags: list[ContentViolation] = []
+    if _MONEY.search(text):
+        flags.append("d2_model_prose_money")
+    if _LINK.search(text):
+        flags.append("d2_model_prose_link")
+    return tuple(flags)

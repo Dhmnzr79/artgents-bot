@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 import yaml
 
@@ -154,6 +155,7 @@ def build_d2_snapshot_sources(
             section = next((item for item in content.sections if item.section_ref == ref), None)
             if section is not None:
                 heading = section.display_text.splitlines()[0].lstrip("#").strip()
+                heading = re.sub(r"\s*\{#[^}]+\}\s*$", "", heading).strip()
                 quick.append(UiQuickReplyCandidate(source_client_id=snapshot.client_id, reply_id=f"{content.content_ref}#{wanted}", label=heading))
         video = None
         key = meta.get("video_key")

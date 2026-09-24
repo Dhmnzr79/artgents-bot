@@ -289,6 +289,68 @@ def resolve_materialized_response(
     )
 
 
+def _d2_without_unverified_provenance(
+    envelope: OneCallEnvelope,
+    sources: ResponsePlanMaterializationSources,
+) -> OneCallEnvelope:
+    """Keep FullContext prose when its optional source pointer is inaccurate."""
+    understanding = envelope.request_understanding
+    if understanding is None or envelope.commercial_intent == "promotion":
+        return envelope
+    client_id = sources.material_authority.source_client_id
+    by_ref = {item.content_ref: item for item in sources.d2_authored_content}
+    changed = False
+    requests = []
+    for part in understanding.requests:
+        if (part.kind != "content" or part.content_ref is None
+                or part.content_realization != "model_prose"
+                or not (part.content_text or "").strip()):
+            requests.append(part)
+            continue
+        authority = by_ref.get(part.content_ref)
+        if authority is not None and authority.source_client_id != client_id:
+            # A genuinely foreign tenant authority is still a hard boundary.
+            requests.append(part)
+            continue
+        valid = authority is not None
+        if valid:
+            section_refs = {section.section_ref for section in authority.sections}
+            valid = all(ref in section_refs for ref in part.content_section_refs)
+            if part.service_id is not None and part.service_id not in authority.allowed_service_ids:
+                valid = False
+            if part.topic_id is not None and authority.allowed_service_ids:
+                content_topics = {
+                    item.topic_id for item in sources.d2_directions
+                    if item.source_client_id == client_id
+                    and set(authority.allowed_service_ids).intersection(item.service_ids)
+                }
+                if content_topics and part.topic_id not in content_topics:
+                    valid = False
+            if valid:
+                try:
+                    _d2_content_scope(
+                        part, client_id=client_id, sources=sources,
+                        allow_missing_content_ref=True,
+                    )
+                except MaterializationContractError:
+                    valid = False
+        if valid:
+            requests.append(part)
+            continue
+        # The prose came from the approved FullContext corpus. Drop the
+        # unverified attribution and its secondary UI, never invent a ref.
+        requests.append(part.model_copy(update={
+            "content_ref": None, "content_section_refs": (),
+            "content_fallback_section_ref": None,
+        }))
+        changed = True
+    if not changed:
+        return envelope
+    return envelope.model_copy(update={
+        "request_understanding": understanding.model_copy(update={"requests": tuple(requests)})
+    })
+
+
 def resolve_d2_envelope_response(
     envelope: OneCallEnvelope,
     sources: ResponsePlanMaterializationSources,
@@ -306,6 +368,7 @@ def resolve_d2_envelope_response(
 
     if envelope.route != "ANSWER":
         raise MaterializationContractError("d2_envelope_route_unsupported")
+    envelope = _d2_without_unverified_provenance(envelope, sources)
     understanding = envelope.request_understanding
     if understanding is None or not understanding.requests:
         raise MaterializationContractError("d2_request_understanding_required")
@@ -970,6 +1033,11 @@ def _d2_content_scope(
                 return direction.service_ids, "topic", part.topic_id
         if not authority.allowed_service_ids:
             return (), "topic", part.topic_id
+    # A content_ref is optional provenance, not a service selector. Model prose
+    # without typed service/topic scope remains a clinic-level answer.
+    if (part.service_id is None and part.topic_id is None
+            and part.content_realization != "authored"):
+        return (), "clinic", None
     if not authority.allowed_service_ids:
         return (), "clinic", None
     raise MaterializationContractError("d2_content_scope_required")
@@ -1449,7 +1517,8 @@ def _d2_information_blocks(
             sources=sources,
             allow_missing_content_ref=allow_missing_content_ref,
         )
-        if authority.allowed_service_ids and not set(part_service_ids).intersection(authority.allowed_service_ids):
+        if (authority.allowed_service_ids and (part.service_id is not None or part.topic_id is not None)
+                and not set(part_service_ids).intersection(authority.allowed_service_ids)):
             raise MaterializationOwnershipError("materialization_foreign_material")
         if part.service_id is not None and part.service_id not in part_service_ids:
             realizations[part.request_id] = D2ContentRealization(

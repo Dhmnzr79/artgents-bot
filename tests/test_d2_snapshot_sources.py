@@ -142,10 +142,10 @@ def test_tenant_view_and_source_binding() -> None:
         snapshot, model_view=view, envelope=scoped, session_key=SessionKey(client_id="demo", sid="scope")
     )
     outcome = resolve_d2_envelope_response(scoped, sources, as_of=_AS_OF)
-    assert outcome.resolved.d2_result_status == "failed"
-    assert outcome.resolved.d2_request_parts[0].status == "unavailable"
-    assert outcome.resolved.d2_request_parts[0].failure_reason == "d2_content_source_missing"
-    assert "недостаточно информации" in outcome.rendered_text
+    assert outcome.resolved.d2_result_status == "complete"
+    assert outcome.resolved.d2_request_parts[0].status == "answered"
+    assert outcome.resolved.d2_request_parts[0].content_ref is None
+    assert "D1R fixture." in outcome.rendered_text
 
     wrong_topic = {**content, "service_id": "classic", "topic_id": "prosthetics"}
     scoped = _envelope(snapshot, view, wrong_topic, commercial_intent="none")
@@ -153,6 +153,6 @@ def test_tenant_view_and_source_binding() -> None:
         snapshot, model_view=view, envelope=scoped, session_key=SessionKey(client_id="demo", sid="topic")
     )
     outcome = resolve_d2_envelope_response(scoped, sources, as_of=_AS_OF)
-    assert outcome.resolved.d2_request_parts[0].status == "unavailable"
-    assert outcome.resolved.d2_request_parts[0].failure_reason == "d2_content_source_missing"
-    assert "недостаточно информации" in outcome.rendered_text
+    assert outcome.resolved.d2_request_parts[0].status == "answered"
+    assert outcome.resolved.d2_request_parts[0].content_ref is None
+    assert "D1R fixture." in outcome.rendered_text

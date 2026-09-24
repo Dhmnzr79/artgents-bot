@@ -204,14 +204,15 @@ def test_missing_or_foreign_failure_authority_is_fatal_and_late_foreign_content_
     foreign_content = _part(
         "r2", "content", service_id="service_two", topic_id="therapy", content_ref="missing.md"
     )
-    # Wrong/missing content_ref is a recoverable gap (D2-078), not foreign ownership.
+    # An optional wrong source ref drops attribution, not the live answer.
     outcome = resolve_d2_envelope_response(
         _envelope([_part("r1", "price", service_id="service_one", topic_id="implantation"), foreign_content]),
         _sources_with_incomplete_price_and_content(),
         as_of=_AS_OF,
     )
-    assert outcome.resolved.d2_request_parts[1].status == "unavailable"
-    assert outcome.resolved.d2_request_parts[1].failure_reason == "d2_content_source_missing"
+    assert outcome.resolved.d2_request_parts[1].status == "answered"
+    assert outcome.resolved.d2_request_parts[1].content_ref is None
+    assert foreign_content["content_text"] in outcome.rendered_text
 
 
 def test_unexpected_price_error_is_fatal(monkeypatch: pytest.MonkeyPatch) -> None:

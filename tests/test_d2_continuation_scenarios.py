@@ -215,7 +215,12 @@ def test_a01_overview_volume_hypothesis_does_not_overwrite_correction_does(tmp_p
         "Один зуб", "Несколько зубов", "Вся челюсть", "Не знаю",
     ]
     assert _offer_ids(overview) == CLASSIC_THREE
-    assert "Понимаю" in overview.response.rendered_text
+    assert decision.introduction_text == (
+        "Понимаю, хочется сначала сориентироваться по стоимости имплантации. "
+        "Вот опубликованные примеры цен."
+    )
+    assert overview.response.rendered_text.startswith(decision.introduction_text)
+    assert "восстановления одного зуба" not in overview.response.rendered_text
     assert "Подскажите" in overview.response.rendered_text
     assert saved.state.situation_state is None
     assert overview.response.resolved.terminal_text is None

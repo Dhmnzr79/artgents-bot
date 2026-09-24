@@ -18,6 +18,15 @@ from tests.test_d2_single_request import (
     _sources,
 )
 
+LIVE_PAIN = "Врач подберёт обезболивание после осмотра и объяснит каждый этап."
+
+
+def _live_content_request(**kwargs):
+    request = _content_request(**kwargs)
+    request["content_text"] = LIVE_PAIN
+    request["content_realization"] = "model_prose"
+    return request
+
 
 def _content_sources(*, shown: tuple[str, ...] = ()) -> ResponsePlanMaterializationSources:
     base = _sources(
@@ -136,9 +145,9 @@ def test_warranty_does_not_inherit_pain_navigation() -> None:
     assert outcome.ui_projection.buttons == ()
 
 
-def test_missing_source_ui_keeps_the_approved_text_without_borrowing_navigation() -> None:
+def test_missing_source_ui_keeps_live_prose_without_borrowing_navigation() -> None:
     envelope = _parsed_envelope(
-        requests=[_content_request(content_ref="pain.md", service_id="service_one", topic_id="implantation")],
+        requests=[_live_content_request(content_ref="pain.md", service_id="service_one", topic_id="implantation")],
         commercial_intent="none",
     )
     payload = _content_sources().model_dump()
@@ -147,7 +156,7 @@ def test_missing_source_ui_keeps_the_approved_text_without_borrowing_navigation(
 
     outcome = resolve_d2_envelope_response(envelope, source, as_of=date(2026, 9, 18))
 
-    assert outcome.rendered_text == "Одобренный текст о боли."
+    assert outcome.rendered_text == LIVE_PAIN
     assert outcome.ui_projection.quick_replies == ()
     assert outcome.ui_projection.video is None
     assert outcome.ui_projection.buttons == ()
@@ -157,7 +166,7 @@ def test_price_plus_content_suppresses_source_secondary_but_keeps_source_cta() -
     envelope = _parsed_envelope(
         requests=[
             _price_request(service_id="service_one", topic_id="implantation", request_id="r1"),
-            _content_request(
+            _live_content_request(
                 content_ref="pain.md",
                 service_id="service_one",
                 topic_id="implantation",
@@ -172,7 +181,7 @@ def test_price_plus_content_suppresses_source_secondary_but_keeps_source_cta() -
     )
 
     assert outcome.resolved.d2_price_block is not None
-    assert outcome.rendered_text.endswith("Одобренный текст о боли.")
+    assert outcome.rendered_text.endswith(LIVE_PAIN)
     assert outcome.ui_projection.video is None
     assert outcome.ui_projection.quick_replies == ()
     assert [item.button_id for item in outcome.ui_projection.buttons] == ["pain_cta"]
@@ -192,7 +201,7 @@ def test_foreign_source_ui_is_rejected_at_the_tenant_boundary() -> None:
 
 def test_invalid_optional_source_cta_is_omitted_with_a_diagnostic() -> None:
     envelope = _parsed_envelope(
-        requests=[_content_request(content_ref="pain.md", service_id="service_one", topic_id="implantation")],
+        requests=[_live_content_request(content_ref="pain.md", service_id="service_one", topic_id="implantation")],
         commercial_intent="none",
     )
     payload = _content_sources().model_dump()
@@ -201,7 +210,7 @@ def test_invalid_optional_source_cta_is_omitted_with_a_diagnostic() -> None:
 
     outcome = resolve_d2_envelope_response(envelope, source, as_of=date(2026, 9, 18))
 
-    assert outcome.rendered_text == "Одобренный текст о боли."
+    assert outcome.rendered_text == LIVE_PAIN
     assert outcome.ui_projection.buttons == ()
     assert [(item.code, item.detail) for item in outcome.materialization_diagnostics] == [
         ("materialization_optional_unavailable", ("d2_source_ui_cta_kind_invalid", "pain_cta")),

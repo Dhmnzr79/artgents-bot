@@ -6,6 +6,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from contracts.response_plan import SessionKey
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore
@@ -164,6 +166,127 @@ def test_valid_content_ref_does_not_replace_default_fullcontext_prose(tmp_path: 
     assert text in answer
 
 
+def test_optional_provenance_without_typed_scope_keeps_fullcontext_prose(tmp_path: Path) -> None:
+    text = "Понимаю, что лечение может тревожить. Врач заранее обсудит обезболивание."
+    payload = json.loads(_raw(kind="content", text=text))
+    request = payload["request_understanding"]["requests"][0]
+    request["content_ref"] = "implantation__service__all_on_4.md"
+    answer = _run(tmp_path, json.dumps(payload, ensure_ascii=False), "Я боюсь боли")
+    assert text in answer
+
+
+def test_direct_question_keeps_live_prose_when_optional_ref_is_wrong(tmp_path: Path) -> None:
+    text = "После установки врач объяснит уход на ближайшие дни."
+    payload = json.loads(_raw(kind="content", text=text,
+                              service_id="classic", topic_id="implantation"))
+    part = payload["request_understanding"]["requests"][0]
+    part["content_ref"] = "missing.md"
+    part["content_section_refs"] = ["a:missing"]
+    answer = _run(tmp_path, json.dumps(payload, ensure_ascii=False),
+                  "Как ухаживать после установки импланта?")
+    assert text in answer
+    assert INFO_GAP not in answer
+
+
+def test_section_click_keeps_verified_source_and_gets_live_prose(tmp_path: Path) -> None:
+    content_ref = "implantation__faq__pain.md"
+    first = json.loads(_raw(kind="content", text="Врач обсудит обезболивание заранее.",
+                            service_id="classic", topic_id="implantation"))
+    first_part = first["request_understanding"]["requests"][0]
+    first_part.update({"content_ref": content_ref, "content_section_refs": ["a:korotko"]})
+    follow = json.loads(_raw(kind="content", text="Первые 2–3 дня после установки возможен умеренный дискомфорт.",
+                             service_id="classic", topic_id="implantation"))
+    follow_part = follow["request_understanding"]["requests"][0]
+    follow_part.update({"content_ref": content_ref,
+                        "content_section_refs": ["a:kakuyu-anesteziyu-ispolzuyut"]})
+
+    class SequenceProvider:
+        def __init__(self, raws) -> None:
+            self.raws = list(raws)
+            self.inputs = []
+
+        def generate(self, request):
+            self.inputs.append(request)
+            return self.raws.pop(0)
+
+    provider = SequenceProvider((json.dumps(first, ensure_ascii=False),
+                                 json.dumps(follow, ensure_ascii=False)))
+    key = SessionKey(client_id="demo", sid="r3-section-click")
+    with D2DialogueStore(tmp_path / "click.sqlite") as store:
+        first_turn = run_d2_dialogue_turn(
+            session_key=key, user_message="Я боюсь боли при имплантации",
+            provider=provider, clients_root=Path("clients"), store=store,
+            now=NOW, request_id="first",
+        )
+        reply = next(item for item in first_turn.response.ui_projection.quick_replies
+                     if "Какую анестезию" in item.label)
+        assert "{#" not in reply.label
+        second_turn = run_d2_dialogue_turn(
+            session_key=key, user_message="", lead_ui_ref=reply.reply_id,
+            ui_revision=first_turn.committed_revision, provider=provider,
+            clients_root=Path("clients"), store=store,
+            now=NOW, request_id="follow",
+        )
+
+    assert provider.inputs[1].selected_content_ref == content_ref
+    assert provider.inputs[1].selected_section_ref == "a:kakuyu-anesteziyu-ispolzuyut"
+    assert provider.inputs[1].user_message != reply.label
+    assert "Первые 2–3 дня после установки возможен умеренный дискомфорт." in second_turn.response.rendered_text
+    assert "{#" not in second_turn.response.rendered_text
+    assert second_turn.response.resolved.information_blocks[0].publication == "model_prose"
+
+    wrong = json.loads(json.dumps(follow, ensure_ascii=False))
+    wrong_part = wrong["request_understanding"]["requests"][0]
+    wrong_part["content_ref"] = "clinic__info__warranty.md"
+    wrong_part["content_section_refs"] = []
+    wrong_provider = SequenceProvider((json.dumps(first, ensure_ascii=False),
+                                       json.dumps(wrong, ensure_ascii=False)))
+    wrong_key = SessionKey(client_id="demo", sid="r3-section-wrong-source")
+    with D2DialogueStore(tmp_path / "click.sqlite") as store:
+        wrong_first = run_d2_dialogue_turn(
+            session_key=wrong_key, user_message="Я боюсь боли при имплантации",
+            provider=wrong_provider, clients_root=Path("clients"), store=store,
+            now=NOW, request_id="wrong-first",
+        )
+        wrong_reply = next(item for item in wrong_first.response.ui_projection.quick_replies
+                           if "Какую анестезию" in item.label)
+        recovered_click = run_d2_dialogue_turn(
+            session_key=wrong_key, user_message="", lead_ui_ref=wrong_reply.reply_id,
+            ui_revision=wrong_first.committed_revision, provider=wrong_provider,
+            clients_root=Path("clients"), store=store,
+            now=NOW, request_id="wrong-follow",
+        )
+    recovered_part = recovered_click.response.resolved.d2_request_parts[0]
+    assert recovered_part.status == "answered"
+    assert recovered_part.content_ref == content_ref
+    assert recovered_part.content_section_refs == ("a:kakuyu-anesteziyu-ispolzuyut",)
+    assert "Первые 2–3 дня" in recovered_click.response.rendered_text
+
+    omitted = json.loads(json.dumps(follow, ensure_ascii=False))
+    omitted_part = omitted["request_understanding"]["requests"][0]
+    omitted_part["content_ref"] = None
+    omitted_part["content_section_refs"] = []
+    omitted_provider = SequenceProvider((json.dumps(first, ensure_ascii=False),
+                                         json.dumps(omitted, ensure_ascii=False)))
+    omitted_key = SessionKey(client_id="demo", sid="r3-section-omitted-source")
+    with D2DialogueStore(tmp_path / "click.sqlite") as store:
+        omitted_first = run_d2_dialogue_turn(
+            session_key=omitted_key, user_message="Я боюсь боли при имплантации",
+            provider=omitted_provider, clients_root=Path("clients"), store=store,
+            now=NOW, request_id="omitted-first",
+        )
+        omitted_reply = next(item for item in omitted_first.response.ui_projection.quick_replies
+                             if "Какую анестезию" in item.label)
+        omitted_click = run_d2_dialogue_turn(
+            session_key=omitted_key, user_message="", lead_ui_ref=omitted_reply.reply_id,
+            ui_revision=omitted_first.committed_revision, provider=omitted_provider,
+            clients_root=Path("clients"), store=store,
+            now=NOW, request_id="omitted-follow",
+        )
+    assert omitted_click.response.resolved.d2_request_parts[0].content_ref == content_ref
+    assert "Первые 2–3 дня" in omitted_click.response.rendered_text
+
+
 def test_free_fullcontext_prose_and_exact_price_share_one_answer(tmp_path: Path) -> None:
     prose = "All-on-4 explanation from the approved FullContext corpus."
     payload = production_envelope_template(
@@ -233,7 +356,7 @@ def test_free_prose_price_and_contact_use_one_typed_composition(tmp_path: Path) 
     assert answer.index(prose) < answer.index("г. Москва, ул. Тверская, 12") < answer.index("₽")
 
 
-def test_available_contact_leaves_an_unavailable_information_part_degraded(tmp_path: Path) -> None:
+def test_available_contact_keeps_information_text_with_number(tmp_path: Path) -> None:
     payload = production_envelope_template(
         request_understanding={"subjects": [], "requests": [
             {"request_id": "r1", "kind": "content", "subject_id": None,
@@ -245,7 +368,7 @@ def test_available_contact_leaves_an_unavailable_information_part_degraded(tmp_p
         ]},
     )
     answer = _run(tmp_path, json.dumps(payload), "Tell me about something and give me your phone")
-    assert INFO_GAP in answer
+    assert "100 ₽" in answer
     assert "+7 (495) 128-47-60" in answer
 
 

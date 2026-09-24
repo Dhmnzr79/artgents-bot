@@ -12,7 +12,6 @@ from contracts.response_plan_materialization import (
     D2DirectionAuthority,
     D2PartFailureAuthority,
     D2SourceUiAuthority,
-    MaterializationOwnershipError,
 )
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
@@ -35,8 +34,16 @@ def _envelope(requests):
     )
 
 
+_LIVE_BY_REF = {
+    "therapy.md": "Врач объяснит варианты лечения зубов.",
+    "pain-two.md": "Врач расскажет об обезболивании при имплантации.",
+    "warranty.md": "Условия гарантии можно обсудить на консультации.",
+}
+
+
 def _part(request_id, kind, *, service_id, topic_id, content_ref=None):
-    return {"request_id": request_id, "kind": kind, "subject_id": None, "context": "general_information", "policy_ids": [], "payment_scheme": "unspecified", "payment_scheme_intent": "not_requested", "contact_fields": [], "content_text": "approved meaning" if kind == "content" else None, "content_ref": content_ref, "service_id": service_id, "topic_id": topic_id, "statement_mode": "question"}
+    content_text = _LIVE_BY_REF.get(content_ref, "Расскажу подробнее об этом лечении.") if kind == "content" else None
+    return {"request_id": request_id, "kind": kind, "subject_id": None, "context": "general_information", "policy_ids": [], "payment_scheme": "unspecified", "payment_scheme_intent": "not_requested", "contact_fields": [], "content_text": content_text, "content_ref": content_ref, "service_id": service_id, "topic_id": topic_id, "statement_mode": "question"}
 
 
 def _sources_ab(base=None):
@@ -68,7 +75,7 @@ def test_price_and_other_service_content_remain_independent_and_mixed() -> None:
     assert outcome.resolved.response_scope == "mixed"
     assert outcome.resolved.session_delta.active_service_id is None
     assert [(item.request_id, item.scope) for item in outcome.resolved.d2_request_parts] == [("r1", "topic"), ("r2", "service")]
-    assert outcome.rendered_text.index("Exact package") < outcome.rendered_text.index("Материал терапии.")
+    assert outcome.rendered_text.index("Exact package") < outcome.rendered_text.index(_LIVE_BY_REF["therapy.md"])
 
 
 def test_request_order_controls_frozen_render_order() -> None:
@@ -76,7 +83,7 @@ def test_request_order_controls_frozen_render_order() -> None:
         _part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"),
         _part("r1", "price", service_id="service_one", topic_id="implantation"),
     ]), _sources_ab(), as_of=date(2026, 9, 18))
-    assert outcome.rendered_text.index("Материал терапии.") < outcome.rendered_text.index("Exact package")
+    assert outcome.rendered_text.index(_LIVE_BY_REF["therapy.md"]) < outcome.rendered_text.index("Exact package")
 
 
 def test_two_content_services_are_mixed_and_render_each_source_once() -> None:
@@ -90,9 +97,11 @@ def test_two_content_services_are_mixed_and_render_each_source_once() -> None:
     ]), sources, as_of=date(2026, 9, 18))
     assert outcome.resolved.response_scope == "mixed"
     assert outcome.resolved.session_delta.active_service_id is None
-    assert outcome.rendered_text.count("Материал терапии.") == 1
-    assert outcome.rendered_text.count("Второй материал имплантации.") == 1
-    assert outcome.rendered_text.index("Материал терапии.") < outcome.rendered_text.index("Второй материал")
+    assert outcome.rendered_text.count(_LIVE_BY_REF["therapy.md"]) == 1
+    assert outcome.rendered_text.count(_LIVE_BY_REF["pain-two.md"]) == 1
+    assert outcome.rendered_text.index(_LIVE_BY_REF["therapy.md"]) < outcome.rendered_text.index(_LIVE_BY_REF["pain-two.md"])
+    assert "Материал терапии." not in outcome.rendered_text
+    assert "Второй материал имплантации." not in outcome.rendered_text
 
 
 @pytest.mark.parametrize(
@@ -132,11 +141,11 @@ def test_two_content_sources_keep_order_without_source_secondary_ui(request_refs
         _envelope([parts_by_ref[ref] for ref in request_refs]), sources,
         as_of=date(2026, 9, 18),
     )
-    texts_by_ref = {"therapy.md": "Материал терапии.", "pain-two.md": "Материал имплантации."}
+    texts_by_ref = _LIVE_BY_REF
     assert [part.content_ref for part in outcome.resolved.d2_request_parts] == list(request_refs)
     assert outcome.rendered_text.index(texts_by_ref[request_refs[0]]) < outcome.rendered_text.index(texts_by_ref[request_refs[1]])
-    assert outcome.rendered_text.count("Материал терапии.") == 1
-    assert outcome.rendered_text.count("Материал имплантации.") == 1
+    assert outcome.rendered_text.count(_LIVE_BY_REF["therapy.md"]) == 1
+    assert outcome.rendered_text.count(_LIVE_BY_REF["pain-two.md"]) == 1
     assert outcome.resolved.ui_plan.source_content_ref == request_refs[0]
     assert outcome.ui_projection.quick_replies == ()
     assert outcome.ui_projection.video is None
@@ -161,15 +170,20 @@ def test_clinic_wide_content_is_independent_beside_price() -> None:
         _part("r2", "content", service_id=None, topic_id=None, content_ref="warranty.md"),
     ]), sources, as_of=date(2026, 9, 18))
     assert outcome.resolved.response_scope == "mixed"
-    assert "Общая гарантия." in outcome.rendered_text
+    assert _LIVE_BY_REF["warranty.md"] in outcome.rendered_text
+    assert "Общая гарантия." not in outcome.rendered_text
 
 
-def test_foreign_content_source_fails_closed_without_neighbor_substitution() -> None:
-    with pytest.raises(MaterializationOwnershipError):
-        resolve_d2_envelope_response(_envelope([
-            _part("r1", "price", service_id="service_one", topic_id="implantation"),
-            _part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="missing.md"),
-        ]), _sources_ab(), as_of=date(2026, 9, 18))
+def test_unknown_optional_content_source_keeps_prose_without_neighbor_substitution() -> None:
+    outcome = resolve_d2_envelope_response(_envelope([
+        _part("r1", "price", service_id="service_one", topic_id="implantation"),
+        _part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="missing.md"),
+    ]), _sources_ab(), as_of=date(2026, 9, 18))
+    assert outcome.resolved.d2_request_parts[0].status == "answered"
+    assert outcome.resolved.d2_request_parts[1].status == "answered"
+    assert outcome.resolved.d2_request_parts[1].content_ref is None
+    assert "Расскажу подробнее об этом лечении." in outcome.rendered_text
+    assert "Материал терапии." not in outcome.rendered_text
 
 
 def test_direct_d2_path_does_not_call_legacy_materializer(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -220,7 +234,7 @@ def test_c4_strict_scope_remains_owned_by_price_part_with_other_content() -> Non
     assert [(part.request_id, part.topic_id, part.content_ref) for part in outcome.resolved.d2_request_parts] == [
         ("r1", "implantation", None), ("r2", "therapy", "therapy.md")
     ]
-    assert "Материал терапии." in outcome.rendered_text
+    assert _LIVE_BY_REF["therapy.md"] in outcome.rendered_text
     assert "Exact package option_a_from" in outcome.rendered_text
     assert "Exact package generic_fixed" not in outcome.rendered_text
 
@@ -235,7 +249,7 @@ def test_other_direction_content_cannot_supply_missing_known_scope_price() -> No
     )
     assert outcome.resolved.d2_result_status == "degraded"
     assert outcome.resolved.d2_request_parts[0].failure_reason == "d2_no_scope_price_candidates"
-    assert "Материал терапии." in outcome.rendered_text
+    assert _LIVE_BY_REF["therapy.md"] in outcome.rendered_text
 
 
 def test_other_direction_situation_does_not_filter_price_part() -> None:
@@ -252,7 +266,7 @@ def test_other_direction_situation_does_not_filter_price_part() -> None:
     assert outcome.resolved.d2_treatment_situation.source_request_id == "r2"
     assert outcome.resolved.d2_price_scope_decision.applied_extent is None
     assert "generic_fixed" in [row.offer_id for row in outcome.resolved.d2_price_block.rows]
-    assert "Материал терапии." in outcome.rendered_text
+    assert _LIVE_BY_REF["therapy.md"] in outcome.rendered_text
 
 
 def test_price_suppresses_other_source_secondary_ui_but_keeps_volume_choices_and_cta() -> None:

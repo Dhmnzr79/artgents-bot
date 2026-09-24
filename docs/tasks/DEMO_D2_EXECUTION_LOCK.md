@@ -1,8 +1,10 @@
 # D2 Execution Lock — постоянный договор исполнения
 
-Дата фиксации: 2026-09-20. Ветка: `codex/demo-d2-service-volume`, baseline `8e7a3b6`.
+Первоначально зафиксирован 2026-09-20; демо-уточнение владельца 2026-09-24.
 Статус: **действующий lock**. Меняется только по явному решению владельца
-отдельным checkpoint. Это не roadmap, не архитектурный аудит и не план работ;
+отдельным checkpoint. Исходные branch/baseline `codex/demo-d2-service-volume`
+и `8e7a3b6` — историческое происхождение, не текущая точка старта.
+Это не roadmap, не архитектурный аудит и не план работ;
 фиксированный порядок checkpoint ведётся в
 [DEMO_D2_DELIVERY_ROADMAP.md](DEMO_D2_DELIVERY_ROADMAP.md), а факты выполнения —
 в [DEMO_D2_CHECKPOINT_LEDGER.md](DEMO_D2_CHECKPOINT_LEDGER.md).
@@ -29,8 +31,10 @@ memory **не достижимы из normal answer path**. Достижимос
 
 1. Запрещён fallback «D2 не справился → вызвать старый runtime» — в любом
    виде: per-request, per-scenario, try/except, флаг, выбор обработчика по
-   виду вопроса. Неподдержанный сценарий отвечает fail closed утверждённым
-   сообщением и фиксируется как незакрытый, а не маскируется старым путём.
+   виду вопроса. Неподдержанный сценарий фиксируется как незакрытый и не
+   маскируется старым путём. Это не разрешение блокировать пригодный живой
+   ответ по базе из-за обнаруженной неточности прозы: действует D2-092.
+   Tenant, privacy, UI-action и lead/effect границы остаются строгими.
 2. Запрещён второй параллельный semantic prompt, второй parser модели,
    второй state-контракт, второй tenant-data контракт и второй wire contract.
 3. Запрещены временные compatibility fields «на переходный период»
@@ -44,6 +48,10 @@ memory **не достижимы из normal answer path**. Достижимос
 - Новый пользовательский сценарий, новый strict refusal/gate или правило,
   способное скрыть или сломать нормальный ответ, **нельзя добавлять без
   решения владельца**.
+- Изменение архитектурных границ, порядка этапов или заметного видимого
+  поведения также требует явного решения владельца. При конфликте
+  документов исполнитель останавливает изменение и обращается к владельцу;
+  Astra может помочь разобрать конфликт, но не утверждает новое правило.
 - Если утверждённые D2 contract, acceptance или decision log уже задают
   поведение — исполнитель принимает техническое решение сам и фиксирует
   ссылку на пункт в отчёте checkpoint. Переспрашивать владельца не нужно.
@@ -64,18 +72,21 @@ memory **не достижимы из normal answer path**. Достижимос
 | FUTURE SCOPE | что осознанно оставлено следующим checkpoint |
 | Allowlist | точный перечень файлов записи |
 | Test isolation | временные БД/логи/tenant pack; сеть и provider запрещены offline |
-| Ledger draft | до Cursor review внесена строка доказанных фактов checkpoint; она называет checkpoint, но не требует невозможного self-reference на hash ещё не созданного commit |
-| Cursor verdict | результат независимого Checker |
+| Ledger draft | до review внесена строка доказанных фактов checkpoint; она называет checkpoint, но не требует невозможного self-reference на hash ещё не созданного commit |
+| Checker verdict | результат независимого Checker; на отмеченном рубеже также отдельный Cursor review |
 
-Значимый checkpoint **не commitится до независимого Cursor PASS**
-(master prompt: [DEMO_D2_CURSOR_CHECKER_PROMPT.md](DEMO_D2_CURSOR_CHECKER_PROMPT.md)).
-После PASS разрешены только exact staging, commit, push и финальный отчёт с
-фактическим hash. Нельзя дописывать Ledger после PASS только ради hash: Cursor
-должен увидеть Ledger вместе с кодом и тестами.
+Значимый checkpoint **не commitится до независимого Checker PASS**.
+На рубежах 0, 3 и 5 дорожная карта дополнительно требует отдельный Cursor
+review по [проверочному prompt](DEMO_D2_CURSOR_CHECKER_PROMPT.md).
+После требуемых PASS допустимы только exact staging, commit, push и финальный
+отчёт с фактическим hash в согласованной ветке. Нельзя дописывать Ledger
+после review только ради hash: проверяющий видит Ledger вместе с diff.
 
-Постоянный prompt исполнителя:
-[DEMO_D2_CODEX_EXECUTOR_PROMPT.md](DEMO_D2_CODEX_EXECUTOR_PROMPT.md). Каждый
-checkpoint card его дополняет, но не заменяет.
+Постоянный процесс исполнителя:
+[DEMO_D2_CODEX_EXECUTOR_PROMPT.md](DEMO_D2_CODEX_EXECUTOR_PROMPT.md).
+Короткая вставка в каждый новый этап —
+[DEMO_D2_STAGE_TASK_MINI_PROMPT.md](DEMO_D2_STAGE_TASK_MINI_PROMPT.md).
+Карточка этапа задаёт точный baseline, allowlist, приёмку и тесты.
 
 ## 6. Приоритет документов
 

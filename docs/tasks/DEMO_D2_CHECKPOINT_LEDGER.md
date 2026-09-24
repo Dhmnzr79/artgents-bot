@@ -1,12 +1,24 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
-Обновлено: 2026-09-23, CP7 подготовлен к независимому Cursor review; CP6a, CP6b и CP6c получили независимый Cursor PASS и отправлены в ветку.
-Это не roadmap и не план: только
-факты с доказательствами. Правила ведения — в
+Обновлено: 2026-09-24 для документального этапа 0. Это не roadmap и не
+план: только факты с доказательствами. Текущая точка отсчёта — сохранённый
+D2 HEAD `38fdeb3`; незакоммиченный WIP в основной папке не включён и не
+получает здесь задним числом статус PASS. Правила ведения — в
 [DEMO_D2_EXECUTION_LOCK.md](DEMO_D2_EXECUTION_LOCK.md). В будущем новая строка
-добавляется в незакоммиченный diff **до** Cursor review вместе с кодом и
+добавляется в незакоммиченный diff **до** независимого review вместе с кодом и
 тестами. Она называет checkpoint; фактический hash сообщается в финальном
 closeout, потому что commit не может содержать свой собственный hash.
+
+## Текущая точка отсчёта
+
+На `38fdeb3` `app.ask` и `app.ask_stream` вызывают `run_d2_ask_json`, который
+вызывает общий `run_d2_dialogue_turn`; widget подключён к `/ask/stream`.
+FullContext-подготовка присутствует. Это подтверждает активность пути, но
+не устойчивость ответов, корректность ценовых кликов или прохождение новой
+приёмки A13–A15/C03. Отдельный этап 0 меняет только документы; его
+Checker/Cursor verdict будет указан после проверки diff. Прежняя строка
+`Current local runtime` и заключительная фиксация CP5 ниже сохраняются
+как исторические снимки на момент их составления, а не текущие инструкции.
 
 Исключение ниже отмечено явно: CP1 был уже закоммичен без строки Ledger. Его
 факт добавлен отдельным документным correction checkpoint и не выдаётся за
@@ -50,7 +62,7 @@ closeout, потому что commit не может содержать свой
 | CP7 — изоляция legacy semantic route | **ACCEPTANCE:** C08: из `app.py` удалены старые JSON/SSE orchestration handlers, worker, semantic imports и ordinary-memory writes; реальные `/ask` и `/ask/stream` продолжают работать только через `run_d2_ask_json`, `/lead` сохранён. Startup provenance указывает D2. Endpoint sentinels, HTTP и lead/privacy regressions проходят; прямой импорт `app` не загружает Composer, sales_fast, старый finalizer или прежний orchestration entry. | **D2 ROUTE:** `app.ask` / `app.ask_stream` → `core/d2_http_adapter.py` → общий `run_d2_dialogue_turn` и один D2 store. | **LEGACY IMPACT:** старый semantic route больше не существует как callable wiring в `app.py`. Исторические legacy модули и их unit/eval tests физически остаются в репозитории, но не загружаются и не вызываются из bot HTTP entry; это не fallback и не normal-dialogue механизм. | **OWNER DECISION:** не требуется: удаление прежнего entry wiring задано Delivery Roadmap CP7 и Execution Lock §2–3. **FUTURE SCOPE:** CP8 итоговые offline/live evidence и качество модели; merge/deploy вне D2 rebuild. Полная уборка исторических файлов вне текущего функционального удаления маршрута. | Draft — ожидает independent Cursor Checker | Авторский focused endpoint/no-legacy/lead: 29 passed, 0 failed; health/widget-config/lead transport smoke: 3 passed; `app` import legacy-loaded `[]`; provider/live/network/SMTP calls 0; staging пуст, foreign WIP не затронуты. |
 | Current local runtime | JSON `/ask`, SSE `/ask/stream` и браузерный widget используют D2 result/wire; старый semantic entry wiring удалён из `app.py`. | `static/widget/widget.js` → `api.js` → `app.py` → `core/d2_http_adapter.py` → общий D2 turn | Исторические legacy файлы существуют, но normal path их не импортирует и не вызывает | CP8 итоговый evidence pack; полная уборка исторических файлов может выполняться отдельно без восстановления старого маршрута | — (сводка состояния) | CP7 uncommitted draft; независимый review ещё не проведён |
 
-## Явная фиксация
+## Историческая фиксация прежних checkpoint
 
 - Через внутренний common D2 route собраны **A08**, узкая часть **A10a**
   (same-topic price continuation), узкая часть **B13a** (одна простая

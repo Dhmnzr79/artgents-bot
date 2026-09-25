@@ -151,6 +151,10 @@ def _collect_owned_candidates(plan: PreComposerPlan) -> list[object]:
         items.extend(plan.d2_price_block.rows)
     items.extend(plan.d2_part_failure_blocks)
     items.extend(plan.d2_part_deferred_blocks)
+    items.extend(plan.d2_contact_blocks)
+    items.extend(plan.d2_policy_blocks)
+    if plan.d2_canonical_contact is not None:
+        items.append(plan.d2_canonical_contact)
     items.extend(plan.required_offer_conditions)
     items.extend(plan.commercial_facts)
     items.extend(plan.d2_commercial_promo_blocks)
@@ -392,6 +396,8 @@ def _resolve_composer_answer(
         d2_part_failure_blocks=plan.d2_part_failure_blocks,
         d2_part_deferred_blocks=plan.d2_part_deferred_blocks,
         d2_contact_blocks=plan.d2_contact_blocks,
+        d2_policy_blocks=plan.d2_policy_blocks,
+        d2_canonical_contact=plan.d2_canonical_contact,
         d2_result_status=plan.d2_result_status,
         price_block=price_block,
         d2_price_block=d2_price_block,
@@ -696,6 +702,7 @@ def _resolve_commerce_ui(plan: PreComposerPlan) -> ResolvedUiPlan:
         buttons=plan.ui_candidates.buttons,
         widget=plan.ui_candidates.widget,
         video=plan.ui_candidates.video,
+        contact=plan.d2_canonical_contact,
         source_content_ref=plan.ui_candidates.source_content_ref,
     )
 

@@ -496,6 +496,21 @@ class D2ContactFactBlock(ResponsePlanModel):
     phone: NonBlankStr
 
 
+class D2PolicyFactBlock(ResponsePlanModel):
+    """Exact tenant policy text attached to one D2 request part."""
+
+    request_id: NonBlankStr
+    source_client_id: NonBlankStr
+    policy_ids: tuple[NonBlankStr, ...]
+    display_text: NonBlankStr
+
+    @model_validator(mode="after")
+    def _validate_policy_ids(self) -> Self:
+        if len(self.policy_ids) != len(set(self.policy_ids)):
+            raise ValueError("d2_policy_fact_block_duplicate_ids")
+        return self
+
+
 class D2PartFailureBlock(ResponsePlanModel):
     """Frozen clinic-owned text for a recoverable D2 request-part failure."""
 
@@ -767,7 +782,7 @@ class D2PriceScopeChoice(ResponsePlanModel):
 
 class D2ResolvedRequestPart(ResponsePlanModel):
     request_id: NonBlankStr
-    kind: Literal["price", "content", "contact"]
+    kind: Literal["price", "content", "contact", "clinic_policy"]
     status: Literal["answered", "recovered", "unavailable", "deferred"]
     failure_reason: D2PartFailureReason | None = None
     subject_id: NonBlankStr | None = None
@@ -781,9 +796,9 @@ class D2ResolvedRequestPart(ResponsePlanModel):
 
     @model_validator(mode="after")
     def _validate_d2_part(self) -> Self:
-        if self.kind in {"price", "contact"} and self.content_ref is not None:
+        if self.kind in {"price", "contact", "clinic_policy"} and self.content_ref is not None:
             raise ValueError("d2_price_part_content_ref_forbidden")
-        if self.kind in {"price", "contact"} and self.content_section_refs:
+        if self.kind in {"price", "contact", "clinic_policy"} and self.content_section_refs:
             raise ValueError("d2_price_part_section_refs_forbidden")
         if self.content_section_refs and self.content_ref is None:
             raise ValueError("d2_section_refs_require_content_ref")
@@ -832,11 +847,11 @@ class D2ResolvedRequestPart(ResponsePlanModel):
                 raise ValueError("d2_content_part_failure_reason_invalid")
             if self.status != "unavailable" and self.snapshot_fingerprint is None:
                 raise ValueError("d2_content_part_snapshot_required")
-        elif self.kind == "contact":
+        elif self.kind in {"contact", "clinic_policy"}:
             if self.status != "answered" or self.failure_reason is not None:
-                raise ValueError("d2_contact_part_status_invalid")
+                raise ValueError("d2_exact_fact_part_status_invalid")
             if self.content_publication is not None or self.snapshot_fingerprint is not None:
-                raise ValueError("d2_contact_part_content_provenance_forbidden")
+                raise ValueError("d2_exact_fact_part_content_provenance_forbidden")
         elif self.content_publication is not None or self.snapshot_fingerprint is not None:
             raise ValueError("d2_price_part_content_provenance_forbidden")
         if self.status == "unavailable":
@@ -926,6 +941,8 @@ class PreComposerPlan(ResponsePlanModel):
     d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()
     d2_part_deferred_blocks: tuple[D2PartDeferredBlock, ...] = ()
     d2_contact_blocks: tuple[D2ContactFactBlock, ...] = ()
+    d2_policy_blocks: tuple[D2PolicyFactBlock, ...] = ()
+    d2_canonical_contact: CanonicalContactCandidate | None = None
     d2_result_status: D2ResultStatus | None = None
     required_offer_conditions: UniqueRequiredOfferConditions = ()
     commercial_facts: UniqueCommercialFacts = ()
@@ -1356,6 +1373,10 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
     if len(contact_ids) != len(set(contact_ids)):
         raise ValueError("d2_request_part_contact_block_duplicate")
     contact_by_request = {block.request_id: block for block in plan.d2_contact_blocks}
+    policy_ids = [block.request_id for block in plan.d2_policy_blocks]
+    if len(policy_ids) != len(set(policy_ids)):
+        raise ValueError("d2_request_part_policy_block_duplicate")
+    policy_by_request = {block.request_id: block for block in plan.d2_policy_blocks}
     published_content_parts = [
         part for part in parts
         if part.kind == "content" and part.status in {"answered", "recovered"}
@@ -1380,6 +1401,13 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
         block = contact_by_request.get(part.request_id)
         if block is None or block.source_client_id != plan.session_delta.session_key.client_id:
             raise ValueError("d2_request_part_contact_linkage_invalid")
+    policy_parts = [part for part in parts if part.kind == "clinic_policy"]
+    if len(policy_parts) != len(policy_by_request):
+        raise ValueError("d2_request_part_policy_linkage_invalid")
+    for part in policy_parts:
+        block = policy_by_request.get(part.request_id)
+        if block is None or block.source_client_id != plan.session_delta.session_key.client_id:
+            raise ValueError("d2_request_part_policy_linkage_invalid")
 
 
 def _validate_terminal_state(plan: ResolvedResponsePlan) -> None:
@@ -1438,6 +1466,12 @@ def _validate_resolved_client_ownership(plan: ResolvedResponsePlan) -> None:
         _check(block)
     for block in plan.d2_part_deferred_blocks:
         _check(block)
+    for block in plan.d2_contact_blocks:
+        _check(block)
+    for block in plan.d2_policy_blocks:
+        _check(block)
+    if plan.d2_canonical_contact is not None:
+        _check(plan.d2_canonical_contact)
     for block in plan.information_blocks:
         _check(block)
     for condition in plan.required_offer_conditions:
@@ -1491,6 +1525,8 @@ class ResolvedResponsePlan(ResponsePlanModel):
     d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()
     d2_part_deferred_blocks: tuple[D2PartDeferredBlock, ...] = ()
     d2_contact_blocks: tuple[D2ContactFactBlock, ...] = ()
+    d2_policy_blocks: tuple[D2PolicyFactBlock, ...] = ()
+    d2_canonical_contact: CanonicalContactCandidate | None = None
     d2_result_status: D2ResultStatus | None = None
     information_blocks: tuple[InformationSourceBlock, ...] = ()
     required_offer_conditions: tuple[RequiredOfferConditionBlock, ...] = ()

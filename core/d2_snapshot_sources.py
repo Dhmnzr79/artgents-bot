@@ -12,6 +12,7 @@ from contracts.response_plan import (
     CodeOwnedTerminalCandidate,
     ComposerResult,
     ComposerSelectedRouteAuthority,
+    D2PolicyFactBlock,
     PreComposerPlan,
     PricePlan,
     RouteModePair,
@@ -578,6 +579,35 @@ def build_d2_clinic_policy_response(
         session_key=session_key,
         text=_INFO_GAP,
         route="ANSWER",
+    )
+
+
+def build_d2_clinic_policy_fact_block(
+    snapshot: D2TenantSnapshot,
+    *,
+    session_key: SessionKey,
+    understanding,
+    request_id: str,
+) -> D2PolicyFactBlock:
+    """Freeze one already-typed clinic-policy part for a mixed D2 plan."""
+    if snapshot.client_id != session_key.client_id:
+        raise D2SnapshotBindingError("policy_client_mismatch")
+    request = next(
+        (item for item in understanding.requests if item.request_id == request_id),
+        None,
+    )
+    if request is None or request.kind != "clinic_policy" or not request.policy_ids:
+        raise D2SnapshotBindingError("mixed_policy_id_required")
+    answers = _authored_policy_answers(snapshot)
+    policy_ids = tuple(dict.fromkeys(request.policy_ids))
+    texts = [answers.get(policy_id) for policy_id in policy_ids]
+    if any(text is None for text in texts):
+        raise D2SnapshotBindingError("mixed_policy_not_in_pack")
+    return D2PolicyFactBlock(
+        request_id=request_id,
+        source_client_id=snapshot.client_id,
+        policy_ids=policy_ids,
+        display_text="\n\n".join(text for text in texts if text is not None),
     )
 
 

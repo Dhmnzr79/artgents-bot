@@ -23,6 +23,9 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
         contacts_by_request = {
             block.request_id: block for block in plan.d2_contact_blocks
         }
+        policies_by_request = {
+            block.request_id: block for block in plan.d2_policy_blocks
+        }
         failures_by_request = {
             block.request_id: block for block in plan.d2_part_failure_blocks
         }
@@ -38,6 +41,8 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
                 _render_d2_price_parts(plan, parts)
             elif part.kind == "contact":
                 parts.append(contacts_by_request[part.request_id].display_text.strip())
+            elif part.kind == "clinic_policy":
+                parts.append(policies_by_request[part.request_id].display_text.strip())
             else:
                 block = content_by_request.get(part.request_id)
                 if block is not None:

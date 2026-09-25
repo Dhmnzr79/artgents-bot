@@ -21,6 +21,35 @@ def _ui(events):
     return next(payload for kind, payload in events if kind == "ui")
 
 
+def _mixed_widget_raw() -> str:
+    return json.dumps(production_envelope_template(
+        commercial_intent="price",
+        primary_price_request_id="r1",
+        request_understanding={
+            "subjects": [{"subject_id": "s1", "relation": "self", "age_group": "unknown"}],
+            "requests": [
+                {
+                    "request_id": "r1", "kind": "price", "subject_id": "s1",
+                    "context": "general_information", "topic_id": "implantation",
+                    "service_id": None, "statement_mode": "question", "situation": None,
+                },
+                {
+                    "request_id": "r2", "kind": "content", "subject_id": None,
+                    "context": "general_information", "topic_id": "implantation",
+                    "service_id": "classic",
+                    "content_text": "Живой mixed-ответ для реального widget harness.",
+                },
+                {
+                    "request_id": "r3", "kind": "clinic_policy", "subject_id": None,
+                    "context": "general_information", "policy_ids": ["no_pediatric_dentistry"],
+                    "payment_scheme": "unspecified", "payment_scheme_intent": "not_requested",
+                    "contact_fields": [], "content_text": None,
+                },
+            ],
+        },
+    ), ensure_ascii=False)
+
+
 def test_current_scope_click_and_stale_foreign_forged_actions(http_env):
     client, db, use_provider, _ = http_env
     fake = use_provider(FakeProvider(_price_raw("implantation")))
@@ -116,9 +145,10 @@ def test_current_cta_enters_lead_owner_and_replays_once(http_env, monkeypatch):
 
 def test_real_d2_payloads_render_and_retry_in_browser(http_env, tmp_path):
     client, _, use_provider, _ = http_env
-    fake = use_provider(FakeProvider(_price_raw("implantation")))
+    fake = use_provider(FakeProvider(_mixed_widget_raw()))
     sid = "cp6c-browser"
     first = post(client, sid=sid, request_id="b1", q="первый").get_json()
+    assert "Живой mixed-ответ" in first["answer"]
     choice = next(item for item in first["ui"]["quick_replies"]
                   if item["reply_id"].endswith("one_tooth"))
     fake.raw = _price_raw("implantation", {

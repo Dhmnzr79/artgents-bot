@@ -9,6 +9,7 @@ from datetime import date
 
 from contracts.doctor_schema import TargetDoctorCatalog
 from contracts.response_plan import (
+    CanonicalContactCandidate,
     CanonicalMultiPriceCandidate,
     CanonicalSinglePriceCandidate,
     CommercialFactCandidate,
@@ -16,8 +17,10 @@ from contracts.response_plan import (
     ComposerSelectedRouteAuthority,
     D2PartDeferredBlock,
     D2PartFailureBlock,
+    D2ContactFactBlock,
     D2FrozenPriceBlock,
     D2FrozenPriceRow,
+    D2PolicyFactBlock,
     D2PriceScopeDecision,
     D2PriceScopeChoice,
     D2ResolvedRequestPart,
@@ -297,6 +300,11 @@ def resolve_d2_envelope_response(
     d2_plan_focus_seed: D2PlanFocusSeed | None = None,
     common_route_direct_service_only: bool = False,
     common_route_content_lookup: bool = False,
+    exact_contact_blocks: tuple[D2ContactFactBlock, ...] = (),
+    exact_policy_blocks: tuple[D2PolicyFactBlock, ...] = (),
+    exact_contact_button: UiButtonCandidate | None = None,
+    exact_canonical_contact: CanonicalContactCandidate | None = None,
+    d2_request_order: tuple[str, ...] = (),
 ) -> MaterializedResponseOutcome:
     """Resolve the D2 lower plan from an already validated D1R envelope.
 
@@ -557,6 +565,32 @@ def resolve_d2_envelope_response(
                     if realization.outcome != "unavailable" else None
                 ),
             ))
+    if exact_contact_blocks or exact_policy_blocks:
+        exact_parts = [
+            D2ResolvedRequestPart(
+                request_id=block.request_id,
+                kind="contact",
+                status="answered",
+                scope="clinic",
+            )
+            for block in exact_contact_blocks
+        ] + [
+            D2ResolvedRequestPart(
+                request_id=block.request_id,
+                kind="clinic_policy",
+                status="answered",
+                scope="clinic",
+            )
+            for block in exact_policy_blocks
+        ]
+        by_request_id = {part.request_id: part for part in (*request_parts, *exact_parts)}
+        if (
+            not d2_request_order
+            or len(by_request_id) != len(request_parts) + len(exact_parts)
+            or set(by_request_id) != set(d2_request_order)
+        ):
+            raise MaterializationContractError("d2_exact_part_order_invalid")
+        request_parts = [by_request_id[request_id] for request_id in d2_request_order]
     frozen_failure_blocks = tuple(failure_blocks)
     frozen_deferred_blocks = tuple(deferred_blocks)
     source_content_ref = None
@@ -587,6 +621,12 @@ def resolve_d2_envelope_response(
     if volume_choices:
         ui_candidates = ui_candidates.model_copy(
             update={"quick_replies": (*ui_candidates.quick_replies, *(item.candidate for item in volume_choices))}
+        )
+    if exact_contact_button is not None and exact_contact_button.button_id not in {
+        item.button_id for item in ui_candidates.buttons
+    }:
+        ui_candidates = ui_candidates.model_copy(
+            update={"buttons": (*ui_candidates.buttons, exact_contact_button)}
         )
     unavailable_count = sum(part.status == "unavailable" for part in request_parts)
     deferred_count = sum(part.status == "deferred" for part in request_parts)
@@ -649,6 +689,9 @@ def resolve_d2_envelope_response(
         d2_request_parts=tuple(request_parts),
         d2_part_failure_blocks=frozen_failure_blocks,
         d2_part_deferred_blocks=frozen_deferred_blocks,
+        d2_contact_blocks=exact_contact_blocks,
+        d2_policy_blocks=exact_policy_blocks,
+        d2_canonical_contact=exact_canonical_contact,
         d2_result_status=result_status,
         textual_cta_candidate=(
             _materialize_textual_cta(sources)

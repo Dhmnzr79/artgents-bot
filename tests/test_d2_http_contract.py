@@ -94,6 +94,37 @@ def sse_events(response):
             for frame in frames if (lines := frame.splitlines()) and len(lines) >= 2]
 
 
+def _mixed_price_content_policy_raw() -> str:
+    return json.dumps(production_envelope_template(
+        commercial_intent="price",
+        primary_price_request_id="r1",
+        request_understanding={
+            "subjects": [],
+            "requests": [
+                {
+                    "request_id": "r1", "kind": "price", "subject_id": None,
+                    "context": "general_information", "topic_id": "implantation",
+                    "service_id": "all_on_4", "statement_mode": "question",
+                    "situation": {"scope_commitment": "reported", "extent": "full_arch",
+                                  "tooth_count": None, "jaw": "unknown", "continuity": "new"},
+                },
+                {
+                    "request_id": "r2", "kind": "content", "subject_id": None,
+                    "context": "general_information", "topic_id": "implantation",
+                    "service_id": "all_on_4",
+                    "content_text": "Живой ответ модели о восстановлении всей челюсти.",
+                },
+                {
+                    "request_id": "r3", "kind": "clinic_policy", "subject_id": None,
+                    "context": "general_information", "policy_ids": ["no_pediatric_dentistry"],
+                    "payment_scheme": "unspecified", "payment_scheme_intent": "not_requested",
+                    "contact_fields": [], "content_text": None,
+                },
+            ],
+        },
+    ), ensure_ascii=False)
+
+
 def test_endpoint_persists_exact_final_text_ui_actions_and_replays(http_env):
     client, db, use_provider, tmp_path = http_env
     fake = use_provider(FakeProvider(envelope_clinic_policy_only("no_pediatric_dentistry")))
@@ -214,6 +245,31 @@ def test_json_sse_parity_in_both_replay_directions(http_env):
     with D2DialogueStore(db) as store:
         assert store.read(SessionKey(client_id="demo", sid="json-first")).state.revision == 1
         assert store.read(SessionKey(client_id="demo", sid="sse-first")).state.revision == 1
+
+
+def test_mixed_plan_has_json_sse_parity_and_replays_without_reselection(http_env):
+    client, db, use_provider, tmp_path = http_env
+    fake = use_provider(FakeProvider(_mixed_price_content_policy_raw()))
+    first = post(client, sid="mixed", request_id="mixed", q="Составной вопрос").get_json()
+    assert "Живой ответ модели" in first["answer"]
+    assert "дет" in first["answer"].casefold()
+    assert first["ui"]["video"] is None
+    events = sse_events(post_sse(client, sid="mixed", request_id="mixed", q="Составной вопрос"))
+    assert [kind for kind, _ in events] == ["status", "typing", "ui", "done"]
+    assert events[2][1] == first
+    assert len(fake.inputs) == 1
+    with D2DialogueStore(db) as store:
+        saved = store.read_latest_completion(SessionKey(client_id="demo", sid="mixed"))
+        assert saved is not None
+        assert saved.response.rendered_text == first["answer"]
+        assert [part.kind for part in saved.response.resolved.d2_request_parts] == [
+            "price", "content", "clinic_policy",
+        ]
+    (tmp_path / "clients" / "demo" / "clinic_policies.yaml").write_text(
+        "policies: {}\n", encoding="utf-8"
+    )
+    assert post(client, sid="mixed", request_id="mixed", q="Составной вопрос").get_json() == first
+    assert len(fake.inputs) == 1
 
 
 def test_sse_terminal_and_error_are_single_outcomes(http_env):

@@ -4,7 +4,6 @@ This is deliberately an internal experiment, not an HTTP adapter or the full
 product. Unsupported inputs fail explicitly; there is no legacy fallback.
 """
 
-from dataclasses import replace
 from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
@@ -15,7 +14,7 @@ from contracts.d2_dialogue import (
     D2LeadEffectDispatcher, D2ProviderInput, D2RawProvider, D2SelectedUiRef,
 )
 from contracts.d2_session_context import D2SessionActivity, D2SessionTtlPolicy
-from contracts.response_plan import D2ResolvedRequestPart, SessionKey
+from contracts.response_plan import SessionKey
 from contracts.response_plan_session import (
     SESSION_SCHEMA_VERSION, D2ShownPriceOfferRef, PersistedActiveService, PersistedActiveTopic,
     PersistedClarifyTask, PersistedShownCommercialIds, PersistedShownOptionsSnapshot,
@@ -37,6 +36,7 @@ from core.d2_snapshot_sources import (
     build_d2_manual_contact_terminal_response,
     build_d2_snapshot_sources,
     build_d2_clinic_policy_response,
+    build_d2_clinic_policy_fact_block,
     build_d2_brand_policy_response,
     build_d2_service_availability_response,
     build_d2_unknown_reference_response,
@@ -51,8 +51,6 @@ from core.one_call_envelope_protocol import (
     production_envelope_template,
 )
 from core.response_plan_materialization import resolve_d2_envelope_response
-from core.response_text_renderer import render_response_text
-from core.response_ui_projection import project_response_ui
 from core.user_text_privacy import provider_message_has_substance, provider_safe_user_text
 import json
 
@@ -112,15 +110,18 @@ def _d2_multipart_shape_ok(*, parts: tuple, subjects_by_id: dict) -> bool:
     """
     if len(parts) < 2 or len(parts) > 3:
         return False
-    if any(item.kind not in {"price", "content", "contact"} for item in parts):
+    if any(item.kind not in {"price", "content", "contact", "clinic_policy"} for item in parts):
         return False
     price_parts = tuple(item for item in parts if item.kind == "price")
     content_parts = tuple(item for item in parts if item.kind == "content")
     contact_parts = tuple(item for item in parts if item.kind == "contact")
+    policy_parts = tuple(item for item in parts if item.kind == "clinic_policy")
     if not price_parts and not content_parts:
         return False
     # Typed exact facts may be added to an ordinary FullContext/price answer.
-    if len(price_parts) + len(content_parts) + len(contact_parts) != len(parts):
+    if len(price_parts) + len(content_parts) + len(contact_parts) + len(policy_parts) != len(parts):
+        return False
+    if any(not item.policy_ids for item in policy_parts):
         return False
     for item in price_parts:
         subject = subjects_by_id.get(item.subject_id) if item.subject_id else None
@@ -233,74 +234,6 @@ def _next_d2_shown_price_offer_refs(*, snapshot, price, context):
             service_id=row.service_id,
         )
         for row in price.rows
-    )
-
-
-def _append_d2_exact_contact_parts(
-    *, response, tenant, session_key: SessionKey, all_parts: tuple, contact_parts: tuple,
-):
-    """Attach tenant-owned contacts to an already materialized ordinary D2 answer.
-
-    This is composition of a typed fact, not a separate conversational route:
-    model prose and price blocks remain untouched, while each contact value is
-    read only from the bound tenant snapshot.
-    """
-    if not contact_parts:
-        return response
-    blocks = []
-    buttons = list(response.resolved.ui_plan.buttons)
-    contact = response.resolved.ui_plan.contact
-    for part in contact_parts:
-        block, button, canonical_contact = build_d2_contact_fact_block(
-            tenant,
-            session_key=session_key,
-            request_id=part.request_id,
-            contact_fields=tuple(part.contact_fields),
-        )
-        blocks.append(block)
-        if button.button_id not in {item.button_id for item in buttons}:
-            buttons.append(button)
-        if contact is None:
-            contact = canonical_contact
-    contact_results = {
-        part.request_id: D2ResolvedRequestPart(
-            request_id=part.request_id,
-            kind="contact",
-            status="answered",
-            scope="clinic",
-        )
-        for part in contact_parts
-    }
-    ordinary_results = {part.request_id: part for part in response.resolved.d2_request_parts}
-    merged_parts = tuple(
-        contact_results[part.request_id] if part.kind == "contact" else ordinary_results[part.request_id]
-        for part in all_parts
-    )
-    unavailable_count = sum(part.status == "unavailable" for part in merged_parts)
-    deferred_count = sum(part.status == "deferred" for part in merged_parts)
-    result_status = (
-        "complete" if not unavailable_count and not deferred_count
-        and not any(part.status == "recovered" for part in merged_parts)
-        else "failed" if unavailable_count == len(merged_parts)
-        else "degraded"
-    )
-    resolved = response.resolved.model_copy(
-        update={
-            "d2_request_parts": merged_parts,
-            "d2_contact_blocks": tuple(blocks),
-            "d2_result_status": result_status,
-            "ui_plan": response.resolved.ui_plan.model_copy(
-                update={"buttons": tuple(buttons), "contact": contact}
-            ),
-        }
-    )
-    # Validate the merged frozen plan: the renderer must never be its validator.
-    resolved = type(resolved).model_validate(resolved.model_dump())
-    return replace(
-        response,
-        resolved=resolved,
-        rendered_text=render_response_text(resolved),
-        ui_projection=project_response_ui(resolved),
     )
 
 
@@ -981,6 +914,7 @@ def _run_reserved_d2_dialogue_turn(
         parts = understanding.requests
         part = parts[0]
         contact_parts = tuple(item for item in parts if item.kind == "contact")
+        policy_parts = tuple(item for item in parts if item.kind == "clinic_policy")
         subjects_by_id = {item.subject_id: item for item in understanding.subjects}
         multi_part = _d2_multipart_shape_ok(parts=parts, subjects_by_id=subjects_by_id)
         clinic_policy = (
@@ -1137,15 +1071,42 @@ def _run_reserved_d2_dialogue_turn(
                 shown_secondary_ref_ids=context.retained_shown_ids.secondary_ref_ids,
             )
             # The common lower materializer owns free prose and price. Contacts
-            # are exact tenant facts attached afterwards; do not make their
-            # presence change the meaning of the ordinary parts.
+            # and policies enter its pre-resolver plan as exact tenant facts;
+            # they never trigger a second render or UI projection.
             resolution_envelope = envelope
-            if contact_parts:
+            exact_contact_blocks = []
+            exact_contact_button = None
+            exact_canonical_contact = None
+            for contact_part in contact_parts:
+                block, button, canonical_contact = build_d2_contact_fact_block(
+                    tenant,
+                    session_key=session_key,
+                    request_id=contact_part.request_id,
+                    contact_fields=tuple(contact_part.contact_fields),
+                )
+                exact_contact_blocks.append(block)
+                if exact_contact_button is None:
+                    exact_contact_button = button
+                if exact_canonical_contact is None:
+                    exact_canonical_contact = canonical_contact
+            exact_policy_blocks = tuple(
+                build_d2_clinic_policy_fact_block(
+                    tenant,
+                    session_key=session_key,
+                    understanding=understanding,
+                    request_id=policy_part.request_id,
+                )
+                for policy_part in policy_parts
+            )
+            if contact_parts or policy_parts:
                 resolution_envelope = envelope.model_copy(
                     update={
                         "request_understanding": understanding.model_copy(
                             update={
-                                "requests": tuple(item for item in parts if item.kind != "contact")
+                                "requests": tuple(
+                                    item for item in parts
+                                    if item.kind not in {"contact", "clinic_policy"}
+                                )
                             }
                         )
                     }
@@ -1157,13 +1118,11 @@ def _run_reserved_d2_dialogue_turn(
                 d2_plan_focus_seed=focus,
                 common_route_direct_service_only=True,
                 common_route_content_lookup=True,
-            )
-            response = _append_d2_exact_contact_parts(
-                response=response,
-                tenant=tenant,
-                session_key=session_key,
-                all_parts=parts,
-                contact_parts=contact_parts,
+                exact_contact_blocks=tuple(exact_contact_blocks),
+                exact_policy_blocks=exact_policy_blocks,
+                exact_contact_button=exact_contact_button,
+                exact_canonical_contact=exact_canonical_contact,
+                d2_request_order=tuple(item.request_id for item in parts),
             )
             price = response.resolved.d2_price_block
             decision = response.resolved.d2_price_scope_decision

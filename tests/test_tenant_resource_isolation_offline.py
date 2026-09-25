@@ -138,8 +138,12 @@ def _assert_tooth_extraction_isolation(*, demo_data, nika_data) -> None:
     nika_offer = _find_tooth_extraction_offer(nika_data.bundle)
     assert demo_offer.offer_id == "tooth_extraction.default"
     assert nika_offer.offer_id == "tooth_extraction.default"
-    assert int(demo_offer.price.min_amount) == 4500
+    assert int(demo_offer.price.min_amount) == 5000
     assert int(nika_offer.price.min_amount) == 5000
+    demo_offer_ids = {offer.offer_id for offer in demo_data.bundle.offers if offer.active}
+    nika_offer_ids = {offer.offer_id for offer in nika_data.bundle.offers if offer.active}
+    assert "tooth_extraction.complex" in demo_offer_ids
+    assert "tooth_extraction.complex" not in nika_offer_ids
 
 
 @pytest.mark.parametrize(

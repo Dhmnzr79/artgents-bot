@@ -73,12 +73,14 @@ def _parsed_demo_envelope(*requests: dict[str, object]):
 
 @pytest.mark.parametrize(
     ("service_id", "expected_minimum"),
-    (("tooth_extraction", 4_500), ("professional_whitening", 18_000), ("veneers", 35_000)),
+    (("tooth_extraction", 5_000), ("professional_whitening", 18_000), ("veneers", 35_000)),
 )
 def test_real_simple_prices_without_metadata(service_id: str, expected_minimum: int) -> None:
     _, envelope, sources = _parsed_demo_envelope(_request("r1", "price", service_id=service_id))
 
-    outcome = resolve_d2_envelope_response(envelope, sources, as_of=_AS_OF)
+    outcome = resolve_d2_envelope_response(
+        envelope, sources, as_of=_AS_OF, common_route_direct_service_only=True
+    )
 
     assert outcome.resolved.d2_result_status == "complete"
     assert outcome.resolved.d2_price_block is not None
@@ -87,6 +89,62 @@ def test_real_simple_prices_without_metadata(service_id: str, expected_minimum: 
     assert row.min_amount == expected_minimum
     assert "всё включено" not in outcome.rendered_text.lower()
     assert [button.button_id for button in outcome.ui_projection.buttons] == ["price"]
+
+
+@pytest.mark.parametrize("direction_count", (0, 1, 2))
+def test_exact_extraction_price_ignores_content_direction_count(direction_count: int) -> None:
+    _, envelope, sources = _parsed_demo_envelope(_request("r1", "price", service_id="tooth_extraction"))
+    extraction = next(item for item in sources.d2_directions if item.topic_id == "extraction")
+    chosen = (
+        () if direction_count == 0 else
+        (extraction,) if direction_count == 1 else
+        (extraction, extraction.model_copy(update={"topic_id": "other_content_topic"}))
+    )
+    sources = sources.model_copy(update={
+        "d2_directions": tuple(
+            item for item in sources.d2_directions if item.topic_id != "extraction"
+        ) + chosen,
+    })
+
+    outcome = resolve_d2_envelope_response(
+        envelope, sources, as_of=_AS_OF, common_route_direct_service_only=True
+    )
+
+    assert [row.offer_id for row in outcome.resolved.d2_price_block.rows] == [
+        "tooth_extraction.default", "tooth_extraction.complex",
+    ]
+
+
+@pytest.mark.parametrize("remove_direction", (False, True))
+@pytest.mark.parametrize(("topic_id", "service_id"), (
+    ("implantation", "classic"),
+    ("prosthetics", "implant_supported_prosthetics"),
+))
+def test_exact_service_without_authored_price_order_still_answers(
+    topic_id: str, service_id: str, remove_direction: bool,
+) -> None:
+    _, envelope, sources = _parsed_demo_envelope(
+        _request("r1", "price", service_id=service_id, topic_id=topic_id)
+    )
+    sources = sources.model_copy(update={
+        "d2_directions": tuple(
+            item.model_copy(update={"ordered_offer_ids": ()})
+            if item.topic_id == topic_id and not remove_direction else item
+            for item in sources.d2_directions
+            if not (remove_direction and item.topic_id == topic_id)
+        ),
+    })
+
+    outcome = resolve_d2_envelope_response(
+        envelope, sources, as_of=_AS_OF, common_route_direct_service_only=True
+    )
+
+    assert outcome.resolved.d2_price_block is not None
+    rows = outcome.resolved.d2_price_block.rows
+    assert rows and all(row.service_id == service_id for row in rows)
+    amounts = [row.amount if row.amount is not None else row.min_amount for row in rows]
+    assert amounts == sorted(amounts)
+    assert outcome.resolved.d2_request_parts[0].status == "answered"
 
 
 def test_real_implant_terms_are_preserved() -> None:

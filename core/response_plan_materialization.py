@@ -428,13 +428,7 @@ def resolve_d2_envelope_response(
                 sources=sources,
             )
         try:
-            direct_service_order = ()
-            if common_route_direct_service_only and price_part.service_id is not None:
-                direct_service_order = _d2_direct_service_ordered_offer_ids(
-                    service_ids=service_ids,
-                    client_id=client_id,
-                    sources=sources,
-                )
+            direct_service_only = price_part.service_id is not None
             direction_order = next(
                 (
                     item.ordered_offer_ids
@@ -450,9 +444,8 @@ def resolve_d2_envelope_response(
                 published_terms=sources.d2_published_terms_by_offer,
                 brand_id=price_part.brand_id,
                 applied_extent=applied_extent,
-                ordered_offer_ids=direct_service_order or direction_order,
-                direct_service_only=False,
-                authored_order_only=bool(direct_service_order),
+                ordered_offer_ids=direction_order,
+                direct_service_only=direct_service_only,
             )
         except MaterializationContractError as error:
             price_failure_reason = str(error)
@@ -1064,36 +1057,6 @@ def _d2_validate_price_scope_ownership(
         raise MaterializationOwnershipError("materialization_foreign_material")
 
 
-def _d2_direct_service_ordered_offer_ids(
-    *,
-    service_ids: tuple[str, ...],
-    client_id: str,
-    sources: ResponsePlanMaterializationSources,
-) -> tuple[str, ...]:
-    """Return the sole tenant-authored offer order for one exact D2 service."""
-    if len(service_ids) != 1:
-        raise MaterializationContractError("d2_direct_service_scope_invalid")
-    service_id = service_ids[0]
-    directions = tuple(
-        item
-        for item in sources.d2_directions
-        if item.source_client_id == client_id and service_id in item.service_ids
-    )
-    if len(directions) != 1:
-        raise MaterializationContractError("d2_no_price_candidates")
-    offers_by_id = {
-        offer.offer_id: offer for offer in sources.material_authority.bundle.offers
-    }
-    ordered_offer_ids = tuple(
-        offer_id
-        for offer_id in directions[0].ordered_offer_ids
-        if (offer := offers_by_id.get(offer_id)) is not None and offer.service_id == service_id
-    )
-    if not ordered_offer_ids:
-        raise MaterializationContractError("d2_no_price_candidates")
-    return ordered_offer_ids
-
-
 def _d2_price_block(
     *,
     bundle: ResponseSchemaBundle,
@@ -1104,16 +1067,14 @@ def _d2_price_block(
     applied_extent: str | None = None,
     ordered_offer_ids: tuple[str, ...] = (),
     direct_service_only: bool = False,
-    authored_order_only: bool = False,
 ) -> tuple[D2FrozenPriceBlock, MaterializationTrace]:
     if brand_id is not None and brand_id not in bundle.brands.brands:
         raise MaterializationContractError("d2_no_price_candidates")
     offers: list[TargetOffer] = []
     if direct_service_only:
-        # A direct D2 service-price request has no authored direction ordering.
-        # Keep this narrow: it is materializable only when the tenant publishes
-        # one active offer for that service, so no legacy strategy selector is
-        # needed to choose or rank alternatives.
+        # Exact-service prices never depend on direction membership or its
+        # marketing order. Publish this service's applicable active offers
+        # by ascending price, with no-public-price rows last.
         if len(service_ids) != 1:
             raise MaterializationContractError("d2_direct_service_scope_invalid")
         service = bundle.services.get(service_ids[0])
@@ -1128,7 +1089,7 @@ def _d2_price_block(
             and offer.active
             and (
                 offer.option_id is None
-                or (offer.option_id in options_by_id and options_by_id[offer.option_id].active)
+                or (offer.option_id in options_by_id and options_by_id[offer.option_id].active is not False)
             )
             and (applied_extent is None or _d2_offer_applies(offer, service, applied_extent))
         ]
@@ -1136,12 +1097,10 @@ def _d2_price_block(
             # Recoverable empty catalog for this service (C02 / D2-065): keep
             # independent content parts alive instead of hard-failing the turn.
             raise MaterializationContractError("d2_no_price_candidates")
-        if len(offers) != 1:
-            raise MaterializationContractError("d2_direct_service_offer_selection_unsupported")
-    elif ordered_offer_ids and (authored_order_only or brand_id is None):
-        # An exact D2 service with several prices may only use the tenant's
-        # explicit order.  In particular, no catalog/strategy fallback may
-        # introduce a fourth card or a card absent from that order.
+        offers.sort(key=_d2_direct_service_offer_sort_key)
+    elif ordered_offer_ids and brand_id is None:
+        # Broad direction overviews retain the tenant-authored representative
+        # offers and their order, independently of exact-service pricing.
         by_id = {offer.offer_id: offer for offer in bundle.offers}
         for offer_id in ordered_offer_ids:
             offer = by_id.get(offer_id)
@@ -1156,9 +1115,9 @@ def _d2_price_block(
                 continue
             if applied_extent is None or _d2_offer_applies(offer, service, applied_extent):
                 offers.append(offer)
-        if not offers and applied_extent is not None and not authored_order_only:
+        if not offers and applied_extent is not None:
             # Generic direction overviews may keep their existing typed-extent
-            # behaviour. Exact-service selection above remains order-only.
+            # behaviour. Exact-service requests never enter this branch.
             for offer in bundle.offers:
                 if not offer.active or offer.service_id not in service_ids:
                     continue
@@ -1664,6 +1623,17 @@ def _d2_source_ui(
         ),
         tuple(diagnostics),
     )
+
+
+def _d2_direct_service_offer_sort_key(offer: TargetOffer) -> tuple[int, int, str]:
+    """Keep direct-service prices deterministic without selecting a winner."""
+    price = offer.price
+    if isinstance(price, TargetFixedPrice):
+        return (0, price.amount, offer.offer_id)
+    if isinstance(price, (TargetFromPrice, TargetRangePrice)):
+        return (0, price.min_amount, offer.offer_id)
+    assert isinstance(price, TargetNoPublicPrice)
+    return (1, 0, offer.offer_id)
 
 
 def _d2_select_ui(

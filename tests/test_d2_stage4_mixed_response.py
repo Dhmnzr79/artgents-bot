@@ -159,7 +159,7 @@ def test_content_price_and_policy_are_one_frozen_ordered_plan(tmp_path, monkeypa
         ("r3", "clinic_policy", "answered"),
     ]
     assert [row.offer_id for row in turn.response.resolved.d2_price_block.rows] == [
-        "all_on_4.jaw.impro", "all_on_4.jaw.implantium", "all_on_4.jaw.nobel",
+        "all_on_4.jaw.implantium", "all_on_4.jaw.impro", "all_on_4.jaw.nobel",
     ]
     assert len(turn.response.resolved.d2_policy_blocks) == 1
     assert "Живой ответ модели" in turn.response.rendered_text

@@ -4,12 +4,12 @@
   "active": true,
   "price": {
     "mode": "from",
-    "min_amount": 4500,
+    "min_amount": 5000,
     "currency": "RUB",
     "billing_unit": "tooth"
   },
   "package": {
-    "label": "за удаление одного зуба; сложное удаление или зуб мудрости — по результатам осмотра",
+    "label": "за удаление одного зуба",
     "includes": []
   },
   "fact_refs": [],

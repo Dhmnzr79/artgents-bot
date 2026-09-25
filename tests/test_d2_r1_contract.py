@@ -46,9 +46,11 @@ def no_network(monkeypatch, tmp_path):
     monkeypatch.setattr(socket, "create_connection", forbidden)
 
 
-def _run(tmp_path: Path, payload: dict, *, sid: str):
+def _run(tmp_path: Path, payload: dict, *, sid: str, prepare_clients=None):
     root = tmp_path / "clients"
     shutil.copytree(Path("clients/demo"), root / "demo")
+    if prepare_clients is not None:
+        prepare_clients(root)
     provider = RawProvider(payload)
     key = SessionKey(client_id="demo", sid=sid)
     with D2DialogueStore(tmp_path / "dialogue.sqlite") as store:
@@ -175,8 +177,8 @@ def test_unattributed_fullcontext_prose_with_null_legacy_text_commits(
     assert provider.calls == 1
 
 
-def test_direct_service_price_without_optional_topic_reaches_common_turn(tmp_path: Path) -> None:
-    payload = production_envelope_template(
+def _direct_service_price_payload() -> dict:
+    return production_envelope_template(
         patient_text=None,
         commercial_intent="price",
         primary_price_request_id="r1",
@@ -184,18 +186,74 @@ def test_direct_service_price_without_optional_topic_reaches_common_turn(tmp_pat
             "subjects": [],
             "requests": [{
                 "request_id": "r1", "kind": "price", "subject_id": None,
-                "context": "general_information", "service_id": "professional_whitening",
+                "context": "general_information", "service_id": "tooth_extraction",
                 "topic_id": None, "situation": None,
             }],
         },
     )
-    turn, saved, provider = _run(tmp_path, payload, sid="r1-direct-service")
+def test_direct_service_price_without_optional_topic_reaches_common_turn(tmp_path: Path) -> None:
+    turn, saved, provider = _run(
+        tmp_path, _direct_service_price_payload(), sid="r1-direct-service"
+    )
 
     assert turn.response.resolved.d2_price_block is not None
+    assert [row.offer_id for row in turn.response.resolved.d2_price_block.rows] == [
+        "tooth_extraction.default",
+        "tooth_extraction.complex",
+    ]
     assert turn.response.resolved.d2_request_parts[0].status == "answered"
     assert turn.focus.action == "clarify_focus"
     assert saved is not None and saved.state.revision == 1
     assert saved.state.active_topic is None
+    assert provider.calls == 1
+
+
+def test_direct_service_without_authored_order_lists_all_active_prices_in_ascending_order(tmp_path: Path) -> None:
+    def add_direct_service_offers(root: Path) -> None:
+        offer_path = root / "demo" / "target_response" / "pricebook" / "services" / "tooth_extraction.default.json"
+        source_offer = json.loads(offer_path.read_text(encoding="utf-8"))
+        for offer_id, price, label in (
+            (
+                "tooth_extraction.surgical",
+                {
+                    "mode": "fixed",
+                    "amount": 12_000,
+                    "currency": "RUB",
+                    "billing_unit": "tooth",
+                },
+                "за хирургическое удаление одного зуба",
+            ),
+            (
+                "tooth_extraction.on_request",
+                {
+                    "mode": "no_public_price",
+                    "approved_text": "Стоимость уточняется врачом после осмотра.",
+                },
+                "стоимость уточняется после консультации",
+            ),
+        ):
+            offer = source_offer.copy()
+            offer["offer_id"] = offer_id
+            offer["price"] = price
+            offer["package"] = {"label": label, "includes": []}
+            (offer_path.parent / f"{offer_id}.json").write_text(
+                json.dumps(offer, ensure_ascii=False), encoding="utf-8"
+            )
+
+    turn, saved, provider = _run(
+        tmp_path,
+        _direct_service_price_payload(),
+        sid="r1-direct-service-many",
+        prepare_clients=add_direct_service_offers,
+    )
+
+    assert [(row.offer_id, row.mode, row.min_amount, row.amount) for row in turn.response.resolved.d2_price_block.rows] == [
+        ("tooth_extraction.default", "from", 5_000, None),
+        ("tooth_extraction.complex", "from", 8_000, None),
+        ("tooth_extraction.surgical", "fixed", None, 12_000),
+        ("tooth_extraction.on_request", "no_public_price", None, None),
+    ]
+    assert saved is not None and saved.state.active_topic is None
     assert provider.calls == 1
 
 

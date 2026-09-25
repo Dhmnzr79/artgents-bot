@@ -1,0 +1,17 @@
+{
+  "offer_id": "tooth_extraction.complex",
+  "service_id": "tooth_extraction",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 8000,
+    "currency": "RUB",
+    "billing_unit": "tooth"
+  },
+  "package": {
+    "label": "за сложное удаление одного зуба; окончательная стоимость зависит от анатомии зуба и результата осмотра",
+    "includes": []
+  },
+  "fact_refs": [],
+  "followups": []
+}

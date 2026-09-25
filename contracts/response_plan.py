@@ -449,7 +449,7 @@ class D2FrozenPriceBlock(ResponsePlanModel):
 
     @model_validator(mode="after")
     def _validate_rows(self) -> Self:
-        if not (1 <= len(self.rows) <= 3):
+        if not self.rows:
             raise ValueError("d2_price_rows_out_of_bounds")
         seen: set[str] = set()
         for row in self.rows:

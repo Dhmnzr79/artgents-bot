@@ -108,7 +108,7 @@ def _demo_clients(tmp_path: Path) -> Path:
     return clients
 
 
-def test_exact_all_on_4_uses_only_tenant_authored_order_and_keeps_typed_state(
+def test_exact_all_on_4_uses_ascending_published_prices_and_keeps_typed_state(
     tmp_path, monkeypatch
 ) -> None:
     def forbidden_network(*_args, **_kwargs):
@@ -130,32 +130,32 @@ def test_exact_all_on_4_uses_only_tenant_authored_order_and_keeps_typed_state(
 
     rows = turn.response.resolved.d2_price_block.rows
     assert tuple(row.offer_id for row in rows) == (
-        "all_on_4.jaw.impro",
         "all_on_4.jaw.implantium",
+        "all_on_4.jaw.impro",
         "all_on_4.jaw.nobel",
     )
     assert turn.response.resolved.session_delta.shown_price_offer_ids == (
-        "all_on_4.jaw.impro",
         "all_on_4.jaw.implantium",
+        "all_on_4.jaw.impro",
         "all_on_4.jaw.nobel",
     )
-    assert saved.state.shown_options_snapshot.price_offer_ids == (
-        "all_on_4.jaw.impro",
+    assert tuple(item.offer_id for item in saved.state.d2_shown_price_offer_refs) == (
         "all_on_4.jaw.implantium",
+        "all_on_4.jaw.impro",
         "all_on_4.jaw.nobel",
     )
     assert saved.state.situation_state is not None
     assert saved.state.situation_state.extent == "full_arch"
     assert [(row.mode, row.amount, row.currency, row.billing_unit) for row in rows] == [
-        ("fixed", 368_000, "RUB", "jaw"),
         ("fixed", 318_000, "RUB", "jaw"),
+        ("fixed", 368_000, "RUB", "jaw"),
         ("fixed", 428_000, "RUB", "jaw"),
     ]
     assert all(row.condition_texts == ("КТ и костная пластика по показаниям — отдельно",) for row in rows)
     assert "КТ и костная пластика по показаниям — отдельно" in turn.response.rendered_text
 
 
-def test_exact_classic_is_another_tenant_ordered_multi_offer_service(tmp_path) -> None:
+def test_exact_classic_is_another_ascending_multi_offer_service(tmp_path) -> None:
     turn, _, _ = _run(
         raw=_exact_price("classic", extent="one_tooth"),
         clients=_demo_clients(tmp_path),
@@ -164,8 +164,8 @@ def test_exact_classic_is_another_tenant_ordered_multi_offer_service(tmp_path) -
     )
 
     assert tuple(row.offer_id for row in turn.response.resolved.d2_price_block.rows) == (
-        "classic.one_tooth.impro",
         "classic.one_tooth.implantium",
+        "classic.one_tooth.impro",
         "classic.one_tooth.nobel",
     )
 
@@ -187,8 +187,8 @@ def test_exact_service_unknown_and_correction_never_multiply_or_repeat_scope_men
 
     assert unknown.response.resolved.d2_price_scope_decision is None
     assert unknown.response.ui_projection.quick_replies == ()
-    assert [row.amount for row in unknown.response.resolved.d2_price_block.rows] == [368_000, 318_000, 428_000]
-    assert [row.amount for row in correction.response.resolved.d2_price_block.rows] == [368_000, 318_000, 428_000]
+    assert [row.amount for row in unknown.response.resolved.d2_price_block.rows] == [318_000, 368_000, 428_000]
+    assert [row.amount for row in correction.response.resolved.d2_price_block.rows] == [318_000, 368_000, 428_000]
 
 
 def _direct_service_multi_extent_sources():
@@ -226,7 +226,7 @@ def _direct_service_envelope(*, extent: str, commitment: str):
     )})
 
 
-def test_exact_service_filters_by_its_own_typed_extent_before_tenant_order_cap() -> None:
+def test_exact_service_filters_by_its_own_typed_extent_before_price_sort() -> None:
     sources = _direct_service_multi_extent_sources()
     known = resolve_d2_envelope_response(
         _direct_service_envelope(extent="few_teeth", commitment="correction"),
@@ -245,7 +245,7 @@ def test_exact_service_filters_by_its_own_typed_extent_before_tenant_order_cap()
     assert known.resolved.d2_price_scope_decision is None
     assert known.ui_projection.quick_replies == ()
     assert [row.offer_id for row in unknown.resolved.d2_price_block.rows] == [
-        "generic_fixed", "option_a_from", "option_c_range",
+        "option_a_from", "option_c_range", "generic_fixed",
     ]
     assert unknown.ui_projection.quick_replies == ()
 
@@ -294,6 +294,7 @@ def _sources_with_no_price_failure(*, ambiguous: bool):
         display_text="Нет опубликованной цены.",
     ).model_dump()]
     if ambiguous:
+        payload["d2_directions"] = list(payload["d2_directions"])
         payload["d2_directions"].append(D2DirectionAuthority(
             source_client_id="demo",
             topic_id="other_direction",
@@ -303,7 +304,7 @@ def _sources_with_no_price_failure(*, ambiguous: bool):
     return type(base).model_validate(payload)
 
 
-def test_absent_or_ambiguous_authored_order_is_unavailable_without_catalog_fallback() -> None:
+def test_exact_service_ignores_absent_order_and_multiple_content_directions() -> None:
     for ambiguous in (False, True):
         with patch(
             "core.response_plan_materialization.project_target_service_offers",
@@ -315,8 +316,10 @@ def test_absent_or_ambiguous_authored_order_is_unavailable_without_catalog_fallb
                 as_of=date(2026, 9, 25),
                 common_route_direct_service_only=True,
             )
-        assert outcome.resolved.d2_price_block is None
-        assert outcome.resolved.d2_request_parts[0].failure_reason == "d2_no_price_candidates"
+        assert [row.offer_id for row in outcome.resolved.d2_price_block.rows] == [
+            "option_a_from", "option_c_range", "generic_fixed",
+        ]
+        assert outcome.resolved.d2_request_parts[0].status == "answered"
 
 
 def test_exact_service_no_public_price_remains_a_frozen_no_public_row() -> None:

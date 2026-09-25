@@ -1,5 +1,36 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Текущее дополнение — 2026-09-25
+
+Активная папка: `C:\Cursor Projects\artgents-bot-active`; ветка
+`codex/d2-stage1-contract`; baseline документационного diff и runtime:
+`e261383515d94e7d925acc705d8a6731aa704e48`.
+`origin/main` / merge-base: `141ce91fb1731cd990fcf8391550150016c73e7f`.
+Это журнал evidence, не самостоятельный план. Текущий порядок — в
+[Delivery Roadmap](DEMO_D2_DELIVERY_ROADMAP.md); сохранённые источники и
+ограничения аудита — в [inventory](DEMO_D2_RECONCILIATION_INVENTORY.md).
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-REC-DOC — план восстановления и карточка диагностики | **ACCEPTANCE:** только документы; runtime-критерии не закрываются. **D2 ROUTE / LEGACY IMPACT:** без изменений кода, данных, wire и окружения. Allowlist: этот Ledger, Delivery Roadmap, Reconciliation Inventory и Recovery Diagnostics Task. **OWNER DECISION:** разрешена фиксация документов и передача в Cursor. **FUTURE SCOPE:** отдельный GO на REC-1 и проверка тестового окружения. Проверены ссылки, 36/36 inventory и отсутствие tracked diff вне allowlist; `git diff --check` чистый. Тесты не запускались по scope; provider/live calls 0; staging пуст. | Draft — ожидается независимый Checker и завершение Cursor review исправленного diff; checkpoint не закрыт, commit/push не выполнены. Вердикты сообщаются отдельными отчётами проверяющих, не записываются внутрь проверяемого diff. |
+
+Исторические D2-S1–S4 и CP-записи ниже не переписаны и не повышены до нового
+PASS. D2-S1 остаётся с незакрытым focused review; D2-S2 PASS не подменяет
+отсутствовавший в его evidence полноценный pytest. Правило exact-service
+из D2-S3 позднее изменено владельцем и реализовано в `7b8554f`: ascending
+без лимита и зависимости от direction, с фильтрами brand/volume; обзор
+направления по-прежнему отдельный. D2-S4 PASS относится к проверенному
+mixed checkpoint, не ко всем целым диалогам текущей сборки.
+
+Результат предыдущего выбранного offline-аудита — 147 passed / 11 failed,
+не новая проверка этого документационного diff и не полный CI. Тесты
+запускались на другом interpreter против active-кода; ограничения и
+сравнения baseline перечислены в inventory. Общая демо-приёмка открыта.
+Подготовительные документы ранее получили независимый review во временной
+папке; этот результат не переносится автоматически на постоянный diff.
+
+## Историческая запись этапа 0
+
 Обновлено: 2026-09-24 для документального этапа 0. Это не roadmap и не
 план: только факты с доказательствами. Текущая точка отсчёта — сохранённый
 D2 HEAD `38fdeb3`; незакоммиченный WIP в основной папке не включён и не

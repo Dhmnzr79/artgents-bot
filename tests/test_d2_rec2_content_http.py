@@ -148,20 +148,24 @@ def test_mixed_price_prose_and_exact_fact_keep_one_frozen_plan(http_env, fact):
     assert len(fake.inputs) == 1
 
 
-def test_authorized_followup_stays_server_owned_when_model_omits_ref(http_env):
+@pytest.mark.parametrize("model_ref", [None, "clinic__info__consultation.md"])
+@pytest.mark.parametrize("transport", ["json", "sse"])
+def test_authorized_followup_stays_server_owned_with_optional_model_ref(http_env, model_ref, transport):
     client, db, use_provider, _ = http_env
     fake = use_provider(FakeProvider(_content_pain_raw()))
     first = post(client, sid="rec2-follow", request_id="first", q="Я боюсь боли при имплантации")
     assert first.status_code == 200
     shown = first.get_json()
     assert [item["reply_id"] for item in shown["ui"]["quick_replies"]] == [PAIN_FOLLOW]
-    fake.raw = _content_raw(text="Дополнительный ответ об анестезии без ссылки модели.")
-    second = post(
-        client, sid="rec2-follow", request_id="clicked", q="", ref=PAIN_FOLLOW,
-        ui_revision=shown["revision"],
+    fake.raw = _content_raw(
+        text="Дополнительный ответ об анестезии без ссылки модели.", ref=model_ref,
     )
+    args = dict(sid="rec2-follow", request_id="clicked", q="", ref=PAIN_FOLLOW,
+                ui_revision=shown["revision"])
+    second = post(client, **args) if transport == "json" else post_sse(client, **args)
     assert second.status_code == 200
-    assert "Дополнительный ответ" in second.get_json()["answer"]
+    body = second.get_json() if transport == "json" else dict(sse_events(second))["ui"]
+    assert "Дополнительный ответ" in body["answer"]
     assert len(fake.inputs) == 2
     assert fake.inputs[1].selected_ui_ref.reply_id == PAIN_FOLLOW
     assert fake.inputs[1].selected_ui_ref.source_revision == shown["revision"]
@@ -169,7 +173,115 @@ def test_authorized_followup_stays_server_owned_when_model_omits_ref(http_env):
         key = SessionKey(client_id="demo", sid="rec2-follow")
         saved = store.read_latest_completion(key)
         assert saved is not None and store.read(key).state.revision == 2
-        assert saved.response.resolved.d2_request_parts[0].content_ref is None
+        part = saved.response.resolved.d2_request_parts[0]
+        block = saved.response.resolved.information_blocks[0]
+        assert part.content_ref == "implantation__faq__pain.md"
+        assert part.content_section_refs == ("a:kakuyu-anesteziyu-ispolzuyut",)
+        assert block.content_ref == part.content_ref
+        assert block.source_section_refs == part.content_section_refs
+        assert block.publication == "model_prose"
+        assert saved.response.resolved.ui_plan.source_content_ref == part.content_ref
+        assert [item.button_id for item in saved.response.ui_projection.buttons] == ["consult"]
+        assert saved.response.rendered_text == body["answer"]
+    replay = post(client, **args) if transport == "json" else post_sse(client, **args)
+    replay_body = replay.get_json() if transport == "json" else dict(sse_events(replay))["ui"]
+    assert replay.status_code == 200 and replay_body == body
+    assert len(fake.inputs) == 2
+
+
+@pytest.mark.parametrize("topic_id,service_id", [
+    ("prosthetics", None),
+    ("pain", None),
+    (None, "veneers"),
+    ("prosthetics", "veneers"),
+])
+@pytest.mark.parametrize("transport", ["json", "sse"])
+def test_document_click_drops_incompatible_optional_scope_before_memory(
+    http_env, topic_id, service_id, transport,
+):
+    client, db, use_provider, _ = http_env
+    fake = use_provider(FakeProvider(_content_pain_raw()))
+    first = post(client, sid="rec2-click-scope", request_id="first", q="Я боюсь боли при имплантации")
+    assert first.status_code == 200
+    shown = first.get_json()
+    assert [item["reply_id"] for item in shown["ui"]["quick_replies"]] == [PAIN_FOLLOW]
+    with D2DialogueStore(db) as store:
+        before = store.read(SessionKey(client_id="demo", sid="rec2-click-scope")).state
+        assert before.active_topic is not None and before.active_topic.topic_id == "implantation"
+        assert before.active_service is not None and before.active_service.service_id == "classic"
+    prose = "Живой ответ о применяемой анестезии."
+    fake.raw = _content_raw(
+        text=prose, ref="clinic__info__consultation.md",
+        topic_id=topic_id, service_id=service_id,
+    )
+    args = dict(sid="rec2-click-scope", request_id="clicked", q="", ref=PAIN_FOLLOW,
+                ui_revision=shown["revision"])
+    second = post(client, **args) if transport == "json" else post_sse(client, **args)
+    assert second.status_code == 200
+    body = second.get_json() if transport == "json" else dict(sse_events(second))["ui"]
+    assert prose in body["answer"]
+    with D2DialogueStore(db) as store:
+        key = SessionKey(client_id="demo", sid="rec2-click-scope")
+        saved = store.read_latest_completion(key)
+        assert saved is not None
+        part = saved.response.resolved.d2_request_parts[0]
+        block = saved.response.resolved.information_blocks[0]
+        assert part.service_id is None and part.topic_id is None
+        assert part.content_ref == "implantation__faq__pain.md"
+        assert part.content_section_refs == ("a:kakuyu-anesteziyu-ispolzuyut",)
+        assert block.content_ref == part.content_ref and block.publication == "model_prose"
+        assert saved.response.resolved.ui_plan.source_content_ref == part.content_ref
+        assert [item.button_id for item in saved.response.ui_projection.buttons] == ["consult"]
+        state = store.read(key).state
+        assert state.revision == 2
+        assert state.active_topic == before.active_topic
+        assert state.active_service == before.active_service
+    replay = post(client, **args) if transport == "json" else post_sse(client, **args)
+    replay_body = replay.get_json() if transport == "json" else dict(sse_events(replay))["ui"]
+    assert replay.status_code == 200 and replay_body == body
+    assert len(fake.inputs) == 2
+
+
+def test_document_click_keeps_unknown_service_strict(http_env):
+    client, db, use_provider, _ = http_env
+    fake = use_provider(FakeProvider(_content_pain_raw()))
+    first = post(client, sid="rec2-click-unknown", request_id="first", q="Я боюсь боли при имплантации")
+    shown = first.get_json()
+    assert first.status_code == 200
+    fake.raw = _content_raw(text="Текст модели.", service_id="not_in_this_tenant")
+    second = post(client, sid="rec2-click-unknown", request_id="clicked", q="",
+                  ref=PAIN_FOLLOW, ui_revision=shown["revision"])
+    assert second.status_code != 200
+    with D2DialogueStore(db) as store:
+        key = SessionKey(client_id="demo", sid="rec2-click-unknown")
+        assert store.read(key).state.revision == 1
+    assert len(fake.inputs) == 2
+
+
+def test_document_click_keeps_compatible_typed_scope(http_env):
+    client, db, use_provider, _ = http_env
+    fake = use_provider(FakeProvider(_content_pain_raw()))
+    first = post(client, sid="rec2-click-valid", request_id="first", q="Я боюсь боли при имплантации")
+    assert first.status_code == 200
+    shown = first.get_json()
+    fake.raw = _content_raw(
+        text="Живой ответ о применяемой анестезии.",
+        topic_id="implantation", service_id="classic",
+    )
+    second = post(client, sid="rec2-click-valid", request_id="clicked", q="",
+                  ref=PAIN_FOLLOW, ui_revision=shown["revision"])
+    assert second.status_code == 200
+    with D2DialogueStore(db) as store:
+        key = SessionKey(client_id="demo", sid="rec2-click-valid")
+        saved = store.read_latest_completion(key)
+        assert saved is not None
+        part = saved.response.resolved.d2_request_parts[0]
+        assert (part.topic_id, part.service_id) == ("implantation", "classic")
+        assert part.content_ref == "implantation__faq__pain.md"
+        assert [item.button_id for item in saved.response.ui_projection.buttons] == ["consult"]
+        assert store.read(key).state.active_topic.topic_id == "implantation"
+        assert store.read(key).state.active_service.service_id == "classic"
+    assert len(fake.inputs) == 2
 
 
 @pytest.mark.parametrize("raw", [
@@ -209,17 +321,49 @@ def test_unknown_typed_service_is_not_hidden_by_missing_optional_source(http_env
     assert len(fake.inputs) == 1
 
 
-def test_unknown_typed_topic_is_not_hidden_by_missing_optional_source(http_env):
+@pytest.mark.parametrize("ref", ["missing.md", None])
+def test_unknown_optional_topic_keeps_prose_without_authorizing_scope(http_env, ref):
     client, db, use_provider, _ = http_env
     fake = use_provider(FakeProvider(_content_raw(
         text="Непустой текст не даёт права выдумать направление.",
-        ref="missing.md", topic_id="not_in_this_tenant",
+        ref=ref, topic_id="not_in_this_tenant",
     )))
     response = post(client, sid="rec2-unknown-topic", q="Расскажите о направлении")
-    assert response.status_code != 200
-    assert "answer" not in response.get_json()
+    assert response.status_code == 200
+    assert "Непустой текст" in response.get_json()["answer"]
     with D2DialogueStore(db) as store:
-        assert store.read_latest_completion(SessionKey(client_id="demo", sid="rec2-unknown-topic")) is None
+        key = SessionKey(client_id="demo", sid="rec2-unknown-topic")
+        saved = store.read_latest_completion(key)
+        assert saved is not None
+        assert saved.response.resolved.d2_request_parts[0].topic_id is None
+        assert saved.response.resolved.information_blocks[0].content_ref is None
+        assert saved.response.resolved.ui_plan.source_content_ref is None
+        assert store.read(key).state.active_topic is None
+    assert len(fake.inputs) == 1
+
+
+@pytest.mark.parametrize("doc,model_topic,expected_topic", [
+    ("implantation__faq__pain.md", "pain", None),
+    ("whitening__service__teeth_whitening.md", "teeth_whitening", None),
+    ("clinic__info__consultation.md", "clinic", "clinic"),
+])
+def test_document_subtopic_is_not_canonical_focus(http_env, doc, model_topic, expected_topic):
+    client, db, use_provider, _ = http_env
+    prose = "Живой ответ по утверждённому документу."
+    fake = use_provider(FakeProvider(_content_raw(
+        text=prose, ref=doc, topic_id=model_topic,
+    )))
+    response = post(client, sid="rec2-document-topic", q="Расскажите подробнее")
+    assert response.status_code == 200
+    assert prose in response.get_json()["answer"]
+    with D2DialogueStore(db) as store:
+        key = SessionKey(client_id="demo", sid="rec2-document-topic")
+        saved = store.read_latest_completion(key)
+        assert saved is not None
+        assert saved.response.resolved.d2_request_parts[0].topic_id == expected_topic
+        assert saved.response.resolved.information_blocks[0].content_ref == doc
+        active = store.read(key).state.active_topic
+        assert (active.topic_id if active else None) == expected_topic
     assert len(fake.inputs) == 1
 
 

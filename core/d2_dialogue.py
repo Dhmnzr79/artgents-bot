@@ -17,6 +17,7 @@ from contracts.d2_dialogue import (
 )
 from contracts.d2_session_context import D2SessionActivity, D2SessionTtlPolicy
 from contracts.response_plan import SessionKey
+from contracts.response_plan_materialization import D2SelectedDocumentAction
 from contracts.response_plan_session import (
     SESSION_SCHEMA_VERSION, D2ShownPriceOfferRef, PersistedActiveService, PersistedActiveTopic,
     PersistedClarifyTask, PersistedShownCommercialIds, PersistedShownOptionsSnapshot,
@@ -43,6 +44,8 @@ from core.d2_snapshot_sources import (
     build_d2_service_availability_response,
     build_d2_unknown_reference_response,
     resolve_d2_clarify_service_topic,
+    resolve_d2_optional_content_claims,
+    resolve_d2_selected_document_action,
 )
 from core.d2_spam_gate import build_d2_spam_gate_response, is_d2_garbage_message
 from core.d2_contacts_cta import build_d2_contact_fact_block, build_d2_contact_response
@@ -315,6 +318,7 @@ def run_d2_dialogue_turn(
         )
         diagnostics.stage("binding")
         selected_ui_ref: D2SelectedUiRef | None = None
+        selected_document_action: D2SelectedDocumentAction | None = None
         if lead_ui_ref and ui_revision is not None:
             shown = store.read_latest_completion(session_key)
             if (
@@ -338,6 +342,11 @@ def run_d2_dialogue_turn(
                     selected_ui_ref = D2SelectedUiRef(
                         reply_id=reply.reply_id,
                         source_revision=ui_revision,
+                    )
+                    selected_document_action = resolve_d2_selected_document_action(
+                        tenant, reply_id=reply.reply_id,
+                        source_revision=ui_revision,
+                        shown_source_content_ref=shown.response.resolved.ui_plan.source_content_ref,
                     )
         full_audit(
             "ui_binding", effective_ref=lead_ui_ref,
@@ -438,6 +447,7 @@ def run_d2_dialogue_turn(
             lead_effect_dispatcher=lead_effect_dispatcher,
             lead_bridge=lead_bridge,
             selected_ui_ref=selected_ui_ref,
+            selected_document_action=selected_document_action,
             selected_service_id=(
                 lead_ui_ref.removeprefix("service:")
                 if lead_ui_ref and lead_ui_ref.startswith("service:") and ui_revision is not None
@@ -759,6 +769,7 @@ def _run_reserved_d2_dialogue_turn(
     lead_effect_id: str | None, lead_effect_dispatcher: D2LeadEffectDispatcher | None,
     lead_bridge: bool = False,
     selected_ui_ref: D2SelectedUiRef | None = None,
+    selected_document_action: D2SelectedDocumentAction | None = None,
     selected_service_id: str | None = None,
 ) -> D2DialogueTurn:
     """Build a final result only after ``reserve_request`` made this turn owner."""
@@ -834,6 +845,12 @@ def _run_reserved_d2_dialogue_turn(
             "request_understanding": understanding.model_copy(update={"requests": (ordinary,)})
         })
         understanding = envelope.request_understanding
+    envelope = resolve_d2_optional_content_claims(
+        envelope, snapshot=tenant, model_view=view,
+        selected_document_action=selected_document_action,
+        selected_action_only=not safe_user_message.strip(),
+    )
+    understanding = envelope.request_understanding
     full_audit("effective_envelope", envelope=envelope, selected_service_id=selected_service_id)
     diagnostics.stage("materialize")
     admin_terminal = envelope.route == "ADMIN"
@@ -1186,6 +1203,7 @@ def _run_reserved_d2_dialogue_turn(
                 exact_contact_button=exact_contact_button,
                 exact_canonical_contact=exact_canonical_contact,
                 d2_request_order=tuple(item.request_id for item in parts),
+                selected_document_action=selected_document_action,
             )
             price = response.resolved.d2_price_block
             decision = response.resolved.d2_price_scope_decision

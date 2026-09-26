@@ -34,6 +34,7 @@ from contracts.response_plan_materialization import (
     D2DirectionPricePresentation,
     D2PartFailureAuthority,
     D2ServiceCommercialProfileAuthority,
+    D2SelectedDocumentAction,
     D2SourceUiAuthority,
     D2VolumeChoice,
     MaterializationTrace,
@@ -92,6 +93,142 @@ def _frontmatter(snapshot: D2TenantSnapshot, ref: str) -> dict[str, object]:
     return value if isinstance(value, dict) else {}
 
 
+def d2_canonical_topic_ids(
+    snapshot: D2TenantSnapshot, model_view: D2ModelView,
+) -> tuple[str, ...]:
+    """Canonical directions from captured tenant data, never MD subtopics."""
+    topics = dict.fromkeys(item.topic_id for item in model_view.direction_prices)
+    for content in snapshot.content:
+        topic = _frontmatter(snapshot, content.content_ref).get("topic")
+        if isinstance(topic, str) and topic and topic == topic.strip():
+            topics[topic] = None
+    return tuple(topics)
+
+
+def resolve_d2_optional_content_claims(
+    envelope: OneCallEnvelope, *, snapshot: D2TenantSnapshot,
+    model_view: D2ModelView, selected_document_action: D2SelectedDocumentAction | None,
+    selected_action_only: bool,
+) -> OneCallEnvelope:
+    """Resolve ordinary model claims and a selected source before session binding."""
+    understanding = envelope.request_understanding
+    if envelope.route != "ANSWER" or understanding is None:
+        return envelope
+    allowed = set(d2_canonical_topic_ids(snapshot, model_view))
+    content_parts = tuple(item for item in understanding.requests if item.kind == "content")
+    selected_part = content_parts[0] if len(content_parts) == 1 else None
+    selected_authority = None
+    if selected_document_action is not None:
+        action = selected_document_action
+        if action.source_client_id != snapshot.client_id:
+            raise D2SnapshotBindingError("selected_document_client_mismatch")
+        selected_authority = next(
+            (item for item in snapshot.content if item.content_ref == action.content_ref), None,
+        )
+        if (
+            selected_authority is None
+            or selected_authority.source_client_id != snapshot.client_id
+            or action.section_ref not in {item.section_ref for item in selected_authority.sections}
+            or not any(
+                candidate.reply_id == action.reply_id and section_ref == action.section_ref
+                for candidate, section_ref in _document_followups(
+                    selected_authority, _frontmatter(snapshot, action.content_ref),
+                )
+            )
+        ):
+            raise D2SnapshotBindingError("selected_document_binding_mismatch")
+    can_bind = (
+        selected_authority is not None and selected_part is not None
+        and selected_part.content_realization == "model_prose"
+        and bool((selected_part.content_text or "").strip())
+    )
+    optional_click_scope = (
+        can_bind and selected_action_only and len(understanding.requests) == 1
+        and envelope.commercial_intent == "none"
+        and envelope.service_reference_status == "none"
+        and selected_part.situation is None
+    )
+    changed = False
+    requests = []
+    for part in understanding.requests:
+        if (
+            part.kind in {"content", "other"}
+            and part.content_realization == "model_prose"
+            and (part.content_text or "").strip()
+            and part.topic_id is not None
+            and part.topic_id not in allowed
+        ):
+            part = part.model_copy(update={"topic_id": None})
+            changed = True
+        if can_bind and part.request_id == selected_part.request_id:
+            raw_authority = next(
+                (item for item in snapshot.content if item.content_ref == part.content_ref), None,
+            )
+            if raw_authority is not None and raw_authority.source_client_id != snapshot.client_id:
+                raise D2SnapshotBindingError("selected_document_foreign_material")
+            updates = {
+                "content_ref": selected_document_action.content_ref,
+                "content_section_refs": (selected_document_action.section_ref,),
+                "content_fallback_section_ref": None,
+            }
+            if optional_click_scope:
+                if part.service_id is not None:
+                    if part.service_id not in snapshot.bundle.services:
+                        raise D2SnapshotBindingError("selected_document_unknown_service")
+                    if part.service_id not in selected_authority.allowed_service_ids:
+                        updates["service_id"] = None
+                source_topic = _frontmatter(snapshot, selected_document_action.content_ref).get("topic")
+                if part.topic_id is not None and part.topic_id != source_topic:
+                    updates["topic_id"] = None
+            part = part.model_copy(update=updates)
+            changed = True
+        requests.append(part)
+    if not changed:
+        return envelope
+    return envelope.model_copy(update={
+        "request_understanding": understanding.model_copy(update={"requests": tuple(requests)})
+    })
+
+
+def _document_followups(content, metadata: dict[str, object]) -> tuple[tuple[UiQuickReplyCandidate, str], ...]:
+    pairs = []
+    wanted_sections = metadata.get("suggest_h3")
+    for wanted in wanted_sections if isinstance(wanted_sections, list) else []:
+        section_ref = f"a:{wanted}"
+        section = next((item for item in content.sections if item.section_ref == section_ref), None)
+        if section is not None:
+            heading = section.display_text.splitlines()[0].lstrip("#").strip()
+            pairs.append((
+                UiQuickReplyCandidate(
+                    source_client_id=content.source_client_id,
+                    reply_id=f"{content.content_ref}#{wanted}", label=heading,
+                ),
+                section_ref,
+            ))
+    return tuple(pairs)
+
+
+def resolve_d2_selected_document_action(
+    snapshot: D2TenantSnapshot, *, reply_id: str, source_revision: int,
+    shown_source_content_ref: str | None,
+) -> D2SelectedDocumentAction | None:
+    """Resolve a shown opaque reply against the same captured document map."""
+    selected = None
+    for content in snapshot.content:
+        metadata = _frontmatter(snapshot, content.content_ref)
+        for candidate, section_ref in _document_followups(content, metadata):
+            if candidate.reply_id != reply_id:
+                continue
+            if selected is not None or shown_source_content_ref != content.content_ref:
+                raise D2SnapshotBindingError("selected_document_binding_mismatch")
+            selected = D2SelectedDocumentAction(
+                source_client_id=snapshot.client_id, reply_id=reply_id,
+                source_revision=source_revision, content_ref=content.content_ref,
+                section_ref=section_ref,
+            )
+    return selected
+
+
 def build_d2_snapshot_sources(
     snapshot: D2TenantSnapshot,
     *,
@@ -144,18 +281,14 @@ def build_d2_snapshot_sources(
     videos = (_yaml_file(snapshot, "video_catalog.yaml").get("videos") or {})
     ui_rows: list[D2SourceUiAuthority] = []
     direction_map: dict[str, list[str]] = {}
+    content_topics_by_ref: dict[str, str] = {}
     for content in snapshot.content:
         meta = _frontmatter(snapshot, content.content_ref)
         topic = meta.get("topic")
-        if isinstance(topic, str):
+        if isinstance(topic, str) and topic and topic == topic.strip():
             direction_map.setdefault(topic, []).extend(content.allowed_service_ids)
-        quick: list[UiQuickReplyCandidate] = []
-        for wanted in meta.get("suggest_h3", []) if isinstance(meta.get("suggest_h3"), list) else []:
-            ref = f"a:{wanted}"
-            section = next((item for item in content.sections if item.section_ref == ref), None)
-            if section is not None:
-                heading = section.display_text.splitlines()[0].lstrip("#").strip()
-                quick.append(UiQuickReplyCandidate(source_client_id=snapshot.client_id, reply_id=f"{content.content_ref}#{wanted}", label=heading))
+            content_topics_by_ref[content.content_ref] = topic
+        quick = [candidate for candidate, _ in _document_followups(content, meta)]
         video = None
         key = meta.get("video_key")
         if isinstance(key, str) and isinstance(videos, dict) and key in videos:
@@ -179,6 +312,8 @@ def build_d2_snapshot_sources(
         d2_published_terms_by_offer={term.offer_id: term for term in model_view.published_terms},
         ui_authority=ui_authority,
         d2_authored_content=snapshot.content,
+        d2_canonical_topic_ids=d2_canonical_topic_ids(snapshot, model_view),
+        d2_content_topics_by_ref=content_topics_by_ref,
         d2_directions=directions,
         d2_direction_price_presentations=tuple(
             D2DirectionPricePresentation(

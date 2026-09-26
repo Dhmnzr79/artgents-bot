@@ -61,6 +61,7 @@ from contracts.response_plan_materialization import (
     MaterializedResponseOutcome,
     D2PartFailureAuthority,
     D2PublishedOfferTerms,
+    D2SelectedDocumentAction,
     OfferConditionEvidence,
     PriceLookupMode,
     ResponsePlanMaterializationSources,
@@ -305,6 +306,7 @@ def resolve_d2_envelope_response(
     exact_contact_button: UiButtonCandidate | None = None,
     exact_canonical_contact: CanonicalContactCandidate | None = None,
     d2_request_order: tuple[str, ...] = (),
+    selected_document_action: D2SelectedDocumentAction | None = None,
 ) -> MaterializedResponseOutcome:
     """Resolve the D2 lower plan from an already validated D1R envelope.
 
@@ -317,6 +319,15 @@ def resolve_d2_envelope_response(
     understanding = envelope.request_understanding
     if understanding is None or not understanding.requests:
         raise MaterializationContractError("d2_request_understanding_required")
+    client_id = sources.material_authority.source_client_id
+    if client_id != sources.session_key.client_id:
+        raise MaterializationOwnershipError("materialization_client_mismatch")
+    if selected_document_action is not None:
+        envelope = _d2_validate_selected_document_binding(
+            envelope, sources=sources, action=selected_document_action,
+        )
+        understanding = envelope.request_understanding
+        assert understanding is not None
 
     price_parts = tuple(item for item in understanding.requests if item.kind == "price")
     content_parts = tuple(item for item in understanding.requests if item.kind == "content")
@@ -355,10 +366,6 @@ def resolve_d2_envelope_response(
         raise MaterializationContractError("d2_price_or_content_part_required")
     if direct_promotion and envelope.promotion_scope not in {"general", "service", "shown"}:
         raise MaterializationContractError("d2_promotion_scope_invalid")
-
-    client_id = sources.material_authority.source_client_id
-    if client_id != sources.session_key.client_id:
-        raise MaterializationOwnershipError("materialization_client_mismatch")
 
     treatment_situation = _d2_treatment_situation(
         understanding, client_id=client_id, sources=sources
@@ -602,15 +609,19 @@ def resolve_d2_envelope_response(
         and content_blocks_by_id[content_parts[0].request_id].content_ref is not None
     ):
         source_content_ref = content_blocks_by_id[content_parts[0].request_id].content_ref
-    elif direct_fact:
+    elif direct_fact and not multiple_content_parts:
         source_content_ref = _d2_direct_fact_source_ref(
             envelope.references.direct_fact_ids,
             sources,
         )
-    source_ui, source_ui_diagnostics = _d2_source_ui(
-        content_ref=source_content_ref,
-        sources=sources,
-    )
+    if multiple_content_parts:
+        # Preserve the ordered source marker, without borrowing one document's UI.
+        source_ui, source_ui_diagnostics = UiPlanCandidates(source_content_ref=source_content_ref), ()
+    else:
+        source_ui, source_ui_diagnostics = _d2_source_ui(
+            content_ref=source_content_ref,
+            sources=sources,
+        )
     ui_candidates = _d2_select_ui(
         source_ui=source_ui,
         sources=sources,
@@ -968,6 +979,53 @@ def _d2_offer_applies(offer: TargetOffer, service: TargetService, extent: str) -
     return offer_applies_to_extent(offer, service, extent)  # type: ignore[arg-type]
 
 
+def _d2_validate_selected_document_binding(
+    envelope: OneCallEnvelope, *, sources: ResponsePlanMaterializationSources,
+    action: D2SelectedDocumentAction,
+) -> OneCallEnvelope:
+    """Check the selected source already resolved before session binding."""
+    client_id = sources.session_key.client_id
+    if action.source_client_id != client_id:
+        raise MaterializationOwnershipError("materialization_selected_document_client_mismatch")
+    authority = next(
+        (item for item in sources.d2_authored_content if item.content_ref == action.content_ref),
+        None,
+    )
+    source_ui = next(
+        (item for item in sources.d2_source_ui if item.content_ref == action.content_ref),
+        None,
+    )
+    if (
+        authority is None or source_ui is None
+        or action.section_ref not in {item.section_ref for item in authority.sections}
+        or action.reply_id not in {item.reply_id for item in source_ui.quick_replies}
+    ):
+        raise MaterializationContractError("d2_selected_document_target_invalid")
+    if authority.source_client_id != client_id or source_ui.source_client_id != client_id:
+        raise MaterializationOwnershipError("materialization_selected_document_client_mismatch")
+    understanding = envelope.request_understanding
+    assert understanding is not None
+    content_parts = tuple(item for item in understanding.requests if item.kind == "content")
+    # D2-072: two independent documents have no single source-owned UI.
+    if len(content_parts) != 1:
+        return envelope
+    part = content_parts[0]
+    if part.content_realization != "model_prose" or not (part.content_text or "").strip():
+        return envelope
+    if (
+        part.content_ref != action.content_ref
+        or part.content_section_refs != (action.section_ref,)
+        or part.content_fallback_section_ref is not None
+    ):
+        raise MaterializationContractError("d2_selected_document_binding_missing")
+    if part.service_id is not None and part.service_id not in authority.allowed_service_ids:
+        raise MaterializationContractError("d2_selected_document_scope_mismatch")
+    source_topic = sources.d2_content_topics_by_ref.get(action.content_ref)
+    if part.topic_id is not None and source_topic is not None and part.topic_id != source_topic:
+        raise MaterializationContractError("d2_selected_document_scope_mismatch")
+    return envelope
+
+
 def _d2_typed_content_scope_from_part(
     part: RequestUnderstandingRequest,
     *,
@@ -995,10 +1053,12 @@ def _d2_content_scope(
     allow_missing_content_ref: bool = False,
     allow_missing_content_authority: bool = False,
 ) -> tuple[tuple[str, ...], str, str | None]:
-    if part.topic_id is not None and not any(
-        direction.topic_id == part.topic_id and direction.source_client_id == client_id
-        for direction in sources.d2_directions
-    ):
+    canonical_topics = (
+        set(sources.d2_canonical_topic_ids)
+        if sources.d2_canonical_topic_ids
+        else {item.topic_id for item in sources.d2_directions if item.source_client_id == client_id}
+    )
+    if part.topic_id is not None and part.topic_id not in canonical_topics:
         # Optional source provenance cannot authorize an unknown typed topic.
         raise MaterializationOwnershipError("materialization_foreign_material")
     if part.content_ref is None:
@@ -1028,7 +1088,9 @@ def _d2_content_scope(
         for direction in sources.d2_directions:
             if direction.topic_id == part.topic_id and direction.source_client_id == client_id:
                 return direction.service_ids, "topic", part.topic_id
-        if not authority.allowed_service_ids:
+        if sources.d2_content_topics_by_ref.get(authority.content_ref) == part.topic_id:
+            return (), "topic", part.topic_id
+        if not authority.allowed_service_ids and not sources.d2_content_topics_by_ref:
             return (), "topic", part.topic_id
     if not authority.allowed_service_ids or part.content_realization == "model_prose":
         # An owned source can support clinic-level model prose and source UI
@@ -1505,12 +1567,18 @@ def _d2_information_blocks(
             if content_topics and part.topic_id not in content_topics:
                 unverified_source(part)
                 continue
-            if not any(
-                direction.topic_id == part.topic_id and direction.source_client_id == client_id
-                for direction in sources.d2_directions
-            ):
+            known_topics = (
+                set(sources.d2_canonical_topic_ids)
+                if sources.d2_canonical_topic_ids
+                else {item.topic_id for item in sources.d2_directions if item.source_client_id == client_id}
+            )
+            if part.topic_id not in known_topics:
                 unverified_source(part)
                 continue
+        source_topic = sources.d2_content_topics_by_ref.get(authority.content_ref)
+        if part.topic_id is not None and source_topic is not None and part.topic_id != source_topic:
+            unverified_source(part)
+            continue
         part_service_ids, _, part_topic_id = _d2_content_scope(
             part,
             client_id=client_id,

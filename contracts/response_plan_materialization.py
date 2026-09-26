@@ -220,6 +220,26 @@ class D2SourceUiAuthority(ResponsePlanModel):
         return self
 
 
+class D2SelectedDocumentAction(ResponsePlanModel):
+    """Target of a shown, tenant-owned document follow-up action."""
+
+    source_client_id: str
+    reply_id: str
+    source_revision: int
+    content_ref: str
+    section_ref: str
+
+    @model_validator(mode="after")
+    def _validate_selected_document(self) -> Self:
+        if any(not value or value != value.strip() for value in (
+            self.source_client_id, self.reply_id, self.content_ref, self.section_ref,
+        )):
+            raise ValueError("d2_selected_document_invalid")
+        if type(self.source_revision) is not int or self.source_revision < 1:
+            raise ValueError("d2_selected_document_revision_invalid")
+        return self
+
+
 class D2PartFailureAuthority(ResponsePlanModel):
     """Clinic-owned text for one recoverable D2 request-part failure."""
 
@@ -328,6 +348,8 @@ class ResponsePlanMaterializationSources(ResponsePlanModel):
     shown_amplifier_fact_ids: tuple[str, ...] = ()
     shown_service_value_ids: tuple[str, ...] = ()
     d2_authored_content: tuple[D2AuthoredContentAuthority, ...] = ()
+    d2_canonical_topic_ids: tuple[str, ...] = ()
+    d2_content_topics_by_ref: dict[str, str] = Field(default_factory=dict)
     d2_directions: tuple[D2DirectionAuthority, ...] = ()
     d2_direction_price_presentations: tuple[D2DirectionPricePresentation, ...] = ()
     d2_source_ui: tuple[D2SourceUiAuthority, ...] = ()
@@ -370,6 +392,17 @@ class ResponsePlanMaterializationSources(ResponsePlanModel):
             if content.content_ref in content_refs:
                 raise ValueError("materialization_d2_content_ref_duplicate")
             content_refs.add(content.content_ref)
+        if (
+            len(self.d2_canonical_topic_ids) != len(set(self.d2_canonical_topic_ids))
+            or any(not value or value != value.strip() for value in self.d2_canonical_topic_ids)
+        ):
+            raise ValueError("materialization_d2_canonical_topics_invalid")
+        if any(
+            ref not in content_refs or not topic or topic != topic.strip()
+            or (self.d2_canonical_topic_ids and topic not in self.d2_canonical_topic_ids)
+            for ref, topic in self.d2_content_topics_by_ref.items()
+        ):
+            raise ValueError("materialization_d2_content_topic_invalid")
         direction_topics: set[str] = set()
         for direction in self.d2_directions:
             if direction.source_client_id != client_id:

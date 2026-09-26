@@ -1,5 +1,17 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-26: коррекция REC-2 D2-097/098
+
+Baseline `7621441ca84e6bfc39fce79b744b647cc521a8b4`, ветка
+`codex/d2-stage1-contract`; origin branch совпал, `origin/main` и merge-base
+`141ce91`. Tracked/staged diff до работы пуст; чужой untracked `data/`
+сохранён. Точный allowlist — § «Точный write allowlist» в
+[карточке коррекции](DEMO_D2_REC2_CORRECTION_TASK.md).
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-REC-2-CORR | **ACCEPTANCE:** A03/B12/C01 и регрессии C04/C05/C07/C09/C10, не полный REC-5. **D2 ROUTE:** `/ask`/`/ask/stream`, один parser, captured tenant snapshot разрешает optional claims и проверенный document action в одном effective envelope **до** session binding; затем прежний materializer/frozen plan/store/replay. **LEGACY IMPACT:** запрещённый runtime/fallback не подключается. **OWNER DECISION:** владелец отнёс D2-097/098 к REC-2, после первого Cursor REJECT согласовал узкое правило для чистого документного клика и разрешил добавить Product Decisions в allowlist; D2-099 остаётся REC-4. До кода baseline: 2 passed / 18 deselected в узком HTTP-тесте. Новый P1-тест до fix: 6 failed / 1 passed. После fix и окончательного ограничения чистым кликом: целевой P1/source/multipart набор **18 passed / 44 deselected**, соседний widget/replay/lead/R1 набор **24 passed / 2 deselected**. Широкий aggregate шести файлов до последнего ограничения: **86 passed / 1 failed / 1 deselected**; красный `test_other_with_prose_gets_authored_help_not_price_gate` упирается в старый `d2_experiment_content_not_resolved` для `other`, описанный в исходной REC-2 карточке; тест не ослаблялся. В соседнем наборе исключены старый `other` и browser-case; browser в этом checkpoint не запускался. Тестовые DB/логи в `%TEMP%`, fake provider; live/provider/SMTP 0. **FUTURE SCOPE:** REC-3–5, live/merge/deploy и старые read-only падения REC-2 открыты. | Draft после Cursor REJECT; требуется focused Checker recheck находки и новый отдельный Cursor review diff до commit; staging пуст. Исторический PASS `bc76169` и прежний Checker PASS этой коррекции не переносятся на изменённый diff. |
+
 ## Draft — 2026-09-26: документальная фиксация widget-дефектов
 
 Baseline `6c4a96339a2eb293fa3dc2b95e253ad6efedd1c9`, ветка

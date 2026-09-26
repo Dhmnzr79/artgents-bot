@@ -181,6 +181,28 @@ def test_price_plus_content_suppresses_source_secondary_but_keeps_source_cta() -
     assert [item.button_id for item in outcome.ui_projection.buttons] == ["pain_cta"]
 
 
+def test_two_independent_documents_do_not_borrow_first_document_cta() -> None:
+    envelope = _parsed_envelope(
+        requests=[
+            _content_request(content_ref="pain.md", service_id="service_one",
+                             topic_id="implantation", request_id="r1"),
+            _content_request(content_ref="warranty.md", service_id="service_one",
+                             topic_id="implantation", request_id="r2"),
+        ],
+        commercial_intent="none",
+    )
+
+    outcome = resolve_d2_envelope_response(
+        envelope, _content_sources(), as_of=date(2026, 9, 18),
+    )
+
+    assert len(outcome.resolved.information_blocks) == 2
+    assert outcome.resolved.ui_plan.source_content_ref == "pain.md"
+    assert outcome.ui_projection.buttons == ()
+    assert outcome.ui_projection.quick_replies == ()
+    assert outcome.ui_projection.video is None
+
+
 def test_foreign_source_ui_is_rejected_at_the_tenant_boundary() -> None:
     payload = _content_sources().model_dump()
     payload["d2_source_ui"] = [

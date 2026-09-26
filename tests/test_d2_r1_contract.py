@@ -111,6 +111,8 @@ def test_real_fullcontext_prompt_contains_every_snapshot_document() -> None:
     ))
 
     assert "=== APPROVED_MD_CORPUS ===" in system["content"]
+    assert "topic_id: canonical direction ID" in system["content"]
+    assert "a document subtopic, section, filename, or action label is not a topic_id" in system["content"]
     for path, raw in tenant.files:
         if path.startswith("md/"):
             content_ref = path.removeprefix("md/")

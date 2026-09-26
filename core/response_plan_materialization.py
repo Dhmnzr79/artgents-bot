@@ -520,7 +520,13 @@ def resolve_d2_envelope_response(
             return ("topic", topic_id)
         return (scope, None)
     if price_parts:
-        part_identities.append(_scope_identity(response_scope, price_part.service_id, selected_topic_id))
+        # D2-080 chooses the first price to show; T4 considers every requested
+        # service when deciding whether a single focus may be remembered.
+        part_identities.extend(
+            _scope_identity(price_scopes_by_id[item.request_id][1], item.service_id,
+                            price_scopes_by_id[item.request_id][2])
+            for item in price_parts
+        )
     part_identities.extend(_scope_identity(scope, part.service_id, topic) for part, (_, scope, topic) in zip(content_parts, content_part_scopes))
     plan_scope = response_scope if len(set(part_identities)) == 1 else "mixed"
     request_parts = []

@@ -20,6 +20,56 @@ from contracts.response_plan import SessionKey
 from contracts.response_plan_session import ResponsePlanSessionSnapshot
 
 
+def bind_implicit_price_service(
+    envelope: OneCallEnvelope,
+    projection: D2SessionContextProjection,
+    *,
+    active_service_ids: frozenset[str],
+) -> OneCallEnvelope:
+    """Bind one unscoped price request to a fresh, exact service reference.
+
+    The persisted service is already tenant-scoped. No topic, treatment facts,
+    or prose-derived meaning is copied into the current request.
+    """
+    understanding = envelope.request_understanding
+    if (
+        projection.freshness != "fresh"
+        or envelope.route != "ANSWER"
+        or envelope.commercial_intent != "price"
+        or envelope.service_id is not None
+        or envelope.extent is not None
+        or envelope.jaw is not None
+        or envelope.stage is not None
+        or envelope.requested_service_id is not None
+        or envelope.service_reference_status != "none"
+        or understanding is None
+        or len(understanding.requests) != 1
+        or understanding.subjects
+        or projection.ordinary.clarify_pending
+        or projection.ordinary.clarify_task is not None
+    ):
+        return envelope
+    part = understanding.requests[0]
+    current = projection.ordinary.active_service
+    if (
+        part.kind != "price"
+        or part.service_id is not None
+        or part.topic_id is not None
+        or part.subject_id is not None
+        or part.situation is not None
+        or part.brand_id is not None
+        or part.statement_mode != "question"
+        or part.context not in {"general_information", "current_care"}
+        or current is None
+        or current.service_id not in active_service_ids
+    ):
+        return envelope
+    bound = part.model_copy(update={"service_id": current.service_id})
+    return envelope.model_copy(update={
+        "request_understanding": understanding.model_copy(update={"requests": (bound,)})
+    })
+
+
 def project_d2_session_context(
     snapshot: ResponsePlanSessionSnapshot,
     *,

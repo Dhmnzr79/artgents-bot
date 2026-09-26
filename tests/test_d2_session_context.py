@@ -37,6 +37,7 @@ from contracts.response_plan_session import (
 )
 from core.d2_session_context import (
     bind_d1r_envelope_to_d2_context,
+    bind_implicit_price_service,
     project_d2_session_context,
     seed_d2_plan_focus,
 )
@@ -196,6 +197,28 @@ def _expired_projection():
         policy=D2SessionTtlPolicy(),
         now=NOW,
     )
+
+
+def test_implicit_price_service_binds_only_fresh_unambiguous_reference() -> None:
+    fresh = _fresh_projection()
+    ordinary = fresh.ordinary.model_copy(update={"clarify_pending": False, "clarify_task": None})
+    fresh = fresh.model_copy(update={"ordinary": ordinary})
+    envelope = _envelope(_request()).model_copy(update={"commercial_intent": "price"})
+    services = frozenset({"all_on_4"})
+    bound = bind_implicit_price_service(envelope, fresh, active_service_ids=services)
+    part = bound.request_understanding.requests[0]
+    assert part.service_id == "all_on_4"
+    assert part.topic_id is None and part.situation is None
+    assert envelope.request_understanding.requests[0].service_id is None
+    assert bind_implicit_price_service(envelope, fresh, active_service_ids=frozenset()) == envelope
+    assert bind_implicit_price_service(envelope, _expired_projection(), active_service_ids=services) == envelope
+    assert bind_implicit_price_service(envelope, _fresh_projection(), active_service_ids=services) == envelope
+    unresolved = envelope.model_copy(update={"service_reference_status": "unresolved"})
+    assert bind_implicit_price_service(unresolved, fresh, active_service_ids=services) == unresolved
+    new_situation = _envelope(_request(continuity="new")).model_copy(update={"commercial_intent": "price"})
+    assert bind_implicit_price_service(new_situation, fresh, active_service_ids=services) == new_situation
+    multipart = _envelope(_request(), _request(request_id="r2")).model_copy(update={"commercial_intent": "price"})
+    assert bind_implicit_price_service(multipart, fresh, active_service_ids=services) == multipart
 
 
 def test_default_ttl_is_30_minutes_and_is_injected() -> None:

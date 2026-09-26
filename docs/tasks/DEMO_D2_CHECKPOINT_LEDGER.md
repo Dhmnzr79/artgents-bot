@@ -1,5 +1,17 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-26: REC-3 память точной услуги
+
+Baseline `279b21c3504b1c2ae999575e1f44eb85567d3ac7`, ветка
+`codex/d2-stage1-contract`; локальный origin branch совпал, `origin/main` и
+merge-base `141ce91`. До реализации tracked/staged diff пуст, чужой `data/`
+сохранён. Точный allowlist — [карточка REC-3](DEMO_D2_RECOVERY_MEMORY_TASK.md),
+включая отдельно разрешённый владельцем `core/response_plan_materialization.py`.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-REC-3 — сохранение фокуса | **ACCEPTANCE:** точная услуга без topic сохраняется и связывается с одной следующей короткой ценовой частью, даже если модель не повторила ID; две разные ценовые услуги не превращают первую в фокус; одинаковые части оставляют однозначный фокус; CLARIFY service click сохраняет ценовую задачу; новая услуга и TTL не наследуют старую память или чужую ситуацию. Это REC-3, не полный A15/REC-5. **D2 ROUTE:** offline JSON/SSE → production parser → captured tenant/context → effective typed envelope → итоговый response plan и `session_delta` → ordinary state/store/replay. Первая цена, отложенная часть и UI сравнивались с одиночной ценой. **LEGACY IMPACT:** нового parser, semantic regex и fallback нет. **OWNER DECISION:** GO REC-3 и отдельное расширение allowlist для сборщика плана получены; Astra проверила две узкие коррекции после Checker REJECT. Исходный выбранный offline baseline: 70 passed / 1 failed (`spam_closed` в старом тесте истории). До Checker находок новый REC-3 и соседний набор: 84 passed / 1 failed (то же историческое падение); отдельные проверки границ 37 passed / 46 deselected. Затем Checker выявил два P1: короткая цена без повторного ID уходила в CLARIFY, а no-topic service click мог сохранять старую ситуацию/варианты. Оба случая воспроизведены красными HTTP-тестами до исправления. После исправления REC-3 + session-context: **73 passed**; REC-3 + session-context + multipart + R1: **91 passed / 1 failed**, старый `other` → `d2_experiment_content_not_resolved`. Более широкий промежуточный набор до P1-правок: 114 passed / 1 failed, старый тест истории; финальным aggregate его не считать. Вопрос о враче проверен через текущий `model_prose` с сохранённым service и replay; прежний `authored` directory path всё ещё отвергается, детерминированный справочник врачей этим checkpoint не подтверждён. Fake provider, временные DB/logs, live/provider/SMTP 0. **FUTURE SCOPE:** REC-4/5, отдельный разбор старых authored/`other` отказов, live/merge/deploy. | Draft. Первый независимый Checker review дал REJECT по двум P1; после их исправления требуется focused Checker recheck и отдельный Cursor review рубежа 3. Staging/commit/push не выполнены. Ledger после PASS не дописывать. |
+
 ## Draft — 2026-09-26: коррекция REC-2 D2-097/098
 
 Baseline `7621441ca84e6bfc39fce79b744b647cc521a8b4`, ветка

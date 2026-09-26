@@ -32,7 +32,8 @@ from core.d2_lead_bridge import (
     resolve_d2_lead_pre_provider,
 )
 from core.d2_session_context import (
-    bind_d1r_envelope_to_d2_context, project_d2_session_context, seed_d2_plan_focus,
+    bind_d1r_envelope_to_d2_context, bind_implicit_price_service,
+    project_d2_session_context, seed_d2_plan_focus,
 )
 from core.d2_snapshot_sources import (
     build_d2_focus_clarify_response,
@@ -665,22 +666,24 @@ def _commit_non_price_d2_turn(
             PersistedActiveService(
                 service_id=selected_service_id, provenance="explicit_current", set_at_turn=turn,
             ) if selected_service_id is not None else (
-                None if clear_active_service else snapshot.state.active_service
+                None if clear_active_service else context.ordinary.active_service
             )
         ),
         active_topic=(
             PersistedActiveTopic(
                 topic_id=selected_service_topic, provenance="explicit_topic", set_at_turn=turn,
-            ) if selected_service_topic is not None else snapshot.state.active_topic
+            ) if selected_service_topic is not None else (
+                None if selected_service_id is not None else context.ordinary.active_topic
+            )
         ),
-        situation_state=None if clear_situation else snapshot.state.situation_state,
+        situation_state=None if clear_situation else context.ordinary.situation_state,
         shown_options_snapshot=(
             PersistedShownOptionsSnapshot(
                 session_key=session_key, topic_id=shown_service_topic,
                 service_ids=shown_service_options, shown_at_turn=turn,
             )
             if shown_service_options and shown_service_topic is not None
-            else snapshot.state.shown_options_snapshot
+            else (None if selected_service_id is not None else context.ordinary.shown_options_snapshot)
         ),
         dialogue_pairs=(
             (
@@ -812,7 +815,7 @@ def _run_reserved_d2_dialogue_turn(
     if selected_service_id is not None:
         selected_topic = resolve_d2_clarify_service_topic(tenant, (selected_service_id,))
         understanding_for_click = envelope.request_understanding
-        if selected_topic is None or envelope.route not in {"ANSWER", "CLARIFY"} or understanding_for_click is None or len(understanding_for_click.requests) != 1:
+        if envelope.route not in {"ANSWER", "CLARIFY"} or understanding_for_click is None or len(understanding_for_click.requests) != 1:
             raise ValueError("d2_ui_service_selection_unresolved")
         if envelope.route == "CLARIFY" and envelope.clarify_axis == "service":
             raise ValueError("d2_ui_service_selection_unresolved")
@@ -849,6 +852,10 @@ def _run_reserved_d2_dialogue_turn(
         envelope, snapshot=tenant, model_view=view,
         selected_document_action=selected_document_action,
         selected_action_only=not safe_user_message.strip(),
+    )
+    envelope = bind_implicit_price_service(
+        envelope, context,
+        active_service_ids=view.active_service_catalog.active_service_ids,
     )
     understanding = envelope.request_understanding
     full_audit("effective_envelope", envelope=envelope, selected_service_id=selected_service_id)
@@ -896,6 +903,27 @@ def _run_reserved_d2_dialogue_turn(
             resolve_d2_clarify_service_topic(tenant, envelope.clarify_service_options)
             if envelope.clarify_service_options else None
         )
+        clicked_part = understanding.requests[0] if selected_service_id is not None else None
+        clicked_subject = (
+            next((item for item in understanding.subjects
+                  if item.subject_id == clicked_part.subject_id), None)
+            if clicked_part is not None and clicked_part.subject_id is not None else None
+        )
+        click_breaks_situation = (
+            selected_service_id is not None
+            and (
+                context.ordinary.active_service is None
+                or context.ordinary.active_service.service_id != selected_service_id
+                or (clicked_part is not None and clicked_part.subject_id is not None
+                    and (clicked_subject is None or clicked_subject.relation != "self"))
+                or (clicked_part is not None and clicked_part.situation is not None
+                    and (
+                        clicked_part.situation.scope_commitment == "reset"
+                        or (clicked_part.situation.scope_commitment in {"reported", "correction"}
+                            and clicked_part.situation.continuity != "same")
+                    ))
+            )
+        )
         return _commit_non_price_d2_turn(
             session_key=session_key, store=store, snapshot=snapshot, context=context,
             focus=focus, response=response, tenant_fingerprint=tenant.fingerprint,
@@ -910,10 +938,15 @@ def _run_reserved_d2_dialogue_turn(
             selected_service_topic=(selected_topic if selected_service_id is not None else shown_topic),
             clear_active_service=(selected_service_id is None and shown_topic is not None),
             clear_situation=(
-                (selected_topic if selected_service_id is not None else shown_topic) is not None
-                and snapshot.state.situation_state is not None
-                and snapshot.state.situation_state.topic_id
-                != (selected_topic if selected_service_id is not None else shown_topic)
+                context.ordinary.situation_state is not None
+                and (
+                    click_breaks_situation
+                    or (
+                        (selected_topic if selected_service_id is not None else shown_topic) is not None
+                        and context.ordinary.situation_state.topic_id
+                        != (selected_topic if selected_service_id is not None else shown_topic)
+                    )
+                )
             ),
             dialogue_pairs=_next_d2_dialogue_pairs(
                 snapshot=snapshot,
@@ -1260,7 +1293,8 @@ def _run_reserved_d2_dialogue_turn(
     diagnostics.stage("state_build")
     # Persist only finalized facts. Hypothetical/overview/unknown must not wipe
     # a previously reported or corrected situation (D2-003).
-    situation = snapshot.state.situation_state
+    ordinary_situation = context.ordinary.situation_state
+    situation = ordinary_situation
     if (
         admin_terminal
         or price_focus_clarify
@@ -1271,13 +1305,13 @@ def _run_reserved_d2_dialogue_turn(
         or unknown_term
         or directory_kind is not None
     ):
-        situation = snapshot.state.situation_state
+        situation = ordinary_situation
     elif multi_part and (price is None or decision is None or decision.applied_extent is None):
         # Independent parts: do not invent a situation from deferred/unavailable price.
         if (
-            snapshot.state.situation_state is not None
+            ordinary_situation is not None
             and part.topic_id is not None
-            and snapshot.state.situation_state.topic_id != part.topic_id
+            and ordinary_situation.topic_id != part.topic_id
             and focus.cross_topic_carry is None
         ):
             situation = None
@@ -1307,12 +1341,12 @@ def _run_reserved_d2_dialogue_turn(
                 session_key=session_key, topic_id=part.topic_id, extent=current.extent,
                 jaw=current.jaw, stage="unknown", modifiers=(), set_at_turn=turn,
                 situation_owner_id=(
-                    snapshot.state.situation_state.situation_owner_id
+                    ordinary_situation.situation_owner_id
                     if (
                         current.scope_commitment == "correction"
-                        and snapshot.state.situation_state is not None
-                        and snapshot.state.situation_state.situation_owner_id is not None
-                        and snapshot.state.situation_state.topic_id == part.topic_id
+                        and ordinary_situation is not None
+                        and ordinary_situation.situation_owner_id is not None
+                        and ordinary_situation.topic_id == part.topic_id
                     )
                     else uuid4().hex
                 ),
@@ -1328,17 +1362,17 @@ def _run_reserved_d2_dialogue_turn(
                 situation_owner_id=source.situation_owner_id, tooth_count=source.tooth_count,
             )
         elif current is not None and current.scope_commitment == "hypothetical":
-            situation = snapshot.state.situation_state
+            situation = ordinary_situation
     elif decision is not None and decision.reason == "overview":
         current = part.situation
         if current is not None and current.scope_commitment in {"unknown", "reset"}:
             situation = None
         else:
-            situation = snapshot.state.situation_state
+            situation = ordinary_situation
     elif (
-        snapshot.state.situation_state is not None
+        ordinary_situation is not None
         and part.topic_id is not None
-        and snapshot.state.situation_state.topic_id != part.topic_id
+        and ordinary_situation.topic_id != part.topic_id
         and focus.cross_topic_carry is None
         and (decision is None or decision.applied_extent is None)
     ):
@@ -1347,44 +1381,64 @@ def _run_reserved_d2_dialogue_turn(
     shown_services = tuple(dict.fromkeys(row.service_id for row in price.rows)) if price is not None else ()
     extra_offers = tuple(row.offer_id for row in price.rows) if price is not None else ()
     shown_offers = tuple(dict.fromkeys((*context.retained_shown_ids.price_offer_ids, *extra_offers)))
-    if admin_terminal or part is None:
-        active_topic = snapshot.state.active_topic
-        shown_options_snapshot = snapshot.state.shown_options_snapshot
+    session_delta = response.resolved.session_delta
+    response_scope = response.resolved.response_scope
+    if admin_terminal or response_scope == "clinic":
+        active_service = context.ordinary.active_service
+        active_topic = context.ordinary.active_topic
+        shown_options_snapshot = context.ordinary.shown_options_snapshot
+    elif response_scope == "mixed":
+        active_service = None
+        active_topic = None
+        shown_options_snapshot = None
     else:
-        active_topic = (
-            PersistedActiveTopic(topic_id=part.topic_id, provenance="explicit_topic", set_at_turn=turn)
-            if part.topic_id is not None
-            else snapshot.state.active_topic
+        active_service = (
+            PersistedActiveService(
+                service_id=session_delta.active_service_id,
+                provenance="explicit_current", set_at_turn=turn,
+            ) if session_delta.active_service_id is not None else None
         )
-        shown_options_snapshot = snapshot.state.shown_options_snapshot
-        if price is not None and part.topic_id is not None:
+        active_topic = (
+            PersistedActiveTopic(
+                topic_id=session_delta.active_topic_id,
+                provenance="explicit_topic", set_at_turn=turn,
+            ) if session_delta.active_topic_id is not None else None
+        )
+        previous_options = context.ordinary.shown_options_snapshot
+        shown_options_snapshot = (
+            previous_options
+            if previous_options is not None and active_topic is not None
+            and previous_options.topic_id == active_topic.topic_id
+            and (active_service is None or active_service.service_id in previous_options.service_ids)
+            else None
+        )
+        if price is not None and active_topic is not None:
             shown_options_snapshot = PersistedShownOptionsSnapshot(
-                session_key=session_key, topic_id=part.topic_id, service_ids=shown_services,
-                shown_at_turn=turn, provenance="finalized_plan_price_offers",
+                session_key=session_key, topic_id=active_topic.topic_id,
+                service_ids=shown_services, shown_at_turn=turn,
+                provenance="finalized_plan_price_offers",
             )
+    if (
+        response_scope == "service"
+        and active_service is not None
+        and (
+            context.ordinary.active_service is None
+            or active_service.service_id != context.ordinary.active_service.service_id
+        )
+        and situation is ordinary_situation
+        and not (
+            part is not None and part.situation is not None
+            and part.situation.scope_commitment in {"hypothetical", "unknown"}
+        )
+    ):
+        # A new exact service cannot silently inherit an earlier patient's
+        # treatment facts. A newly established or explicitly carried situation
+        # was materialized above as a distinct state value.
+        situation = None
     state = ResponsePlanSessionState(
         schema_version=SESSION_SCHEMA_VERSION, session_key=session_key,
         revision=snapshot.state.revision + 1, last_committed_turn_index=turn,
-        active_service=(
-            PersistedActiveService(
-                service_id=selected_service_id, provenance="explicit_current", set_at_turn=turn,
-            ) if selected_service_id is not None else (
-                PersistedActiveService(
-                    service_id=part.service_id, provenance="explicit_current", set_at_turn=turn,
-                )
-                if part is not None and part.service_id is not None
-                and active_topic is not None and focus.action == "resolve_topic"
-                and focus.topic_id == active_topic.topic_id
-                else (
-                    snapshot.state.active_service
-                    if (
-                        active_topic is not None
-                        and snapshot.state.active_topic is not None
-                        and active_topic.topic_id == snapshot.state.active_topic.topic_id
-                    ) else None
-                )
-            )
-        ),
+        active_service=active_service,
         active_topic=active_topic,
         situation_state=situation,
         shown_options_snapshot=shown_options_snapshot,

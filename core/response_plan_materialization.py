@@ -1281,6 +1281,7 @@ def _d2_price_block(
     rows = tuple(
         _d2_frozen_price_row(
             offer,
+            bundle=bundle,
             client_id=client_id,
             terms=_d2_terms_for_offer(offer, client_id=client_id, published_terms=published_terms),
         )
@@ -1352,9 +1353,14 @@ def _d2_content_failure_block(
 def _d2_frozen_price_row(
     offer: TargetOffer,
     *,
+    bundle: ResponseSchemaBundle,
     client_id: str,
     terms: D2PublishedOfferTerms,
 ) -> D2FrozenPriceRow:
+    service = bundle.services.get(offer.service_id)
+    if service is None or not service.active:
+        raise MaterializationOwnershipError("materialization_foreign_material")
+    service_name = service.name
     price = offer.price
     unit = ""
     if isinstance(price, TargetFixedPrice):
@@ -1378,7 +1384,7 @@ def _d2_frozen_price_row(
             offer_id=offer.offer_id,
             service_id=offer.service_id,
             mode="no_public_price",
-            display_text=price.approved_text,
+            display_text=f"{service_name} — {price.approved_text}",
             approved_text=price.approved_text,
             condition_texts=tuple(item for item in (terms.package_label, *terms.condition_texts) if item != price.approved_text),
         )
@@ -1389,7 +1395,7 @@ def _d2_frozen_price_row(
         offer_id=offer.offer_id,
         service_id=offer.service_id,
         mode=mode,
-        display_text=f"{body} {unit} — {terms.package_label}",
+        display_text=f"{service_name} — {body} {unit} — {terms.package_label}",
         amount=price.amount if isinstance(price, TargetFixedPrice) else None,
         min_amount=(
             price.min_amount

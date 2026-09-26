@@ -41,6 +41,7 @@ tooth_count: positive integer or null. Include this legacy summary field only wh
 When any request has a non-null situation, OMIT request_understanding.scope_commitment and request_understanding.tooth_count entirely. The nested situation is the only treatment-scope source; these legacy summary fields are forbidden even when their values would match it. The production schema supplies unknown and null for their omitted values.
 subjects[].subject_id: unique s1, s2, ... (pattern s[1-9][0-9]*); relation: self | other | unknown; age_group: adult | child | unknown. Never infer current child age from childhood history.
 requests: ordered array (>=1 for ANSWER/CLARIFY) of {request_id, kind, subject_id, context, policy_ids, payment_scheme, payment_scheme_intent, contact_fields, content_text, content_ref, service_id, topic_id, statement_mode, situation}
+Interpret the current USER_MESSAGE before using dialog history. Preserve each independent question as an ordered request with its own explicitly named service_id. Use session context to resolve an omitted referent such as "это", never to replace a service explicitly named now. When the user asks independent questions about several named services, keep those requests separate; do not turn them into a choice merely because several service IDs appear. A genuine request to compare or choose among alternatives retains its own meaning. The application limits displayed price blocks after understanding.
 requests[].request_id: unique r1, r2, ... (pattern r[1-9][0-9]*); subject_id: matching subject ID or null when no patient is named, including general policy/contact/price. Booking may use null if patient identity is unknown.
 kind: clinic_policy | booking | price | contact | content | other
 context: current_care | general_information | past_history | unknown
@@ -66,11 +67,11 @@ price_text must be null on all turns. Exact visible prices, billing units, packa
 When SELECTED_EXACT_OFFER.availability=multiple and commercial_intent=price, add a content request with a short grounded explanation without exact amounts if needed.
 ADMIN — patient_text=null; price_text=null; clarify_axis=null; clarify_service_options=null; promotion_scope=none; direct_fact_ids=[].
 CLARIFY — request_understanding.requests>=1 and nonblank patient_text; price_text=null; clarify_axis required; for clarify_axis=service use 2-3 unique active service_id values; for other axes clarify_service_options=null; promotion_scope=none; direct_fact_ids=[].
-When a price question from dialog history clearly involves two or three services and one service is not chosen yet, return route=CLARIFY, clarify_axis=service, and the active service_id values in clarify_service_options (example: All-on-4 vs All-on-6 → clarify_service_options=["all_on_4","all_on_6"]).
+When the current message asks for one price but omits its service and fresh dialog context offers two or three possible services, return route=CLARIFY, clarify_axis=service, and those active service_id values in clarify_service_options. This does not apply when the current message explicitly asks separate prices for multiple named services: return ordered price requests, route=ANSWER, and primary_price_request_id for the first. The application explicitly defers later price requests.
 
 service_reference_status=none → requested_service_id=null.
 service_reference_status=unresolved → requested_service_id=null.
-service_reference_status=resolved → requested_service_id non-null and must exist in SERVICE_REFERENCE_CATALOG (active or inactive).
+service_reference_status=resolved → requested_service_id non-null and must exist in SERVICE_REFERENCE_CATALOG (active or inactive), including on CLARIFY turns. Never emit resolved with requested_service_id=null.
 service_id remains active-only: use null when the referenced service is inactive; never put inactive IDs in service_id or clarify_service_options.
 When resolved references an active service, you may set service_id to that same active ID or leave service_id null for code projection.
 

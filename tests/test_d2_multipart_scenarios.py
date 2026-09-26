@@ -367,6 +367,37 @@ def test_b14_price_plus_info_keeps_info_and_defers_nothing_extra(tmp_path: Path)
     assert outcome.response.ui_projection.video is None
 
 
+def test_mixed_content_then_price_names_the_priced_service(tmp_path: Path) -> None:
+    outcome, saved, _, _ = _run(
+        tmp_path,
+        _raw(
+            _content_part(
+                request_id="r1",
+                content_ref="implantation__faq__pain.md",
+                service_id=None,
+                topic_id="implantation",
+                text=PAIN_LIVE,
+            ),
+            _price_part(
+                request_id="r2", service_id="professional_whitening", topic_id="whitening"
+            ),
+        ),
+        key=SessionKey(client_id="demo", sid="mixed-service-price-label"),
+        message="Вопрос об имплантах и цене отбеливания",
+    )
+
+    resolved = outcome.response.resolved
+    assert [part.status for part in resolved.d2_request_parts] == ["answered", "answered"]
+    assert resolved.d2_price_block is not None
+    assert [row.service_id for row in resolved.d2_price_block.rows] == ["professional_whitening"]
+    assert resolved.d2_price_block.rows[0].display_text.startswith(
+        "Профессиональное отбеливание — от 18 000 ₽"
+    )
+    assert PAIN_LIVE in outcome.response.rendered_text
+    assert resolved.d2_price_block.rows[0].display_text in outcome.response.rendered_text
+    assert saved is not None
+
+
 def test_c02_adjacent_broken_price_keeps_independent_content(tmp_path: Path) -> None:
     """Broken independent price part must not kill live content (C02 mechanics)."""
     clients = _clients(tmp_path)

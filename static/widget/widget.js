@@ -1590,9 +1590,12 @@ export function mountWidget(root, config) {
   }
 
   function setError(msg) {
-    state.errorLine = msg || "";
+    const displayMessage = msg === "d2_invalid_turn"
+      ? "Не удалось подготовить ответ. Попробуйте задать вопрос ещё раз."
+      : msg;
+    state.errorLine = displayMessage || "";
     if (msg) {
-      errBox.textContent = msg;
+      errBox.textContent = displayMessage;
       if (state.retryBody) {
         const retry = document.createElement("button");
         retry.type = "button";

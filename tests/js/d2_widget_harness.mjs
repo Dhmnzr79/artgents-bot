@@ -138,7 +138,9 @@ try {
   if ([...root.querySelectorAll(".clinic-turn")].at(-1).querySelector(".clinic-turn__btn--cta-primary"))
     throw new Error("terminal gained an unplanned CTA");
   await send("error");
-  await waitUntil(() => root.querySelector("[data-clinic-err]")?.textContent.includes("d2_invalid_turn"));
+  await waitUntil(() => root.querySelector("[data-clinic-err]")?.textContent.includes("Не удалось подготовить ответ"));
+  if (root.querySelector("[data-clinic-err]")?.textContent.includes("d2_invalid_turn"))
+    throw new Error("technical D2 error leaked into widget");
   if (botBodies().length !== 1 || root.querySelector("[data-clinic-err] button"))
     throw new Error("terminal SSE error created UI or retry");
   widget.resetSession();

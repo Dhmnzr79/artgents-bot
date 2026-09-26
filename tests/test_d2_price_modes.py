@@ -38,6 +38,7 @@ def test_d2_price_modes_are_frozen_without_model_prose(
     assert outcome.resolved.d2_price_block is not None
     row = outcome.resolved.d2_price_block.rows[0]
     assert row.mode == expected_mode
+    assert row.display_text.startswith(f"{narrowed.services[row.service_id].name} — ")
     assert expected_text in row.display_text
     assert expected_text in outcome.rendered_text
     if expected_mode == "fixed":

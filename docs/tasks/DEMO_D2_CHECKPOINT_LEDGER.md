@@ -1,5 +1,17 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-26: коррекция model envelope и подписи цены
+
+Baseline `28ff60a4f51228dec1409e7b703cd279ea2dcee7`, ветка
+`codex/d2-stage1-contract`; origin branch совпал, `origin/main` и merge-base
+`141ce91`. До работы tracked/staged diff пуст. Чужой untracked `data/`
+сохранён; лог теста владельца прочитан только для диагностики. Точный
+allowlist — [карточка коррекции](DEMO_D2_ENVELOPE_CORRECTION_TASK.md).
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-ENVELOPE-CORR | **ACCEPTANCE:** B14/D2-080/T2, C01/R4 и подпись проверенной цены D2-093; не полный REC-4/5. **D2 ROUTE:** единственный действующий prompt явно отделяет самостоятельные вопросы текущего сообщения от пропущенного referent из истории; production parser по-прежнему отвергает `resolved` с null ID. Materializer замораживает имя услуги именно из `bundle.services[offer.service_id].name` рядом с price offer; renderer, числовые цены и условия не менялись. Widget преобразует только видимый `d2_invalid_turn` в человеческий текст; JSON/SSE error code остаётся, failed turn не commit ordinary/lead. **LEGACY IMPACT:** нового parser, второго call, semantic regex и старого fallback нет. **OWNER DECISION:** владелец разрешил отдельную коррекцию перед REC-4 и подпись услуги перед ценой; Astra дала read-only архитектурное заключение. **EVIDENCE:** три trace из карточки без копирования raw payload. До правок baseline 15 passed / 1 failed: старый prompt-version тест ждёт v19 при текущем v20; штатный browser fixture внутри sandbox истёк по timeout. После правок адресный набор 14 passed; расширенный набор 75 passed / 2 failed: старый `other` → `d2_experiment_content_not_resolved` и `test_price_content_price_preserves_independent_content_and_request_order`. Последний тест не менялся и повторил то же падение после удаления нового service-name префикса только в памяти процесса; это ограниченная изоляция, не clean HEAD baseline. Отдельный JSON/SSE tenant/replay тест 4 passed; browser harness с fake provider вне sandbox 1 passed. Сеть/provider 0, временные DB/logs. **FUTURE SCOPE:** REC-4 — краткость цены, повтор единицы, кнопки/CTA; REC-5 и отдельно разрешённый live eval; упрощение schema только новой карточкой. | Независимый Checker PASS: P0/P1 нет, его офлайн набор 16 passed. Cursor review ещё требуется. Staging/commit/push отсутствуют; после Cursor PASS Ledger не менять. |
+
 ## Draft — 2026-09-26: REC-3 память точной услуги
 
 Baseline `279b21c3504b1c2ae999575e1f44eb85567d3ac7`, ветка

@@ -1,5 +1,17 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-26: документальная фиксация widget-дефектов
+
+Baseline `6c4a96339a2eb293fa3dc2b95e253ad6efedd1c9`, ветка
+`codex/d2-stage1-contract`, `origin/main` и merge-base `141ce91`.
+Перед правкой tracked/staged diff пуст; чужой untracked `data/` сохранён.
+Точный write allowlist: этот Ledger, `DEMO_D2_PRODUCT_DECISIONS.md`,
+`DEMO_D2_ACCEPTANCE.md`, `DEMO_D2_DELIVERY_ROADMAP.md`.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-WIDGET-FINDINGS-DOC | **ACCEPTANCE:** только уточнённый план A03/B12/C01 и регрессии C04/C05/C07/C09/C10, без runtime PASS. **D2 ROUTE:** текущие `/ask`/`/ask/stream` не меняются. **LEGACY IMPACT:** код и старый runtime не меняются. **OWNER DECISION:** владелец попросил зафиксировать общий D2-сбой, связь CTA с документом и нейтральную CTA; отдельно подтвердил, что она показывается только в разрешённых D2-012 ответах. Полный локальный журнал подтвердил `d2_invalid_turn` (`276c9af0caf245bebc04fa56e65370d2`) и потерю source CTA (`f60977c81a8d4dc9a170496195526beb`); сырые переписки и ПД в commit не включаются. **FUTURE SCOPE:** владелец ещё определит место D2-097/098 в ограниченной карточке и даст отдельный GO; D2-099 проверить в REC-4; REC-3–5/live/merge/deploy не разрешены. | Draft до review. Независимый Checker ожидается; Cursor на требуемом рубеже отдельно. Документальный diff ещё не stage/commit/push; офлайн-тесты не запускались, provider/live/SMTP 0. Известные старые падения REC-2 не меняют статуса. |
+
 ## Дополнение — 2026-09-26: локальная полная D2-трассировка, offline-reviewed
 
 REC-2 после отдельных независимых Checker и Cursor отчётов сохранён и отправлен

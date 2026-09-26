@@ -10,6 +10,7 @@ from typing import Any
 
 from config import DEFAULT_LLM_MODEL
 from core import d2_diagnostics as diagnostics
+from core.d2_full_audit import full_audit
 from contracts.d2_dialogue import D2ProviderInput
 from core.one_call_prompt_contract import (
     ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS,
@@ -184,6 +185,11 @@ class D2HttpProvider:
     def generate(self, request: D2ProviderInput) -> str:
         diagnostics.stage("prompt")
         system, user = build_d2_d1r_messages(request)
+        full_audit(
+            "provider_messages", model=self.model, system=system, user=user,
+            temperature=0, max_completion_tokens=1024,
+            timeout_seconds=LLM_REQUEST_TIMEOUT_SEC,
+        )
         response = diagnostics.call_provider(self._transport,
             model=self.model, temperature=0, max_completion_tokens=1024,
             timeout=LLM_REQUEST_TIMEOUT_SEC, messages=(system, user),
@@ -197,4 +203,9 @@ class D2HttpProvider:
         content = getattr(getattr(choices[0], "message", None), "content", None)
         if not isinstance(content, str) or not content.strip():
             raise D2LiveProviderError("d2_http_response_content_missing")
+        full_audit(
+            "provider_response", model=getattr(response, "model", None),
+            usage=getattr(response, "usage", None), raw=content,
+            choice_count=len(choices),
+        )
         return content.strip()

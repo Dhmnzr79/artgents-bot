@@ -9,6 +9,7 @@ from pathlib import Path
 
 from contracts.response_plan import SessionKey
 from core import d2_diagnostics as diagnostics
+from core.d2_full_audit import full_audit, full_audit_enabled, full_audit_exception
 from core.client_runtime import per_client_data_dir
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore, D2RequestIdConflict, D2RequestInProgress
@@ -50,6 +51,17 @@ def _response_payload(turn, *, session_key: SessionKey) -> dict:
     }
 
 
+def _audit_lead_after(sid: str, *, phase: str) -> None:
+    # This extra read exists only for the local full transcript. A failed
+    # audit read must never turn a committed answer into a failed turn.
+    if not full_audit_enabled():
+        return
+    try:
+        full_audit("lead_session_after", phase=phase, row=capture_lead_session_row(sid))
+    except Exception as exc:
+        full_audit_exception("lead_session_after", exc)
+
+
 def run_d2_ask_json(data: dict, *, client_id: str) -> dict:
     diagnostics.stage("request")
     supported = {"client_id", "sid", "request_id", "q", "ref", "ui_revision", "situation_action"}
@@ -79,12 +91,19 @@ def run_d2_ask_json(data: dict, *, client_id: str) -> dict:
     if not isinstance(user_message, str):
         raise ValueError("d2_question_invalid")
     key = SessionKey(client_id=client_id, sid=sid)
+    full_audit(
+        "validated_request", client_id=client_id, sid=sid,
+        request_id=request_id, user_message=user_message,
+        selected_ref=data.get("ref"), ui_revision=data.get("ui_revision"),
+        situation_action=data.get("situation_action"),
+    )
     bind_session_client(client_id)
     path = _store_path(client_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     diagnostics.stage("store_open")
     with D2DialogueStore(path) as store:
         lead_before = capture_lead_session_row(sid)
+        full_audit("lead_session_before", row=lead_before)
         try:
             turn = run_d2_dialogue_turn(
                 session_key=key,
@@ -101,9 +120,12 @@ def run_d2_ask_json(data: dict, *, client_id: str) -> dict:
             )
         except (D2RequestIdConflict, D2RequestInProgress) as exc:
             diagnostics.failure(exc)
+            full_audit_exception("adapter_conflict", exc)
+            _audit_lead_after(sid, phase="conflict")
             raise
         except Exception as exc:
             diagnostics.failure(exc)
+            full_audit_exception("adapter_turn", exc)
             diagnostics.stage("rollback")
             completed = store._connection.execute(
                 "SELECT 1 FROM d2_turn_request WHERE client_id=? AND sid=? "
@@ -112,10 +134,18 @@ def run_d2_ask_json(data: dict, *, client_id: str) -> dict:
             ).fetchone()
             if completed is None:
                 diagnostics.completion_not_found()
+                full_audit("rollback_decision", completion_found=False, restore_lead=True)
                 restore_lead_session_row(sid, lead_before)
+                full_audit("rollback_result", lead_row_restored=True)
+                _audit_lead_after(sid, phase="rollback")
             else:
                 diagnostics.committed()
+                full_audit("rollback_decision", completion_found=True, restore_lead=False)
+                _audit_lead_after(sid, phase="committed_error")
             raise
+        _audit_lead_after(sid, phase="success")
         diagnostics.stage("store_close")
     diagnostics.stage("payload")
-    return _response_payload(turn, session_key=key)
+    payload = _response_payload(turn, session_key=key)
+    full_audit("adapter_result", payload=payload, idempotent_replay=turn.idempotent_replay)
+    return payload

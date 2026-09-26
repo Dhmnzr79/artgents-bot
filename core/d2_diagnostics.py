@@ -59,6 +59,12 @@ def _quiet(fn):
     return safe
 
 
+@_quiet
+def current_trace_id():
+    attempt = _current.get()
+    return attempt.trace if attempt is not None else None
+
+
 @dataclass
 class _Attempt:
     trace: str = field(default_factory=lambda: uuid4().hex)
@@ -91,6 +97,8 @@ def _event(attempt, event, *, reason="none", duration_ms=None):
     if duration_ms is not None:
         fields["duration_ms"] = duration_ms
     _write(fields)
+    from core.d2_full_audit import full_audit
+    full_audit("diagnostic", trace_id=attempt.trace, diagnostic=fields)
 
 
 @_quiet
@@ -237,6 +245,7 @@ class _Stream:
                 _finish(self.attempt, "stream_raised")
                 raise
             _chunk_emitted(self.attempt)
+            _full_audit_chunk(self.attempt, chunk)
         return chunk
 
     def close(self):
@@ -258,6 +267,15 @@ def _chunk_emitted(attempt):
     if attempt is not None and attempt.stage == "stream_done":
         attempt.done_emitted = True
         _event(attempt, "stream_done_emitted")
+
+
+@_quiet
+def _full_audit_chunk(attempt, chunk):
+    from core.d2_full_audit import full_audit
+    full_audit(
+        "sse_chunk", trace_id=attempt.trace if attempt is not None else None,
+        chunk=chunk,
+    )
 
 
 @_quiet

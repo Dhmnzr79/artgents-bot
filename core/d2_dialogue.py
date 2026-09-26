@@ -9,6 +9,7 @@ from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 from core import d2_diagnostics as diagnostics
+from core.d2_full_audit import full_audit, full_audit_exception
 
 from contracts.d2_dialogue import (
     D2CompletedTurn, D2DialogueRecord, D2DialogueTurn, D2LeadEffect,
@@ -263,6 +264,11 @@ def run_d2_dialogue_turn(
     effective_request_id = (request_id or uuid4().hex).strip()
     if not effective_request_id:
         raise ValueError("d2_request_id_required")
+    full_audit(
+        "turn_input", session_key=session_key, request_id=effective_request_id,
+        user_message=user_message, lead_ui_ref=lead_ui_ref,
+        ui_revision=ui_revision, situation_action=situation_action,
+    )
     if (lead_effect_id is None) != (lead_effect_dispatcher is None):
         raise ValueError("d2_lead_effect_pair_required")
     fingerprint = _request_fingerprint(
@@ -280,8 +286,10 @@ def run_d2_dialogue_turn(
     reservation = store.reserve_request(
         session_key, request_id=effective_request_id, request_fingerprint=fingerprint,
     )
+    full_audit("reservation", is_replay=reservation.is_replay)
     if reservation.is_replay:
         diagnostics.replayed()
+        full_audit("replay", completion=reservation.completed)
         return _turn_from_completion(reservation.completed, idempotent_replay=True)
     try:
         diagnostics.stage("snapshot")
@@ -300,6 +308,10 @@ def run_d2_dialogue_turn(
             activity=previous.activity if previous else None,
             policy=ttl_policy,
             now=now,
+        )
+        full_audit(
+            "session_before", record=previous, context=early_context,
+            tenant_fingerprint=tenant.fingerprint,
         )
         diagnostics.stage("binding")
         selected_ui_ref: D2SelectedUiRef | None = None
@@ -327,6 +339,10 @@ def run_d2_dialogue_turn(
                         reply_id=reply.reply_id,
                         source_revision=ui_revision,
                     )
+        full_audit(
+            "ui_binding", effective_ref=lead_ui_ref,
+            selected_ui_ref=selected_ui_ref,
+        )
         # D2-071: closed until a new chat/sid; beats lead and ordinary turns.
         if early_context.retained_terminal_state == "spam_closed":
             return _run_spam_gate_turn(
@@ -399,6 +415,7 @@ def run_d2_dialogue_turn(
                 context=early_context,
             )
         safe_user_message = provider_safe_user_text(user_message)
+        full_audit("effective_input", provider_safe_user_message=safe_user_message)
         if (
             selected_ui_ref is None
             and not provider_message_has_substance(safe_user_message, raw_source=user_message)
@@ -429,6 +446,7 @@ def run_d2_dialogue_turn(
         )
     except Exception as exc:
         diagnostics.failure(exc)
+        full_audit_exception("dialogue_turn", exc)
         store.abandon_request(
             session_key, request_id=effective_request_id, request_fingerprint=fingerprint,
         )
@@ -627,6 +645,7 @@ def _commit_non_price_d2_turn(
     clarify_task: PersistedClarifyTask | None = None,
 ) -> D2DialogueTurn:
     """Persist lead/terminal/clarify-style turns without mutating price situation."""
+    full_audit("materialized_response", response=response, focus=focus, branch="non_price")
     diagnostics.stage("state_build")
     turn = snapshot.current_turn_index
     state = ResponsePlanSessionState(
@@ -706,12 +725,14 @@ def _commit_non_price_d2_turn(
         committed_revision=state.revision,
         lead_effect=initial_effect,
     )
+    full_audit("commit_intent", state=state, completion=completion, branch="non_price")
     diagnostics.stage("commit")
     store.complete(D2DialogueRecord(
         state=state, activity=D2SessionActivity(session_key=session_key, last_user_turn_at=now),
         tenant_fingerprint=tenant_fingerprint,
     ), expected_revision=snapshot.state.revision, completion=completion)
     diagnostics.committed()
+    full_audit("commit_confirmed", state=state, completion=completion, branch="non_price")
     if lead_effect_dispatcher is not None and lead_effect_id is not None:
         diagnostics.stage("effect")
         try:
@@ -725,7 +746,10 @@ def _commit_non_price_d2_turn(
             request_id=request_id,
             effect=D2LeadEffect(effect_id=lead_effect_id, status=effect_status),
         )
-    return _turn_from_completion(completion, idempotent_replay=False)
+        full_audit("effect_result", status=effect_status, completion=completion)
+    turn_result = _turn_from_completion(completion, idempotent_replay=False)
+    full_audit("turn_return", turn=turn_result)
+    return turn_result
 
 
 def _run_reserved_d2_dialogue_turn(
@@ -751,19 +775,27 @@ def _run_reserved_d2_dialogue_turn(
         snapshot, expected_session_key=session_key,
         activity=previous.activity if previous else None, policy=ttl_policy, now=now,
     )
+    full_audit(
+        "model_context", record=previous, state=snapshot.state,
+        context=context, tenant_fingerprint=tenant.fingerprint,
+    )
     diagnostics.stage("provider")
-    raw = provider.generate(D2ProviderInput(
+    provider_input = D2ProviderInput(
         user_message=safe_user_message,
         model_view=view,
         context=context,
         selected_ui_ref=selected_ui_ref,
-    ))
+    )
+    full_audit("provider_input", provider_input=provider_input)
+    raw = provider.generate(provider_input)
+    full_audit("raw_model_response", raw=raw)
     diagnostics.stage("parse")
     envelope = parse_production_envelope_json(
         raw, active_service_catalog=view.active_service_catalog,
         service_reference_catalog=view.service_reference_catalog,
         commercial_fact_catalog=view.commercial_fact_catalog,
     )
+    full_audit("parsed_envelope", envelope=envelope)
     diagnostics.stage("binding")
     selected_topic = None
     if selected_service_id is not None:
@@ -802,6 +834,7 @@ def _run_reserved_d2_dialogue_turn(
             "request_understanding": understanding.model_copy(update={"requests": (ordinary,)})
         })
         understanding = envelope.request_understanding
+    full_audit("effective_envelope", envelope=envelope, selected_service_id=selected_service_id)
     diagnostics.stage("materialize")
     admin_terminal = envelope.route == "ADMIN"
     if admin_terminal:
@@ -1135,6 +1168,12 @@ def _run_reserved_d2_dialogue_turn(
                     }
                 )
             diagnostics.stage("materialize")
+            full_audit(
+                "materialization_input", envelope=resolution_envelope,
+                sources=sources, focus=focus,
+                exact_contact_blocks=tuple(exact_contact_blocks),
+                exact_policy_blocks=tuple(exact_policy_blocks),
+            )
             response = resolve_d2_envelope_response(
                 resolution_envelope,
                 sources,
@@ -1198,6 +1237,7 @@ def _run_reserved_d2_dialogue_turn(
         pass
     elif price is None or (part.service_id is None and decision is None) or not response.rendered_text.strip():
         raise ValueError("d2_experiment_price_not_resolved")
+    full_audit("materialized_response", response=response, focus=focus, branch="ordinary")
     turn = snapshot.current_turn_index
     diagnostics.stage("state_build")
     # Persist only finalized facts. Hypothetical/overview/unknown must not wipe
@@ -1382,12 +1422,14 @@ def _run_reserved_d2_dialogue_turn(
         committed_revision=state.revision,
         lead_effect=initial_effect,
     )
+    full_audit("commit_intent", state=state, completion=completion, branch="ordinary")
     diagnostics.stage("commit")
     store.complete(D2DialogueRecord(
         state=state, activity=D2SessionActivity(session_key=session_key, last_user_turn_at=now),
         tenant_fingerprint=tenant.fingerprint,
     ), expected_revision=snapshot.state.revision, completion=completion)
     diagnostics.committed()
+    full_audit("commit_confirmed", state=state, completion=completion, branch="ordinary")
     if lead_effect_dispatcher is not None and lead_effect_id is not None:
         diagnostics.stage("effect")
         try:
@@ -1401,4 +1443,7 @@ def _run_reserved_d2_dialogue_turn(
             request_id=request_id,
             effect=D2LeadEffect(effect_id=lead_effect_id, status=effect_status),
         )
-    return _turn_from_completion(completion, idempotent_replay=False)
+        full_audit("effect_result", status=effect_status, completion=completion)
+    turn_result = _turn_from_completion(completion, idempotent_replay=False)
+    full_audit("turn_return", turn=turn_result)
+    return turn_result

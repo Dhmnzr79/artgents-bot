@@ -1,5 +1,28 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Дополнение — 2026-09-26: локальная полная D2-трассировка, offline-reviewed
+
+REC-2 после отдельных независимых Checker и Cursor отчётов сохранён и отправлен
+в `codex/d2-stage1-contract` как `bc7616999ed9fa2a9a3f74a3e7bdc8b47ba0e171`.
+Его historical Draft ниже описывает состояние проверяемого diff до checkpoint.
+Новый baseline: `bc76169`; staging до работы пуст, foreign `data/` не тронут.
+
+По отдельному запросу владельца создаётся opt-in локальный полный журнал D2,
+включая тестовые ПД. Он не заменяет REC-1 безопасные события и не разрешает
+live/merge/deploy. Исторический `d2_full_audit.py` используется только как
+reference writer; старый dialogue/HTTP runtime не переносится. Карточка:
+[D2 local full audit](DEMO_D2_FULL_AUDIT_TASK.md). Код прошёл offline review:
+последний полный прогон нового `tests/test_d2_full_audit.py` — **15 passed**;
+связанный офлайн-набор full audit + diagnostics/HTTP/SSE/widget/no-legacy/lead
+до последнего расширения маски credentials — **71 passed**. После расширения
+отдельные 3 целевых теста также прошли; это не повтор общего набора.
+Независимый Checker дважды указал на пробелы маскировки и перехода lead state;
+после исправлений его focused recheck дал PASS. Переданный владельцем отдельный
+read-only Cursor review также дал PASS: 15 новых и 67 связанных тестов прошли.
+Статусы записаны после получения отчётов, не как предварительный вердикт.
+Локальное включение журнала, live, merge и deploy отдельно не разрешены.
+Fake provider и временные DB/log/tenant; provider/live/SMTP 0.
+
 ## Дополнение — 2026-09-26: реализация REC-2 на проверке
 
 Active-папка `C:\Cursor Projects\artgents-bot-active`, ветка

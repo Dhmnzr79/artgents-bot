@@ -17,6 +17,7 @@ from config import DEBUG_TOKEN, PORT
 from core.client_host import resolve_request_client_id
 from core.d2_http_adapter import run_d2_ask_json
 from core import d2_diagnostics as diagnostics
+from core.d2_full_audit import full_audit, full_audit_enabled, full_audit_exception
 from core.d2_dialogue_store import D2RequestIdConflict, D2RequestInProgress
 from core.client_config_loader import (
     WidgetPresentationLoadError,
@@ -67,6 +68,14 @@ def _sanitize(x):
 
 def safe_jsonify(payload):
     return jsonify(_sanitize(payload))
+
+
+def _audit_d2_request(route: str) -> None:
+    if full_audit_enabled():
+        try:
+            full_audit("http_request", route=route, body=request.get_data(cache=True, as_text=True))
+        except Exception:
+            pass
 
 
 def _bind_chat_ctx(sid: str, client_id: str) -> None:
@@ -232,14 +241,18 @@ def dashboard_events_api():
 def ask():
     """Return the durable D2 final result through the JSON transport."""
     try:
+        _audit_d2_request("/ask")
         data = request.get_json(force=True)
         if not isinstance(data, dict):
+            full_audit("http_result", route="/ask", status=400, payload={"error": "invalid_request"})
             return safe_jsonify({"error": "invalid_request"}), 400
         client_id = resolve_request_client_id(data.get("client_id"), host=request.host)
         if client_id is None:
+            full_audit("http_result", route="/ask", status=403, payload={"error": "unknown_client"})
             return safe_jsonify({"error": "unknown_client"}), 403
         blocked = _widget_origin_forbidden(client_id)
         if blocked:
+            full_audit("http_result", route="/ask", status="origin_blocked")
             return blocked
         result = run_d2_ask_json(data, client_id=client_id)
         request.ctx["sid"] = result["sid"]
@@ -247,18 +260,27 @@ def ask():
         request.ctx["client_id"] = client_id
         request.ctx["request_id"] = result["request_id"]
         diagnostics.stage("transport")
+        full_audit("http_result", route="/ask", status=200, payload=result)
         return safe_jsonify(result)
     except D2RequestIdConflict as exc:
         diagnostics.failure(exc)
+        full_audit_exception("/ask", exc)
+        full_audit("http_result", route="/ask", status=409, payload={"error": "request_id_payload_conflict"})
         return safe_jsonify({"error": "request_id_payload_conflict"}), 409
     except D2RequestInProgress as exc:
         diagnostics.failure(exc)
+        full_audit_exception("/ask", exc)
+        full_audit("http_result", route="/ask", status=409, payload={"error": "request_in_progress"})
         return safe_jsonify({"error": "request_in_progress"}), 409
     except ValueError as exc:
         diagnostics.failure(exc)
+        full_audit_exception("/ask", exc)
+        full_audit("http_result", route="/ask", status=400, payload={"error": "d2_invalid_turn"})
         return safe_jsonify({"error": "d2_invalid_turn"}), 400
     except Exception as exc:
         diagnostics.failure(exc)
+        full_audit_exception("/ask", exc)
+        full_audit("http_result", route="/ask", status=503, payload={"error": "d2_turn_failed"})
         logger.error("d2_ask_failed")
         return safe_jsonify({"error": "d2_turn_failed"}), 503
 
@@ -283,14 +305,18 @@ def _sse_status_line(message: str) -> str:
 @diagnostics.http_attempt
 def ask_stream():
     """SSE framing of the same durable D2 result returned by JSON /ask."""
+    _audit_d2_request("/ask/stream")
     data = request.get_json(force=True, silent=True)
     if not isinstance(data, dict):
+        full_audit("http_result", route="/ask/stream", status=400, payload={"error": "invalid_request"})
         return safe_jsonify({"error": "invalid_request"}), 400
     client_id = resolve_request_client_id(data.get("client_id"), host=request.host)
     if client_id is None:
+        full_audit("http_result", route="/ask/stream", status=403, payload={"error": "unknown_client"})
         return safe_jsonify({"error": "unknown_client"}), 403
     blocked = _widget_origin_forbidden(client_id)
     if blocked:
+        full_audit("http_result", route="/ask/stream", status="origin_blocked")
         return blocked
 
     # The generator holds only captured values, never Flask's request context.
@@ -306,32 +332,44 @@ def ask_stream():
                 out = run_d2_ask_json(data, client_id=client_id)
             except D2RequestIdConflict as exc:
                 diagnostics.failure(exc)
+                full_audit_exception("/ask/stream", exc)
                 error = "request_id_payload_conflict"
             except D2RequestInProgress as exc:
                 diagnostics.failure(exc)
+                full_audit_exception("/ask/stream", exc)
                 error = "request_in_progress"
             except ValueError as exc:
                 diagnostics.failure(exc)
+                full_audit_exception("/ask/stream", exc)
                 error = "d2_invalid_turn"
             except Exception as exc:
                 diagnostics.failure(exc)
+                full_audit_exception("/ask/stream", exc)
                 logger.error("d2_ask_stream_failed")
                 error = "d2_turn_failed"
             else:
                 diagnostics.stage("transport")
+                # The turn is committed, but framing or client disconnect may
+                # still prevent the UI event from being delivered.
+                full_audit("sse_result_ready", route="/ask/stream", payload=out)
                 try:
                     typing_line = _sse_typing_line("writing")
                     ui_line = f"event: ui\ndata: {json.dumps(out, ensure_ascii=False)}\n\n"
                 except Exception as exc:
                     diagnostics.failure(exc)
+                    full_audit_exception("/ask/stream/framing", exc)
+                    full_audit("sse_event", kind="error", payload={"error": "d2_stream_transport_failed"})
                     logger.error("d2_ask_stream_framing_failed")
                     yield 'event: error\ndata: {"error":"d2_stream_transport_failed"}\n\n'
                     return
                 yield typing_line
+                full_audit("sse_event", kind="ui", payload=out)
                 yield ui_line
                 diagnostics.stage("stream_done")
+                full_audit("sse_event", kind="done", payload={})
                 yield "event: done\ndata: {}\n\n"
                 return
+            full_audit("sse_event", kind="error", payload={"error": error})
             yield f"event: error\ndata: {json.dumps({'error': error})}\n\n"
         finally:
             clear_session_client_binding()

@@ -1,5 +1,19 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Дополнение — 2026-09-26: REC-1 сохранён, REC-2 только планируется
+
+В active-папке на `codex/d2-stage1-contract` по отдельному разрешению владельца
+создан и отправлен `f4bae9b0b292026733854ae1d8fd34e608f953d5`
+(`feat(d2): add safe REC-1 diagnostics`). Ровно девять проверенных файлов;
+remote branch hash подтверждён ls-remote. Checker и Cursor отчёты REC-1,
+включая late-clock дополнение, получены отдельно до commit; исторический
+Draft ниже отражает состояние проверяемого diff до этих завершающих действий.
+В этом шаге тесты повторно не запускались. Live/provider/SMTP 0.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-REC-2-DOC — карточка ответов и ссылок | **ACCEPTANCE:** план C01–C03 и обязательные регрессии границ; никаких новых runtime PASS. **D2 ROUTE:** существующий, без изменения кода. **LEGACY IMPACT:** старый WIP не переносится. **OWNER DECISION:** разрешены документы, не реализация. **FUTURE SCOPE:** отдельный GO REC-2, REC-3–5/live. Baseline f4bae9b; allowlist — новая Recovery Content Task, Roadmap, Ledger. Проверены code-level места отказов и действующий D2-092. Тесты не запускались, provider/live/SMTP 0. | Draft; независимый Checker и Cursor review карточки ожидаются отдельными отчётами. Карточка не stage/commit/push; чужой data/ сохранён. |
+
 ## Текущее дополнение — 2026-09-25
 
 Активная папка: `C:\Cursor Projects\artgents-bot-active`; ветка

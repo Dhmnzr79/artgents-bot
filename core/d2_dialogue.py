@@ -8,6 +8,7 @@ from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
+from core import d2_diagnostics as diagnostics
 
 from contracts.d2_dialogue import (
     D2CompletedTurn, D2DialogueRecord, D2DialogueTurn, D2LeadEffect,
@@ -275,13 +276,17 @@ def run_d2_dialogue_turn(
             )
         ),
     )
+    diagnostics.stage("reserve")
     reservation = store.reserve_request(
         session_key, request_id=effective_request_id, request_fingerprint=fingerprint,
     )
     if reservation.is_replay:
+        diagnostics.replayed()
         return _turn_from_completion(reservation.completed, idempotent_replay=True)
     try:
+        diagnostics.stage("snapshot")
         tenant = load_d2_tenant_snapshot(session_key.client_id, clients_root=clients_root)
+        diagnostics.stage("state_read")
         previous = store.read(session_key)
         if previous and previous.tenant_fingerprint != tenant.fingerprint:
             raise ValueError("d2_experiment_tenant_changed")
@@ -296,6 +301,7 @@ def run_d2_dialogue_turn(
             policy=ttl_policy,
             now=now,
         )
+        diagnostics.stage("binding")
         selected_ui_ref: D2SelectedUiRef | None = None
         if lead_ui_ref and ui_revision is not None:
             shown = store.read_latest_completion(session_key)
@@ -421,7 +427,8 @@ def run_d2_dialogue_turn(
                 else None
             ),
         )
-    except Exception:
+    except Exception as exc:
+        diagnostics.failure(exc)
         store.abandon_request(
             session_key, request_id=effective_request_id, request_fingerprint=fingerprint,
         )
@@ -445,6 +452,7 @@ def _run_spam_gate_turn(
 ) -> D2DialogueTurn:
     """Authored spam warn/closed stub without a provider call."""
     del clients_root, ttl_policy, previous  # already projected by caller
+    diagnostics.stage("materialize")
     response = build_d2_spam_gate_response(tenant, session_key=session_key, kind=kind)
     if response.resolved.route != "ADMIN" or not response.rendered_text.strip():
         raise ValueError("d2_experiment_spam_gate_not_resolved")
@@ -461,6 +469,7 @@ def _run_spam_gate_turn(
         ensure_ascii=False,
     )
     view = build_d2_model_view(tenant)
+    diagnostics.stage("parse")
     envelope = parse_production_envelope_json(
         raw,
         active_service_catalog=view.active_service_catalog,
@@ -503,7 +512,9 @@ def _run_lead_pre_provider_turn(
     """Situation intake / active lead slots: no provider, existing privacy owners."""
     if not d2_lead_session_client_matches(session_key):
         raise ValueError("d2_lead_session_client_required")
+    diagnostics.stage("snapshot")
     tenant = load_d2_tenant_snapshot(session_key.client_id, clients_root=clients_root)
+    diagnostics.stage("state_read")
     previous = store.read(session_key)
     if previous and previous.tenant_fingerprint != tenant.fingerprint:
         raise ValueError("d2_experiment_tenant_changed")
@@ -515,6 +526,7 @@ def _run_lead_pre_provider_turn(
         snapshot, expected_session_key=session_key,
         activity=previous.activity if previous else None, policy=ttl_policy, now=now,
     )
+    diagnostics.stage("materialize")
     bridge = resolve_d2_lead_pre_provider(
         snapshot=tenant,
         session_key=session_key,
@@ -564,6 +576,7 @@ def _run_lead_pre_provider_turn(
         ensure_ascii=False,
     )
     view = build_d2_model_view(tenant)
+    diagnostics.stage("parse")
     envelope = parse_production_envelope_json(
         raw, active_service_catalog=view.active_service_catalog,
         service_reference_catalog=view.service_reference_catalog,
@@ -614,6 +627,7 @@ def _commit_non_price_d2_turn(
     clarify_task: PersistedClarifyTask | None = None,
 ) -> D2DialogueTurn:
     """Persist lead/terminal/clarify-style turns without mutating price situation."""
+    diagnostics.stage("state_build")
     turn = snapshot.current_turn_index
     state = ResponsePlanSessionState(
         schema_version=SESSION_SCHEMA_VERSION, session_key=session_key,
@@ -692,11 +706,14 @@ def _commit_non_price_d2_turn(
         committed_revision=state.revision,
         lead_effect=initial_effect,
     )
+    diagnostics.stage("commit")
     store.complete(D2DialogueRecord(
         state=state, activity=D2SessionActivity(session_key=session_key, last_user_turn_at=now),
         tenant_fingerprint=tenant_fingerprint,
     ), expected_revision=snapshot.state.revision, completion=completion)
+    diagnostics.committed()
     if lead_effect_dispatcher is not None and lead_effect_id is not None:
+        diagnostics.stage("effect")
         try:
             effect_status = lead_effect_dispatcher.dispatch(effect_id=lead_effect_id)
             if effect_status not in {"sent", "failed", "unknown", "demo_stub"}:
@@ -721,8 +738,10 @@ def _run_reserved_d2_dialogue_turn(
     selected_service_id: str | None = None,
 ) -> D2DialogueTurn:
     """Build a final result only after ``reserve_request`` made this turn owner."""
+    diagnostics.stage("snapshot")
     tenant = load_d2_tenant_snapshot(session_key.client_id, clients_root=clients_root)
     view = build_d2_model_view(tenant)
+    diagnostics.stage("state_read")
     previous = store.read(session_key)
     if previous and previous.tenant_fingerprint != tenant.fingerprint:
         raise ValueError("d2_experiment_tenant_changed")
@@ -732,17 +751,20 @@ def _run_reserved_d2_dialogue_turn(
         snapshot, expected_session_key=session_key,
         activity=previous.activity if previous else None, policy=ttl_policy, now=now,
     )
+    diagnostics.stage("provider")
     raw = provider.generate(D2ProviderInput(
         user_message=safe_user_message,
         model_view=view,
         context=context,
         selected_ui_ref=selected_ui_ref,
     ))
+    diagnostics.stage("parse")
     envelope = parse_production_envelope_json(
         raw, active_service_catalog=view.active_service_catalog,
         service_reference_catalog=view.service_reference_catalog,
         commercial_fact_catalog=view.commercial_fact_catalog,
     )
+    diagnostics.stage("binding")
     selected_topic = None
     if selected_service_id is not None:
         selected_topic = resolve_d2_clarify_service_topic(tenant, (selected_service_id,))
@@ -780,6 +802,7 @@ def _run_reserved_d2_dialogue_turn(
             "request_understanding": understanding.model_copy(update={"requests": (ordinary,)})
         })
         understanding = envelope.request_understanding
+    diagnostics.stage("materialize")
     admin_terminal = envelope.route == "ADMIN"
     if admin_terminal:
         # B03/D2-023: one authored stub; no ordinary parts / focus required.
@@ -1111,6 +1134,7 @@ def _run_reserved_d2_dialogue_turn(
                         )
                     }
                 )
+            diagnostics.stage("materialize")
             response = resolve_d2_envelope_response(
                 resolution_envelope,
                 sources,
@@ -1126,6 +1150,7 @@ def _run_reserved_d2_dialogue_turn(
             )
             price = response.resolved.d2_price_block
             decision = response.resolved.d2_price_scope_decision
+    diagnostics.stage("gate")
     if admin_terminal:
         pass
     elif price_focus_clarify:
@@ -1174,6 +1199,7 @@ def _run_reserved_d2_dialogue_turn(
     elif price is None or (part.service_id is None and decision is None) or not response.rendered_text.strip():
         raise ValueError("d2_experiment_price_not_resolved")
     turn = snapshot.current_turn_index
+    diagnostics.stage("state_build")
     # Persist only finalized facts. Hypothetical/overview/unknown must not wipe
     # a previously reported or corrected situation (D2-003).
     situation = snapshot.state.situation_state
@@ -1356,11 +1382,14 @@ def _run_reserved_d2_dialogue_turn(
         committed_revision=state.revision,
         lead_effect=initial_effect,
     )
+    diagnostics.stage("commit")
     store.complete(D2DialogueRecord(
         state=state, activity=D2SessionActivity(session_key=session_key, last_user_turn_at=now),
         tenant_fingerprint=tenant.fingerprint,
     ), expected_revision=snapshot.state.revision, completion=completion)
+    diagnostics.committed()
     if lead_effect_dispatcher is not None and lead_effect_id is not None:
+        diagnostics.stage("effect")
         try:
             effect_status = lead_effect_dispatcher.dispatch(effect_id=lead_effect_id)
             if effect_status not in {"sent", "failed", "unknown", "demo_stub"}:

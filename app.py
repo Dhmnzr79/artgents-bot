@@ -16,6 +16,7 @@ from pg_sink import init_pg_sink
 from config import DEBUG_TOKEN, PORT
 from core.client_host import resolve_request_client_id
 from core.d2_http_adapter import run_d2_ask_json
+from core import d2_diagnostics as diagnostics
 from core.d2_dialogue_store import D2RequestIdConflict, D2RequestInProgress
 from core.client_config_loader import (
     WidgetPresentationLoadError,
@@ -90,6 +91,7 @@ def _startup_check() -> None:
 
 
 _startup_check()
+diagnostics.startup()
 
 _HEALTH_PROBE_PATHS = frozenset({"/health/live", "/health/ready"})
 
@@ -226,6 +228,7 @@ def dashboard_events_api():
 
 
 @app.post("/ask")
+@diagnostics.http_attempt
 def ask():
     """Return the durable D2 final result through the JSON transport."""
     try:
@@ -243,14 +246,19 @@ def ask():
         request.ctx["session_id"] = result["sid"]
         request.ctx["client_id"] = client_id
         request.ctx["request_id"] = result["request_id"]
+        diagnostics.stage("transport")
         return safe_jsonify(result)
-    except D2RequestIdConflict:
+    except D2RequestIdConflict as exc:
+        diagnostics.failure(exc)
         return safe_jsonify({"error": "request_id_payload_conflict"}), 409
-    except D2RequestInProgress:
+    except D2RequestInProgress as exc:
+        diagnostics.failure(exc)
         return safe_jsonify({"error": "request_in_progress"}), 409
-    except ValueError:
+    except ValueError as exc:
+        diagnostics.failure(exc)
         return safe_jsonify({"error": "d2_invalid_turn"}), 400
-    except Exception:
+    except Exception as exc:
+        diagnostics.failure(exc)
         logger.error("d2_ask_failed")
         return safe_jsonify({"error": "d2_turn_failed"}), 503
 
@@ -272,6 +280,7 @@ def _sse_status_line(message: str) -> str:
 
 
 @app.post("/ask/stream")
+@diagnostics.http_attempt
 def ask_stream():
     """SSE framing of the same durable D2 result returned by JSON /ask."""
     data = request.get_json(force=True, silent=True)
@@ -291,35 +300,43 @@ def ask_stream():
         from session import clear_session_client_binding
 
         try:
+            diagnostics.stage("transport")
             yield _sse_status_line(_SSE_INITIAL_STATUS_PHRASE)
             try:
                 out = run_d2_ask_json(data, client_id=client_id)
-            except D2RequestIdConflict:
+            except D2RequestIdConflict as exc:
+                diagnostics.failure(exc)
                 error = "request_id_payload_conflict"
-            except D2RequestInProgress:
+            except D2RequestInProgress as exc:
+                diagnostics.failure(exc)
                 error = "request_in_progress"
-            except ValueError:
+            except ValueError as exc:
+                diagnostics.failure(exc)
                 error = "d2_invalid_turn"
-            except Exception:
+            except Exception as exc:
+                diagnostics.failure(exc)
                 logger.error("d2_ask_stream_failed")
                 error = "d2_turn_failed"
             else:
+                diagnostics.stage("transport")
                 try:
                     typing_line = _sse_typing_line("writing")
                     ui_line = f"event: ui\ndata: {json.dumps(out, ensure_ascii=False)}\n\n"
-                except Exception:
+                except Exception as exc:
+                    diagnostics.failure(exc)
                     logger.error("d2_ask_stream_framing_failed")
                     yield 'event: error\ndata: {"error":"d2_stream_transport_failed"}\n\n'
                     return
                 yield typing_line
                 yield ui_line
+                diagnostics.stage("stream_done")
                 yield "event: done\ndata: {}\n\n"
                 return
             yield f"event: error\ndata: {json.dumps({'error': error})}\n\n"
         finally:
             clear_session_client_binding()
 
-    return app.response_class(_gen(), mimetype="text/event-stream", headers=_SSE_HEADERS)
+    return app.response_class(diagnostics.stream(_gen()), mimetype="text/event-stream", headers=_SSE_HEADERS)
 
 
 @app.get("/api/video-catalog")

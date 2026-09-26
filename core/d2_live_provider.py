@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from config import DEFAULT_LLM_MODEL
+from core import d2_diagnostics as diagnostics
 from contracts.d2_dialogue import D2ProviderInput
 from core.one_call_prompt_contract import (
     ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS,
@@ -181,13 +182,15 @@ class D2HttpProvider:
         self._transport = transport
 
     def generate(self, request: D2ProviderInput) -> str:
+        diagnostics.stage("prompt")
         system, user = build_d2_d1r_messages(request)
-        response = self._transport(
+        response = diagnostics.call_provider(self._transport,
             model=self.model, temperature=0, max_completion_tokens=1024,
             timeout=LLM_REQUEST_TIMEOUT_SEC, messages=(system, user),
             response_format={"type": "json_object"},
             provider_call_source="d2_http",
         )
+        diagnostics.stage("provider_response")
         choices = getattr(response, "choices", None) or ()
         if not choices:
             raise D2LiveProviderError("d2_http_response_choices_missing")

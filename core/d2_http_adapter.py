@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from contracts.response_plan import SessionKey
+from core import d2_diagnostics as diagnostics
 from core.client_runtime import per_client_data_dir
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore, D2RequestIdConflict, D2RequestInProgress
@@ -50,6 +51,7 @@ def _response_payload(turn, *, session_key: SessionKey) -> dict:
 
 
 def run_d2_ask_json(data: dict, *, client_id: str) -> dict:
+    diagnostics.stage("request")
     supported = {"client_id", "sid", "request_id", "q", "ref", "ui_revision", "situation_action"}
     if set(data) - supported:
         raise ValueError("d2_unsupported_request_fields")
@@ -80,6 +82,7 @@ def run_d2_ask_json(data: dict, *, client_id: str) -> dict:
     bind_session_client(client_id)
     path = _store_path(client_id)
     path.parent.mkdir(parents=True, exist_ok=True)
+    diagnostics.stage("store_open")
     with D2DialogueStore(path) as store:
         lead_before = capture_lead_session_row(sid)
         try:
@@ -96,15 +99,23 @@ def run_d2_ask_json(data: dict, *, client_id: str) -> dict:
                 situation_action=data.get("situation_action"),
                 lead_bridge=True,
             )
-        except (D2RequestIdConflict, D2RequestInProgress):
+        except (D2RequestIdConflict, D2RequestInProgress) as exc:
+            diagnostics.failure(exc)
             raise
-        except Exception:
+        except Exception as exc:
+            diagnostics.failure(exc)
+            diagnostics.stage("rollback")
             completed = store._connection.execute(
                 "SELECT 1 FROM d2_turn_request WHERE client_id=? AND sid=? "
                 "AND request_id=? AND status='complete'",
                 (client_id, sid, request_id),
             ).fetchone()
             if completed is None:
+                diagnostics.completion_not_found()
                 restore_lead_session_row(sid, lead_before)
+            else:
+                diagnostics.committed()
             raise
+        diagnostics.stage("store_close")
+    diagnostics.stage("payload")
     return _response_payload(turn, session_key=key)

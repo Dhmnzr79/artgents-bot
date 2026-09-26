@@ -119,6 +119,15 @@ def _normalize_production_payload(
                 continue
             content_text = request.get("content_text")
             content_ref = request.get("content_ref")
+            model_prose = (
+                request.get("kind") == "content"
+                and (
+                    request.get("content_realization") is None
+                    or request.get("content_realization") == "model_prose"
+                )
+                and isinstance(content_text, str)
+                and bool(content_text.strip())
+            )
             valid_content_ref = (
                 content_ref is None
                 or (
@@ -129,11 +138,41 @@ def _normalize_production_payload(
                     and ".." not in content_ref
                 )
             )
+            sections = request.get("content_section_refs", [])
+            fallback = request.get("content_fallback_section_ref")
+            valid_sections = (
+                isinstance(sections, (list, tuple))
+                and all(
+                    isinstance(ref, str) and bool(ref) and ref == ref.strip()
+                    for ref in sections
+                )
+                and len(sections) == len(set(sections))
+            )
+            valid_fallback = (
+                fallback is None
+                or (
+                    isinstance(fallback, str)
+                    and bool(fallback)
+                    and fallback == fallback.strip()
+                    and isinstance(sections, (list, tuple))
+                    and fallback in sections
+                )
+            )
             if (
-                request.get("kind") in {"content", "other"}
-                and isinstance(content_text, str)
-                and content_text.strip()
-                and not valid_content_ref
+                (
+                    request.get("kind") in {"content", "other"}
+                    and isinstance(content_text, str)
+                    and content_text.strip()
+                    and not valid_content_ref
+                )
+                or (
+                    model_prose
+                    and (
+                        not valid_sections
+                        or not valid_fallback
+                        or (content_ref is None and bool(sections))
+                    )
+                )
             ):
                 # A malformed optional source cannot authorize source UI, but
                 # it must not discard useful FullContext prose. Preserve no

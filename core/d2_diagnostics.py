@@ -40,6 +40,9 @@ _REASONS = frozenset({
     "d2_http_response_choices_missing", "d2_http_response_content_missing",
     "d2_prompt_fullcontext_empty",
 })
+_PROSE_REVIEW_REASONS = frozenset({
+    "d2_model_prose_money", "d2_model_prose_link",
+})
 _SOURCE_FILES = (
     "app.py", "core/d2_diagnostics.py", "core/d2_http_adapter.py",
     "core/d2_dialogue.py", "core/d2_live_provider.py",
@@ -131,6 +134,13 @@ def stage(name):
     if attempt is not None and name in _STAGES:
         attempt.stage = name
         _event(attempt, "stage_started")
+
+
+@_quiet
+def prose_review_signal(reason):
+    """Best-effort observation, not a turn failure or a prose verdict."""
+    if reason in _PROSE_REVIEW_REASONS:
+        _event(_current.get(), "prose_review_signal", reason=reason)
 
 
 @_quiet

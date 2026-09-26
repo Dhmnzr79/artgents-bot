@@ -239,21 +239,61 @@ def test_startup_snapshot_has_only_scoped_code_hash(monkeypatch):
     assert len(events[0]["source_files_sha256"]) == 64
 
 
-def test_existing_content_gate_is_diagnosed_not_repaired(observed):
+def test_money_prose_is_published_with_nonblocking_review(observed):
     from tests.test_d2_ui_b12_scenarios import _content_pain_raw
     (client, _, _, _), events, _, replies = observed
     payload = json.loads(_content_pain_raw())
     payload["request_understanding"]["requests"][0]["content_text"] = "Стоимость от 5 000 рублей."
-    # This case has no authored recovery; the original helper has one and
-    # legitimately returns a recovered answer instead of reaching the gate.
+    # D2-092: money is a review signal, not a gate or authored replacement.
     payload["request_understanding"]["requests"][0]["content_fallback_section_ref"] = None
     replies[0] = json.dumps(payload, ensure_ascii=False)
     response = post(client)
-    assert response.status_code == 400
-    assert response.get_json() == {"error": "d2_invalid_turn"}
-    failed = event_rows(events, "failure")[0]
-    assert failed["stage"] == "gate"
-    assert failed["reason"] == "d2_experiment_content_not_resolved"
+    assert response.status_code == 200
+    assert "Стоимость от 5 000 рублей." in response.get_json()["answer"]
+    assert not event_rows(events, "failure")
+    review = event_rows(events, "prose_review_signal")
+    assert len(review) == 1
+    assert review[0]["reason"] == "d2_model_prose_money"
+    assert review[0]["stage"] == "materialize"
+    assert "Стоимость" not in json.dumps(review, ensure_ascii=False)
+
+
+def test_review_sink_failure_cannot_change_published_answer(observed, monkeypatch):
+    from tests.test_d2_ui_b12_scenarios import _content_pain_raw
+    (client, db, _, _), _, calls, replies = observed
+    payload = json.loads(_content_pain_raw())
+    payload["request_understanding"]["requests"][0]["content_text"] = "Стоимость от 5 000 рублей."
+    replies[0] = json.dumps(payload, ensure_ascii=False)
+    def broken(_fields):
+        raise RuntimeError(SECRET)
+    monkeypatch.setattr(diagnostics, "_write", broken)
+    response = post(client, sid="review-sink")
+    assert response.status_code == 200
+    assert "Стоимость от 5 000 рублей." in response.get_json()["answer"]
+    assert len(calls) == 1
+    with D2DialogueStore(db) as store:
+        saved = store.read_latest_completion(SessionKey(client_id="demo", sid="review-sink"))
+        assert saved.response.resolved.d2_request_parts[0].failure_reason is None
+
+
+def test_money_and_link_review_is_once_per_materialized_attempt_not_replay(observed):
+    from tests.test_d2_ui_b12_scenarios import _content_pain_raw
+    (client, _, _, _), events, calls, replies = observed
+    payload = json.loads(_content_pain_raw())
+    prose = "Ориентир от 5 000 ₽; справка [здесь](https://example.test/info)."
+    payload["request_understanding"]["requests"][0]["content_text"] = prose
+    replies[0] = json.dumps(payload, ensure_ascii=False)
+    first = post(client, sid="review-replay", request_id="same", q="Расскажите подробнее")
+    assert first.status_code == 200 and prose in first.get_json()["answer"]
+    replay = sse_events(post_sse(client, sid="review-replay", request_id="same", q="Расскажите подробнее"))
+    assert dict(replay)["ui"] == first.get_json()
+    assert len(calls) == 1
+    review = event_rows(events, "prose_review_signal")
+    assert {row["reason"] for row in review} == {"d2_model_prose_money", "d2_model_prose_link"}
+    assert len(review) == 2
+    assert len({row["attempt_trace_id"] for row in review}) == 1
+    assert all(row["stage"] == "materialize" and row["replay"] is False for row in review)
+    assert prose not in json.dumps(events, ensure_ascii=False)
 
 
 @pytest.mark.parametrize("path", ["/ask", "/ask/stream"])

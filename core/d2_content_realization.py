@@ -13,6 +13,7 @@ from typing import Literal
 
 from contracts.request_understanding import RequestUnderstandingRequest
 from contracts.response_plan_materialization import D2AuthoredContentAuthority
+from core import d2_diagnostics
 
 
 ContentOutcome = Literal["answered", "recovered", "unavailable"]
@@ -57,14 +58,8 @@ def realize_d2_content(
         )
 
     text = (request.content_text or "").strip()
-    reason: ContentViolation | None = None
-    if not text:
-        reason = "d2_model_prose_empty"
-    elif _MONEY.search(text):
-        reason = "d2_model_prose_money"
-    elif _LINK.search(text):
-        reason = "d2_model_prose_link"
-    if reason is None:
+    if text:
+        _observe_model_prose(text)
         return D2ContentRealization(
             outcome="answered",
             publication="model_prose",
@@ -72,6 +67,7 @@ def realize_d2_content(
             section_refs=request.content_section_refs,
         )
 
+    reason: ContentViolation = "d2_model_prose_empty"
     recovery_refs = _recovery_section_refs(request)
     recovered: list[str] = []
     used: list[str] = []
@@ -104,9 +100,8 @@ def realize_d2_unattributed_content(
 ) -> D2ContentRealization:
     """Publish ordinary FullContext prose without a document-route requirement.
 
-    The model has already received the complete approved corpus.  Unlike a
-    cited section, this prose cannot recover from a rejected money/link check;
-    it simply remains unavailable for the same D2 turn.
+    The model has already received the complete approved corpus. Optional
+    provenance does not decide whether nonempty prose can be published.
     """
 
     text = (request.content_text or "").strip()
@@ -115,20 +110,19 @@ def realize_d2_unattributed_content(
             outcome="unavailable", publication=None, display_text=None,
             section_refs=(), reason="d2_model_prose_empty",
         )
-    if _MONEY.search(text):
-        return D2ContentRealization(
-            outcome="unavailable", publication=None, display_text=None,
-            section_refs=(), reason="d2_model_prose_money",
-        )
-    if _LINK.search(text):
-        return D2ContentRealization(
-            outcome="unavailable", publication=None, display_text=None,
-            section_refs=(), reason="d2_model_prose_link",
-        )
+    _observe_model_prose(text)
     return D2ContentRealization(
         outcome="answered", publication="model_prose", display_text=text,
         section_refs=(),
     )
+
+
+def _observe_model_prose(text: str) -> None:
+    # Existing mechanical detectors are review signals only. Never log prose.
+    if _MONEY.search(text):
+        d2_diagnostics.prose_review_signal("d2_model_prose_money")
+    if _LINK.search(text):
+        d2_diagnostics.prose_review_signal("d2_model_prose_link")
 
 
 def _is_korotko_section(ref: str) -> bool:

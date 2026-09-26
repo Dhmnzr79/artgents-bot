@@ -68,7 +68,7 @@ def test_price_and_other_service_content_remain_independent_and_mixed() -> None:
     assert outcome.resolved.response_scope == "mixed"
     assert outcome.resolved.session_delta.active_service_id is None
     assert [(item.request_id, item.scope) for item in outcome.resolved.d2_request_parts] == [("r1", "topic"), ("r2", "service")]
-    assert outcome.rendered_text.index("Exact package") < outcome.rendered_text.index("Материал терапии.")
+    assert outcome.rendered_text.index("Exact package") < outcome.rendered_text.index("approved meaning")
 
 
 def test_request_order_controls_frozen_render_order() -> None:
@@ -76,7 +76,7 @@ def test_request_order_controls_frozen_render_order() -> None:
         _part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"),
         _part("r1", "price", service_id="service_one", topic_id="implantation"),
     ]), _sources_ab(), as_of=date(2026, 9, 18))
-    assert outcome.rendered_text.index("Материал терапии.") < outcome.rendered_text.index("Exact package")
+    assert outcome.rendered_text.index("approved meaning") < outcome.rendered_text.index("Exact package")
 
 
 def test_two_content_services_are_mixed_and_render_each_source_once() -> None:
@@ -85,14 +85,16 @@ def test_two_content_services_are_mixed_and_render_each_source_once() -> None:
     source_payload["d2_authored_content"] = (*source_payload["d2_authored_content"], D2AuthoredContentAuthority(source_client_id="demo", content_ref="pain-two.md", display_text="Второй материал имплантации.", allowed_service_ids=("service_one",)).model_dump())
     sources = type(base).model_validate(source_payload)
     outcome = resolve_d2_envelope_response(_envelope([
-        _part("r1", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"),
-        _part("r2", "content", service_id="service_one", topic_id="implantation", content_ref="pain-two.md"),
+        {**_part("r1", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"),
+         "content_text": "Ответ модели о терапии."},
+        {**_part("r2", "content", service_id="service_one", topic_id="implantation", content_ref="pain-two.md"),
+         "content_text": "Ответ модели об имплантации."},
     ]), sources, as_of=date(2026, 9, 18))
     assert outcome.resolved.response_scope == "mixed"
     assert outcome.resolved.session_delta.active_service_id is None
-    assert outcome.rendered_text.count("Материал терапии.") == 1
-    assert outcome.rendered_text.count("Второй материал имплантации.") == 1
-    assert outcome.rendered_text.index("Материал терапии.") < outcome.rendered_text.index("Второй материал")
+    assert outcome.rendered_text.count("Ответ модели о терапии.") == 1
+    assert outcome.rendered_text.count("Ответ модели об имплантации.") == 1
+    assert outcome.rendered_text.index("Ответ модели о терапии.") < outcome.rendered_text.index("Ответ модели об имплантации.")
 
 
 @pytest.mark.parametrize(
@@ -125,18 +127,20 @@ def test_two_content_sources_keep_order_without_source_secondary_ui(request_refs
     ]
     sources = type(base).model_validate(payload)
     parts_by_ref = {
-        "therapy.md": _part("r1", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"),
-        "pain-two.md": _part("r2", "content", service_id="service_one", topic_id="implantation", content_ref="pain-two.md"),
+        "therapy.md": {**_part("r1", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"),
+                       "content_text": "Ответ модели о терапии."},
+        "pain-two.md": {**_part("r2", "content", service_id="service_one", topic_id="implantation", content_ref="pain-two.md"),
+                        "content_text": "Ответ модели об имплантации."},
     }
     outcome = resolve_d2_envelope_response(
         _envelope([parts_by_ref[ref] for ref in request_refs]), sources,
         as_of=date(2026, 9, 18),
     )
-    texts_by_ref = {"therapy.md": "Материал терапии.", "pain-two.md": "Материал имплантации."}
+    texts_by_ref = {"therapy.md": "Ответ модели о терапии.", "pain-two.md": "Ответ модели об имплантации."}
     assert [part.content_ref for part in outcome.resolved.d2_request_parts] == list(request_refs)
     assert outcome.rendered_text.index(texts_by_ref[request_refs[0]]) < outcome.rendered_text.index(texts_by_ref[request_refs[1]])
-    assert outcome.rendered_text.count("Материал терапии.") == 1
-    assert outcome.rendered_text.count("Материал имплантации.") == 1
+    assert outcome.rendered_text.count("Ответ модели о терапии.") == 1
+    assert outcome.rendered_text.count("Ответ модели об имплантации.") == 1
     assert outcome.resolved.ui_plan.source_content_ref == request_refs[0]
     assert outcome.ui_projection.quick_replies == ()
     assert outcome.ui_projection.video is None
@@ -161,15 +165,57 @@ def test_clinic_wide_content_is_independent_beside_price() -> None:
         _part("r2", "content", service_id=None, topic_id=None, content_ref="warranty.md"),
     ]), sources, as_of=date(2026, 9, 18))
     assert outcome.resolved.response_scope == "mixed"
-    assert "Общая гарантия." in outcome.rendered_text
+    assert "approved meaning" in outcome.rendered_text
+    assert outcome.resolved.d2_request_parts[1].content_ref == "warranty.md"
 
 
-def test_foreign_content_source_fails_closed_without_neighbor_substitution() -> None:
-    with pytest.raises(MaterializationOwnershipError):
+def test_missing_content_ref_keeps_model_prose_without_borrowed_source() -> None:
+    content = {
+        **_part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="missing.md"),
+        "content_realization": "model_prose",
+    }
+    outcome = resolve_d2_envelope_response(_envelope([
+        _part("r1", "price", service_id="service_one", topic_id="implantation"),
+        content,
+    ]), _sources_ab(), as_of=date(2026, 9, 18))
+    part = outcome.resolved.d2_request_parts[1]
+    assert (part.status, part.content_ref, part.failure_reason) == ("answered", None, None)
+    assert outcome.resolved.information_blocks[0].content_ref is None
+    assert outcome.resolved.ui_plan.source_content_ref is None
+    assert "approved meaning" in outcome.rendered_text
+
+
+def test_missing_content_ref_does_not_authorize_unknown_typed_topic() -> None:
+    content = _part(
+        "r1", "content", service_id=None,
+        topic_id="not_in_this_tenant", content_ref="missing.md",
+    )
+    with pytest.raises(MaterializationOwnershipError, match="materialization_foreign_material"):
+        resolve_d2_envelope_response(
+            _envelope([content]), _sources_ab(), as_of=date(2026, 9, 18),
+        )
+
+
+def test_proven_foreign_content_owner_fails_closed() -> None:
+    # model_copy intentionally bypasses the outer source validator to exercise
+    # the materializer's independent tenant boundary, not a missing filename.
+    sources = _sources_ab()
+    foreign = D2AuthoredContentAuthority(
+        source_client_id="nikadent", content_ref="foreign.md",
+        display_text="Чужой материал.", allowed_service_ids=("service_two",),
+    )
+    sources = sources.model_copy(update={
+        "d2_authored_content": (*sources.d2_authored_content, foreign),
+    })
+    content = {
+        **_part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="foreign.md"),
+        "content_realization": "model_prose",
+    }
+    with pytest.raises(MaterializationOwnershipError, match="materialization_foreign_material"):
         resolve_d2_envelope_response(_envelope([
             _part("r1", "price", service_id="service_one", topic_id="implantation"),
-            _part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="missing.md"),
-        ]), _sources_ab(), as_of=date(2026, 9, 18))
+            content,
+        ]), sources, as_of=date(2026, 9, 18))
 
 
 def test_direct_d2_path_does_not_call_legacy_materializer(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -220,7 +266,7 @@ def test_c4_strict_scope_remains_owned_by_price_part_with_other_content() -> Non
     assert [(part.request_id, part.topic_id, part.content_ref) for part in outcome.resolved.d2_request_parts] == [
         ("r1", "implantation", None), ("r2", "therapy", "therapy.md")
     ]
-    assert "Материал терапии." in outcome.rendered_text
+    assert "approved meaning" in outcome.rendered_text
     assert "Exact package option_a_from" in outcome.rendered_text
     assert "Exact package generic_fixed" not in outcome.rendered_text
 
@@ -235,7 +281,7 @@ def test_other_direction_content_cannot_supply_missing_known_scope_price() -> No
     )
     assert outcome.resolved.d2_result_status == "degraded"
     assert outcome.resolved.d2_request_parts[0].failure_reason == "d2_no_scope_price_candidates"
-    assert "Материал терапии." in outcome.rendered_text
+    assert "approved meaning" in outcome.rendered_text
 
 
 def test_other_direction_situation_does_not_filter_price_part() -> None:
@@ -252,7 +298,7 @@ def test_other_direction_situation_does_not_filter_price_part() -> None:
     assert outcome.resolved.d2_treatment_situation.source_request_id == "r2"
     assert outcome.resolved.d2_price_scope_decision.applied_extent is None
     assert "generic_fixed" in [row.offer_id for row in outcome.resolved.d2_price_block.rows]
-    assert "Материал терапии." in outcome.rendered_text
+    assert "approved meaning" in outcome.rendered_text
 
 
 def test_price_suppresses_other_source_secondary_ui_but_keeps_volume_choices_and_cta() -> None:

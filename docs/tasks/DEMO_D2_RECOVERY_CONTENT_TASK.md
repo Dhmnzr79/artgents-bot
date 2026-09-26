@@ -1,9 +1,10 @@
 # D2-REC-2 — пригодный ответ и необязательные ссылки
 
-Дата: 2026-09-26. Статус: **Draft карточки, не GO на реализацию**.
-Владелец разрешил сохранить проверенный REC-1 и подготовить эту карточку.
-Код REC-2, тестовые запуски, установки пакетов, live, merge и deploy сейчас
-не разрешены. После согласования карточки нужен отдельный GO на реализацию.
+Дата: 2026-09-26. Статус реализации: **Draft; ожидаются Checker и Cursor**.
+Карточка была отдельно одобрена Checker и Cursor, сохранена в `ce47c16`,
+после чего владелец дал GO на реализацию REC-2. Live, merge и deploy не
+разрешены. Ниже §1–8 сохраняют утверждённый план и исторический prompt
+проверки карточки; факты текущего implementation diff добавлены в §9.
 
 ## 1. Результат простыми словами
 
@@ -33,9 +34,9 @@ REC-4, полная приёмка и отдельно разрешённая р
 
 - Папка и Git top level: `C:\Cursor Projects\artgents-bot-active`.
 - Ветка: `codex/d2-stage1-contract`, продолжение существующей D2-задачи.
-- Точный baseline подготовки: `f4bae9b0b292026733854ae1d8fd34e608f953d5`
-  (`feat(d2): add safe REC-1 diagnostics`). Push в эту ветку подтверждён
-  `git ls-remote`; remote HEAD совпал с локальным.
+- Baseline подготовки карточки: `f4bae9b0b292026733854ae1d8fd34e608f953d5`
+  (`feat(d2): add safe REC-1 diagnostics`). Документальный checkpoint и точный
+  implementation baseline: `ce47c16f564498165c1d00b2d0efd997dcbb9c22`.
 - `origin/main` и merge-base: `141ce91fb1731cd990fcf8391550150016c73e7f`.
 - После commit REC-1 tracked clean, staging пуст. Foreign/untracked: `data/`.
   `data/demo/d2_dialogue.sqlite` не часть задачи. Старые папки/worktrees,
@@ -44,7 +45,7 @@ REC-4, полная приёмка и отдельно разрешённая р
   late-clock дополнение. Это история предыдущего checkpoint, не verdict
   этой карточки и не доказательство готовности REC-2.
 
-Текущий documentation-only allowlist:
+Исторический documentation-only allowlist подготовки:
 
 ```text
 docs/tasks/DEMO_D2_RECOVERY_CONTENT_TASK.md     # новый, читать явно даже untracked
@@ -52,11 +53,9 @@ docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md          # текущий статус и
 docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md        # новая Draft/evidence строка
 ```
 
-Сначала review карточки; без её commit/push до отдельного согласования.
-Будущая реализация стартует с подтверждённого documentation checkpoint:
-точный hash сообщается в handoff и проверяется preflight. До него разрешённый
-runtime baseline — f4bae9b; промежуточный diff должен содержать только три
-документа выше. Произвольный descendant не считается разрешённым baseline.
+Review карточки и отдельный GO получены. Реализация стартовала ровно с
+`ce47c16`; разрешённые файлы перечислены в §5. Произвольный descendant не
+считается разрешённым baseline.
 
 ## 3. Источники и подтверждённые места проблемы
 
@@ -167,7 +166,7 @@ server-owned привязку, даже если модель не повтор�
   escaping HTML и отсутствие исполнения URI; это не GO делать ссылки активными.
   Текущий formatter отображает Markdown-ссылку как label — в REC-2 его не менять.
 
-## 5. Будущий write allowlist — только после отдельного GO
+## 5. Write allowlist реализации — GO получен
 
 ```text
 core/one_call_envelope_protocol.py             # существующая optional normalization
@@ -270,8 +269,8 @@ temporary tenant copy и SQLite. Browser — temporary profile/fake transport,
 
 Принятые правила не пересогласовывать: неточность prose — демо-риск D2-092;
 code-owned факты и tenant/lead/privacy остаются строгими; один parser/вызов/plan.
-Авторизация сейчас только на документы. Следующее решение владельца — GO на
-реализацию после review карточки и подтверждения точного baseline.
+GO на реализацию после review карточки получен. Следующие ворота — независимый
+Checker, Cursor и согласование закрытия diff; live отдельно.
 
 Остановиться и задать конкретный вопрос, если безопасная реализация требует:
 нового visible правила или отказа; ослабления ownership/lead/privacy; нового
@@ -316,3 +315,64 @@ Money/link review не должен стать semantic sanitizer, новым ga
 Без edits/tests/staging/commit/push/install/live/merge/deploy.
 PASS карточки не разрешает реализацию: требуется отдельный GO владельца.
 ```
+
+## 9. Реализация на `ce47c16`: Draft evidence, не verdict
+
+Владелец дал GO после отдельных Checker/Cursor PASS карточки. Runtime diff
+ограничен одним существующим parser/materializer/frozen plan: optional поля
+`content_ref`/sections/fallback у непустой `model_prose` очищаются как одна
+группа при неверной форме; отсутствующий в snapshot или локально несовместимый
+источник не скрывает prose, но не получает source ref/UI. Доказанный чужой
+владелец источника, неизвестная typed service, пустая prose и явный `authored`
+остаются строгими. У подтверждённого источника без service/topic сохраняются
+source ref и разрешённые UI, но не создаётся service focus. Money/link — два
+закрытых review-сигнала REC-1, а не ответный gate или проверенная цена.
+
+Точное изменение прежних ожиданий по принятому D2-092 и §4:
+
+| Тесты | До → после | Основание |
+|---|---|---|
+| `test_d2_prose_violation.py`, `test_d2_recovery_scenarios.py`, `test_d2_content_scenarios.py` | money/link выбрасывали или заменяли prose цитатой → непустой исходный prose в ответе, без `failure_reason`; code-owned цена отдельно неизменна | §4.1, §4.3, D2-092 |
+| `test_d2_prose_violation.py`, `test_d2_independent_request_parts.py` | `missing.md` считался gap/foreign → пригодный prose без ref, sections и source UI; настоящий `source_client_id` другого tenant проверяется отдельным отрицательным тестом | §4.2, C01/C09 |
+| `test_request_understanding_schema_offline.py` | malformed optional sections у `model_prose` отвергали весь envelope → очищается только optional provenance; `authored` и пустой текст остаются strict | §4.1–4.2 |
+| `test_d2_content_source_ui.py`, `test_d2_independent_request_parts.py` | старые assertions ожидали текст документа при default `model_prose` → проверяют текст модели, порядок частей и прежние границы UI | §4.1–4.2 |
+| `test_d2_diagnostics.py` | money давали `d2_invalid_turn` → HTTP 200 и неблокирующий закрытый review; другие реальные отказные кейсы остаются | §4.3 |
+
+Офлайн-проверки с временными tenant copies/SQLite и отключённой сетью:
+
+- До кода на точном `ce47c16`: восемь назначенных файлов — **83 passed,
+  27 failed**, 69.46 с. Это старые ожидания v19/authored и старый HTTP
+  fixture, не новый regression baseline после переписывания тестов.
+- После основного diff: десять назначенных файлов, включая новый собранный
+  HTTP-файл и REC-1 diagnostics — **150 passed, 13 failed**, 93.71 с.
+  Тринадцать красных — старые parser/R1 проверки: один v19 вместо v20,
+  старый HTTP fixture/маршрут `other` и смежные старые ожидания. После этого
+  для одного строгого случая сохранён прежний `d2_content_service_mismatch`
+  вместо нового класса ошибки; focused recheck **2 passed**, новый полный
+  aggregate после этой точечной правки не заявляется.
+- Затронутые сценарии отдельно: `test_d2_rec2_content_http.py`,
+  `test_d2_content_source_ui.py`, `test_d2_independent_request_parts.py`,
+  `test_d2_prose_violation.py` — **50 passed**; recovery/content — **10 passed**;
+  новый money/link review/replay/sink — **3 passed**. Это выборочные прогоны,
+  не сумма для общего pass-rate.
+- Дополнительный read-only regression set (HTTP, Stage 4, lead, no-legacy,
+  widget replay, multi-request, R3, B12), исключая один browser-case:
+  **52 passed, 6 failed, 1 deselected**, 103.18 с. Исключённый browser-case
+  внутри sandbox дал timeout 75 с, но тот же офлайн case вне sandbox
+  **1 passed**, 24.97 с. Никакого live/provider вызова не было.
+- Шесть read-only failures не правились: три в `test_d2_multi_request.py`
+  ожидают старый authored text вместо default `model_prose`; один в
+  `test_d2_r3_free_dialogue.py` требует старый money-gap вместо D2-092;
+  его greeting/`other` case всё ещё упирается в content gate; B12 free-CTA
+  останавливается на `patient_text_required`. Последние два не исправляются
+  под видом REC-2. Для изменения этих тестов нужен отдельный test-only
+  allowlist владельца; их падения не объявлены PASS.
+
+Новый HTTP-файл проверяет JSON/SSE и replay в обе стороны, completion/store,
+согласованность frozen part/block/UI, mixed price+policy/contact, valid source
+без выдуманного focus, пустой/явный authored/неизвестный typed ID, показанный
+follow-up и следующий ход. Диагностика проверена с отказавшим sink и replay:
+review не содержит prose и не повторяется на replay. `git diff --check`,
+allowlist и foreign WIP — обязательны к повторной проверке на review. Текущий
+diff не staged, не committed и не pushed; независимый Checker implementation
+и Cursor ещё не проводились. Provider/live/SMTP 0; merge/deploy 0.

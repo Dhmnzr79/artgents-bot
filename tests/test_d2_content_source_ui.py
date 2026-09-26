@@ -19,6 +19,9 @@ from tests.test_d2_single_request import (
 )
 
 
+MODEL_PROSE = "Смысловой текст модели не является источником ответа."
+
+
 def _content_sources(*, shown: tuple[str, ...] = ()) -> ResponsePlanMaterializationSources:
     base = _sources(
         content=(
@@ -147,7 +150,7 @@ def test_missing_source_ui_keeps_the_approved_text_without_borrowing_navigation(
 
     outcome = resolve_d2_envelope_response(envelope, source, as_of=date(2026, 9, 18))
 
-    assert outcome.rendered_text == "Одобренный текст о боли."
+    assert outcome.rendered_text == MODEL_PROSE
     assert outcome.ui_projection.quick_replies == ()
     assert outcome.ui_projection.video is None
     assert outcome.ui_projection.buttons == ()
@@ -172,7 +175,7 @@ def test_price_plus_content_suppresses_source_secondary_but_keeps_source_cta() -
     )
 
     assert outcome.resolved.d2_price_block is not None
-    assert outcome.rendered_text.endswith("Одобренный текст о боли.")
+    assert outcome.rendered_text.endswith(MODEL_PROSE)
     assert outcome.ui_projection.video is None
     assert outcome.ui_projection.quick_replies == ()
     assert [item.button_id for item in outcome.ui_projection.buttons] == ["pain_cta"]
@@ -201,7 +204,7 @@ def test_invalid_optional_source_cta_is_omitted_with_a_diagnostic() -> None:
 
     outcome = resolve_d2_envelope_response(envelope, source, as_of=date(2026, 9, 18))
 
-    assert outcome.rendered_text == "Одобренный текст о боли."
+    assert outcome.rendered_text == MODEL_PROSE
     assert outcome.ui_projection.buttons == ()
     assert [(item.code, item.detail) for item in outcome.materialization_diagnostics] == [
         ("materialization_optional_unavailable", ("d2_source_ui_cta_kind_invalid", "pain_cta")),

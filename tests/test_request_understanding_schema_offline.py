@@ -186,8 +186,12 @@ def test_d2_section_refs_use_existing_envelope() -> None:
     for invalid in (["a:one", "a:one"], [""], "a:one"):
         broken = dict(request)
         broken["content_section_refs"] = invalid
+        normalized = _parse(production_envelope_template(request_understanding={"subjects": [], "requests": [broken]}))
+        part = normalized.request_understanding.requests[0]
+        assert (part.content_ref, part.content_section_refs, part.content_fallback_section_ref) == (None, (), None)
+        authored = {**broken, "content_realization": "authored"}
         with pytest.raises(OneCallEnvelopeProtocolError):
-            _parse(production_envelope_template(request_understanding={"subjects": [], "requests": [broken]}))
+            _parse(production_envelope_template(request_understanding={"subjects": [], "requests": [authored]}))
 
 
 def test_nested_primary_price_request_id_is_repaired_before_understanding_validation() -> None:
@@ -326,7 +330,7 @@ def test_content_ref_is_limited_to_safe_content_requests() -> None:
         )
 
 
-def test_model_prose_requires_grounded_sections_and_explicit_fallback() -> None:
+def test_model_prose_allows_no_sections_but_keeps_structural_limits() -> None:
     request = RequestUnderstandingRequest(
         request_id="r1", kind="content", subject_id=None, context="general_information",
         content_realization="model_prose", content_text="Человеческий текст.",
@@ -334,17 +338,20 @@ def test_model_prose_requires_grounded_sections_and_explicit_fallback() -> None:
         content_fallback_section_ref="a:pain",
     )
     assert request.content_realization == "model_prose"
-    with pytest.raises(ValueError, match="model_prose_grounding_required"):
-        request.model_copy(update={"content_section_refs": ()}).__class__.model_validate({
-            **request.model_dump(), "content_section_refs": []
-        })
+    without_provenance = request.__class__.model_validate({
+        **request.model_dump(), "content_ref": None, "content_section_refs": [],
+        "content_fallback_section_ref": None,
+    })
+    assert without_provenance.content_ref is None
+    assert without_provenance.content_section_refs == ()
     with pytest.raises(ValueError, match="content_fallback_not_grounded"):
         request.__class__.model_validate({
             **request.model_dump(), "content_fallback_section_ref": "a:other"
         })
     with pytest.raises(ValueError, match="extra_forbidden"):
         request.__class__.model_validate({**request.model_dump(), "safe": True})
-    assert request.__class__.model_validate({**request.model_dump(), "content_text": ""}).content_text == ""
+    with pytest.raises(ValueError, match="model_prose_text_required"):
+        request.__class__.model_validate({**request.model_dump(), "content_text": ""})
 
 
 def test_answered_pain_source_projects_its_video_and_followup(

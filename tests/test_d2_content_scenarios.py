@@ -609,10 +609,11 @@ def test_b15_section_without_korotko_and_irrelevant_fallback(tmp_path: Path) -> 
         clients=clients,
     )
     recovered_text = recovered.response.rendered_text
-    assert PAIN_SEDATION in recovered_text
+    assert "Наркоз стоит 5 000 ₽ и это общий абзац." in recovered_text
+    assert PAIN_SEDATION not in recovered_text
     assert PAIN_KOROTKO not in recovered_text
-    assert "5 000" not in recovered_text
-    assert recovered.response.resolved.d2_request_parts[0].status == "recovered"
+    assert recovered.response.resolved.d2_request_parts[0].status == "answered"
     assert recovered.response.resolved.information_blocks[0].source_section_refs == (
         "a:sedatsiya-i-narkoz",
+        "a:korotko",
     )

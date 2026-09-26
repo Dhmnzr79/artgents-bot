@@ -262,19 +262,21 @@ def test_c02_live_price_survives_broken_content_ref(tmp_path: Path) -> None:
     text = outcome.response.rendered_text
     assert [(part.request_id, part.status, part.failure_reason) for part in resolved.d2_request_parts] == [
         ("r1", "answered", None),
-        ("r2", "unavailable", "d2_content_source_missing"),
+        ("r2", "answered", None),
     ]
     assert resolved.d2_price_block is not None
     assert [row.offer_id for row in resolved.d2_price_block.rows] == ["veneers.default"]
     assert "35000" in text.replace("\xa0", " ").replace(" ", "")
-    assert INFO_GAP in text
-    assert resolved.d2_result_status == "degraded"
+    assert "Нет такого материала." in text
+    assert resolved.d2_request_parts[1].content_ref is None
+    assert resolved.ui_plan.source_content_ref is None
+    assert resolved.d2_result_status == "complete"
     # No invented substitute service/direction card.
     assert all(row.service_id == "veneers" for row in resolved.d2_price_block.rows)
 
 
 def test_c02_live_price_survives_prose_money_violation(tmp_path: Path) -> None:
-    """T3: money in prose recovers or gaps; verified price stays (D2-065/D2-078)."""
+    """D2-092: money in prose is review-only; verified price stays exact."""
     outcome, _, _, _ = _run(
         tmp_path,
         _raw(
@@ -297,14 +299,11 @@ def test_c02_live_price_survives_prose_money_violation(tmp_path: Path) -> None:
     part = resolved.d2_request_parts[1]
     assert resolved.d2_request_parts[0].status == "answered"
     assert part.kind == "content"
-    assert part.status in {"unavailable", "recovered"}
-    assert part.failure_reason == "d2_model_prose_money"
+    assert part.status == "answered"
+    assert part.failure_reason is None
     assert resolved.d2_price_block is not None
-    assert "5000" not in outcome.response.rendered_text
-    assert "Наркоз стоит" not in outcome.response.rendered_text
-    if part.status == "unavailable":
-        assert INFO_GAP in outcome.response.rendered_text
-    assert resolved.d2_result_status == "degraded"
+    assert "Наркоз стоит 5000 руб." in outcome.response.rendered_text
+    assert resolved.d2_result_status == "complete"
 
 
 def test_optional_secondary_ui_failure_keeps_verified_price(tmp_path: Path) -> None:

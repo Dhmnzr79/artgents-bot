@@ -1,5 +1,17 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Дополнение — 2026-09-26: реализация REC-2 на проверке
+
+Active-папка `C:\Cursor Projects\artgents-bot-active`, ветка
+`codex/d2-stage1-contract`, implementation baseline `ce47c16f564498165c1d00b2d0efd997dcbb9c22`.
+Карточка получила внешние Checker/Cursor PASS, затем владелец дал отдельный GO
+на реализацию. Это не PASS реализации. Staging/commit/push для текущего diff не
+выполнены, live/provider/SMTP 0; foreign `data/` не менялся.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-REC-2 — пригодная проза и optional provenance | **ACCEPTANCE:** C01–C03 и регрессии C04/C05/C08/C09/C10/A12; не полный REC-5. **D2 ROUTE:** `/ask`/`/ask/stream` → один parser → тот же materializer/plan/store. **LEGACY IMPACT:** fallback и semantic selector не добавлены. **OWNER DECISION:** GO на код REC-2 получен; REC-3/4 и live отдельно. На исходном baseline 8 файлов: 83 passed / 27 failed. Последний полный набор 10 файлов: 150 passed / 13 failed; после него точечно восстановлен прежний код ошибки неизвестной услуги (2 passed; новый полный aggregate не заявлен). Остаток — старые parser/R1 проверки (v19, прежний HTTP fixture/old `other` route). Новые собранные JSON/SSE, replay, follow-up, mixed, tenant/typed strict и review-sink сценарии проходят. Дополнительный read-only regression set без browser-case: 52 passed / 6 failed / 1 deselected; browser-case отдельно прошёл вне sandbox. Шесть read-only красных тестов не менялись из-за allowlist, список и причины — §9 карточки. | **Draft; ожидаются независимый Checker и Cursor именно implementation diff.** Не повышать исторический PASS, не записывать verdict в diff. Commit/push только после review и отдельного решения владельца. |
+
 ## Дополнение — 2026-09-26: REC-1 сохранён, REC-2 только планируется
 
 В active-папке на `codex/d2-stage1-contract` по отдельному разрешению владельца

@@ -1,5 +1,21 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-28: указатель текущего состояния D2
+
+Папка/Git root `C:\Cursor Projects\artgents-bot-active`, ветка
+`codex/d2-stage1-contract`, baseline HEAD и локальный origin branch
+`e246f1e7132596e20b8f81db7bc911855678ad8e`; `origin/main` и merge-base
+`141ce91fb1731cd990fcf8391550150016c73e7f`. До правок tracked diff и
+staging пусты. Чужие untracked `data/` и
+`docs/MARKETING_ANSWER_SCENARIOS.md` сохраняются. Точный allowlist и владелец
+решения — [карточка](DEMO_D2_CURRENT_STATUS_INDEX_TASK.md). Предыдущая Draft
+D2-DOC-CLICK ниже — историческая строка до его Checker/Cursor PASS и commit/push
+`e246f1e`, не текущий Git-status; после review её не переписывали.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-CURRENT-STATUS | **ACCEPTANCE:** корректный указатель и ссылки, без закрытия A/B/C. **D2 ROUTE / LEGACY IMPACT:** код и маршруты не меняются. **OWNER DECISION:** владелец согласовал отдельный порядок в документах; lead-исправление требует отдельной карточки и решения. **Test isolation/evidence:** read-only Git/документы и полный локальный журнал; `40820dcb` фиксирует pending choice, `96b02f07` — клик `lead:pending:answer`, запрос имени и 0 provider calls. `core/d2_lead_bridge.py` явно реализует возврат к слоту. В новый checkpoint не включены сырые сообщения, PII или БД. Документальные ссылки и diff проверить до Checker; runtime pytest не требуется. Provider/live/SMTP 0, бот не запускался. **FUTURE SCOPE:** отдельная карточка lead-прерывания и исправление после согласования, REC-4-P2 после нового preflight/GO, REC-5 и live-качество. | Draft до независимого Checker и Cursor review. Staging пуст, commit/push не выполнялись; после PASS Ledger не дописывать. |
+
 ## Draft — 2026-09-28: D2-DOC-CLICK перед возвратом к REC-4-P2
 
 Папка/Git root `C:\Cursor Projects\artgents-bot-active`, ветка

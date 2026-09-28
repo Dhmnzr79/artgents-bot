@@ -1,5 +1,23 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-28: карточка REC-4-P и согласование документов
+
+Папка/Git root `C:\Cursor Projects\artgents-bot-active`, ветка
+`codex/d2-stage1-contract`; HEAD и локальный origin branch
+`b02db8ee010b3431ab24f6e3ef98e5392a591673`, `origin/main` и merge-base
+`141ce91fb1731cd990fcf8391550150016c73e7f`. До правок tracked/staging чисты;
+чужие untracked `data/` и `docs/MARKETING_ANSWER_SCENARIOS.md` сохранены.
+Git предупреждает о недоступных global ignore/`.pytest_cache/`; свежего fetch
+не было. Семь разрешённых doc paths перечислены в §1
+[карточки REC-4-P](DEMO_D2_PRICE_PRESENTATION_DETAILS_TASK.md).
+Предыдущая строка REC-4 ниже — snapshot **до** его review, не текущий status:
+его последующий Checker/Cursor PASS и сохранение относятся к `b02db8e`.
+Старые строки, включая процессное исключение `6c4a963`, не переписываются.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-REC-4-P-DOC | **ACCEPTANCE:** план A16/B18/B19 и регрессий, без runtime PASS. **D2 ROUTE:** read-only изучены текущие materializer/renderer, Markdown widget, service profile, offer details и ordered shown refs; код не изменён. **LEGACY IMPACT:** старый widget-format текст явно отделён от текущего D2; legacy selector/runtime не подключается. **OWNER DECISION:** согласованы D2-101–103; владелец отдельно выбрал детали всех показанных вариантов и скрытие кнопки при неполных данных, сохраняя прямой вопрос. Astra выполнила read-only архитектурный разбор; карточка делит реализацию на P1/P2 с точными allowlists и отдельными GO. Синхронизированы Decisions/Target/Acceptance/Roadmap/Widget Format. **Test isolation/evidence:** только чтение репозитория и документальные проверки, pytest/бот не запускались, provider/live/SMTP 0; БД/логи не открывались. Старые REC-4 75/10 — исторический отчёт Cursor, не новый прогон и не доказательство baseline будущей реализации. **FUTURE SCOPE:** код P1/P2, отдельные reviews, REC-5/A15, ручной/live тест с разрешением. | Draft до независимого Checker и отдельного Cursor review. Staging пуст; commit/push не разрешены и не выполнены. Ledger после PASS не дописывать. |
+
 ## Draft — 2026-09-28: REC-4 короткие цены и кнопки
 
 Рабочая папка и Git root `C:\Cursor Projects\artgents-bot-active`, ветка

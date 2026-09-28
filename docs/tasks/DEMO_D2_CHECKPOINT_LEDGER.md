@@ -1,5 +1,20 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-29: подготовка карточки REC-4-P2
+
+Git root `C:\Cursor Projects\artgents-bot-active`, ветка
+`codex/d2-stage1-contract`, baseline HEAD и origin branch
+`71d746793ffbd3ef796ae81cd6d0eae09d8cfd69`; `origin/main` и merge-base
+`141ce91fb1731cd990fcf8391550150016c73e7f`. До правок tracked diff и
+staging пусты. Чужие untracked `data/` и
+`docs/MARKETING_ANSWER_SCENARIOS.md` сохранены. Нижняя Draft реализации
+D2-LEAD-INTERRUPT — снимок до её Checker/Cursor PASS и commit/push `71d7467`,
+не текущий Git-status.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-REC-4-P2-DOC | **ACCEPTANCE:** план A16/B19 и затронутых A02/A05/B12/B14/B18/C01/C03–C05/C07/C09/C10; runtime P2 ещё не проверен. **D2 ROUTE:** документально сверены действующие `/ask`/`/ask/stream`, tenant snapshot, один parser/frozen plan/store/replay и typed UI, без изменения runtime. **LEGACY IMPACT:** старый price_aspect selector, semantic regex и fallback не разрешаются. **OWNER DECISION:** D2-102 и варианты нескольких/частичных offers утверждены; владелец выбрал обе кнопки у `classic` при полном наборе данных, остальные услуги выключены; GO на код впереди. **Test isolation/evidence:** read-only Git/код/документы и demo commercial/offer inventory: три `classic.one_tooth.*` имеют includes/stages/followups, runtime captured set ещё не доказан; pytest, бот, provider/live/SMTP 0. **FUTURE SCOPE:** P2 implementation, Checker/Cursor, REC-5 и отдельно разрешённое live-качество. | Draft до независимого Checker и Cursor review карточки. Staging/commit/push не выполнялись; после PASS Ledger не дописывать. |
+
 ## Draft — 2026-09-29: реализация D2-LEAD-INTERRUPT
 
 Git root `C:\Cursor Projects\artgents-bot-active`, ветка

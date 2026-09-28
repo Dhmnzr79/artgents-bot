@@ -1,5 +1,77 @@
 # D2-REC-4-P — компактные цены и точные детали по запросу
 
+## P2 — подготовка карточки от принятого checkpoint, 2026-09-29
+
+**Статус:** документальная подготовка P2. REC-4-P1, D2-DOC-CLICK и
+D2-LEAD-INTERRUPT прошли независимые Checker и Cursor review; последний
+commit/push активной ветки — `71d746793ffbd3ef796ae81cd6d0eae09d8cfd69`.
+Это новая точка отсчёта P2; прежние SHA и фразы «сейчас разрешён только
+документальный checkpoint» ниже относятся к датам своих разделов.
+
+**Preflight:** Git root `C:\Cursor Projects\artgents-bot-active`, ветка
+`codex/d2-stage1-contract`, HEAD и `origin/codex/d2-stage1-contract`
+`71d746793ffbd3ef796ae81cd6d0eae09d8cfd69`; `origin/main` и merge-base
+`141ce91fb1731cd990fcf8391550150016c73e7f`. До этой подготовки tracked
+diff и staging пусты. Чужие untracked `data/` и
+`docs/MARKETING_ANSWER_SCENARIOS.md` не открывать для записи и не stage.
+Старый `artgents-bot` и worktree 27e1 остаются историей.
+
+**Точный write allowlist этой документальной подготовки:**
+
+```text
+docs/tasks/DEMO_D2_PRICE_PRESENTATION_DETAILS_TASK.md
+docs/tasks/DEMO_D2_CURRENT_STATUS.md
+docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md
+docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md
+```
+
+**Утверждённое поведение P2:** D2-102, Target Contract §7, A16/B19 и §3 этой
+карточки. В профиле услуги `price_detail_ids` разрешает максимум две точные
+кнопки; отсутствие настройки выключает их. Кнопка появляется только при
+полных данных каждого показанного offer. Клик раскрывает все показанные
+варианты, точно общее — один раз с областью применимости, различия —
+раздельно. Прямой вопрос работает и при выключенных кнопках: сообщает
+доступные детали и явно отмечает пробелы. Контекст клика проверяется по
+tenant, revision, aspect и ordered shown offers; цены, контакты и заявка
+не пересчитываются. Смена услуги и TTL не используют старый набор.
+
+**Граница настройки demo:** сейчас ни у одной услуги нет
+`price_detail_ids`. Владелец выбрал обе кнопки для классической имплантации
+(`service_id=classic`) **при полных данных всех показанных вариантов**;
+остальные услуги оставить выключенными. Read-only инвентаризация трёх
+текущих `classic.one_tooth.*` offer-файлов показала у каждого четыре
+`package.includes`, два `payment_stages` и followup IDs `includes`/`stages`.
+Это не заменяет проверку captured offer-набора в реализации: если любой
+показанный вариант не проходит точную проверку соответствующего detail,
+скрыть только эту кнопку по D2-102, не дописывая данные и не меняя цену.
+Менять `clients/demo/target_response/d2_commercial.json` только в отдельном
+P2 code checkpoint после GO. Не включать кнопки у других услуг автоматически
+по наличию данных или предположению о «сильном» офере.
+
+**Implementation gate:** §4 ниже содержит предполагаемый технический P2
+allowlist, но этот документальный GO не разрешает код. Перед реализацией
+сверить новый baseline после принятия карточки, точный allowlist и чистый
+baseline назначенных offline тестов. Если существующие refs/plan не позволяют
+связать клик с конкретным набором offers или нужен файл вне списка —
+остановиться и согласовать отклонение. P2 не меняет P1 формат цены, B14,
+lead/privacy, один parser/runtime или wire; `tests/test_d2_lead_interrupt_http.py`
+читать и запускать как соседнюю регрессию без правок. Без отдельного GO нет
+live/provider, запуска бота, merge и deploy. После реализации нужны
+независимый Checker и Cursor review, затем отдельное разрешение на commit/push.
+
+**ACCEPTANCE:** A16/B19 и затронутые A02/A05/B12/B14/B18/C01/C03–C05/C07/C09/C10
+по JSON/SSE, replay и widget; это не полный REC-5. **D2 ROUTE:** существующие
+`/ask` и `/ask/stream` → tenant snapshot → один parser/plan → frozen detail
+и UI → store/replay; чистый проверенный клик без модели. **LEGACY IMPACT:**
+старый price_aspect selector и normal runtime не подключаются. **OWNER
+DECISION:** D2-102 и поведение нескольких/частичных offers утверждены;
+владелец выбрал `classic` с обеими кнопками при полном наборе данных,
+GO на код ещё впереди. **TEST ISOLATION:**
+fake provider, временные tenant/DB/log, сеть и SMTP заблокированы;
+рабочую SQLite и сырой журнал не использовать. **FUTURE SCOPE:** REC-5,
+ручное качество widget/live только с отдельным бюджетом, админка и каталог
+с большим числом позиций.
+
 Актуальное дополнение 2026-09-28: P1 принят Checker/Cursor и сохранён в
 `a930ed70df9d2d709cc36b9076be55659485c582`. Перед P2 владелец разрешил
 [D2-DOC-CLICK](DEMO_D2_DOCUMENT_CLICK_TASK.md). После этой коррекции P2 требует

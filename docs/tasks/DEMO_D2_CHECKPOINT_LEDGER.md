@@ -1,5 +1,23 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-28: REC-4 короткие цены и кнопки
+
+Рабочая папка и Git root `C:\Cursor Projects\artgents-bot-active`, ветка
+`codex/d2-stage1-contract`, baseline HEAD и локальный origin branch
+`cebd09bd0deca0dd5c52fd0b3c4b70d6ef8dc654`; `origin/main` и merge-base
+`141ce91fb1731cd990fcf8391550150016c73e7f`. Перед реализацией tracked
+diff и staging пусты. Чужие untracked `data/` и
+`docs/MARKETING_ANSWER_SCENARIOS.md` не правились и не stage. Карточка REC-4
+была untracked и входит в checkpoint. Полный точный write allowlist — § «Точный
+write allowlist будущей реализации» [карточки REC-4](DEMO_D2_REC4_PRICE_BUTTONS_TASK.md),
+включая три отдельно разрешённых старых test-файла. Владелец отдельно
+разрешил обновить в них проверку краткой цены и проверку опубликованного
+объёма удаления зуба; остальные изменения в этих файлах касаются CTA.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-REC-4 — краткие цены и кнопки | **ACCEPTANCE:** срез A01/A02/A07/A09/A10/A13/A14/A15, B06/B08/B12/B13/B14/B16/B17, C04/C05/C07/C09/C10 только в границе REC-4: одна точная услуга показывает все применимые опубликованные offers текущего tenant по возрастанию, включая четвёртую временную позицию, с именем варианта, scope и обязательными оговорками; первый ответ не перечисляет состав пакета и этапы оплаты, но они остаются в captured offer. Общий authored обзор до трёх цен и четыре кнопки объёма; follow-up подпись без якоря при сохранённом section ref; CTA документа приоритетна, иначе разрешённая нейтральная `default_consult`, без auto-lead. **D2 ROUTE:** offline JSON/SSE → один production parser → captured tenant snapshot и price/UI authority → frozen plan/render/store/replay → существующий widget/lead owner; цена и CTA не извлекаются из прозы модели. **LEGACY IMPACT:** второго prompt/parser, semantic regex, старого runtime, fallback и второго owner состояния нет; JSON/SSE и lead/privacy wire не менялись. **OWNER DECISION:** владелец подтвердил D2-100: для одного точного вопроса нет лимита три; общий обзор и B14 остаются отдельно. Владелец дал GO реализации и разрешил перечисленные расширения старых тестов; Astra дала read-only архитектурное заключение. **Test isolation:** fake provider, временные tenant copy/DB/logs, блокировка внешней сети; рабочий `data/` не открывался на запись, provider/live/SMTP 0. **Evidence:** адресный REC-4/price/snapshot набор 37 passed; широкий набор семи файлов на clean HEAD 61 passed / 9 failed и на REC-4 diff 61 passed / 9 failed с теми же девятью test IDs; B14, lead CTA, stale/forged и запреты CTA 6 passed, 1 failed. Последний `test_price_content_price_preserves_independent_content_and_request_order` падает тем же assertion на clean HEAD. Старые девять: doctor authored `patient_text_required`, history `spam_closed`, три старых content/source assertions и четыре старых snapshot/scope assertions; тесты не скрыты и не ослаблены. **FUTURE SCOPE:** REC-5 полная приёмка и ручная widget-проверка, отдельный анализ старых красных тестов, возможный показ большого каталога частями, live/merge/deploy. Это не полный A15/REC-5. | Draft до независимого Checker и отдельного Cursor review реализации. Staging, commit и push не выполнялись. После PASS Ledger не дописывать. |
+
 ## Draft — 2026-09-26: коррекция model envelope и подписи цены
 
 Baseline `28ff60a4f51228dec1409e7b703cd279ea2dcee7`, ветка

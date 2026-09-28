@@ -292,7 +292,8 @@ def test_default_price_cta_after_unknown_extent(tmp_path: Path) -> None:
     assert after.applied_extent is None
     assert after.volume_choices == ()
     ctas = _cta_buttons(unknown.response.ui_projection)
-    assert [b.button_id for b in ctas] == ["price"]
+    assert [b.button_id for b in ctas] == ["default_consult"]
+    assert ctas[0].label == "Записаться на консультацию"
     assert unknown.response.ui_projection.quick_replies == ()
     assert "бесплатн" not in ctas[0].label.casefold()
     assert saved is not None

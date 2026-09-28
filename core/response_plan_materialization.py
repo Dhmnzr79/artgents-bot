@@ -1360,7 +1360,8 @@ def _d2_frozen_price_row(
     service = bundle.services.get(offer.service_id)
     if service is None or not service.active:
         raise MaterializationOwnershipError("materialization_foreign_material")
-    service_name = service.name
+    variant = _offer_variant_label(bundle, offer)
+    service_name = f"{service.name} — {variant}" if variant else service.name
     price = offer.price
     unit = ""
     if isinstance(price, TargetFixedPrice):
@@ -1386,16 +1387,19 @@ def _d2_frozen_price_row(
             mode="no_public_price",
             display_text=f"{service_name} — {price.approved_text}",
             approved_text=price.approved_text,
-            condition_texts=tuple(item for item in (terms.package_label, *terms.condition_texts) if item != price.approved_text),
+            condition_texts=_d2_brief_price_conditions(
+                offer, package_label=terms.package_label, already_shown=price.approved_text,
+            ),
         )
     else:  # pragma: no cover - TargetPrice is a discriminated union.
         raise MaterializationContractError("d2_price_mode_invalid")
+    package_scope = terms.package_label.strip()
     return D2FrozenPriceRow(
         source_client_id=client_id,
         offer_id=offer.offer_id,
         service_id=offer.service_id,
         mode=mode,
-        display_text=f"{service_name} — {body} {unit} — {terms.package_label}",
+        display_text=f"{service_name} — {body}{'' if package_scope else f' {unit}'}",
         amount=price.amount if isinstance(price, TargetFixedPrice) else None,
         min_amount=(
             price.min_amount
@@ -1405,8 +1409,27 @@ def _d2_frozen_price_row(
         max_amount=price.max_amount if isinstance(price, TargetRangePrice) else None,
         currency=price.currency,
         billing_unit=price.billing_unit,
-        condition_texts=terms.condition_texts,
+        condition_texts=_d2_brief_price_conditions(
+            offer, package_label=package_scope, already_shown=unit if not package_scope else "",
+        ),
     )
+
+
+def _d2_brief_price_conditions(
+    offer: TargetOffer, *, package_label: str, already_shown: str,
+) -> tuple[str, ...]:
+    """Keep authored scope and mandatory caveats, not package contents or payment stages."""
+    # The authored package label carries the precise billing scope. When it is
+    # present, the generic billing-unit phrase is not rendered a second time.
+    # Semicolon-separated clauses are authored data, not inferred from prose.
+    clauses = tuple(part.strip() for part in package_label.split(";") if part.strip())
+    conditions = (item.display_text for item in (
+        offer.required_conditions_metadata.conditions
+        if offer.required_conditions_metadata is not None else ()
+    ))
+    return tuple(dict.fromkeys(
+        item for item in (*clauses, *conditions) if item and item != already_shown
+    ))
 
 
 def _d2_terms_for_offer(

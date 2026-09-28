@@ -198,6 +198,9 @@ def _document_followups(content, metadata: dict[str, object]) -> tuple[tuple[UiQ
         section = next((item for item in content.sections if item.section_ref == section_ref), None)
         if section is not None:
             heading = section.display_text.splitlines()[0].lstrip("#").strip()
+            anchor = f"{{#{wanted}}}"
+            if heading.endswith(anchor) and heading != anchor:
+                heading = heading[:-len(anchor)].rstrip()
             pairs.append((
                 UiQuickReplyCandidate(
                     source_client_id=content.source_client_id,
@@ -271,12 +274,12 @@ def build_d2_snapshot_sources(
     scope_nav = ui_yaml.get("scope_nav") if isinstance(ui_yaml.get("scope_nav"), dict) else {}
     cta_variants = ((tone.get("lead") or {}) if isinstance(tone.get("lead"), dict) else {}).get("cta_variants", [])
     labels = {str(item.get("key")): str(item.get("label")) for item in cta_variants if isinstance(item, dict)}
-    price_label = labels.get("price")
+    default_label = labels.get("default_consult")
     ui_authority = None
-    if price_label:
+    if default_label:
         ui_authority = ResponsePlanAdapterUiAuthority(
             source_client_id=snapshot.client_id,
-            buttons=(ResponsePlanAdapterUiButtonAuthority(source_client_id=snapshot.client_id, button_id="price", label=price_label, action_kind="cta"),),
+            buttons=(ResponsePlanAdapterUiButtonAuthority(source_client_id=snapshot.client_id, button_id="default_consult", label=default_label, action_kind="cta"),),
         )
     videos = (_yaml_file(snapshot, "video_catalog.yaml").get("videos") or {})
     ui_rows: list[D2SourceUiAuthority] = []

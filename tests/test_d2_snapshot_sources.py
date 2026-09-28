@@ -48,7 +48,7 @@ def test_terms_absence_and_corruption_are_distinct() -> None:
     outcome = resolve_d2_envelope_response(envelope, sources, as_of=_AS_OF)
     assert outcome.resolved.d2_result_status == "complete"
     assert outcome.resolved.d2_price_block is not None
-    assert outcome.resolved.d2_price_block.rows[0].condition_texts == ()
+    assert outcome.resolved.d2_price_block.rows[0].condition_texts == ("за удаление одного зуба",)
 
     unknown = OfferConditionEvidence(source_client_id="demo", offer_id="tooth_extraction.default", completeness="unknown")
     outcome = resolve_d2_envelope_response(envelope, sources.model_copy(update={"condition_evidence_by_offer": {unknown.offer_id: unknown}}), as_of=_AS_OF)
@@ -111,7 +111,8 @@ def test_optional_ui_does_not_block_answer() -> None:
     assert "Седация и наркоз" in outcome.rendered_text
     assert outcome.ui_projection.quick_replies == ()
     assert outcome.ui_projection.video is None
-    assert [item.button_id for item in outcome.ui_projection.buttons] == ["price"]
+    assert [item.button_id for item in outcome.ui_projection.buttons] == ["default_consult"]
+    assert outcome.ui_projection.buttons[0].label == "Записаться на консультацию"
 
     invalid = D2SourceUiAuthority(
         source_client_id="demo", content_ref="implantation__faq__pain.md",

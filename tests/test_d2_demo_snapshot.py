@@ -88,7 +88,8 @@ def test_real_simple_prices_without_metadata(service_id: str, expected_minimum: 
     assert row.mode == "from"
     assert row.min_amount == expected_minimum
     assert "всё включено" not in outcome.rendered_text.lower()
-    assert [button.button_id for button in outcome.ui_projection.buttons] == ["price"]
+    assert [button.button_id for button in outcome.ui_projection.buttons] == ["default_consult"]
+    assert outcome.ui_projection.buttons[0].label == "Записаться на консультацию"
 
 
 @pytest.mark.parametrize("direction_count", (0, 1, 2))
@@ -147,7 +148,7 @@ def test_exact_service_without_authored_price_order_still_answers(
     assert outcome.resolved.d2_request_parts[0].status == "answered"
 
 
-def test_real_implant_terms_are_preserved() -> None:
+def test_real_implant_short_price_keeps_scope_and_required_conditions() -> None:
     _, envelope, sources = _parsed_demo_envelope(_request("r1", "price", service_id="classic", topic_id="implantation"))
 
     outcome = resolve_d2_envelope_response(envelope, sources, as_of=_AS_OF)
@@ -155,10 +156,17 @@ def test_real_implant_terms_are_preserved() -> None:
     assert outcome.resolved.d2_price_block is not None
     impro = next(row for row in outcome.resolved.d2_price_block.rows if row.offer_id == "classic.one_tooth.impro")
     assert impro.amount == 85_200
-    assert "имплант + постоянная коронка" in impro.display_text
-    assert "Хирургический этап: 54200 RUB" in "\n".join(impro.condition_texts)
-    assert "Ортопедический этап (коронка): 31000 RUB" in "\n".join(impro.condition_texts)
-    assert impro.amount == 85_200
+    assert "Impro" in impro.display_text
+    assert "имплант + постоянная коронка" in "\n".join(impro.condition_texts)
+    assert "КТ при необходимости и временная коронка — отдельно" in impro.condition_texts
+    assert "Хирургический этап" not in outcome.rendered_text
+    assert "Ортопедический этап" not in outcome.rendered_text
+    captured = next(offer for offer in sources.material_authority.bundle.offers
+                    if offer.offer_id == impro.offer_id)
+    assert [(stage.label, stage.amount, stage.currency) for stage in captured.payment_stages] == [
+        ("Хирургический этап", 54_200, "RUB"),
+        ("Ортопедический этап (коронка)", 31_000, "RUB"),
+    ]
 
 
 def test_real_content_below_korotko() -> None:

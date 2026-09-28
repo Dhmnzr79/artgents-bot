@@ -320,7 +320,8 @@ def test_a07_unknown_keeps_overview_without_repeating_volume_or_starting_lead(tm
     assert decision.volume_choices == ()
     assert decision.unknown_extent_text is None
     assert second.response.ui_projection.quick_replies == ()
-    assert [b.button_id for b in second.response.ui_projection.buttons] == ["price"]
+    assert [b.button_id for b in second.response.ui_projection.buttons] == ["default_consult"]
+    assert second.response.ui_projection.buttons[0].label == "Записаться на консультацию"
     assert second.response.ui_projection.buttons[0].action_kind == "cta"
     assert second.response.resolved.terminal_text is None
     assert saved.state.terminal_state == "none"

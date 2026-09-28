@@ -1,5 +1,20 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-29: реализация D2-LEAD-INTERRUPT
+
+Git root `C:\Cursor Projects\artgents-bot-active`, ветка
+`codex/d2-stage1-contract`, baseline HEAD и локальный origin branch
+`43c0aba362403ac144e88809e4f8ff5a81e6bc2a`; `origin/main` и merge-base
+`141ce91fb1731cd990fcf8391550150016c73e7f`. До правок tracked diff и
+staging пусты; чужие untracked `data/` и
+`docs/MARKETING_ANSWER_SCENARIOS.md` сохранены. Allowlist и решение владельца —
+[карточка](DEMO_D2_LEAD_INTERRUPT_TASK.md). Нижняя Draft карточки — снимок до
+её Checker/Cursor PASS и commit/push `43c0aba`, не текущий Git-status.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-LEAD-INTERRUPT-IMPL | **ACCEPTANCE:** A12/B11/C05–C07 проверяются на D2 HTTP; это не полный REC-5. **D2 ROUTE:** current tenant/revision `lead:pending:answer` берёт сохранённый вопрос только у bound lead owner, существующий privacy scrub идёт до единственного provider/parser, обычный D2 сохраняет ответ и typed resume/cancel в одном completion. После D2 commit lead owner одним row write переходит в paused; replay/следующий запрос согласует post-commit gap только для последнего completion и той же версии pending-вопроса. Старый replay не стирает новый pending. Resume восстанавливает исходный name/phone без provider, cancel чистит ПД. В paused ответах CTA скрыта, выход к записи остаётся в frozen UI. **LEGACY IMPACT:** старый answer→resume runtime не вызывался; semantic regex/второй parser/state owner не добавлены. **OWNER DECISION:** ответ + явный resume и code GO даны владельцем после Cursor PASS карточки; D2-106. **Test isolation/evidence:** fake provider, временные tenant/SQLite/log, сеть заблокирована; адресный HTTP JSON/SSE 15 passed, соседние lead/HTTP 18 passed, документный клик 16 passed. Provider/live/SMTP 0. Рабочие БД/логи не открывались. **FUTURE SCOPE:** общий hard-crash `inflight` без lease/recovery остаётся отдельным ограничением D2; REC-4-P2 и REC-5 впереди. | Draft до независимого Checker и Cursor review реализации. Staging пуст; commit/push не выполнялись. После PASS Ledger не дописывать. |
+
 ## Draft — 2026-09-28: карточка D2-LEAD-INTERRUPT
 
 Папка/Git root `C:\Cursor Projects\artgents-bot-active`, ветка

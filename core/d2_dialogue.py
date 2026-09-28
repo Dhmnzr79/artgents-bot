@@ -26,8 +26,12 @@ from contracts.response_plan_session import (
 )
 from core.d2_dialogue_store import D2DialogueStore
 from core.d2_lead_bridge import (
+    apply_d2_lead_pause_ui,
+    d2_paused_lead_profile_name,
     d2_lead_needs_pre_provider,
     d2_lead_session_client_matches,
+    prepare_d2_pending_lead_answer,
+    reconcile_d2_lead_pause,
     resolve_d2_booking_lead_entry,
     resolve_d2_lead_pre_provider,
 )
@@ -58,6 +62,8 @@ from core.one_call_envelope_protocol import (
 )
 from core.response_plan_materialization import resolve_d2_envelope_response
 from core.user_text_privacy import provider_message_has_substance, provider_safe_user_text
+from lead_interrupt import LEAD_PENDING_ANSWER_REF
+from session import peek_lead_paused
 import json
 
 
@@ -312,6 +318,13 @@ def run_d2_dialogue_turn(
     if reservation.is_replay:
         diagnostics.replayed()
         full_audit("replay", completion=reservation.completed)
+        latest = store.read_latest_completion(session_key)
+        if (
+            latest is not None
+            and latest.request_id == reservation.completed.request_id
+            and latest.committed_revision == reservation.completed.committed_revision
+        ):
+            reconcile_d2_lead_pause(session_key, reservation.completed)
         return _turn_from_completion(reservation.completed, idempotent_replay=True)
     try:
         diagnostics.stage("snapshot")
@@ -334,6 +347,12 @@ def run_d2_dialogue_turn(
         full_audit(
             "session_before", record=previous, context=early_context,
             tenant_fingerprint=tenant.fingerprint,
+        )
+        if lead_bridge and d2_lead_session_client_matches(session_key):
+            reconcile_d2_lead_pause(session_key, store.read_latest_completion(session_key))
+        lead_paused = bool(
+            lead_bridge and d2_lead_session_client_matches(session_key)
+            and peek_lead_paused(session_key.sid)
         )
         diagnostics.stage("binding")
         selected_ui_ref: D2SelectedUiRef | None = None
@@ -388,13 +407,17 @@ def run_d2_dialogue_turn(
                 context=early_context,
             )
         session_matched = d2_lead_session_client_matches(session_key)
+        pending_answer = None
+        if lead_ui_ref == LEAD_PENDING_ANSWER_REF:
+            pending_answer = prepare_d2_pending_lead_answer(session_key)
+        lead_pause_response = lead_paused or pending_answer is not None
         lead_gate = bool(
             lead_bridge
             or session_matched
             or (situation_action or "").strip()
             or (lead_ui_ref or "").strip()
         )
-        if lead_gate and d2_lead_needs_pre_provider(
+        if pending_answer is None and lead_gate and d2_lead_needs_pre_provider(
             session_key=session_key,
             situation_action=situation_action,
             lead_ui_ref=lead_ui_ref,
@@ -416,6 +439,8 @@ def run_d2_dialogue_turn(
         # D2-040: one authored chance, then hard-stop. Lead/medical terminals stay owners.
         if (
             selected_ui_ref is None
+            and not (lead_ui_ref or "").startswith("lead:")
+            and not lead_pause_response
             and is_d2_garbage_message(user_message)
             and early_context.retained_terminal_state in {
             "none",
@@ -442,17 +467,27 @@ def run_d2_dialogue_turn(
                 snapshot=early_snapshot,
                 context=early_context,
             )
-        safe_user_message = provider_safe_user_text(user_message)
+        safe_user_message = (
+            pending_answer.safe_question
+            if pending_answer is not None
+            else provider_safe_user_text(
+                user_message,
+                profile_name=(d2_paused_lead_profile_name(session_key) if lead_paused else ""),
+            )
+        )
         full_audit("effective_input", provider_safe_user_message=safe_user_message)
         if (
             selected_ui_ref is None
-            and not provider_message_has_substance(safe_user_message, raw_source=user_message)
+            and not provider_message_has_substance(
+                safe_user_message, raw_source=(user_message or safe_user_message),
+                reject_lone_personal_name=lead_paused,
+            )
         ):
             store.abandon_request(
                 session_key, request_id=effective_request_id, request_fingerprint=fingerprint,
             )
             raise ValueError("d2_provider_input_privacy_only")
-        return _run_reserved_d2_dialogue_turn(
+        turn = _run_reserved_d2_dialogue_turn(
             session_key=session_key,
             safe_user_message=safe_user_message,
             provider=provider,
@@ -465,6 +500,7 @@ def run_d2_dialogue_turn(
             lead_effect_id=lead_effect_id,
             lead_effect_dispatcher=lead_effect_dispatcher,
             lead_bridge=lead_bridge,
+            lead_pause_response=lead_pause_response,
             selected_ui_ref=selected_ui_ref,
             selected_document_action=selected_document_action,
             selected_service_id=(
@@ -473,6 +509,9 @@ def run_d2_dialogue_turn(
                 else None
             ),
         )
+        if lead_pause_response:
+            reconcile_d2_lead_pause(session_key, store.read_latest_completion(session_key))
+        return turn
     except Exception as exc:
         diagnostics.failure(exc)
         full_audit_exception("dialogue_turn", exc)
@@ -580,6 +619,7 @@ def _run_lead_pre_provider_turn(
         user_message=user_message,
         situation_action=situation_action,
         lead_ui_ref=lead_ui_ref,
+        published_revision=snapshot.state.revision + 1,
     )
     if not bridge.response.rendered_text.strip():
         raise ValueError("d2_experiment_lead_not_resolved")
@@ -672,8 +712,13 @@ def _commit_non_price_d2_turn(
     dialogue_pairs: tuple[SessionDialoguePair, ...] | None = None,
     d2_shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...] | None = None,
     clarify_task: PersistedClarifyTask | None = None,
+    lead_pause_response: bool = False,
 ) -> D2DialogueTurn:
     """Persist lead/terminal/clarify-style turns without mutating price situation."""
+    if lead_pause_response:
+        response = apply_d2_lead_pause_ui(response)
+        shown_service_options = ()
+        shown_service_topic = None
     full_audit("materialized_response", response=response, focus=focus, branch="non_price")
     diagnostics.stage("state_build")
     turn = snapshot.current_turn_index
@@ -789,6 +834,7 @@ def _run_reserved_d2_dialogue_turn(
     ttl_policy: D2SessionTtlPolicy, request_id: str, request_fingerprint: str,
     lead_effect_id: str | None, lead_effect_dispatcher: D2LeadEffectDispatcher | None,
     lead_bridge: bool = False,
+    lead_pause_response: bool = False,
     selected_ui_ref: D2SelectedUiRef | None = None,
     selected_document_action: D2SelectedDocumentAction | None = None,
     selected_service_id: str | None = None,
@@ -980,6 +1026,7 @@ def _run_reserved_d2_dialogue_turn(
                 snapshot=snapshot, price=None, context=context,
             ),
             clarify_task=_d2_clarify_task(envelope=envelope),
+            lead_pause_response=lead_pause_response,
         )
     else:
         if envelope.route != "ANSWER" or understanding is None or not understanding.requests:
@@ -1006,6 +1053,7 @@ def _run_reserved_d2_dialogue_turn(
                 request_fingerprint=request_fingerprint,
                 lead_effect_id=lead_effect_id,
                 lead_effect_dispatcher=lead_effect_dispatcher,
+                lead_pause_response=lead_pause_response,
             )
         booking_entry = None
         if lead_bridge:
@@ -1035,6 +1083,7 @@ def _run_reserved_d2_dialogue_turn(
                 request_fingerprint=request_fingerprint,
                 lead_effect_id=lead_effect_id,
                 lead_effect_dispatcher=lead_effect_dispatcher,
+                lead_pause_response=lead_pause_response,
             )
         parts = understanding.requests
         part = parts[0]
@@ -1260,6 +1309,8 @@ def _run_reserved_d2_dialogue_turn(
             price = response.resolved.d2_price_block
             decision = response.resolved.d2_price_scope_decision
     diagnostics.stage("gate")
+    if lead_pause_response:
+        response = apply_d2_lead_pause_ui(response)
     if admin_terminal:
         pass
     elif price_focus_clarify:
@@ -1454,6 +1505,10 @@ def _run_reserved_d2_dialogue_turn(
         # treatment facts. A newly established or explicitly carried situation
         # was materialized above as a distinct state value.
         situation = None
+    if lead_pause_response:
+        # The lead resume/cancel controls replace volume/service choices. Do
+        # not persist hidden choices as if the patient had seen them.
+        shown_options_snapshot = None
     state = ResponsePlanSessionState(
         schema_version=SESSION_SCHEMA_VERSION, session_key=session_key,
         revision=snapshot.state.revision + 1, last_committed_turn_index=turn,

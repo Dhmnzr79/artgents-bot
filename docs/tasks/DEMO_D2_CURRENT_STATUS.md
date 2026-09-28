@@ -2,7 +2,7 @@
 
 Снимок на 2026-09-28 для `C:\Cursor Projects\artgents-bot-active`, ветка
 `codex/d2-stage1-contract`. Последний принятый Checker/Cursor и отправленный
-checkpoint: **указатель D2 `b39ed36cdbc57f608da1c199cf45ce938e70b6dc`**;
+checkpoint: **карточка D2-LEAD-INTERRUPT `43c0aba362403ac144e88809e4f8ff5a81e6bc2a`**;
 предыдущий runtime checkpoint — D2-DOC-CLICK `e246f1e`.
 Это локальный демо-бот; production-развёртывания и пользователей нет. Перед
 работой сверяйте текущие Git HEAD, origin и status: этот файл — указатель на
@@ -26,7 +26,7 @@ checkpoint: **указатель D2 `b39ed36cdbc57f608da1c199cf45ce938e70b6dc`**
 | Шаг | Состояние на этом снимке | Где детали |
 |---|---|---|
 | D2-DOC-CLICK | Checker и Cursor PASS, commit/push `e246f1e`; исправлены передача выбранного раздела модели и omitted mode ordinary prose. Качество реальной генерации отдельно не доказано | [Карточка](DEMO_D2_DOCUMENT_CLICK_TASK.md) |
-| Вопрос при активной записи | Открытая находка widget-аудита. После вопроса о цене кнопка «Ответить» возвращает к запросу имени. Логи `40820dcb` → `96b02f07` и код `core/d2_lead_bridge.py` подтверждают отсутствие ответа и provider call. Проект отдельной карточки готов; видимое поведение и code GO ожидают решения владельца | [Карточка lead-прерывания](DEMO_D2_LEAD_INTERRUPT_TASK.md) |
+| Вопрос при активной записи | Документальная карточка прошла Checker/Cursor и сохранена в `43c0aba`. Владелец утвердил ответ на сохранённый вопрос, кнопку «Продолжить запись» и отдельный GO на код. Реализация и offline-проверка ведутся от этого SHA; до Checker/Cursor нового checkpoint исправление не объявляется принятым | [Карточка lead-прерывания](DEMO_D2_LEAD_INTERRUPT_TASK.md) |
 | REC-4-P2 | Кнопки «Что входит» и «Этапы оплаты» ещё не начаты; требуется отдельный GO и preflight от принятого SHA | [Карточка цен](DEMO_D2_PRICE_PRESENTATION_DETAILS_TASK.md) |
 | REC-5 | Общая приёмка D2 впереди | [Roadmap](DEMO_D2_DELIVERY_ROADMAP.md) |
 

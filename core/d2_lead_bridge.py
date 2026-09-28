@@ -6,7 +6,7 @@ optional PII-free lead_effect receipt (CP4). This module does not call a model.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from contracts.d2_tenant_snapshot import D2TenantSnapshot
@@ -29,6 +29,7 @@ from contracts.response_plan_post_composer import ResponseSituationDelta
 from core.client_config_loader import resolve_lead_name_prompt, tone_to_txt_dict
 from core.clinic_policy_resolver import resolve_clinic_policies
 from core.lead_phone_input import parse_unambiguous_lead_phone
+from core.lead_provider_input_privacy import prepare_lead_pending_provider_question
 from core.lead_turn_classifier import classify_lead_active_turn
 from core.response_plan_resolver import resolve_response_plan
 from core.response_text_renderer import render_response_text
@@ -38,17 +39,21 @@ from lead_interrupt import (
     LEAD_PENDING_ANSWER_REF,
     LEAD_PENDING_CONTINUE_NAME_REF,
     LEAD_PENDING_RETRY_PHONE_REF,
+    LEAD_RESUME_REF,
 )
 from name_gate import accept_lead_name
 from session import (
     SessionClientNotBoundError,
     clear_lead_pending_interruption,
+    complete_lead_pending_answer_pause,
     exit_lead_flow,
     get_lead_pending_interruption,
     is_active_lead_flow,
+    is_lead_paused,
     mark_booking_intent_ever,
     mem_get,
     peek_lead_activity,
+    resume_lead_from_pause,
     set_lead_intent,
     set_lead_pending_interruption,
     set_situation_note,
@@ -77,6 +82,85 @@ class D2LeadBridgeResult:
     response: MaterializedResponseOutcome
     booking_request_id: str | None = None
     request_effect: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class D2PendingLeadAnswer:
+    safe_question: str
+    resume_step: Literal["collecting_name", "collecting_phone"]
+
+
+def prepare_d2_pending_lead_answer(session_key: SessionKey) -> D2PendingLeadAnswer:
+    """Read the verified click's question from this tenant's lead owner only."""
+    if not d2_lead_session_client_matches(session_key):
+        raise ValueError("d2_lead_session_client_required")
+    state = mem_get(session_key.sid)
+    raw, step = get_lead_pending_interruption(session_key.sid)
+    if step not in {"collecting_name", "collecting_phone"} or state.get("lead_intent") != step:
+        raise ValueError("d2_pending_lead_question_unavailable")
+    profile = state.get("profile") or {}
+    safe = prepare_lead_pending_provider_question(
+        raw, profile_name=str(profile.get("name") or ""),
+    )
+    if safe is None:
+        raise ValueError("d2_pending_lead_question_privacy_only")
+    return D2PendingLeadAnswer(safe_question=safe, resume_step=step)
+
+
+def d2_paused_lead_profile_name(session_key: SessionKey) -> str:
+    """Use a bound name only for privacy stripping, never as model context."""
+    if not d2_lead_session_client_matches(session_key):
+        raise ValueError("d2_lead_session_client_required")
+    state = mem_get(session_key.sid)
+    if not is_lead_paused(state):
+        return ""
+    return str((state.get("profile") or {}).get("name") or "")
+
+
+def apply_d2_lead_pause_ui(response: MaterializedResponseOutcome) -> MaterializedResponseOutcome:
+    """Freeze resume/cancel in the resolved plan before D2 publishes its result."""
+    client_id = response.resolved.session_delta.session_key.client_id
+    replies = (
+        UiQuickReplyCandidate(source_client_id=client_id, reply_id=LEAD_RESUME_REF,
+                              label="Продолжить запись"),
+        UiQuickReplyCandidate(source_client_id=client_id, reply_id=LEAD_CANCEL_REF,
+                              label="Отменить запись"),
+    )
+    ui = response.resolved.ui_plan.model_copy(update={
+        "quick_replies": replies, "buttons": (), "widget": None,
+        "video": None, "contact": None,
+    })
+    resolved = response.resolved.model_copy(update={
+        "ui_plan": ui, "textual_cta_block": None,
+        "finalized_commercial_ids": response.resolved.finalized_commercial_ids.model_copy(
+            update={"shown_service_option_ids": ()}
+        ),
+        "session_delta": response.resolved.session_delta.model_copy(
+            update={"shown_service_option_ids": ()}
+        ),
+    })
+    resolved = type(resolved).model_validate(resolved.model_dump(mode="python"))
+    return replace(
+        response, resolved=resolved, rendered_text=render_response_text(resolved),
+        ui_projection=project_response_ui(resolved),
+    )
+
+
+def reconcile_d2_lead_pause(session_key: SessionKey, completion) -> None:
+    """Finish a committed answer after a post-commit interruption or replay."""
+    if completion is None:
+        return
+    response = completion.response
+    if response.resolved.session_delta.session_key != session_key:
+        raise ValueError("d2_lead_completion_owner_mismatch")
+    refs = {item.reply_id for item in response.ui_projection.quick_replies}
+    if not {LEAD_RESUME_REF, LEAD_CANCEL_REF}.issubset(refs):
+        return
+    if not d2_lead_session_client_matches(session_key):
+        raise ValueError("d2_lead_session_client_required")
+    complete_lead_pending_answer_pause(
+        session_key.sid, expected_source_revision=completion.committed_revision - 1,
+    )
 
 
 def d2_lead_session_client_matches(session_key: SessionKey) -> bool:
@@ -115,6 +199,7 @@ def d2_lead_needs_pre_provider(
         LEAD_PENDING_ANSWER_REF,
         LEAD_PENDING_CONTINUE_NAME_REF,
         LEAD_PENDING_RETRY_PHONE_REF,
+        LEAD_RESUME_REF,
     }:
         return True
     if not d2_lead_session_client_matches(session_key):
@@ -159,6 +244,14 @@ def resolve_d2_booking_lead_entry(
         )
     sid = session_key.sid
     st = mem_get(sid)
+    if is_lead_paused(st):
+        return D2LeadBridgeResult(
+            kind="pending_interrupt",
+            response=_plain_answer(
+                snapshot, session_key=session_key,
+                text="Запись уже начата. Продолжите её, когда будете готовы.", quick=(),
+            ),
+        )
     if is_active_lead_flow(st):
         # Already collecting; re-prompt name without stacking state.
         return D2LeadBridgeResult(
@@ -182,6 +275,7 @@ def resolve_d2_lead_pre_provider(
     user_message: str,
     situation_action: str | None = None,
     lead_ui_ref: str | None = None,
+    published_revision: int | None = None,
 ) -> D2LeadBridgeResult:
     """Handle situation intake and active lead slots without a provider call."""
     sid = session_key.sid
@@ -238,9 +332,19 @@ def resolve_d2_lead_pre_provider(
             ),
         )
 
-    # Pending-choice refs (PD): answer vs continue — continue only clears; answer is
-    # not answered by this bridge (would need one ordinary call — FUTURE / not CP5).
-    pending_text, pending_step = get_lead_pending_interruption(sid)
+    # Pending-choice refs: the answer action enters the ordinary D2 route.
+    if ref == LEAD_RESUME_REF:
+        if not is_lead_paused(st):
+            raise ValueError("d2_lead_resume_not_paused")
+        step = resume_lead_from_pause(sid)
+        return D2LeadBridgeResult(
+            kind=step,
+            response=(
+                _phone_prompt_response(snapshot, session_key=session_key, txt=txt)
+                if step == "collecting_phone"
+                else _name_prompt_response(snapshot, session_key=session_key)
+            ),
+        )
     if ref == LEAD_PENDING_CONTINUE_NAME_REF:
         clear_lead_pending_interruption(sid)
         set_lead_intent(sid, "collecting_name")
@@ -256,34 +360,7 @@ def resolve_d2_lead_pre_provider(
             response=_phone_prompt_response(snapshot, session_key=session_key, txt=txt),
         )
     if ref == LEAD_PENDING_ANSWER_REF:
-        # Explicit choice required; without pending text fail closed (legacy parity).
-        if not pending_text or pending_step not in {"collecting_name", "collecting_phone"}:
-            text = txt.get("lead_unclear_retry") or "Продолжим запись. Как к вам обращаться?"
-            clear_lead_pending_interruption(sid)
-            set_lead_intent(sid, "collecting_name")
-            return D2LeadBridgeResult(
-                kind="unclear",
-                response=_plain_answer(
-                    snapshot,
-                    session_key=session_key,
-                    text=text,
-                    quick=_lead_slot_quick_replies(snapshot.client_id),
-                ),
-            )
-        # CP5-LEAD keeps pending-answer as continue-after-choice without gray LLM:
-        # clear pending and re-prompt the same slot (full answer path stays D1R offline suite).
-        clear_lead_pending_interruption(sid)
-        if pending_step == "collecting_phone":
-            set_lead_intent(sid, "collecting_phone")
-            return D2LeadBridgeResult(
-                kind="collecting_phone",
-                response=_phone_prompt_response(snapshot, session_key=session_key, txt=txt),
-            )
-        set_lead_intent(sid, "collecting_name")
-        return D2LeadBridgeResult(
-            kind="collecting_name",
-            response=_name_prompt_response(snapshot, session_key=session_key),
-        )
+        raise ValueError("d2_pending_answer_requires_ordinary_route")
 
     decision = classify_lead_active_turn(q, ref=ref, st=st, sid=sid, client_id=client_id)
     if decision.kind == "meta_cancel":
@@ -324,7 +401,9 @@ def resolve_d2_lead_pre_provider(
         step = (st.get("lead_intent") or "collecting_name").strip()
         if step not in {"collecting_name", "collecting_phone"}:
             step = "collecting_name"
-        set_lead_pending_interruption(sid, text=q, step=step)
+        set_lead_pending_interruption(
+            sid, text=q, step=step, source_revision=published_revision,
+        )
         if step == "collecting_phone":
             quick = (
                 UiQuickReplyCandidate(

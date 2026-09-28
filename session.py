@@ -261,6 +261,17 @@ def peek_lead_activity(session_id: str) -> tuple[bool, bool]:
     return bool(state.get("situation_pending")), is_active_lead_flow(state)
 
 
+def peek_lead_paused(session_id: str) -> bool:
+    """Read the lead pause flag without creating a session row."""
+    with _lock:
+        row = _connect().execute(
+            "SELECT payload, updated_at FROM sessions WHERE sid = ?", (session_id,)
+        ).fetchone()
+    if row is None or _now() - float(row[1]) > MAX_IDLE_SEC:
+        return False
+    return is_lead_paused(json.loads(row[0]))
+
+
 def capture_lead_session_row(session_id: str) -> tuple[str, float] | None:
     """Hold the existing lead owner's row for rollback before D2 publication."""
     with _lock:
@@ -788,6 +799,34 @@ def pause_lead_flow(
         _persist_unlocked(session_id, st)
 
 
+def complete_lead_pending_answer_pause(session_id: str, *, expected_source_revision: int) -> bool:
+    """Idempotently finish a committed D2 answer in one lead-owner row write.
+
+    The pending question remains untouched until the ordinary D2 completion is
+    durable. A retry after that commit can safely finish this transition.
+    """
+    with _lock:
+        st = mem_get(session_id)
+        if st.get("lead_intent") == "paused":
+            return True
+        step = (st.get("lead_pending_interruption_step") or "").strip()
+        if (
+            step not in {"collecting_name", "collecting_phone"}
+            or st.get("lead_intent") != step
+            or not (st.get("lead_pending_interruption_text") or "").strip()
+            or st.get("lead_pending_interruption_source_revision") != expected_source_revision
+        ):
+            return False
+        st["lead_intent"] = "paused"
+        st["lead_resume_step"] = step
+        st["lead_interrupt_kind"] = "pending_question"
+        st["lead_pending_interruption_text"] = ""
+        st["lead_pending_interruption_step"] = ""
+        st["lead_pending_interruption_source_revision"] = None
+        _persist_unlocked(session_id, st)
+        return True
+
+
 def resume_lead_from_pause(session_id: str) -> str:
     """Restore slot step from pause; returns new lead_intent."""
     with _lock:
@@ -981,6 +1020,7 @@ def clear_lead_pii(session_id: str) -> None:
         st["lead_pending_name"] = ""
         st["lead_pending_interruption_text"] = ""
         st["lead_pending_interruption_step"] = ""
+        st["lead_pending_interruption_source_revision"] = None
         st["lead_resume_step"] = ""
         st["lead_return_doc_id"] = ""
         st["lead_interrupt_kind"] = ""
@@ -988,11 +1028,14 @@ def clear_lead_pii(session_id: str) -> None:
         _persist_unlocked(session_id, st)
 
 
-def set_lead_pending_interruption(session_id: str, *, text: str, step: str) -> None:
+def set_lead_pending_interruption(
+    session_id: str, *, text: str, step: str, source_revision: int | None = None,
+) -> None:
     with _lock:
         st = mem_get(session_id)
         st["lead_pending_interruption_text"] = (text or "").strip()[:2000]
         st["lead_pending_interruption_step"] = (step or "").strip()
+        st["lead_pending_interruption_source_revision"] = source_revision
         _persist_unlocked(session_id, st)
 
 
@@ -1009,4 +1052,5 @@ def clear_lead_pending_interruption(session_id: str) -> None:
         st = mem_get(session_id)
         st["lead_pending_interruption_text"] = ""
         st["lead_pending_interruption_step"] = ""
+        st["lead_pending_interruption_source_revision"] = None
         _persist_unlocked(session_id, st)

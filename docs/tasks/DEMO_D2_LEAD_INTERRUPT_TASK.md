@@ -1,11 +1,48 @@
 # D2-LEAD-INTERRUPT — вопрос во время записи
 
-Дата: 2026-09-28. Статус: **проект карточки, только документальный checkpoint**.
-Владелец попросил сначала оформить отдельную карточку заявки. Решение о
-видимом поведении кнопки «Ответить» и GO на runtime-код фиксируются отдельно;
-REC-4-P2 не начинается. Astra выполнила read-only архитектурный разбор.
+Дата: 2026-09-28; реализация начата 2026-09-29. Статус:
+**документальный checkpoint `43c0aba` принят; implementation Draft**.
+Владелец утвердил ответ на сохранённый вопрос с кнопкой «Продолжить запись»
+и отдельно дал GO на код. REC-4-P2 не начинается. Astra выполнила read-only
+архитектурный разбор и follow-up для двух SQLite owners.
 
-## Baseline и preflight
+## Implementation preflight и write allowlist
+
+- Рабочая папка/Git root `C:\Cursor Projects\artgents-bot-active`, ветка
+  `codex/d2-stage1-contract`; HEAD и локальный origin branch
+  `43c0aba362403ac144e88809e4f8ff5a81e6bc2a`.
+- `origin/main` и merge-base `141ce91fb1731cd990fcf8391550150016c73e7f`.
+  Tracked diff/staging до реализации пусты. Чужие untracked `data/` и
+  `docs/MARKETING_ANSWER_SCENARIOS.md` сохранены.
+- **OWNER DECISION:** после проверенного «Ответить» дать ответ на сохранённый
+  вопрос и показать «Продолжить запись»; только этот клик возвращает к
+  прежнему name/phone. Решение владельца в текущем чате после Cursor PASS
+  карточки; затем отдельное «Давай» разрешило реализацию. Это не разрешение
+  live/provider, запуска бота, merge или deploy.
+
+Точный write allowlist реализации:
+
+```text
+core/d2_dialogue.py
+core/d2_lead_bridge.py
+core/response_plan_materialization.py
+session.py
+tests/test_d2_lead_interrupt_http.py
+docs/tasks/DEMO_D2_LEAD_INTERRUPT_TASK.md
+docs/tasks/DEMO_D2_CURRENT_STATUS.md
+docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md
+docs/tasks/DEMO_D2_PRODUCT_DECISIONS.md
+docs/tasks/DEMO_D2_ACCEPTANCE.md
+docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md
+```
+
+Если файл из allowlist остаётся без diff, это не повод создавать правку. Изменение
+`core/d2_dialogue_store.py` для восстановления общего `inflight` после hard crash
+не входит в этот checkpoint: текущая D2 reservation не имеет lease/recovery.
+Обычные ошибки до commit и сбой после commit с завершённым ответом проверяются
+здесь; полное восстановление hard crash до commit нельзя объявлять доказанным.
+
+## Исторический baseline документального checkpoint
 
 - Единственная рабочая папка/Git root: `C:\Cursor Projects\artgents-bot-active`;
   ветка `codex/d2-stage1-contract`.
@@ -40,16 +77,16 @@ answer→resume, но он не является разрешённым fallback
 потерять имя/телефон и тот шаг, на котором остановилась запись. При
 «Продолжить запись» вернуться именно к прежнему шагу; отмена очищает данные.
 
-Рекомендация Astra: показать содержательный ответ и typed кнопку «Продолжить
-запись»; её клик восстанавливает прежний шаг name/phone. Альтернатива — после
-ответа сразу повторить вопрос соответствующего слота. **Выбор владельца ещё
-ожидается.** До его фиксации и отдельного GO реализация не разрешена.
+Рекомендацию Astra показать содержательный ответ и typed кнопку «Продолжить
+запись» владелец утвердил после review документального checkpoint. Её клик
+восстанавливает прежний шаг name/phone. Немедленный повтор вопроса о слоте
+не выбран. Code GO получен отдельно.
 
 Не добавлять новый parser, второй LLM, semantic regex, реконструкцию вопроса
 по фразам, fallback на старый runtime или второго владельца lead/ordinary
 state. Действуют D2-022/031/036, A12/B11/C05–C07 и Execution Lock §4.
 
-## Границы будущей реализации — после GO
+## Границы реализации
 
 1. При проверенном текущем UI `lead:pending:answer` взять pending question
    только из tenant-bound lead session. Нельзя брать текст из label кнопки,
@@ -69,6 +106,8 @@ state. Действуют D2-022/031/036, A12/B11/C05–C07 и Execution Lock §
    прежним шагом и сохранёнными слотами. Выбранный способ перехода должен
    выдержать ошибку до commit, replay того же request_id и сбой после commit;
    две SQLite state-области не объявляются атомарными без доказанного механизма.
+   Согласование должно относиться к конкретной версии pending-вопроса:
+   replay старого ответа после нового вопроса не может менять новый lead state.
 5. Подключить текущий typed `lead:resume` к D2 pre-provider bridge. Он
    возвращает к name/phone без provider и без повторного lead effect. Cancel
    очищает PII и pending. Если во время паузы приходит ещё один текстовый
@@ -85,11 +124,10 @@ docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md
 docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md
 ```
 
-Для реализации после решения владельца нужен новый preflight и **отдельный
-точный code/test allowlist**. Предварительно читать `core/d2_dialogue.py`,
-`core/d2_lead_bridge.py`, `core/d2_http_adapter.py`, `session.py`,
-`core/lead_provider_input_privacy.py`, D2 UI projection и адресные lead/HTTP
-тесты. Этот перечень мест чтения не является разрешением их менять.
+Этот блок относится к предыдущему документальному checkpoint. Точный
+implementation allowlist и baseline указаны выше. Чтение
+`core/d2_http_adapter.py`, `core/lead_provider_input_privacy.py` и D2 UI
+projection не разрешает их менять.
 
 ## Приёмка будущей реализации и ворота
 
@@ -97,13 +135,15 @@ docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md
 `/ask/stream`; не полный REC-5. **D2 ROUTE:** один проверенный lead click →
 очищенный pending вопрос → обычный D2 ответ → frozen UI/state/replay →
 проверенное возобновление заявки. **LEGACY IMPACT:** старый normal runtime
-не подключается. **OWNER DECISION:** pending по видимому поведению и отдельному
-GO. **FUTURE SCOPE:** REC-4-P2, REC-5, отдельные live проверки с бюджетом.
+не подключается. **OWNER DECISION:** утверждён ответ с typed resume и получен
+отдельный code GO. **FUTURE SCOPE:** REC-4-P2, REC-5, recovery общего
+hard-crash `inflight` по отдельной карточке; live проверки только с бюджетом.
 
 Offline fake-provider проверки: name и phone; цена и материал; JSON/SSE;
 очистка имени/телефона в provider input, истории и D2 store; только ПД →
 fail-closed; current/foreign/stale/forged click; continue/cancel; повтор
 request_id и другой payload с тем же ID; provider/commit/final-frame failure;
+старый replay после возобновления и нового pending-вопроса;
 один lead effect, без автозаявки; содержательный текст и кнопка resume в одном
 сохранённом ответе. Рабочие БД/логи не использовать: временные tenant/DB/log,
 блокировка сети, полный журнал выключен до imports. Сравнить старые падения с

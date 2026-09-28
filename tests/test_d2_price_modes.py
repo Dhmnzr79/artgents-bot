@@ -16,9 +16,9 @@ from tests.test_target_offer_projection import _bundle
 @pytest.mark.parametrize(
     ("offer_id", "expected_mode", "expected_text"),
     [
-        ("generic_fixed", "fixed", "120 000 ₽"),
-        ("option_a_from", "from", "от 68 000 ₽"),
-        ("option_c_range", "range", "80 000–110 000 ₽"),
+        ("generic_fixed", "fixed", "120\u00a0000\u00a0₽"),
+        ("option_a_from", "from", "от 68\u00a0000\u00a0₽"),
+        ("option_c_range", "range", "80\u00a0000–110\u00a0000\u00a0₽"),
         ("generic_no_public", "no_public_price", "Стоимость определяется после консультации."),
     ],
 )
@@ -67,4 +67,4 @@ def test_missing_optional_conditions_do_not_suppress_published_price() -> None:
     outcome = resolve_d2_envelope_response(_envelope(), sources, as_of=date(2026, 9, 18))
     assert outcome.resolved.d2_result_status == "complete"
     assert outcome.resolved.d2_price_block is not None
-    assert "120 000" in outcome.rendered_text
+    assert "120\u00a0000\u00a0₽" in outcome.rendered_text

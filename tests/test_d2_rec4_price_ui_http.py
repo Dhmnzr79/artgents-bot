@@ -98,8 +98,7 @@ def test_general_overview_keeps_three_prices_four_choices_and_neutral_intro(http
         plan = saved.response.resolved
         assert len(plan.d2_price_block.rows) == 3
         assert plan.d2_price_scope_decision.introduction_text == (
-            "Понимаю, хочется сориентироваться в стоимости имплантации. "
-            "Цена зависит от протокола и объёма лечения. Вот основные ориентиры."
+            "Цена зависит от протокола и объёма лечения."
         )
         assert "восстановления одного зуба" not in plan.d2_price_scope_decision.introduction_text
     assert [item["label"] for item in body["ui"]["quick_replies"]] == [

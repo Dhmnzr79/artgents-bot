@@ -16,6 +16,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const runner = `
 import { mountWidget } from "/static/widget/widget.js";
+import { renderBotAnswerHtml } from "/static/widget/answer_format.js";
 const fixture = await fetch("/payloads.json").then((response) => response.json());
 const root = document.createElement("div");
 document.body.append(root);
@@ -88,13 +89,20 @@ async function send(text) {
 }
 function botBodies() { return [...root.querySelectorAll(".clinic-turn .clinic-msg__body")]
   .map(x => x.textContent.trim()); }
-const sameRenderedText = (actual, expected) => actual.replace(/\\s+/gu, "") === expected.replace(/\\s+/gu, "");
+const sameRenderedText = (actual, expected) => {
+  const box = document.createElement("div");
+  box.innerHTML = renderBotAnswerHtml(expected);
+  const compact = (value) => value.replace(/\\s+/gu, "");
+  return compact(actual) === compact(box.textContent);
+};
 try {
   await send("первый");
   await waitUntil(() => botBodies().length === 1);
   if (sent.length !== 2 || sent[0].request_id !== sent[1].request_id) throw new Error("before-ui retry ID changed");
   if (!sameRenderedText(botBodies()[0], first.answer))
     throw new Error("wrong first D2 text: " + JSON.stringify({ actual: botBodies()[0], expected: first.answer }));
+  if (root.querySelectorAll(".clinic-turn .clinic-msg__body")[0].querySelectorAll("ul li").length !== 3)
+    throw new Error("compact price list did not render as three list items");
   const link = root.querySelector(".clinic-msg__link");
   if (!link || link.textContent.trim() !== scopeChoice.label) throw new Error("scope UI missing");
   link.click();
@@ -157,6 +165,12 @@ try {
     scope_ref: sent.find(x => x.ref?.startsWith("volume:"))?.ref,
     lead_ref: sent.find(x => x.ref?.startsWith("button:"))?.ref,
   };
+  window.__D2_PRICE_PREVIEW__ = (text) => {
+    const body = root.querySelector(".clinic-turn .clinic-msg__body");
+    body.innerHTML = renderBotAnswerHtml(text);
+    body.classList.add("clinic-msg__body--rich");
+    return body.querySelectorAll("ul li").length;
+  };
 } catch (error) { window.__D2_WIDGET_ERROR__ = String(error.stack || error); }
 `;
 
@@ -175,7 +189,7 @@ function startServer() {
     }
     if (pathname === "/") {
       res.writeHead(200, { "content-type": "text/html" });
-      res.end('<!doctype html><html><body><script type="module" src="/runner.mjs"></script></body></html>'); return;
+      res.end('<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/static/widget/widget.css"></head><body><script type="module" src="/runner.mjs"></script></body></html>'); return;
     }
     const target = path.resolve(root, "." + pathname);
     if (!target.startsWith(root + path.sep) || !fs.existsSync(target)) {
@@ -255,6 +269,39 @@ async function main() {
       if (result.result.value.result) {
         if (pageRequests.some((url) => !url.startsWith(origin) && !url.startsWith("data:")))
           throw new Error("external page network request: " + JSON.stringify(pageRequests));
+        const visualDir = process.env.D2_P1_VISUAL_DIR;
+        if (visualDir) {
+          const output = path.resolve(visualDir);
+          if (!output.startsWith(path.resolve(os.tmpdir()) + path.sep))
+            throw new Error("visual output must be under the temp directory");
+          fs.mkdirSync(output, { recursive: true });
+          const preview = "**Классическая имплантация**\n\n" +
+            "- Implantium — **76 200 ₽**\n" +
+            "- Impro — **85 200 ₽**\n" +
+            "- Nobel Biocare — **101 200 ₽**\n\n" +
+            "за восстановление одного зуба (имплант + постоянная коронка); " +
+            "КТ при необходимости и временная коронка — отдельно";
+          const previewResult = await cdp.send("Runtime.evaluate", {
+            expression: `window.__D2_PRICE_PREVIEW__(${JSON.stringify(preview)})`,
+            returnByValue: true,
+          });
+          if (previewResult.result.value !== 3) throw new Error("price preview list missing");
+          for (const width of [360, 768]) {
+            await cdp.send("Emulation.setDeviceMetricsOverride", {
+              width, height: 900, deviceScaleFactor: 1, mobile: width === 360,
+            });
+            const geometry = await cdp.send("Runtime.evaluate", {
+              expression: "(() => { const b=document.querySelector('.clinic-turn .clinic-msg__body'); return {width:b.clientWidth,scroll:b.scrollWidth,items:b.querySelectorAll('ul li').length}; })()",
+              returnByValue: true,
+            });
+            if (geometry.result.value.scroll > geometry.result.value.width || geometry.result.value.items !== 3)
+              throw new Error("price preview overflow: " + JSON.stringify({ width, geometry: geometry.result.value }));
+            const screenshot = await cdp.send("Page.captureScreenshot", { format: "png" });
+            const target = path.join(output, `price-${width}.png`);
+            fs.writeFileSync(target, Buffer.from(screenshot.data, "base64"));
+            console.log("D2_PRICE_VISUAL:" + JSON.stringify({ target, width, geometry: geometry.result.value }));
+          }
+        }
         console.log("D2_WIDGET_EVIDENCE:" + JSON.stringify(result.result.value.result));
         return;
       }

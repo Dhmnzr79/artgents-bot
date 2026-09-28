@@ -158,7 +158,25 @@ def _bounded_d2_text(value: str, *, limit: int) -> str:
 def _d2_live_prose_for_history(response) -> str | None:
     """Return only free model prose; frozen price and authored blocks are excluded."""
     resolved = response.resolved
-    if resolved.route != "ANSWER" or resolved.is_price_answer:
+    if resolved.route != "ANSWER":
+        return None
+    if resolved.d2_request_parts:
+        blocks_by_request = {
+            block.request_id: block.display_text
+            for block in resolved.information_blocks
+            if block.publication == "model_prose"
+        }
+        prose: list[str] = []
+        for part in resolved.d2_request_parts:
+            if part.status != "answered":
+                continue
+            if part.kind == "price" and resolved.d2_price_block is not None:
+                if resolved.patient_text:
+                    prose.append(resolved.patient_text)
+            elif part.kind == "content" and part.request_id in blocks_by_request:
+                prose.append(blocks_by_request[part.request_id])
+        return "\n\n".join(prose) if prose else None
+    if resolved.is_price_answer:
         return None
     if resolved.patient_text is not None:
         return resolved.patient_text

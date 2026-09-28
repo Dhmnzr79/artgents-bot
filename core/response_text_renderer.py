@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from contracts.response_plan import ResolvedResponsePlan
+from contracts.response_plan import D2FrozenPriceRow, ResolvedResponsePlan
 
 _AMPLIFIER_HEADER = "Также мы предлагаем:"
 
@@ -38,6 +38,8 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
             elif part.status == "deferred":
                 parts.append(deferred_by_request[part.request_id].display_text.strip())
             elif part.kind == "price":
+                if plan.d2_price_block is not None and plan.patient_text:
+                    parts.append(plan.patient_text.strip())
                 _render_d2_price_parts(plan, parts)
             elif part.kind == "contact":
                 parts.append(contacts_by_request[part.request_id].display_text.strip())
@@ -48,7 +50,7 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
                 if block is not None:
                     parts.append(block.display_text.strip())
         parts.extend(_condition_display_texts(plan.required_offer_conditions))
-        if plan.patient_text:
+        if plan.patient_text and plan.d2_price_block is None:
             parts.append(plan.patient_text.strip())
         parts.extend(block.display_text.strip() for block in plan.requested_fact_blocks)
         parts.extend(block.display_text.strip() for block in plan.promo_blocks)
@@ -58,9 +60,11 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
         return _join_parts(parts)
 
     if plan.is_price_answer:
+        if plan.d2_price_block is not None and plan.patient_text:
+            parts.append(plan.patient_text.strip())
         _render_d2_price_parts(plan, parts)
         parts.extend(_condition_display_texts(plan.required_offer_conditions))
-        if plan.patient_text:
+        if plan.patient_text and plan.d2_price_block is None:
             parts.append(plan.patient_text.strip())
         if not plan.d2_request_parts:
             parts.extend(block.display_text.strip() for block in plan.information_blocks)
@@ -99,9 +103,71 @@ def _render_d2_price_parts(plan: ResolvedResponsePlan, parts: list[str]) -> None
         parts.append(plan.price_block.display_text.strip())
         return
     assert plan.d2_price_block is not None
-    for row in plan.d2_price_block.rows:
-        parts.append(row.display_text.strip())
-        parts.extend(text.strip() for text in row.condition_texts)
+    rows = plan.d2_price_block.rows
+    if any(row.service_name is None or row.price_display_text is None for row in rows):
+        # Older frozen plans retain their original display text on replay.
+        for row in rows:
+            parts.append(row.display_text.strip())
+            parts.extend(text.strip() for text in row.condition_texts)
+        return
+    if scope is not None:
+        _render_compact_price_group(
+            rows, parts,
+            show_service_in_each_row=len({row.service_id for row in rows}) > 1,
+        )
+        return
+    start = 0
+    while start < len(rows):
+        end = start + 1
+        while end < len(rows) and rows[end].service_id == rows[start].service_id:
+            end += 1
+        _render_compact_price_group(rows[start:end], parts, show_service_in_each_row=False)
+        start = end
+
+
+def _render_compact_price_group(
+    rows: tuple[D2FrozenPriceRow, ...], parts: list[str], *, show_service_in_each_row: bool,
+) -> None:
+    details = tuple(
+        tuple(dict.fromkeys(
+            (*((row.scope_text,) if row.scope_text else ()), *row.condition_texts)
+        ))
+        for row in rows
+    )
+    common = tuple(text for text in details[0] if all(text in item for item in details[1:]))
+
+    def price_text(row: D2FrozenPriceRow) -> str:
+        assert row.price_display_text is not None
+        return (
+            row.price_display_text
+            if row.mode == "no_public_price" else f"**{row.price_display_text}**"
+        )
+
+    if len(rows) == 1:
+        row = rows[0]
+        assert row.service_name is not None
+        name = f"**{row.service_name}**"
+        if row.variant_label:
+            name += f" — {row.variant_label}"
+        suffix = f"; {'; '.join(common)}" if common else ""
+        parts.append(f"{name} — {price_text(row)}{suffix}")
+        return
+
+    if not show_service_in_each_row:
+        assert rows[0].service_name is not None
+        parts.append(f"**{rows[0].service_name}**")
+    lines: list[str] = []
+    for row, item in zip(rows, details):
+        label = (
+            f"{row.service_name} — {row.variant_label}" if row.variant_label else row.service_name
+        ) if show_service_in_each_row else row.variant_label
+        local = tuple(text for text in item if text not in common)
+        prefix = f"{label} — " if label else ""
+        suffix = f"; {'; '.join(local)}" if local else ""
+        lines.append(f"- {prefix}{price_text(row)}{suffix}")
+    parts.append("\n".join(lines))
+    if common:
+        parts.append("; ".join(common))
 
 
 def _render_authored_service_alternative(plan: ResolvedResponsePlan) -> list[str]:

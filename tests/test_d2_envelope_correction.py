@@ -102,7 +102,7 @@ def test_http_price_name_comes_from_current_tenant_and_replays(
     first = post(client, client_id=client_id, sid=sid, request_id="price", q="Цена услуги")
     assert first.status_code == 200
     answer = first.get_json()["answer"]
-    assert f"{service_name} — " in answer
+    assert f"**{service_name}** — " in answer
 
     events = sse_events(post_sse(
         client, client_id=client_id, sid=sid, request_id="price", q="Цена услуги"

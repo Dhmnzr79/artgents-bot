@@ -1,5 +1,22 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-28: REC-4-P1 компактное оформление цен
+
+Рабочая папка/Git root `C:\Cursor Projects\artgents-bot-active`, ветка
+`codex/d2-stage1-contract`; baseline HEAD и локальный origin branch
+`04657f10e6e01162e9513a602424dbcccb594ac2` (после Checker/Cursor PASS,
+разрешённого commit/push документального checkpoint REC-4-P). `origin/main`
+и merge-base `141ce91fb1731cd990fcf8391550150016c73e7f`. До P1 tracked
+diff/staging чисты; чужие untracked `data/` и
+`docs/MARKETING_ANSWER_SCENARIOS.md` не менялись. Git предупреждал о
+недоступных global ignore и `.pytest_cache/`. Точный будущий P1 allowlist —
+§4 [карточки REC-4-P](DEMO_D2_PRICE_PRESENTATION_DETAILS_TASK.md); новый
+`tests/test_d2_price_presentation_http.py` входит в него.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-REC-4-P1 | **ACCEPTANCE:** срез A02/A05, B18 и регрессий B12/B14, C03–C05/C07/C09/C10; не полный A16/B19/REC-5. У точной услуги проверенные frozen service/variant/price поля дают короткий список, общие точные условия один раз, частные остаются у offer; RUB в формате `20 000 ₽` с NBSP. У overview остаётся один authored факт зависимости от протокола/объёма и choices. `patient_text` для ANSWER с реально разрешённой ценой — 0–1 optional live intro из одного model call, перед ценой; независимые content parts в порядке requests. Ordinary history хранит всю живую prose, не копирует code-owned цену; replay сохраняет итоговый ответ. **D2 ROUTE:** офлайн `/ask`/`/ask/stream` → единый production envelope/parser → captured tenant snapshot → materializer/frozen plan → renderer/UI → store/replay; browser harness с fake D2 payloads и штатным CSS. **LEGACY IMPACT:** второго model call/parser, semantic regex, старого assembler/fallback или нового state owner нет. **OWNER DECISION:** владелец подтвердил Cursor PASS карточки, отдельно разрешил doc commit/push и дал GO на P1; решения D2-101/103 и границы D2-092/B14 действуют. Astra ранее read-only проверила reuse existing `patient_text` и history boundary. **Test isolation/evidence:** на чистом baseline назначенный набор 28 passed; после P1 адресные пять файлов 39 passed, соседние request order/memory/UI 10 passed, B14 оба порядка 3 passed, headless Chrome widget 1 passed, `node --check`/Python compile/diff check clean. Визуально осмотрены временные скриншоты 360/768 px: список/переносы без горизонтального overflow. Первый baseline pytest без явного basetemp дал 9 setup errors из-за прав на стандартную temp-папку; с отдельным temp 28 passed. Исторический `test_price_content_price_preserves_independent_content_and_request_order` по-прежнему падает: отсутствует «Материал терапии.» (0 вместо 1); тест не менялся и не скрыт; прежнее evidence REC-4 уже сравнивало этот ID с чистым HEAD, на чистом `04657f1` отдельно не воспроизводили. Fake provider, временные tenant/DB/log/Chrome profile, локальная сеть браузера, provider/live/SMTP 0. **FUTURE SCOPE:** P2 exact details/buttons только после принятого P1 и отдельного GO, полный A16/B19/REC-5, старый multipart/content разрыв, живость optional intro в реальном widget/live только по отдельному разрешению и бюджету. | Draft до независимого Checker реализации и отдельного Cursor review. Staging/commit/push P1 не выполнены. После PASS Ledger не дописывать. |
+
 ## Draft — 2026-09-28: карточка REC-4-P и согласование документов
 
 Папка/Git root `C:\Cursor Projects\artgents-bot-active`, ветка

@@ -394,6 +394,10 @@ class D2FrozenPriceRow(ResponsePlanModel):
     service_id: NonBlankStr
     mode: D2PriceMode
     display_text: NonBlankStr
+    service_name: NonBlankStr | None = None
+    variant_label: NonBlankStr | None = None
+    price_display_text: NonBlankStr | None = None
+    scope_text: NonBlankStr | None = None
     amount: int | None = Field(default=None, ge=0)
     min_amount: int | None = Field(default=None, ge=0)
     max_amount: int | None = Field(default=None, ge=0)

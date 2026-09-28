@@ -737,7 +737,7 @@ def resolve_d2_envelope_response(
     composer_result = ComposerResult(
         route="ANSWER",
         mode="standard",
-        patient_text=None,
+        patient_text=envelope.patient_text if price_block is not None else None,
         requested_fact_ids=requested_fact_ids,
         information_blocks=information_blocks,
         d2_part_failure_blocks=frozen_failure_blocks,
@@ -1365,16 +1365,16 @@ def _d2_frozen_price_row(
     price = offer.price
     unit = ""
     if isinstance(price, TargetFixedPrice):
-        body = f"{_format_d2_amount(price.amount)} {_d2_currency(price.currency)}"
+        body = f"{_format_d2_amount(price.amount)}\u00a0{_d2_currency(price.currency)}"
         unit = billing_unit_phrase(price.billing_unit)
         mode = "fixed"
     elif isinstance(price, TargetFromPrice):
-        body = f"от {_format_d2_amount(price.min_amount)} {_d2_currency(price.currency)}"
+        body = f"от {_format_d2_amount(price.min_amount)}\u00a0{_d2_currency(price.currency)}"
         unit = billing_unit_phrase(price.billing_unit)
         mode = "from"
     elif isinstance(price, TargetRangePrice):
         body = (
-            f"{_format_d2_amount(price.min_amount)}–{_format_d2_amount(price.max_amount)} "
+            f"{_format_d2_amount(price.min_amount)}–{_format_d2_amount(price.max_amount)}\u00a0"
             f"{_d2_currency(price.currency)}"
         )
         unit = billing_unit_phrase(price.billing_unit)
@@ -1386,6 +1386,10 @@ def _d2_frozen_price_row(
             service_id=offer.service_id,
             mode="no_public_price",
             display_text=f"{service_name} — {price.approved_text}",
+            service_name=service.name,
+            variant_label=variant,
+            price_display_text=price.approved_text,
+            scope_text=None,
             approved_text=price.approved_text,
             condition_texts=_d2_brief_price_conditions(
                 offer, package_label=terms.package_label, already_shown=price.approved_text,
@@ -1400,6 +1404,10 @@ def _d2_frozen_price_row(
         service_id=offer.service_id,
         mode=mode,
         display_text=f"{service_name} — {body}{'' if package_scope else f' {unit}'}",
+        service_name=service.name,
+        variant_label=variant,
+        price_display_text=body,
+        scope_text=unit if not package_scope else None,
         amount=price.amount if isinstance(price, TargetFixedPrice) else None,
         min_amount=(
             price.min_amount
@@ -1447,7 +1455,7 @@ def _d2_terms_for_offer(
 
 
 def _format_d2_amount(amount: int) -> str:
-    return f"{amount:,}".replace(",", " ")
+    return f"{amount:,}".replace(",", "\u00a0")
 
 
 def _d2_currency(currency: str) -> str:

@@ -119,7 +119,7 @@ class RequestUnderstandingRequest(BaseModel):
         if not isinstance(value, dict):
             return value
         if (
-            value.get("kind") == "content"
+            value.get("kind") in ("content", "other")
             and "content_realization" not in value
             and isinstance(value.get("content_text"), str)
             and value["content_text"].strip()
@@ -211,7 +211,7 @@ class RequestUnderstandingRequest(BaseModel):
         if self.content_section_refs and (self.kind != "content" or self.content_ref is None):
             raise ValueError("content_section_refs_forbidden")
         if self.content_realization == "model_prose":
-            if self.kind != "content":
+            if self.kind not in {"content", "other"}:
                 raise ValueError("model_prose_forbidden")
             if self.content_text is None or not self.content_text.strip():
                 raise ValueError("model_prose_text_required")

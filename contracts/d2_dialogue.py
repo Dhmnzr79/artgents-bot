@@ -8,7 +8,7 @@ from pydantic import model_validator
 from contracts.d2_session_context import D2PlanFocusSeed, D2SessionActivity, D2SessionContextProjection
 from contracts.d2_tenant_snapshot import D2ModelView
 from contracts.response_plan import ResponsePlanModel
-from contracts.response_plan_materialization import MaterializedResponseOutcome
+from contracts.response_plan_materialization import D2SelectedDocumentAction, MaterializedResponseOutcome
 from contracts.response_plan_session import D2SelectedUiRef, ResponsePlanSessionState
 
 
@@ -51,6 +51,7 @@ class D2ProviderInput:
     model_view: D2ModelView
     context: D2SessionContextProjection
     selected_ui_ref: D2SelectedUiRef | None = None
+    selected_document_action: D2SelectedDocumentAction | None = None
 
 
 class D2RawProvider(Protocol):

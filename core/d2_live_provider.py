@@ -114,6 +114,13 @@ def build_d2_d1r_messages(request: D2ProviderInput) -> tuple[dict[str, str], dic
             ensure_ascii=False,
             separators=(",", ":"),
         ),
+        "=== D2_SELECTED_DOCUMENT_ACTION ===\n" + json.dumps(
+            request.selected_document_action.model_dump(mode="json")
+            if request.selected_document_action is not None
+            else None,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
         "=== USER_MESSAGE ===\n" + request.user_message,
     ))
     return {"role": "system", "content": system}, {"role": "user", "content": user}

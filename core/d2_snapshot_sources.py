@@ -227,7 +227,7 @@ def resolve_d2_selected_document_action(
             selected = D2SelectedDocumentAction(
                 source_client_id=snapshot.client_id, reply_id=reply_id,
                 source_revision=source_revision, content_ref=content.content_ref,
-                section_ref=section_ref,
+                section_ref=section_ref, section_title=candidate.label,
             )
     return selected
 

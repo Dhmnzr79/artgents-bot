@@ -76,6 +76,12 @@ ordinary follow-up на цене, до двух, без смешения с choi
 
 ## 4. Технические проверки полной цепочки
 
+Дополнение D2-DOC-CLICK (D2-104/105), baseline `a930ed7`:
+
+| ID | Сценарий | Требование |
+|---|---|---|
+| B20 | Разные документные follow-up и соседние разделы, пустой q; other с prose | До provider известны проверенные document/section/title текущего клика. USER_MESSAGE не подменён label, full corpus сохранён. Выбранный вопрос выше прежнего ответа; metadata источника не доказывает релевантность prose. Omitted mode other становится model_prose; explicit authored/invalid/null и пустой other не нормализуются. JSON/SSE, source CTA, history, tenant/revision и replay сохраняются. Offline подтверждает проводку, live-качество/отсутствие повторов требует отдельного GO и бюджета. |
+
 | ID | Внедряемая ситуация | Что доказываем |
 |---|---|---|
 | C01 | Malformed JSON, truncated envelope, unknown enum/ID, nullable и ошибочные необязательные поля; ordinary prose с `topic_id=pain`, произвольным unknown и null при одинаковом owned документе | Отделить неразбираемый ответ без пригодного текста от пригодного текста с дефектом optional topic; весь пригодный текст сохраняется, неизвестный topic не авторизует scope, UI или память. Проверить разные темы, valid conflict, обязательную цену, foreign owner и forged/stale UI без ослабления строгих границ; без второго LLM/parser, семантических regex и старого fallback; общий вопрос не требует exact service ID |

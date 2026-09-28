@@ -228,11 +228,13 @@ class D2SelectedDocumentAction(ResponsePlanModel):
     source_revision: int
     content_ref: str
     section_ref: str
+    section_title: str
 
     @model_validator(mode="after")
     def _validate_selected_document(self) -> Self:
         if any(not value or value != value.strip() for value in (
             self.source_client_id, self.reply_id, self.content_ref, self.section_ref,
+            self.section_title,
         )):
             raise ValueError("d2_selected_document_invalid")
         if type(self.source_revision) is not int or self.source_revision < 1:

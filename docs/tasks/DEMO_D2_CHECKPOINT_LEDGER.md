@@ -1,5 +1,21 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-28: D2-DOC-CLICK перед возвратом к REC-4-P2
+
+Папка/Git root `C:\Cursor Projects\artgents-bot-active`, ветка
+`codex/d2-stage1-contract`; baseline HEAD и локальный origin branch
+`a930ed70df9d2d709cc36b9076be55659485c582`. `origin/main` и merge-base
+`141ce91fb1731cd990fcf8391550150016c73e7f`. Это принятый Checker/Cursor и
+сохранённый с разрешения владельца REC-4-P1; его нижняя Draft-строка — снимок
+до review, не нынешний Git-status. До этой коррекции tracked/staging пусты.
+Чужие untracked `data/` и `docs/MARKETING_ANSWER_SCENARIOS.md` сохранены;
+БД не открывались. Точный allowlist —
+[D2-DOC-CLICK](DEMO_D2_DOCUMENT_CLICK_TASK.md). Старые строки не переписываются.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-DOC-CLICK | **ACCEPTANCE:** срез A03/B12/B15/B20/C01, не полный REC-5. Проверенный документный action с section_title из captured snapshot поступает в единственный provider input/prompt до генерации; текущий вопрос по клику отделён от истории, q остаётся пустым. В production parser omitted mode для непустого content/other становится model_prose; explicit authored/invalid/null и empty other сохраняют прежние правила. **D2 ROUTE:** JSON/SSE → текущий проверенный action → provider prompt → production parser → прежние materializer/source/CTA → store/history/replay. **LEGACY IMPACT:** второго parser/call, semantic regex, замены prose абзацем MD, нового state owner или legacy fallback нет. **OWNER DECISION:** GO на обе коррекции и документы перед возвратом к ценам; Astra read-only подтвердила эту ограниченную архитектуру. **Test isolation/evidence:** fake provider, временные DB/tenant/logs, запрет сети; BOT_LOG_DIR до imports. Чистый baseline до правок: R1/REC2/envelope-correction 54 passed / 1 failed (исторический other). Те же три файла плюс новый HTTP-набор после правок: 71 passed; прежний other тест проходит без изменения. Соседние scope/lead/replay/B14/fullcontext/offtopic/free-dialogue: 20 passed / 3 failed. Все три воспроизведены теми же assertions в чистом tracked архиве a930ed7 во временной папке: test_offtopic_polite_refuse_from_ui_yaml — patient_text_required; test_greeting_prose_is_not_replaced_by_guided_menu — d2_experiment_content_not_resolved (fixture явно задаёт authored); test_available_contact_leaves_an_unavailable_information_part_degraded — нет INFO_GAP. Тесты не ослаблены. Первые два запуска baseline-архива не собрали tests из-за отсутствия локального CHAT_API_KEY; после фиктивного offline key сравнение состоялось, реальные credentials не копировались. Provider/live/SMTP 0, бот не запускался; browser harness не запускался. **FUTURE SCOPE:** качество настоящей генерации и отсутствие смысловых повторов проверять отдельно с GO/бюджетом; fake ответы доказывают передачу задания и сохранение prose, а не качество модели. REC-4-P2 — после принятого checkpoint и отдельного GO. | Draft до независимого Checker и отдельного Cursor review. Staging пуст, commit/push не выполнены и требуют отдельного разрешения. После PASS Ledger не дописывать. |
+
 ## Draft — 2026-09-28: REC-4-P1 компактное оформление цен
 
 Рабочая папка/Git root `C:\Cursor Projects\artgents-bot-active`, ветка

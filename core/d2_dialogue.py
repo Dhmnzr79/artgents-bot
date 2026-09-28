@@ -817,6 +817,7 @@ def _run_reserved_d2_dialogue_turn(
         model_view=view,
         context=context,
         selected_ui_ref=selected_ui_ref,
+        selected_document_action=selected_document_action,
     )
     full_audit("provider_input", provider_input=provider_input)
     raw = provider.generate(provider_input)

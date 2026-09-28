@@ -1,5 +1,21 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-28: карточка D2-LEAD-INTERRUPT
+
+Папка/Git root `C:\Cursor Projects\artgents-bot-active`, ветка
+`codex/d2-stage1-contract`, baseline HEAD и локальный origin branch
+`b39ed36cdbc57f608da1c199cf45ce938e70b6dc`; `origin/main` и merge-base
+`141ce91fb1731cd990fcf8391550150016c73e7f`. До правок tracked diff и
+staging пусты. Чужие untracked `data/` и
+`docs/MARKETING_ANSWER_SCENARIOS.md` сохранены. Точный документальный
+allowlist — [карточка](DEMO_D2_LEAD_INTERRUPT_TASK.md). Нижняя Draft строка
+указателя — снимок до его Checker/Cursor PASS и сохранения в `b39ed36`;
+Ledger после её review не переписывали.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-LEAD-INTERRUPT-DOC | **ACCEPTANCE:** план A12/B11/C05–C07; runtime пока не проверен. **D2 ROUTE:** read-only разобраны D2 pre-provider lead bridge, pending/resume, обычный D2, UI revision, HTTP replay и существующая очистка ПД. **LEGACY IMPACT:** старый answer→resume путь только историческая сверка, не fallback. **OWNER DECISION:** требуется выбор поведения после «Ответить» и отдельный GO на код по Execution Lock §4. Astra read-only рекомендовала ответ + typed resume к прежнему name/phone. **Test isolation/evidence:** widget trace `40820dcb` → `96b02f07`; исходный D2 bridge стирает pending и повторяет слот, provider attempts 0. Сырые сообщения и БД не перенесены. Только чтение кода/документов, pytest/бот/live/provider/SMTP 0. **FUTURE SCOPE:** отдельный implementation preflight и allowlist, offline HTTP/PII/replay tests, Checker/Cursor, REC-4-P2, REC-5. | Draft до независимого Checker и Cursor review карточки. Staging пуст; commit/push не выполнялись. После PASS Ledger не дописывать. |
+
 ## Draft — 2026-09-28: указатель текущего состояния D2
 
 Папка/Git root `C:\Cursor Projects\artgents-bot-active`, ветка

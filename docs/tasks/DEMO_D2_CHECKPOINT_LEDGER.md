@@ -1,5 +1,21 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-30: карточка D2-AF-1a после D2-AUDIT-PLAN
+
+Git root `C:\Cursor Projects\artgents-bot-active`, ветка
+`codex/d2-stage1-contract`, HEAD и локальная origin-ветка до правок
+`fb81a9af2e1c4e654d9040013c3c6f528d89b5d4`; `origin/main` и merge-base
+`141ce91fb1731cd990fcf8391550150016c73e7f`. Staging/tracked diff до
+правок пусты; foreign `data/` и `docs/MARKETING_ANSWER_SCENARIOS.md`
+сохранены. Write allowlist — эта строка и
+[карточка AF-1a](DEMO_D2_AF1A_PRICE_TASK_TASK.md). Локальный `origin/*`
+прочитан без нового fetch/remote-запроса. Историческая Draft
+D2-AUDIT-PLAN ниже относится к прежнему `f4a08ea`, не к сегодняшнему HEAD.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-AF-1a-DOC | **ACCEPTANCE:** подготовлен узкий план D2-094/A14 по AF-01, без закрытия A/B/C. **D2 ROUTE / LEGACY IMPACT:** только read-only сверка проверки UI ref, volume refs и существующего price path; runtime/legacy не менялись. **OWNER DECISION:** владелец разрешил подготовить карточку; implementation GO и точный code allowlist впереди. **Evidence:** прежний log prefix `a07cab18` дал описание без цены; статически на `fb81a9a` service-clarify binding не распространяется на volume-click; удачные fake-provider price tests не покрывают неверный kind. Это не новое воспроизведение живой моделью. **Test isolation:** документация, без pytest/бота/БД/сырых диалогов; provider/live/SMTP 0. **FUTURE SCOPE:** offline baseline, отдельный implementation GO, Checker/Cursor, AF-1b/1c/2 и REC-5. | Draft до независимого Checker и Cursor review карточки. Staging пуст; commit/push не выполнялись. После PASS reviewed diff не дописывать. |
+
 ## Draft — 2026-09-29: D2-AUDIT-PLAN после сохранённого REC-4-P2
 
 Git root `C:\Cursor Projects\artgents-bot-active`, ветка

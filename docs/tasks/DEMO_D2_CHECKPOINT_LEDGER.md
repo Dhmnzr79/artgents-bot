@@ -1,5 +1,33 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-29: D2-AUDIT-PLAN после сохранённого REC-4-P2
+
+Git root `C:\Cursor Projects\artgents-bot-active`, ветка
+`codex/d2-stage1-contract`, baseline HEAD/local origin/GitHub branch
+`f4a08ea75b284cb51291fd7fe6ca64d842d8e2d0`; main/merge-base
+`141ce91fb1731cd990fcf8391550150016c73e7f`. GitHub проверен read-only
+`ls-remote` в этой сессии; до правок tracked/staging пусты. Write allowlist —
+шесть документов [карточки](DEMO_D2_AUDIT_FOLLOWUP_TASK.md). Foreign `data/`
+и `docs/MARKETING_ANSWER_SCENARIOS.md` сохранены, не stage. Старая папка,
+worktree и backup не менялись. БД/сырые логи не открывались в doc-checkpoint.
+
+Предыдущая Draft P2 ниже относится к `abcb8ee` до review. Позже владелец
+передал Cursor PASS: P2 HTTP 20 passed / 1 browser deselected; отдельный
+browser 1 passed (26.76 s), четыре назначенных файла 65 passed / 15 прежних
+failed; широкий адресный набор 118 passed / 1 deselected. После независимых
+Checker/Cursor и разрешения сохранён `f4a08ea`. Это evidence прежних review,
+не новый тестовый прогон; авторский CDP timeout не переписывается, visual
+360/768, полный REC-5 и live-качество не объявляются закрытыми.
+
+Процессное исключение `6c4a963`, ранее принятое владельцем: по передаче
+статусные строки Full Audit Task/Ledger менялись после Cursor PASS, runtime
+после review не менялся. История не исправляется задним числом; запрет
+после-review правок остаётся. Это не выдача нового PASS тому checkpoint.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-AUDIT-PLAN | **ACCEPTANCE:** актуальные указатели и links, точный Git baseline, разделение утверждённого поведения / audit findings / proposed scope; A/B/C не закрываются. **D2 ROUTE / LEGACY IMPACT:** без runtime изменений; статический вход D2 и старые файлы сверены, полного C08 proof здесь нет. **OWNER DECISION:** разрешена документальная сверка; proposed порядок AF-1a/b/c → AF-2 → общая приёмка, CTA/оформление/authored и остальные новые правила не утверждены. **Evidence:** read-only GitHub refs и ancestry; stale P2 статусы исправлены, исторические строки сохранены; Astra сверила архитектурные границы и приоритет D2-092/094/095/099/102/105/106. Marketing памятка прочитана для сверки, не изменена: её cap 3 и запрет detail UI не authority против поздних D2-100/102. **Test isolation:** только документация, pytest/бот/provider/live/SMTP 0; проверка local links и diff до review, без БД/сырых payload. **FUTURE SCOPE:** принятие проекта порядка, отдельные implementation cards/GO, REC-5 и разрешённое live-качество. | Draft до независимого Checker и Cursor. Staging пуст; commit/push этого checkpoint не выполнялись. После PASS Ledger не дописывать. |
+
 ## Draft — 2026-09-29: реализация REC-4-P2
 
 Git root `C:\Cursor Projects\artgents-bot-active`, ветка

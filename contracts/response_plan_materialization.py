@@ -317,6 +317,7 @@ class D2ServiceCommercialProfileAuthority(ResponsePlanModel):
     promo_refs: tuple[str, ...] = ()
     price_booster_id: str | None = None
     also_list_id: str | None = None
+    price_detail_ids: tuple[Literal["includes", "stages"], ...] = ()
 
 
 class D2CompatibilityGroupAuthority(ResponsePlanModel):

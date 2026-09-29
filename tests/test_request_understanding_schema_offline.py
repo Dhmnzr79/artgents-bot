@@ -62,6 +62,39 @@ def _price_understanding() -> dict[str, object]:
     }
 
 
+def test_price_detail_accepts_one_typed_aspect_and_ordered_selector() -> None:
+    request = RequestUnderstandingRequest.model_validate({
+        "request_id": "r1", "kind": "price_detail", "subject_id": None,
+        "context": "general_information", "price_detail_aspect": "includes",
+        "price_detail_offer_ordinal": 2,
+    })
+    assert request.price_detail_aspect == "includes"
+    assert request.price_detail_offer_ordinal == 2
+
+
+@pytest.mark.parametrize("fields", [
+    {},
+    {"price_detail_aspect": "unknown"},
+    {"price_detail_aspect": "stages", "price_detail_offer_ordinal": 0},
+    {"price_detail_aspect": "stages", "price_detail_offer_ordinal": 1,
+     "price_detail_offer_id": "one"},
+])
+def test_price_detail_rejects_missing_or_conflicting_selector_fields(fields) -> None:
+    with pytest.raises(ValueError):
+        RequestUnderstandingRequest.model_validate({
+            "request_id": "r1", "kind": "price_detail", "subject_id": None,
+            "context": "general_information", **fields,
+        })
+
+
+def test_non_detail_request_forbids_price_detail_claims() -> None:
+    with pytest.raises(ValueError):
+        RequestUnderstandingRequest.model_validate({
+            "request_id": "r1", "kind": "price", "subject_id": None,
+            "context": "general_information", "price_detail_aspect": "includes",
+        })
+
+
 def test_ordered_d2_request_parts_preserve_per_part_refs() -> None:
     payload = production_envelope_template(
         patient_text="Служебный текст.",

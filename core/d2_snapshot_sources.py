@@ -398,6 +398,7 @@ def _commercial_authority(client_id: str, model_view: D2ModelView) -> D2Commerci
             D2ServiceCommercialProfileAuthority(
                 source_client_id=client_id, service_id=item.service_id, promo_refs=item.promo_refs,
                 price_booster_id=item.price_booster_id, also_list_id=item.also_list_id,
+                price_detail_ids=item.price_detail_ids,
             )
             for item in pack.service_profiles
         ),

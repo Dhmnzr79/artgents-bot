@@ -49,6 +49,7 @@
   "service_profiles": [
     {
       "service_id": "classic",
+      "price_detail_ids": ["includes", "stages"],
       "promo_refs": ["implant_same_day_discount", "free_implant_consult"],
       "price_booster_id": "demo_payment_booster",
       "also_list_id": "demo_also_diagnostics"

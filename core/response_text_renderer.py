@@ -41,6 +41,8 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
                 if plan.d2_price_block is not None and plan.patient_text:
                     parts.append(plan.patient_text.strip())
                 _render_d2_price_parts(plan, parts)
+            elif part.kind == "price_detail":
+                _render_d2_price_detail(plan, parts)
             elif part.kind == "contact":
                 parts.append(contacts_by_request[part.request_id].display_text.strip())
             elif part.kind == "clinic_policy":
@@ -123,6 +125,62 @@ def _render_d2_price_parts(plan: ResolvedResponsePlan, parts: list[str]) -> None
             end += 1
         _render_compact_price_group(rows[start:end], parts, show_service_in_each_row=False)
         start = end
+
+
+def _render_d2_price_detail(plan: ResolvedResponsePlan, parts: list[str]) -> None:
+    detail = plan.d2_price_detail_block
+    if detail is None:
+        return
+    rows = detail.rows
+    heading = "Что входит" if detail.aspect == "includes" else "Этапы оплаты"
+    if len(rows) > 1:
+        heading += f": {rows[0].service_name}"
+    parts.append(f"**{heading}**")
+    if len(rows) == 1:
+        parts.append(f"**{rows[0].label}**")
+    if detail.aspect == "stages":
+        schedules = tuple(row.stages for row in rows)
+        if all(not row.missing for row in rows) and all(item == schedules[0] for item in schedules):
+            heading = "Для всех показанных вариантов:\n" if len(rows) > 1 else ""
+            parts.append(heading + "\n".join(f"- {line}" for line in schedules[0]))
+        else:
+            for row in rows:
+                if len(rows) > 1:
+                    parts.append(f"**{row.label}**")
+                parts.append(
+                    "Данные об этапах оплаты не опубликованы для этого варианта."
+                    if row.missing else "\n".join(f"- {line}" for line in row.stages)
+                )
+        return
+    complete = tuple(row for row in rows if not row.missing)
+    common_includes = tuple(
+        item for item in complete[0].includes
+        if len(complete) == len(rows) and all(item in row.includes for row in complete[1:])
+    ) if complete else ()
+    common_excludes = tuple(
+        item for item in complete[0].excludes
+        if len(complete) == len(rows) and all(item in row.excludes for row in complete[1:])
+    ) if complete else ()
+    if common_includes:
+        heading = "Для всех показанных вариантов входит:\n" if len(rows) > 1 else "Входит:\n"
+        parts.append(heading + "\n".join(f"- {line}" for line in common_includes))
+    if common_excludes:
+        heading = "Для всех показанных вариантов отдельно:\n" if len(rows) > 1 else "Отдельно:\n"
+        parts.append(heading + "\n".join(f"- {line}" for line in common_excludes))
+    for row in rows:
+        local_includes = tuple(item for item in row.includes if item not in common_includes)
+        local_excludes = tuple(item for item in row.excludes if item not in common_excludes)
+        if not row.missing and not local_includes and not local_excludes:
+            continue
+        if len(rows) > 1:
+            parts.append(f"**{row.label}**")
+        if row.missing:
+            parts.append("Данные о составе не опубликованы для этого варианта.")
+            continue
+        if local_includes:
+            parts.append("Входит:\n" + "\n".join(f"- {line}" for line in local_includes))
+        if local_excludes:
+            parts.append("Отдельно:\n" + "\n".join(f"- {line}" for line in local_excludes))
 
 
 def _render_compact_price_group(

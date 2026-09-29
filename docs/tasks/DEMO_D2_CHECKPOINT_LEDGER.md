@@ -1,5 +1,19 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-29: реализация REC-4-P2
+
+Git root `C:\Cursor Projects\artgents-bot-active`, ветка
+`codex/d2-stage1-contract`, baseline HEAD и origin branch
+`abcb8ee2bad72ef5d5be689cb21964e63af8dfbc`; `origin/main` и merge-base
+`141ce91fb1731cd990fcf8391550150016c73e7f`. До правок tracked diff и
+staging пусты; чужие untracked `data/` и
+`docs/MARKETING_ANSWER_SCENARIOS.md` сохранены. Предыдущая Draft карточки
+ниже — её исторический снимок до Checker/Cursor PASS и commit/push `abcb8ee`.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-REC-4-P2-IMPL | **ACCEPTANCE:** адресный A16/B19, затронутые A02/A05/B12/B14/B18/C01/C03–C05/C07/C09/C10, не весь REC-5. **D2 ROUTE:** `/ask`/`/ask/stream` → один parser для свободного вопроса или проверенный 0-call detail click → captured tenant offers → frozen detail block/action map в существующем плане → renderer/UI → store/replay. `price_detail_ids` 0–2 в существующем профиле, demo `classic` с обеими кнопками только при полных данных всех показанных offers; прямой вопрос независимо от настройки читает опубликованные данные даже при выключенном followup и называет реальные пробелы. Состав и платежи из captured offer, одинаковое общее один раз, разные графики отдельно; RUB формат P1. Lead pause вытесняет detail-кнопки. Astra нашла три P1: старый набор offers после смены услуги, потерю независимой prose при неоднозначной detail и потерю exact contact рядом с detail. Checker добавил три границы: переход к другой услуге внутри того же multipart, разные явные услуги в price+detail и неоднозначный короткий вопрос после mixed ответа; исправлены проверкой текущих refs, локальной frozen gap-частью и общим multipart route. **LEGACY IMPACT:** второй parser/model call, semantic regex, старый price_aspect runtime, новый state owner и fallback не добавлялись. **OWNER DECISION:** D2-102, `classic` и code GO даны владельцем; commit/push отдельно. **Test isolation/evidence:** fake provider, временные tenant/DB/log, сеть заблокирована; baseline назначенных четырёх файлов до правок 59 passed / 15 failed, после правок 65 passed / те же 15 failed (6 новых schema-тестов). Адресный P2 HTTP JSON/SSE 20 passed / 1 browser deselected; P2 + lead + multipart + price-scope 76 passed / 1 browser deselected. Отдельный browser harness 1 failed из-за `CDP timeout: Runtime.enable` до проверки widget assertions; локальный Chrome открывает WebSocket, но не отвечает на команду, виджет не объявлен проверенным. Provider/live/SMTP 0, бот не запускался. **FUTURE SCOPE:** независимый Checker, Cursor, browser/widget proof, REC-5 и отдельно разрешённое качество модели/live. | Draft до независимого Checker и Cursor review реализации. Staging пуст; commit/push не выполнялись. После PASS Ledger не дописывать. |
+
 ## Draft — 2026-09-29: подготовка карточки REC-4-P2
 
 Git root `C:\Cursor Projects\artgents-bot-active`, ветка

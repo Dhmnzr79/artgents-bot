@@ -9,7 +9,8 @@ from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 SubjectRelation = Literal["self", "other", "unknown"]
 AgeGroup = Literal["adult", "child", "unknown"]
-RequestKind = Literal["clinic_policy", "booking", "price", "contact", "content", "other"]
+RequestKind = Literal["clinic_policy", "booking", "price", "price_detail", "contact", "content", "other"]
+PriceDetailAspect = Literal["includes", "stages"]
 RequestContext = Literal["current_care", "general_information", "past_history", "unknown"]
 PaymentScheme = Literal["oms", "dms", "self_pay", "unspecified"]
 PaymentSchemeIntent = Literal[
@@ -110,6 +111,9 @@ class RequestUnderstandingRequest(BaseModel):
     service_id: str | None = None
     topic_id: str | None = None
     brand_id: str | None = None
+    price_detail_aspect: PriceDetailAspect | None = None
+    price_detail_offer_id: str | None = None
+    price_detail_offer_ordinal: int | None = None
     statement_mode: RequestStatementMode = "question"
     situation: RequestTreatmentSituation | None = None
 
@@ -166,7 +170,7 @@ class RequestUnderstandingRequest(BaseModel):
             raise ValueError("content_ref_invalid")
         return token
 
-    @field_validator("service_id", "topic_id", "brand_id")
+    @field_validator("service_id", "topic_id", "brand_id", "price_detail_offer_id")
     @classmethod
     def _validate_semantic_ref(cls, value: str | None) -> str | None:
         if value is None:
@@ -196,6 +200,17 @@ class RequestUnderstandingRequest(BaseModel):
 
     @model_validator(mode="after")
     def _kind_field_rules(self) -> Self:
+        if self.kind == "price_detail":
+            if self.price_detail_aspect is None:
+                raise ValueError("price_detail_aspect_required")
+            if self.price_detail_offer_id is not None and self.price_detail_offer_ordinal is not None:
+                raise ValueError("price_detail_selector_conflict")
+            if self.price_detail_offer_ordinal is not None and self.price_detail_offer_ordinal < 1:
+                raise ValueError("price_detail_ordinal_invalid")
+        elif any(value is not None for value in (
+            self.price_detail_aspect, self.price_detail_offer_id, self.price_detail_offer_ordinal,
+        )):
+            raise ValueError("price_detail_fields_forbidden")
         if self.content_text is not None and len(self.content_text) > _MAX_CONTENT_TEXT_CODEPOINTS:
             raise ValueError("content_text_too_long")
         if self.kind != "contact" and self.contact_fields:

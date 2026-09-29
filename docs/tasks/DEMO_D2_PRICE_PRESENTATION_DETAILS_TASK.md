@@ -1,5 +1,28 @@
 # D2-REC-4-P — компактные цены и точные детали по запросу
 
+## Draft — реализация P2 от принятой карточки, 2026-09-29
+
+Владелец дал отдельный GO на код P2 после Checker/Cursor PASS карточки.
+Baseline реализации: Git root `C:\Cursor Projects\artgents-bot-active`, ветка
+`codex/d2-stage1-contract`, HEAD и origin branch
+`abcb8ee2bad72ef5d5be689cb21964e63af8dfbc`, `origin/main` и merge-base
+`141ce91fb1731cd990fcf8391550150016c73e7f`. До правок tracked diff и
+staging пусты. Чужие `data/` и `docs/MARKETING_ANSWER_SCENARIOS.md` не stage;
+рабочую SQLite и сырые диалоги не читать. Точный write allowlist — §4 P2 ниже.
+Старые строки «GO впереди» относятся к документальному checkpoint, не к
+этому состоянию.
+
+Реализация в работе: `price_detail_ids` включены в demo только у `classic`;
+проверка capability и точных данных идёт по каждому frozen offer. UI хранит
+внутреннюю карту reply → aspect + ordered offer IDs в том же завершённом плане;
+сервер проверяет revision/tenant до исполнения чистого клика без provider.
+Прямой вопрос идёт через один обычный parser и typed `price_detail` request;
+отрисовка читает captured package/payment stages, называет пробелы и не
+пересчитывает цену. Lead resume/cancel сохраняет своё право на навигацию.
+Промежуточные offline тесты и окончательные границы — в новой Draft-строке
+[Ledger](DEMO_D2_CHECKPOINT_LEDGER.md). До Checker/Cursor это не принятое P2;
+commit/push, live, merge и deploy не разрешены.
+
 ## P2 — подготовка карточки от принятого checkpoint, 2026-09-29
 
 **Статус:** документальная подготовка P2. REC-4-P1, D2-DOC-CLICK и

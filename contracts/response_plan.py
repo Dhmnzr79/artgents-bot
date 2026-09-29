@@ -380,6 +380,7 @@ D2PartFailureReason = Literal[
     "d2_model_prose_money",
     "d2_model_prose_link",
     "d2_content_source_missing",
+    "d2_price_detail_context_ambiguous",
 ]
 D2ResultStatus = Literal["complete", "degraded", "failed"]
 D2ContentPublication = Literal["authored", "model_prose", "fallback"]
@@ -462,6 +463,43 @@ class D2FrozenPriceBlock(ResponsePlanModel):
             if row.offer_id in seen:
                 raise ValueError("d2_price_row_duplicate")
             seen.add(row.offer_id)
+        return self
+
+
+class D2FrozenPriceDetailRow(ResponsePlanModel):
+    source_client_id: NonBlankStr
+    offer_id: NonBlankStr
+    service_id: NonBlankStr
+    service_name: NonBlankStr
+    label: NonBlankStr
+    includes: tuple[NonBlankStr, ...] = ()
+    excludes: tuple[NonBlankStr, ...] = ()
+    stages: tuple[NonBlankStr, ...] = ()
+    missing: bool = False
+
+
+class D2FrozenPriceDetailBlock(ResponsePlanModel):
+    source_client_id: NonBlankStr
+    request_id: NonBlankStr
+    aspect: Literal["includes", "stages"]
+    rows: tuple[D2FrozenPriceDetailRow, ...]
+
+    @model_validator(mode="after")
+    def _validate_rows(self) -> Self:
+        if not self.rows or len({row.offer_id for row in self.rows}) != len(self.rows):
+            raise ValueError("d2_price_detail_rows_invalid")
+        if len({(row.service_id, row.service_name) for row in self.rows}) != 1:
+            raise ValueError("d2_price_detail_service_mismatch")
+        if any(row.source_client_id != self.source_client_id for row in self.rows):
+            raise ValueError("d2_price_detail_owner_mismatch")
+        for row in self.rows:
+            if row.missing and (row.includes or row.excludes or row.stages):
+                raise ValueError("d2_price_detail_missing_has_data")
+            if not row.missing and (
+                (self.aspect == "includes" and (not row.includes or row.stages))
+                or (self.aspect == "stages" and (not row.stages or row.includes or row.excludes))
+            ):
+                raise ValueError("d2_price_detail_aspect_data_mismatch")
         return self
 
 
@@ -725,12 +763,58 @@ class UiVideoCandidate(ResponsePlanModel):
     video_id: NonBlankStr
 
 
+class D2PriceDetailUiAction(ResponsePlanModel):
+    source_client_id: NonBlankStr
+    reply_id: NonBlankStr
+    aspect: Literal["includes", "stages"]
+    service_id: NonBlankStr
+    offer_ids: tuple[NonBlankStr, ...]
+
+    @model_validator(mode="after")
+    def _validate_offers(self) -> Self:
+        if not self.offer_ids or len(self.offer_ids) != len(set(self.offer_ids)):
+            raise ValueError("d2_price_detail_action_offers_invalid")
+        return self
+
+
+def _validate_price_detail_ui_actions(
+    *, actions: tuple[D2PriceDetailUiAction, ...],
+    replies: tuple[UiQuickReplyCandidate, ...],
+    price: D2FrozenPriceBlock | None,
+    detail: D2FrozenPriceDetailBlock | None,
+) -> None:
+    if not actions:
+        return
+    if price is None and detail is None:
+        raise ValueError("d2_price_detail_action_without_offer_source")
+    expected_ids = (
+        tuple(row.offer_id for row in price.rows) if price is not None
+        else tuple(row.offer_id for row in detail.rows)
+    )
+    expected_services = (
+        {row.service_id for row in price.rows} if price is not None
+        else {row.service_id for row in detail.rows}
+    )
+    if len(expected_services) != 1:
+        raise ValueError("d2_price_detail_action_mixed_service")
+    action_ids = [action.reply_id for action in actions]
+    reply_ids = [reply.reply_id for reply in replies]
+    if len(action_ids) != len(set(action_ids)) or set(action_ids) != set(reply_ids):
+        raise ValueError("d2_price_detail_action_reply_mismatch")
+    if any(
+        action.offer_ids != expected_ids or action.service_id not in expected_services
+        for action in actions
+    ):
+        raise ValueError("d2_price_detail_action_offer_mismatch")
+
+
 class UiPlanCandidates(ResponsePlanModel):
     quick_replies: tuple[UiQuickReplyCandidate, ...] = ()
     buttons: tuple[UiButtonCandidate, ...] = ()
     widget: UiWidgetCandidate | None = None
     video: UiVideoCandidate | None = None
     source_content_ref: NonBlankStr | None = None
+    price_detail_actions: tuple[D2PriceDetailUiAction, ...] = ()
 
 
 class D2TreatmentSituationDecision(ResponsePlanModel):
@@ -786,7 +870,7 @@ class D2PriceScopeChoice(ResponsePlanModel):
 
 class D2ResolvedRequestPart(ResponsePlanModel):
     request_id: NonBlankStr
-    kind: Literal["price", "content", "contact", "clinic_policy"]
+    kind: Literal["price", "price_detail", "content", "contact", "clinic_policy"]
     status: Literal["answered", "recovered", "unavailable", "deferred"]
     failure_reason: D2PartFailureReason | None = None
     subject_id: NonBlankStr | None = None
@@ -800,9 +884,9 @@ class D2ResolvedRequestPart(ResponsePlanModel):
 
     @model_validator(mode="after")
     def _validate_d2_part(self) -> Self:
-        if self.kind in {"price", "contact", "clinic_policy"} and self.content_ref is not None:
+        if self.kind in {"price", "price_detail", "contact", "clinic_policy"} and self.content_ref is not None:
             raise ValueError("d2_price_part_content_ref_forbidden")
-        if self.kind in {"price", "contact", "clinic_policy"} and self.content_section_refs:
+        if self.kind in {"price", "price_detail", "contact", "clinic_policy"} and self.content_section_refs:
             raise ValueError("d2_price_part_section_refs_forbidden")
         if self.content_section_refs and self.content_ref is None:
             raise ValueError("d2_section_refs_require_content_ref")
@@ -851,6 +935,14 @@ class D2ResolvedRequestPart(ResponsePlanModel):
                 raise ValueError("d2_content_part_failure_reason_invalid")
             if self.status != "unavailable" and self.snapshot_fingerprint is None:
                 raise ValueError("d2_content_part_snapshot_required")
+        elif self.kind == "price_detail":
+            if self.status == "unavailable":
+                if self.failure_reason != "d2_price_detail_context_ambiguous":
+                    raise ValueError("d2_price_detail_part_failure_reason_invalid")
+            elif self.status != "answered" or self.failure_reason is not None:
+                raise ValueError("d2_price_detail_part_status_invalid")
+            if self.content_publication is not None or self.snapshot_fingerprint is not None:
+                raise ValueError("d2_exact_fact_part_content_provenance_forbidden")
         elif self.kind in {"contact", "clinic_policy"}:
             if self.status != "answered" or self.failure_reason is not None:
                 raise ValueError("d2_exact_fact_part_status_invalid")
@@ -870,6 +962,7 @@ def _validate_d2_part_result_shape(
     deferred_blocks: tuple[D2PartDeferredBlock, ...],
     result_status: D2ResultStatus | None,
     d2_price_block: D2FrozenPriceBlock | None,
+    d2_price_detail_block: D2FrozenPriceDetailBlock | None,
 ) -> None:
     if not parts:
         if failure_blocks or deferred_blocks or result_status is not None:
@@ -917,6 +1010,21 @@ def _validate_d2_part_result_shape(
             raise ValueError("d2_request_part_price_linkage_invalid")
     elif d2_price_block is not None:
         raise ValueError("d2_request_part_price_linkage_invalid")
+    detail_parts = [part for part in parts if part.kind == "price_detail"]
+    if detail_parts:
+        if len(detail_parts) != 1:
+            raise ValueError("d2_price_detail_part_linkage_invalid")
+        detail_part = detail_parts[0]
+        if detail_part.status == "answered" and (
+            d2_price_detail_block is None or detail_part.request_id != d2_price_detail_block.request_id
+        ):
+            raise ValueError("d2_price_detail_part_linkage_invalid")
+        if detail_part.status == "unavailable" and d2_price_detail_block is not None:
+            raise ValueError("d2_price_detail_part_linkage_invalid")
+        if detail_part.status not in {"answered", "unavailable"}:
+            raise ValueError("d2_price_detail_part_linkage_invalid")
+    elif d2_price_detail_block is not None:
+        raise ValueError("d2_price_detail_part_linkage_invalid")
     expected_status: D2ResultStatus
     if not unavailable_parts and not deferred_parts and not any(part.status == "recovered" for part in parts):
         expected_status = "complete"
@@ -939,6 +1047,7 @@ class PreComposerPlan(ResponsePlanModel):
     history_turn_count: int = Field(default=0, ge=0)
     price_plan: PricePlan
     d2_price_block: D2FrozenPriceBlock | None = None
+    d2_price_detail_block: D2FrozenPriceDetailBlock | None = None
     d2_treatment_situation: D2TreatmentSituationDecision | None = None
     d2_price_scope_decision: D2PriceScopeDecision | None = None
     d2_request_parts: tuple[D2ResolvedRequestPart, ...] = ()
@@ -1027,6 +1136,12 @@ class PreComposerPlan(ResponsePlanModel):
             self.d2_part_deferred_blocks,
             self.d2_result_status,
             self.d2_price_block,
+            self.d2_price_detail_block,
+        )
+        _validate_price_detail_ui_actions(
+            actions=self.ui_candidates.price_detail_actions,
+            replies=self.ui_candidates.quick_replies,
+            price=self.d2_price_block, detail=self.d2_price_detail_block,
         )
         return self
 
@@ -1174,6 +1289,7 @@ class ResolvedUiPlan(ResponsePlanModel):
     video: UiVideoCandidate | None = None
     contact: CanonicalContactCandidate | None = None
     source_content_ref: NonBlankStr | None = None
+    price_detail_actions: tuple[D2PriceDetailUiAction, ...] = ()
 
 
 class FinalizedCommercialIds(ResponsePlanModel):
@@ -1206,6 +1322,8 @@ def _assert_no_commerce(plan: ResolvedResponsePlan) -> None:
         raise ValueError("terminal_plan_forbids_price_block")
     if plan.d2_price_block is not None:
         raise ValueError("terminal_plan_forbids_d2_price_block")
+    if plan.d2_price_detail_block is not None:
+        raise ValueError("terminal_plan_forbids_d2_price_detail_block")
     if plan.information_blocks:
         raise ValueError("terminal_plan_forbids_information_blocks")
     if plan.required_offer_conditions:
@@ -1364,9 +1482,10 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
         plan.d2_part_deferred_blocks,
         plan.d2_result_status,
         plan.d2_price_block,
+        plan.d2_price_detail_block,
     )
     if not parts:
-        if plan.d2_price_block is not None or plan.information_blocks:
+        if plan.d2_price_block is not None or plan.d2_price_detail_block is not None or plan.information_blocks:
             raise ValueError("d2_request_parts_required")
         return
     block_ids = [block.request_id for block in plan.information_blocks]
@@ -1466,6 +1585,10 @@ def _validate_resolved_client_ownership(plan: ResolvedResponsePlan) -> None:
         _check(plan.d2_price_block)
         for row in plan.d2_price_block.rows:
             _check(row)
+    if plan.d2_price_detail_block is not None:
+        _check(plan.d2_price_detail_block)
+        for row in plan.d2_price_detail_block.rows:
+            _check(row)
     for block in plan.d2_part_failure_blocks:
         _check(block)
     for block in plan.d2_part_deferred_blocks:
@@ -1503,6 +1626,10 @@ def _validate_resolved_client_ownership(plan: ResolvedResponsePlan) -> None:
     ui = plan.ui_plan
     for item in ui.quick_replies:
         _check(item)
+    for action in ui.price_detail_actions:
+        _check(action)
+        if action.reply_id not in {item.reply_id for item in ui.quick_replies}:
+            raise ValueError("d2_price_detail_action_reply_missing")
     for item in ui.buttons:
         _check(item)
     if ui.widget is not None:
@@ -1523,6 +1650,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
     terminal_text: str | None = None
     price_block: ResolvedPriceBlock | None = None
     d2_price_block: D2FrozenPriceBlock | None = None
+    d2_price_detail_block: D2FrozenPriceDetailBlock | None = None
     d2_treatment_situation: D2TreatmentSituationDecision | None = None
     d2_price_scope_decision: D2PriceScopeDecision | None = None
     d2_request_parts: tuple[D2ResolvedRequestPart, ...] = ()
@@ -1564,6 +1692,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
                 not (self.patient_text and self.patient_text.strip())
                 and not self.information_blocks
                 and not self.is_price_answer
+                and self.d2_price_detail_block is None
                 and not self.d2_part_failure_blocks
                 and not self.d2_part_deferred_blocks
                 and not self.promo_blocks
@@ -1619,6 +1748,11 @@ class ResolvedResponsePlan(ResponsePlanModel):
         _validate_d2_request_parts(self)
         _validate_terminal_state(self)
         _validate_resolved_client_ownership(self)
+        _validate_price_detail_ui_actions(
+            actions=self.ui_plan.price_detail_actions,
+            replies=self.ui_plan.quick_replies,
+            price=self.d2_price_block, detail=self.d2_price_detail_block,
+        )
         return self
 
 

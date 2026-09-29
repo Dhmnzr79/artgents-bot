@@ -79,6 +79,7 @@ class D2ServiceCommercialProfile(ResponsePlanModel):
     promo_refs: tuple[str, ...] = ()
     price_booster_id: str | None = None
     also_list_id: str | None = None
+    price_detail_ids: tuple[Literal["includes", "stages"], ...] = ()
 
     @field_validator("price_booster_id", "also_list_id", mode="before")
     @classmethod
@@ -96,6 +97,8 @@ class D2ServiceCommercialProfile(ResponsePlanModel):
             raise ValueError("commercial_promo_ref_cap")
         if len(set(self.promo_refs)) != len(self.promo_refs):
             raise ValueError("commercial_promo_ref_duplicate")
+        if len(self.price_detail_ids) > 2 or len(set(self.price_detail_ids)) != len(self.price_detail_ids):
+            raise ValueError("commercial_price_detail_ids_invalid")
         return self
 
 

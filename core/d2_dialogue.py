@@ -5,6 +5,7 @@ product. Unsupported inputs fail explicitly; there is no legacy fallback.
 """
 
 from datetime import datetime
+from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
@@ -16,8 +17,9 @@ from contracts.d2_dialogue import (
     D2LeadEffectDispatcher, D2ProviderInput, D2RawProvider, D2SelectedUiRef,
 )
 from contracts.d2_session_context import D2SessionActivity, D2SessionTtlPolicy
-from contracts.response_plan import SessionKey
-from contracts.response_plan_materialization import D2SelectedDocumentAction
+from contracts.response_plan import D2PriceDetailUiAction, SessionKey
+from contracts.one_call_envelope import OneCallEnvelope
+from contracts.response_plan_materialization import D2SelectedDocumentAction, MaterializationContractError
 from contracts.response_plan_session import (
     SESSION_SCHEMA_VERSION, D2ShownPriceOfferRef, PersistedActiveService, PersistedActiveTopic,
     PersistedClarifyTask, PersistedShownCommercialIds, PersistedShownOptionsSnapshot,
@@ -122,16 +124,19 @@ def _d2_multipart_shape_ok(*, parts: tuple, subjects_by_id: dict) -> bool:
     """
     if len(parts) < 2 or len(parts) > 3:
         return False
-    if any(item.kind not in {"price", "content", "contact", "clinic_policy"} for item in parts):
+    if any(item.kind not in {"price", "price_detail", "content", "contact", "clinic_policy"} for item in parts):
         return False
     price_parts = tuple(item for item in parts if item.kind == "price")
     content_parts = tuple(item for item in parts if item.kind == "content")
+    detail_parts = tuple(item for item in parts if item.kind == "price_detail")
     contact_parts = tuple(item for item in parts if item.kind == "contact")
     policy_parts = tuple(item for item in parts if item.kind == "clinic_policy")
-    if not price_parts and not content_parts:
+    if not price_parts and not content_parts and not detail_parts:
         return False
     # Typed exact facts may be added to an ordinary FullContext/price answer.
-    if len(price_parts) + len(content_parts) + len(contact_parts) + len(policy_parts) != len(parts):
+    if len(price_parts) + len(detail_parts) + len(content_parts) + len(contact_parts) + len(policy_parts) != len(parts):
+        return False
+    if len(detail_parts) > 1:
         return False
     if any(not item.policy_ids for item in policy_parts):
         return False
@@ -267,6 +272,30 @@ def _next_d2_shown_price_offer_refs(*, snapshot, price, context):
     )
 
 
+def _apply_lead_pause_without_detail_actions(response):
+    # Lead resume/cancel owns the sole navigation channel while paused.
+    # Drop the private action map together with the visible detail replies.
+    ui = response.resolved.ui_plan
+    if ui.price_detail_actions:
+        resolved = response.resolved.model_copy(update={
+            "ui_plan": ui.model_copy(update={"price_detail_actions": ()}),
+        })
+        response = replace(response, resolved=resolved)
+    return apply_d2_lead_pause_ui(response)
+
+
+def _current_d2_shown_price_offer_refs(context) -> tuple[D2ShownPriceOfferRef, ...]:
+    if context.freshness != "fresh":
+        return ()
+    refs = context.ordinary.d2_shown_price_offer_refs
+    active_service = context.ordinary.active_service
+    if active_service is not None and any(
+        ref.service_id != active_service.service_id for ref in refs
+    ):
+        return ()
+    return refs
+
+
 def run_d2_dialogue_turn(
     *, session_key: SessionKey, user_message: str, provider: D2RawProvider,
     clients_root: Path, store: D2DialogueStore, now: datetime,
@@ -357,6 +386,7 @@ def run_d2_dialogue_turn(
         diagnostics.stage("binding")
         selected_ui_ref: D2SelectedUiRef | None = None
         selected_document_action: D2SelectedDocumentAction | None = None
+        selected_price_detail_action: D2PriceDetailUiAction | None = None
         if lead_ui_ref and ui_revision is not None:
             shown = store.read_latest_completion(session_key)
             if (
@@ -381,11 +411,16 @@ def run_d2_dialogue_turn(
                         reply_id=reply.reply_id,
                         source_revision=ui_revision,
                     )
-                    selected_document_action = resolve_d2_selected_document_action(
-                        tenant, reply_id=reply.reply_id,
-                        source_revision=ui_revision,
-                        shown_source_content_ref=shown.response.resolved.ui_plan.source_content_ref,
+                    selected_price_detail_action = next(
+                        (item for item in shown.response.resolved.ui_plan.price_detail_actions
+                         if item.reply_id == reply.reply_id), None,
                     )
+                    if selected_price_detail_action is None:
+                        selected_document_action = resolve_d2_selected_document_action(
+                            tenant, reply_id=reply.reply_id,
+                            source_revision=ui_revision,
+                            shown_source_content_ref=shown.response.resolved.ui_plan.source_content_ref,
+                        )
         full_audit(
             "ui_binding", effective_ref=lead_ui_ref,
             selected_ui_ref=selected_ui_ref,
@@ -503,6 +538,7 @@ def run_d2_dialogue_turn(
             lead_pause_response=lead_pause_response,
             selected_ui_ref=selected_ui_ref,
             selected_document_action=selected_document_action,
+            selected_price_detail_action=selected_price_detail_action,
             selected_service_id=(
                 lead_ui_ref.removeprefix("service:")
                 if lead_ui_ref and lead_ui_ref.startswith("service:") and ui_revision is not None
@@ -716,7 +752,7 @@ def _commit_non_price_d2_turn(
 ) -> D2DialogueTurn:
     """Persist lead/terminal/clarify-style turns without mutating price situation."""
     if lead_pause_response:
-        response = apply_d2_lead_pause_ui(response)
+        response = _apply_lead_pause_without_detail_actions(response)
         shown_service_options = ()
         shown_service_topic = None
     full_audit("materialized_response", response=response, focus=focus, branch="non_price")
@@ -760,7 +796,15 @@ def _commit_non_price_d2_turn(
         d2_shown_price_offer_refs=(
             (
                 snapshot.state.d2_shown_price_offer_refs
-                if context.freshness == "fresh"
+                if (
+                    context.freshness == "fresh"
+                    and not shown_service_options
+                    and not clear_active_service
+                    and (selected_service_id is None or all(
+                        ref.service_id == selected_service_id
+                        for ref in snapshot.state.d2_shown_price_offer_refs
+                    ))
+                )
                 else ()
             )
             if d2_shown_price_offer_refs is None
@@ -837,6 +881,7 @@ def _run_reserved_d2_dialogue_turn(
     lead_pause_response: bool = False,
     selected_ui_ref: D2SelectedUiRef | None = None,
     selected_document_action: D2SelectedDocumentAction | None = None,
+    selected_price_detail_action: D2PriceDetailUiAction | None = None,
     selected_service_id: str | None = None,
 ) -> D2DialogueTurn:
     """Build a final result only after ``reserve_request`` made this turn owner."""
@@ -857,23 +902,43 @@ def _run_reserved_d2_dialogue_turn(
         "model_context", record=previous, state=snapshot.state,
         context=context, tenant_fingerprint=tenant.fingerprint,
     )
-    diagnostics.stage("provider")
-    provider_input = D2ProviderInput(
-        user_message=safe_user_message,
-        model_view=view,
-        context=context,
-        selected_ui_ref=selected_ui_ref,
-        selected_document_action=selected_document_action,
-    )
-    full_audit("provider_input", provider_input=provider_input)
-    raw = provider.generate(provider_input)
-    full_audit("raw_model_response", raw=raw)
-    diagnostics.stage("parse")
-    envelope = parse_production_envelope_json(
-        raw, active_service_catalog=view.active_service_catalog,
-        service_reference_catalog=view.service_reference_catalog,
-        commercial_fact_catalog=view.commercial_fact_catalog,
-    )
+    if selected_price_detail_action is not None and not safe_user_message.strip():
+        # The current completion's verified action is authority for a clean
+        # click. Build a typed request directly; no second parser or LLM call.
+        envelope = OneCallEnvelope.model_validate(production_envelope_template(
+            patient_text=None,
+            service_id=selected_price_detail_action.service_id,
+            commercial_intent=(
+                "included" if selected_price_detail_action.aspect == "includes"
+                else "payment_stages"
+            ),
+            request_understanding={
+                "subjects": [],
+                "requests": [{
+                    "request_id": "r1", "kind": "price_detail", "subject_id": None,
+                    "context": "general_information", "price_detail_aspect": selected_price_detail_action.aspect,
+                    "service_id": selected_price_detail_action.service_id,
+                }],
+            },
+        ))
+    else:
+        diagnostics.stage("provider")
+        provider_input = D2ProviderInput(
+            user_message=safe_user_message,
+            model_view=view,
+            context=context,
+            selected_ui_ref=selected_ui_ref,
+            selected_document_action=selected_document_action,
+        )
+        full_audit("provider_input", provider_input=provider_input)
+        raw = provider.generate(provider_input)
+        full_audit("raw_model_response", raw=raw)
+        diagnostics.stage("parse")
+        envelope = parse_production_envelope_json(
+            raw, active_service_catalog=view.active_service_catalog,
+            service_reference_catalog=view.service_reference_catalog,
+            commercial_fact_catalog=view.commercial_fact_catalog,
+        )
     full_audit("parsed_envelope", envelope=envelope)
     diagnostics.stage("binding")
     selected_topic = None
@@ -924,6 +989,78 @@ def _run_reserved_d2_dialogue_turn(
     )
     understanding = envelope.request_understanding
     full_audit("effective_envelope", envelope=envelope, selected_service_id=selected_service_id)
+    if (
+        envelope.route == "ANSWER" and understanding is not None
+        and len(understanding.requests) == 1
+        and understanding.requests[0].kind == "price_detail"
+    ):
+        if context.retained_terminal_state not in {"none", "clarify", "spam_warn"}:
+            raise ValueError("d2_experiment_terminal_session_unsupported")
+        detail_part = understanding.requests[0]
+        binding = bind_d1r_envelope_to_d2_context(envelope, context)
+        focus = seed_d2_plan_focus(binding)
+        shown_refs = _current_d2_shown_price_offer_refs(context)
+        active_service = context.ordinary.active_service
+        sources = build_d2_snapshot_sources(
+            tenant, model_view=view, envelope=envelope, session_key=session_key,
+            shown_promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
+            shown_secondary_ref_ids=context.retained_shown_ids.secondary_ref_ids,
+        )
+        try:
+            response = resolve_d2_envelope_response(
+                envelope, sources, as_of=now.date(),
+                shown_price_offer_refs=shown_refs,
+                selected_price_detail_action=(
+                    selected_price_detail_action if not safe_user_message.strip() else None
+                ),
+            )
+        except MaterializationContractError as exc:
+            if str(exc) != "d2_price_detail_context_ambiguous":
+                raise
+            response = build_d2_focus_clarify_response(tenant, session_key=session_key)
+            return _commit_non_price_d2_turn(
+                session_key=session_key, store=store, snapshot=snapshot, context=context,
+                focus=focus, response=response, tenant_fingerprint=tenant.fingerprint,
+                now=now, request_id=request_id, request_fingerprint=request_fingerprint,
+                lead_effect_id=lead_effect_id, lead_effect_dispatcher=lead_effect_dispatcher,
+                lead_pause_response=lead_pause_response,
+            )
+        if not response.rendered_text.strip():
+            raise ValueError("d2_price_detail_not_resolved")
+        detail_rows = response.resolved.d2_price_detail_block.rows
+        detail_services = {row.service_id for row in detail_rows}
+        detail_service_id = next(iter(detail_services)) if len(detail_services) == 1 else None
+        previous_service_id = active_service.service_id if active_service is not None else None
+        service_switched = detail_service_id is not None and detail_service_id != previous_service_id
+        retained_refs = (
+            shown_refs
+            if shown_refs and not service_switched and (
+                detail_part.price_detail_offer_ordinal is not None
+                or detail_part.price_detail_offer_id is not None
+            ) else tuple(D2ShownPriceOfferRef(
+                source_client_id=row.source_client_id, offer_id=row.offer_id,
+                service_id=row.service_id,
+            ) for row in detail_rows)
+        )
+        return _commit_non_price_d2_turn(
+            session_key=session_key, store=store, snapshot=snapshot, context=context,
+            focus=focus, response=response, tenant_fingerprint=tenant.fingerprint,
+            now=now, request_id=request_id, request_fingerprint=request_fingerprint,
+            lead_effect_id=lead_effect_id, lead_effect_dispatcher=lead_effect_dispatcher,
+            selected_service_id=detail_service_id if service_switched else None,
+            selected_service_topic=(
+                resolve_d2_clarify_service_topic(tenant, (detail_service_id,))
+                if service_switched else None
+            ),
+            clear_situation=service_switched,
+            dialogue_pairs=_next_d2_dialogue_pairs(
+                snapshot=snapshot, safe_user_message=safe_user_message,
+                selected_ui_ref=selected_ui_ref, response=response,
+                turn=snapshot.current_turn_index, ttl_policy=ttl_policy, context=context,
+            ),
+            d2_shown_price_offer_refs=retained_refs,
+            lead_pause_response=lead_pause_response,
+        )
     diagnostics.stage("materialize")
     admin_terminal = envelope.route == "ADMIN"
     if admin_terminal:
@@ -1024,7 +1161,7 @@ def _run_reserved_d2_dialogue_turn(
             ),
             d2_shown_price_offer_refs=_next_d2_shown_price_offer_refs(
                 snapshot=snapshot, price=None, context=context,
-            ),
+            ) if not envelope.clarify_service_options else (),
             clarify_task=_d2_clarify_task(envelope=envelope),
             lead_pause_response=lead_pause_response,
         )
@@ -1305,12 +1442,13 @@ def _run_reserved_d2_dialogue_turn(
                 exact_canonical_contact=exact_canonical_contact,
                 d2_request_order=tuple(item.request_id for item in parts),
                 selected_document_action=selected_document_action,
+                shown_price_offer_refs=_current_d2_shown_price_offer_refs(context),
             )
             price = response.resolved.d2_price_block
             decision = response.resolved.d2_price_scope_decision
     diagnostics.stage("gate")
     if lead_pause_response:
-        response = apply_d2_lead_pause_ui(response)
+        response = _apply_lead_pause_without_detail_actions(response)
     if admin_terminal:
         pass
     elif price_focus_clarify:
@@ -1525,8 +1663,33 @@ def _run_reserved_d2_dialogue_turn(
             ttl_policy=ttl_policy,
             context=context,
         ),
-        d2_shown_price_offer_refs=_next_d2_shown_price_offer_refs(
-            snapshot=snapshot, price=price, context=context,
+        d2_shown_price_offer_refs=(
+            tuple(D2ShownPriceOfferRef(
+                source_client_id=row.source_client_id, offer_id=row.offer_id,
+                service_id=row.service_id,
+            ) for row in response.resolved.d2_price_detail_block.rows)
+            if (
+                price is None and response.resolved.d2_price_detail_block is not None
+                and response_scope != "mixed"
+            )
+            else _next_d2_shown_price_offer_refs(
+                snapshot=snapshot, price=price, context=context,
+            ) if (
+                (price is not None and response_scope != "mixed")
+                or (
+                    response_scope != "mixed"
+                    and not (
+                        response_scope == "service" and active_service is not None
+                        and any(ref.service_id != active_service.service_id
+                                for ref in snapshot.state.d2_shown_price_offer_refs)
+                    )
+                    and not (
+                        response_scope == "topic" and active_topic is not None
+                        and context.ordinary.active_topic is not None
+                        and active_topic.topic_id != context.ordinary.active_topic.topic_id
+                    )
+                )
+            ) else ()
         ),
         accumulated_shown_ids=PersistedShownCommercialIds(
             requested_fact_ids=tuple(dict.fromkeys((

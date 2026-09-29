@@ -545,7 +545,7 @@ def _validate_structure(
             for request in request_understanding.requests
         )
         has_code_owned_surface = any(
-            request.kind in {"clinic_policy", "booking", "price", "contact"}
+            request.kind in {"clinic_policy", "booking", "price", "price_detail", "contact"}
             for request in request_understanding.requests
         )
         if (

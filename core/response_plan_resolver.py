@@ -401,6 +401,7 @@ def _resolve_composer_answer(
         d2_result_status=plan.d2_result_status,
         price_block=price_block,
         d2_price_block=d2_price_block,
+        d2_price_detail_block=plan.d2_price_detail_block,
         information_blocks=composer.information_blocks,
         required_offer_conditions=required_conditions,
         requested_fact_blocks=tuple(requested_blocks),
@@ -704,6 +705,7 @@ def _resolve_commerce_ui(plan: PreComposerPlan) -> ResolvedUiPlan:
         video=plan.ui_candidates.video,
         contact=plan.d2_canonical_contact,
         source_content_ref=plan.ui_candidates.source_content_ref,
+        price_detail_actions=plan.ui_candidates.price_detail_actions,
     )
 
 

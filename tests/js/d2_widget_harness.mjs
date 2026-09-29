@@ -24,7 +24,8 @@ const sent = [];
 const failures = new Map();
 const sse = (events) => events.map(([kind, data]) =>
   "event: " + kind + "\\ndata: " + JSON.stringify(data) + "\\n\\n").join("");
-const { first, second, scope, lead, afterUi, manual, terminal, video } = fixture;
+const { first, second, scope, lead, afterUi, manual, terminal, video,
+        p2Price, p2Includes, p2Stages } = fixture;
 const scopeChoice = first.ui.quick_replies.find((item) => item.reply_id.endsWith("one_tooth"));
 const leadButton = second.ui.buttons.find((item) => item.action_kind === "cta");
 if (!scopeChoice || !leadButton) throw new Error("real D2 fixture lacks required typed actions");
@@ -59,6 +60,9 @@ globalThis.fetch = async (url, options = {}) => {
   if (body.q === "ручной повтор") return response(forRequest(manual), count <= 2 ? "before" : null);
   if (body.q === "terminal") return response(forRequest(terminal));
   if (body.q === "video") return response(forRequest(video));
+  if (p2Price && body.q === "детальная цена") return response(forRequest(p2Price));
+  if (p2Includes && body.ref === "price_detail:includes") return response(forRequest(p2Includes));
+  if (p2Stages && body.ref === "price_detail:stages") return response(forRequest(p2Stages));
   if (body.q === "error") return new Response(sse([["status", { message: "Проверяю вопрос" }],
     ["error", { error: "d2_invalid_turn" }]]),
     { status: 200, headers: { "content-type": "text/event-stream" } });
@@ -157,6 +161,30 @@ try {
   const videoButton = root.querySelector(".clinic-msg__link[aria-label='Посмотреть видео с врачом']");
   if (!videoButton || !sameRenderedText(botBodies()[0], video.answer))
     throw new Error("D2 secondary video projection missing");
+  if (p2Price && p2Includes && p2Stages) {
+    widget.resetSession();
+    await send("детальная цена");
+    await waitUntil(() => botBodies().length === 1);
+    const detailLinks = [...root.querySelectorAll(".clinic-msg__link")];
+    const includesLink = detailLinks.find((item) => item.textContent.trim() === "Что входит");
+    const stagesLink = detailLinks.find((item) => item.textContent.trim() === "Этапы оплаты");
+    if (!includesLink || !stagesLink) throw new Error("price detail actions missing");
+    includesLink.click();
+    await waitUntil(() => botBodies().length === 2);
+    if (sent.at(-1).ref !== "price_detail:includes" || sent.at(-1).ui_revision !== p2Price.revision)
+      throw new Error("includes action wire mismatch");
+    if (!sameRenderedText(botBodies().at(-1), p2Includes.answer))
+      throw new Error("includes detail render mismatch");
+    const nextStages = [...root.querySelectorAll(".clinic-msg__link")]
+      .find((item) => item.textContent.trim() === "Этапы оплаты");
+    if (!nextStages) throw new Error("stage detail navigation missing");
+    nextStages.click();
+    await waitUntil(() => botBodies().length === 3);
+    if (sent.at(-1).ref !== "price_detail:stages" || sent.at(-1).ui_revision !== p2Includes.revision)
+      throw new Error("stages action wire mismatch");
+    if (!sameRenderedText(botBodies().at(-1), p2Stages.answer))
+      throw new Error("stages detail render mismatch");
+  }
   window.__D2_WIDGET_RESULT__ = {
     passed: true, requests: sent.length, before_retry_same_id: true,
     after_retry_same_id: true, one_bubble_per_turn: true,
@@ -164,6 +192,7 @@ try {
     secondary_video_from_d2: true,
     scope_ref: sent.find(x => x.ref?.startsWith("volume:"))?.ref,
     lead_ref: sent.find(x => x.ref?.startsWith("button:"))?.ref,
+    price_detail_ref: sent.find(x => x.ref === "price_detail:includes")?.ref,
   };
   window.__D2_PRICE_PREVIEW__ = (text) => {
     const body = root.querySelector(".clinic-turn .clinic-msg__body");
@@ -208,7 +237,8 @@ class Cdp {
     ws.addEventListener("message", (event) => {
       const message = JSON.parse(String(event.data));
       if (!this.pending.has(message.id)) return;
-      const { resolve, reject } = this.pending.get(message.id);
+      const { resolve, reject, timer } = this.pending.get(message.id);
+      clearTimeout(timer);
       this.pending.delete(message.id);
       message.error ? reject(new Error(JSON.stringify(message.error))) : resolve(message.result);
     });
@@ -216,7 +246,11 @@ class Cdp {
   send(method, params = {}) {
     const id = ++this.id;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error("CDP timeout: " + method));
+      }, 10000);
+      this.pending.set(id, { resolve, reject, timer });
       this.ws.send(JSON.stringify({ id, method, params }));
     });
   }

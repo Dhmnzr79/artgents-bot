@@ -12,7 +12,7 @@ from typing import Literal, Self
 
 from pydantic import field_validator, model_validator
 
-from contracts.response_plan import ResponsePlanModel, SessionKey, TerminalState
+from contracts.response_plan import NonBlankStr, ResponsePlanModel, SessionKey, TerminalState
 from contracts.response_plan_session import (
     D2ShownPriceOfferRef,
     HistoricalPriceOffersSnapshot,
@@ -92,6 +92,15 @@ class D2OrdinarySessionContext(ResponsePlanModel):
     clarify_task: PersistedClarifyTask | None = None
 
 
+class D2RecentPriceScope(ResponsePlanModel):
+    """A verified price choice for conversation continuity, not a patient fact."""
+
+    topic_id: NonBlankStr
+    service_id: NonBlankStr | None = None
+    brand_id: NonBlankStr | None = None
+    extent: Literal["one_tooth", "few_teeth", "full_arch", "unknown"]
+
+
 class D2SessionContextProjection(ResponsePlanModel):
     """TTL-gated view of a typed snapshot, not a semantic continuation decision."""
 
@@ -101,6 +110,7 @@ class D2SessionContextProjection(ResponsePlanModel):
     freshness: D2SessionContextFreshness
     last_user_turn_at: datetime | None = None
     ordinary: D2OrdinarySessionContext = D2OrdinarySessionContext()
+    recent_price_scope: D2RecentPriceScope | None = None
     retained_terminal_state: TerminalState
     retained_shown_ids: PersistedShownCommercialIds
 

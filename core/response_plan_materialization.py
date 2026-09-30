@@ -1244,6 +1244,8 @@ def _d2_price_scope_decision(
         D2PriceScopeDecision(
             source_request_id=part.request_id,
             topic_id=part.topic_id,
+            service_id=part.service_id,
+            brand_id=part.brand_id,
             applied_extent=applied_extent,
             reason="known_situation" if applied_extent is not None else "overview",
             selected_offer_ids=selected_offer_ids,

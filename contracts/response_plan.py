@@ -841,6 +841,8 @@ class D2TreatmentSituationDecision(ResponsePlanModel):
 class D2PriceScopeDecision(ResponsePlanModel):
     source_request_id: NonBlankStr
     topic_id: NonBlankStr
+    service_id: NonBlankStr | None = None
+    brand_id: NonBlankStr | None = None
     applied_extent: Literal["one_tooth", "few_teeth", "full_arch"] | None = None
     reason: Literal["known_situation", "overview"]
     selected_offer_ids: tuple[NonBlankStr, ...]

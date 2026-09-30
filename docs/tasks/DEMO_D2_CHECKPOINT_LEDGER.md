@@ -1,5 +1,25 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-30: реализация D2-AF-1a
+
+Владелец уточнил текущий UI: после выбора услуги сразу цена, без кнопок
+объёма; плановая цепочка «услуга → объём» неприменима к этому tenant.
+
+Git root `C:\Cursor Projects\artgents-bot-active`, ветка
+`codex/d2-stage1-contract`, baseline HEAD/local origin
+`8cea81125cfc9ad8898b0e4ab43a6dc42bf15331`; `origin/main` и
+merge-base `141ce91fb1731cd990fcf8391550150016c73e7f`.
+Перед правками staging/tracked diff пусты. Foreign untracked `data/` и
+`docs/MARKETING_ANSWER_SCENARIOS.md` не открывались и не stage.
+Точный implementation allowlist и решения владельца — в
+[карточке AF-1a](DEMO_D2_AF1A_PRICE_TASK_TASK.md).
+После изменения scope отдельный набор context/scope/continuation дал
+87 passed / те же 3 baseline failed из continuation; новых отказов нет.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-AF-1a-IMPL | **ACCEPTANCE:** проверенный volume choice продолжает frozen price task с topic/service/brand; цена берётся из tenant snapshot, при отсутствии подходящего offer — честный пробел. Неверный `content/other` не убирает цену; пригодная prose сохраняется. Кнопка не создаёт личную `situation_state`: выбранный объём хранится в последнем frozen completion и TTL-gated projection следующего хода как контекст разговора, без второй памяти и угадывания по label/ref. **D2 ROUTE / LEGACY IMPACT:** один `/ask`/`/ask/stream` provider/parser/materializer/store; нового semantic selector, fallback или owner нет. **OWNER DECISION:** после read-only Astra владелец отменил self/other/hypothesis-ветвление AF-1a и согласовал расширение allowlist для typed recent scope; live/commit/push/merge/deploy не разрешены. **Evidence:** AF-1a HTTP 19 passed: JSON/SSE, бренд, четыре объёма, wrong kind, цена-gap, следующий provider input, TTL, смена темы, replay/conflict. Соседний набор 53 passed / 1 browser deselected / 1 старый failed: `test_d2_live_provider_offline.py` ожидает prompt v19, хотя HEAD уже v23. Pre-edit baseline 33 passed / 3 failed; после предыдущей правки тот же набор 33 passed / те же 3 failed. Browser harness до этого дважды дал `CDP timeout: Runtime.enable` до DOM assertions; это не browser PASS. Offline fixtures: temporary tenant/SQLite/log, сеть блокирована, provider/live/SMTP 0. **FUTURE SCOPE:** AF-1b/1c/2, полная A/B/C, REC-5 и разрешённое live-качество. | Draft до нового независимого Checker и Cursor review изменённого scope. Staging пуст; commit/push не выполнялись. После PASS reviewed diff не дописывать. |
+
 ## Draft — 2026-09-30: карточка D2-AF-1a после D2-AUDIT-PLAN
 
 Git root `C:\Cursor Projects\artgents-bot-active`, ветка

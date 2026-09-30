@@ -5,7 +5,7 @@ product. Unsupported inputs fail explicitly; there is no legacy fallback.
 """
 
 from datetime import datetime
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
@@ -16,7 +16,7 @@ from contracts.d2_dialogue import (
     D2CompletedTurn, D2DialogueRecord, D2DialogueTurn, D2LeadEffect,
     D2LeadEffectDispatcher, D2ProviderInput, D2RawProvider, D2SelectedUiRef,
 )
-from contracts.d2_session_context import D2SessionActivity, D2SessionTtlPolicy
+from contracts.d2_session_context import D2RecentPriceScope, D2SessionActivity, D2SessionTtlPolicy
 from contracts.response_plan import D2PriceDetailUiAction, SessionKey
 from contracts.one_call_envelope import OneCallEnvelope
 from contracts.response_plan_materialization import D2SelectedDocumentAction, MaterializationContractError
@@ -67,6 +67,17 @@ from core.user_text_privacy import provider_message_has_substance, provider_safe
 from lead_interrupt import LEAD_PENDING_ANSWER_REF
 from session import peek_lead_paused
 import json
+
+
+@dataclass(frozen=True)
+class _SelectedVolumePriceTask:
+    """Price intent carried by a verified choice from one frozen completion."""
+
+    source_request_id: str
+    topic_id: str
+    service_id: str | None
+    brand_id: str | None
+    extent: str
 
 
 def _request_fingerprint(*, session_key: SessionKey, user_message: str) -> str:
@@ -296,6 +307,91 @@ def _current_d2_shown_price_offer_refs(context) -> tuple[D2ShownPriceOfferRef, .
     return refs
 
 
+def _bind_selected_volume_price_task(
+    envelope: OneCallEnvelope,
+    action: _SelectedVolumePriceTask,
+    *,
+    tenant,
+) -> OneCallEnvelope:
+    """Keep a clean, verified scope click attached to its frozen price task."""
+
+    understanding = envelope.request_understanding
+    if envelope.route != "ANSWER" or understanding is None or not understanding.requests:
+        raise ValueError("d2_ui_volume_price_task_unresolved")
+    price_claims = [item for item in understanding.requests if item.kind == "price"]
+    if len(price_claims) == 1:
+        part = price_claims[0]
+    elif not price_claims and len(understanding.requests) == 1:
+        part = understanding.requests[0]
+    else:
+        raise ValueError("d2_ui_volume_price_task_unresolved")
+    if part.kind not in {"price", "content", "other"}:
+        raise ValueError("d2_ui_volume_price_task_unresolved")
+    if part.topic_id not in {None, action.topic_id}:
+        raise ValueError("d2_ui_volume_price_task_topic_mismatch")
+    if part.brand_id not in {None, action.brand_id}:
+        raise ValueError("d2_ui_volume_price_task_brand_mismatch")
+    if part.service_id is not None and resolve_d2_clarify_service_topic(
+        tenant, (part.service_id,)
+    ) != action.topic_id:
+        raise ValueError("d2_ui_volume_price_task_service_mismatch")
+    if action.service_id is not None and part.service_id not in {None, action.service_id}:
+        raise ValueError("d2_ui_volume_price_task_service_mismatch")
+    if envelope.service_id is not None and envelope.service_id != part.service_id:
+        raise ValueError("d2_ui_volume_price_task_service_mismatch")
+    if envelope.extent is not None and envelope.extent != action.extent:
+        raise ValueError("d2_ui_volume_price_task_extent_mismatch")
+    if part.situation is not None and part.situation.extent != action.extent:
+        raise ValueError("d2_ui_volume_price_task_extent_mismatch")
+    commitment = "unknown" if action.extent == "unknown" else "hypothetical"
+    situation = {
+        "scope_commitment": commitment,
+        "extent": action.extent,
+        "tooth_count": 1 if action.extent == "one_tooth" else None,
+        "jaw": "unknown",
+        "continuity": "same",
+    }
+    existing_subject_ids = {item.subject_id for item in understanding.subjects}
+    subject_number = 1
+    while f"s{subject_number}" in existing_subject_ids:
+        subject_number += 1
+    subject_id = f"s{subject_number}"
+    price_part = {
+        "request_id": part.request_id, "kind": "price", "subject_id": subject_id,
+        "context": "general_information", "topic_id": action.topic_id,
+        "service_id": action.service_id, "brand_id": action.brand_id,
+        "statement_mode": "question", "situation": situation,
+    }
+    requests = []
+    for item in understanding.requests:
+        requests.append(price_part if item is part else item.model_dump(mode="json"))
+    if part.kind in {"content", "other"} and part.content_realization == "model_prose":
+        if (part.content_text or "").strip():
+            existing_request_ids = {item.request_id for item in understanding.requests}
+            content_number = 1
+            while f"r{content_number}" in existing_request_ids:
+                content_number += 1
+            content_id = f"r{content_number}"
+            requests.append({
+                "request_id": content_id, "kind": "content", "subject_id": None,
+                "context": "general_information", "topic_id": action.topic_id,
+                "service_id": None, "content_text": part.content_text,
+                "content_realization": "model_prose", "statement_mode": "question",
+            })
+    return OneCallEnvelope.model_validate(production_envelope_template(
+        commercial_intent="price",
+        patient_text=envelope.patient_text,
+        primary_price_request_id=part.request_id,
+        request_understanding={
+            "subjects": [
+                *(item.model_dump(mode="json") for item in understanding.subjects),
+                {"subject_id": subject_id, "relation": "unknown", "age_group": "unknown"},
+            ],
+            "requests": requests,
+        },
+    ))
+
+
 def run_d2_dialogue_turn(
     *, session_key: SessionKey, user_message: str, provider: D2RawProvider,
     clients_root: Path, store: D2DialogueStore, now: datetime,
@@ -387,6 +483,7 @@ def run_d2_dialogue_turn(
         selected_ui_ref: D2SelectedUiRef | None = None
         selected_document_action: D2SelectedDocumentAction | None = None
         selected_price_detail_action: D2PriceDetailUiAction | None = None
+        selected_volume_price_task: _SelectedVolumePriceTask | None = None
         if lead_ui_ref and ui_revision is not None:
             shown = store.read_latest_completion(session_key)
             if (
@@ -421,6 +518,31 @@ def run_d2_dialogue_turn(
                             source_revision=ui_revision,
                             shown_source_content_ref=shown.response.resolved.ui_plan.source_content_ref,
                         )
+                    if selected_document_action is None and selected_price_detail_action is None:
+                        source = shown.response.resolved.d2_price_scope_decision
+                        if source is not None:
+                            choice = next((
+                                item for item in source.volume_choices
+                                if item.candidate.reply_id == reply.reply_id
+                                and item.candidate.source_client_id == session_key.client_id
+                            ), None)
+                            if choice is not None:
+                                source_part = next((
+                                    item for item in shown.response.resolved.d2_request_parts
+                                    if item.request_id == source.source_request_id
+                                    and item.kind == "price" and item.status == "answered"
+                                    and item.topic_id == source.topic_id
+                                    and item.service_id == source.service_id
+                                ), None)
+                                if source_part is None:
+                                    raise ValueError("d2_ui_volume_price_task_missing")
+                                selected_volume_price_task = _SelectedVolumePriceTask(
+                                    source_request_id=source.source_request_id,
+                                    topic_id=source.topic_id,
+                                    service_id=source.service_id,
+                                    brand_id=source.brand_id,
+                                    extent=choice.extent,
+                                )
         full_audit(
             "ui_binding", effective_ref=lead_ui_ref,
             selected_ui_ref=selected_ui_ref,
@@ -539,6 +661,7 @@ def run_d2_dialogue_turn(
             selected_ui_ref=selected_ui_ref,
             selected_document_action=selected_document_action,
             selected_price_detail_action=selected_price_detail_action,
+            selected_volume_price_task=selected_volume_price_task,
             selected_service_id=(
                 lead_ui_ref.removeprefix("service:")
                 if lead_ui_ref and lead_ui_ref.startswith("service:") and ui_revision is not None
@@ -882,6 +1005,7 @@ def _run_reserved_d2_dialogue_turn(
     selected_ui_ref: D2SelectedUiRef | None = None,
     selected_document_action: D2SelectedDocumentAction | None = None,
     selected_price_detail_action: D2PriceDetailUiAction | None = None,
+    selected_volume_price_task: _SelectedVolumePriceTask | None = None,
     selected_service_id: str | None = None,
 ) -> D2DialogueTurn:
     """Build a final result only after ``reserve_request`` made this turn owner."""
@@ -898,6 +1022,15 @@ def _run_reserved_d2_dialogue_turn(
         snapshot, expected_session_key=session_key,
         activity=previous.activity if previous else None, policy=ttl_policy, now=now,
     )
+    if context.freshness == "fresh":
+        shown = store.read_latest_completion(session_key)
+        if (
+            shown is not None and shown.committed_revision == snapshot.state.revision
+            and shown.context.session_key == session_key
+        ):
+            context = context.model_copy(update={
+                "recent_price_scope": shown.recent_price_scope,
+            })
     full_audit(
         "model_context", record=previous, state=snapshot.state,
         context=context, tenant_fingerprint=tenant.fingerprint,
@@ -983,6 +1116,10 @@ def _run_reserved_d2_dialogue_turn(
         selected_document_action=selected_document_action,
         selected_action_only=not safe_user_message.strip(),
     )
+    if selected_volume_price_task is not None and not safe_user_message.strip():
+        envelope = _bind_selected_volume_price_task(
+            envelope, selected_volume_price_task, tenant=tenant,
+        )
     envelope = bind_implicit_price_service(
         envelope, context,
         active_service_ids=view.active_service_catalog.active_service_ids,
@@ -1494,6 +1631,15 @@ def _run_reserved_d2_dialogue_turn(
     ):
         # Exact brand/service without a published offer is an honest gap.
         pass
+    elif (
+        selected_volume_price_task is not None
+        and not safe_user_message.strip()
+        and price is None
+        and response.resolved.d2_part_failure_blocks
+        and response.rendered_text.strip()
+    ):
+        # The verified volume can have no published offer in the current pack.
+        pass
     elif price is None or (part.service_id is None and decision is None) or not response.rendered_text.strip():
         raise ValueError("d2_experiment_price_not_resolved")
     full_audit("materialized_response", response=response, focus=focus, branch="ordinary")
@@ -1730,6 +1876,16 @@ def _run_reserved_d2_dialogue_turn(
         focus=focus,
         committed_revision=state.revision,
         lead_effect=initial_effect,
+        recent_price_scope=(
+            D2RecentPriceScope(
+                topic_id=selected_volume_price_task.topic_id,
+                service_id=selected_volume_price_task.service_id,
+                brand_id=selected_volume_price_task.brand_id,
+                extent=selected_volume_price_task.extent,
+            )
+            if selected_volume_price_task is not None and not safe_user_message.strip()
+            else None
+        ),
     )
     full_audit("commit_intent", state=state, completion=completion, branch="ordinary")
     diagnostics.stage("commit")

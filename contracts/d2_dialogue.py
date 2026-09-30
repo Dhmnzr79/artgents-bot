@@ -5,7 +5,9 @@ from typing import Literal, Protocol, Self
 
 from pydantic import model_validator
 
-from contracts.d2_session_context import D2PlanFocusSeed, D2SessionActivity, D2SessionContextProjection
+from contracts.d2_session_context import (
+    D2PlanFocusSeed, D2RecentPriceScope, D2SessionActivity, D2SessionContextProjection,
+)
 from contracts.d2_tenant_snapshot import D2ModelView
 from contracts.response_plan import ResponsePlanModel
 from contracts.response_plan_materialization import D2SelectedDocumentAction, MaterializedResponseOutcome
@@ -78,6 +80,7 @@ class D2CompletedTurn(ResponsePlanModel):
     focus: D2PlanFocusSeed
     committed_revision: int
     lead_effect: D2LeadEffect = D2LeadEffect()
+    recent_price_scope: D2RecentPriceScope | None = None
 
     @model_validator(mode="after")
     def _validate_identity(self) -> Self:
@@ -87,6 +90,13 @@ class D2CompletedTurn(ResponsePlanModel):
             raise ValueError("d2_request_fingerprint_required")
         if self.committed_revision < 1:
             raise ValueError("d2_committed_revision_invalid")
+        if self.recent_price_scope is not None and not any(
+            part.kind == "price" and part.status in {"answered", "unavailable"}
+            and part.topic_id == self.recent_price_scope.topic_id
+            and part.service_id == self.recent_price_scope.service_id
+            for part in self.response.resolved.d2_request_parts
+        ):
+            raise ValueError("d2_recent_price_scope_price_part_required")
         return self
 
 

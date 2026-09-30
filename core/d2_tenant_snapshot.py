@@ -256,12 +256,30 @@ def _clinic_policy_catalog_json(snapshot: D2TenantSnapshot) -> str:
             answer = body.get("approved_text")
             if isinstance(brand_id, str) and brand_id.strip() and isinstance(answer, str) and answer.strip():
                 brand_rows.append({"brand_id": brand_id.strip(), "answer": answer.strip()})
+    contact = parsed.get("contact") if isinstance(parsed, dict) else None
+    branch_rows: list[dict[str, object]] = []
+    branches = contact.get("branches") if isinstance(contact, dict) else None
+    if isinstance(branches, list):
+        for branch in branches:
+            if not isinstance(branch, dict):
+                continue
+            branch_id = branch.get("branch_id")
+            label = branch.get("label")
+            if not isinstance(branch_id, str) or not branch_id.strip() or not isinstance(label, str) or not label.strip():
+                continue
+            aliases = branch.get("aliases")
+            branch_rows.append({
+                "branch_id": branch_id.strip(), "label": label.strip(),
+                "aliases": [item.strip() for item in aliases if isinstance(item, str) and item.strip()]
+                if isinstance(aliases, list) else [],
+            })
     return json.dumps(
         {
             "client_id": snapshot.client_id,
             "policies_available": bool(rows),
             "policies": rows,
             "brand_policies": brand_rows,
+            "contact_branches": branch_rows,
         },
         ensure_ascii=False, separators=(",", ":"), sort_keys=True,
     )

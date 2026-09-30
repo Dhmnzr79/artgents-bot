@@ -1,5 +1,32 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-09-30: реализация D2-AF-1b
+
+Baseline HEAD/local origin `4e435ce8006cc2df07930a40d058f278469a99f6`,
+ветка `codex/d2-stage1-contract`, Git root `C:\Cursor Projects\artgents-bot-active`;
+локальный `origin/main`/merge-base `141ce91fb1731cd990fcf8391550150016c73e7f`.
+Implementation GO и точный 11-file allowlist — в
+[карточке AF-1b](DEMO_D2_AF1B_CONTACTS_TASK.md). Foreign `data/` и
+`docs/MARKETING_ANSWER_SCENARIOS.md` не открывались и не stage.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-AF-1b-IMPL | **ACCEPTANCE:** AF-02, узкая B09/D2-095/C02: конкретный typed contact field даёт точное значение текущего tenant, `contacts` — телефон+адрес+часы; absent parking — согласованный честный пробел, без телефона вместо неё. Несколько полей и независимая prose сохраняются. Typed `contact_branch_id` выбирает только названный филиал; без него обе адресные строки снабжены названиями, произвольной кнопки звонка нет. **D2 ROUTE / LEGACY IMPACT:** один `/ask`/`/ask/stream` D1R parser/provider → tenant facts → common materializer/frozen response/store; второго selector/parser/state/fallback нет. **OWNER DECISION:** после принятой карточки дан отдельный GO на AF-1b, но не на live/commit/push/merge/deploy. **Evidence:** новый HTTP набор 19 passed; соседний контактный/branch/mixed 19 passed/80 deselected; baseline и повтор тех же соседних сценариев 9 passed/те же 4 failed/9 deselected. Fake provider, temp DB/tenant/log, network blocked; provider/live/SMTP 0. **FUTURE SCOPE:** живое качество выбора полей, AF-1c/2 и REC-5. | Draft после Checker REJECT P1: пустой contact_fields теперь отклоняется; focused recheck и Cursor review впереди. Staging пуст, commit/push не выполнялись. |
+
+## Draft — 2026-09-30: карточка D2-AF-1b после AF-1a
+
+Git root `C:\Cursor Projects\artgents-bot-active`, ветка
+`codex/d2-stage1-contract`, baseline HEAD/local origin
+`4e435ce8006cc2df07930a40d058f278469a99f6`; локальный `origin/main` и
+merge-base `141ce91fb1731cd990fcf8391550150016c73e7f`.
+Перед правками tracked diff/staging пусты; foreign untracked `data/` и
+`docs/MARKETING_ANSWER_SCENARIOS.md` оставлены без изменений. Write allowlist:
+эта Draft-строка и [карточка AF-1b](DEMO_D2_AF1B_CONTACTS_TASK.md).
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-AF-1b-DOC | **ACCEPTANCE:** узкая B09/D2-095/C02 и AF-02; конкретный вопрос получает соответствующий точный tenant contact, несколько вопросов сохраняются, общий `contacts` — телефон+адрес+часы, WhatsApp/парковка по запросу; контакт не стирает независимую prose. **D2 ROUTE / LEGACY IMPACT:** только план для одного D2 provider/parser/materializer/store, без второго semantic selector/fallback. **OWNER DECISION:** согласованы оба адреса с названиями филиалов на общий вопрос, один адрес при названном филиале и честное «нет информации о парковке» при отсутствии этих сведений; другой контакт не подменяет отсутствующее поле. Implementation GO отсутствует. **Evidence:** read-only сверка AF-02, текущего `contacts → phone`/phone fallback, существующих typed fields и mixed contact+content; реализация, offline tests и live не запускались. **FUTURE SCOPE:** AF-1c/2, REC-5 и live quality. | Draft до focused Checker recheck и Cursor; runtime, commit/push, merge/deploy не разрешены. |
+
 ## Draft — 2026-09-30: реализация D2-AF-1a
 
 Владелец уточнил текущий UI: после выбора услуги сразу цена, без кнопок

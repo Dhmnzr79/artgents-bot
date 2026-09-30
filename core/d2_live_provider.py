@@ -80,7 +80,7 @@ def _approved_md_corpus_block(request: D2ProviderInput) -> str:
 def _clinic_business_policies_block(request: D2ProviderInput) -> str:
     return (
         "=== CLINIC_BUSINESS_POLICIES ===\n"
-        "Use exact policy_id values for clinic_policy requests. brand_policies lists exact brand_id values: when one applies, return that brand_id in the content request; code renders its approved answer.\n"
+        "Use exact policy_id values for clinic_policy requests. brand_policies lists exact brand_id values: when one applies, return that brand_id in the content request; code renders its approved answer. contact_branches lists exact branch IDs for contact requests; select one only when the user names that branch.\n"
         + request.model_view.clinic_policy_catalog_json
     )
 

@@ -26,7 +26,10 @@ from contracts.response_plan_materialization import (
     MaterializedResponseOutcome,
 )
 from contracts.response_plan_post_composer import ResponseSituationDelta
-from core.clinic_contact_policies import parse_clinic_contact_facts_from_policies_raw
+from core.clinic_contact_policies import (
+    branch_by_id, parse_clinic_contact_facts_from_policies_raw,
+    validate_clinic_contact_section,
+)
 from core.d2_tenant_snapshot import build_d2_bundle
 from core.response_plan_fact_projection import fact_active_as_of
 from core.response_plan_resolver import resolve_response_plan
@@ -40,7 +43,6 @@ _FIELD_TO_ATTR = {
     "contact_address": "address_display",
     "contact_hours": "hours_display",
     "contact_parking": "parking_display",
-    "contacts": "phone_display",
 }
 _FIELD_LABEL = {
     "contact_phone": "Телефон",
@@ -48,7 +50,12 @@ _FIELD_LABEL = {
     "contact_address": "Адрес",
     "contact_hours": "Часы работы",
     "contact_parking": "Парковка",
-    "contacts": "Телефон",
+}
+_GENERAL_CONTACT_FIELDS = ("contact_phone", "contact_address", "contact_hours")
+_MISSING_CONTACT_TEXT = {
+    "contact_whatsapp": "В материалах клиники нет информации о WhatsApp.",
+    "contact_parking": "В материалах клиники нет информации о парковке.",
+    "contact_hours": "В материалах клиники нет информации о времени работы.",
 }
 
 
@@ -146,21 +153,24 @@ def build_d2_contact_response(
     *,
     session_key: SessionKey,
     contact_fields: tuple[str, ...],
+    contact_branch_id: str | None = None,
 ) -> MaterializedResponseOutcome:
     """Ordinary contact question: tenant contact facts only (not medical terminal).
 
     Uses ANSWER/standard so the session is not locked into contacts terminal_state.
-    Phone is present in text; call button uses action_kind=contact.
+    A call button is shown only when there is one unambiguous clinic number.
     """
     if snapshot.client_id != session_key.client_id:
         raise ValueError("d2_contact_client_mismatch")
-    text, phone = _d2_contact_text(snapshot, contact_fields=contact_fields)
+    text, phone = _d2_contact_text(
+        snapshot, contact_fields=contact_fields, contact_branch_id=contact_branch_id,
+    )
     contact_btn = UiButtonCandidate(
         source_client_id=snapshot.client_id,
         button_id="contact_call",
         label="Позвонить",
         action_kind="contact",
-    )
+    ) if phone is not None else None
     plan = PreComposerPlan(
         session_key=session_key,
         context_strategy="full_context",
@@ -173,7 +183,7 @@ def build_d2_contact_response(
         active_session_service_id=None,
         selected_topic_id=None,
         price_plan=PricePlan(kind="none"),
-        ui_candidates=UiPlanCandidates(buttons=(contact_btn,)),
+        ui_candidates=UiPlanCandidates(buttons=(contact_btn,) if contact_btn else ()),
         transport_kind="blocking",
     )
     composer = ComposerResult(
@@ -184,7 +194,7 @@ def build_d2_contact_response(
     )
     resolved = resolve_response_plan(plan, composer)
     # Attach canonical phone for UI projection (resolver standard path omits contact).
-    if resolved.ui_plan.contact is None:
+    if phone is not None and resolved.ui_plan.contact is None:
         resolved = resolved.model_copy(
             update={
                 "ui_plan": resolved.ui_plan.model_copy(
@@ -215,11 +225,14 @@ def build_d2_contact_fact_block(
     session_key: SessionKey,
     request_id: str,
     contact_fields: tuple[str, ...],
-) -> tuple[D2ContactFactBlock, UiButtonCandidate, CanonicalContactCandidate]:
+    contact_branch_id: str | None = None,
+) -> tuple[D2ContactFactBlock, UiButtonCandidate | None, CanonicalContactCandidate | None]:
     """Make a typed exact-contact part which can compose with a normal D2 answer."""
     if snapshot.client_id != session_key.client_id:
         raise ValueError("d2_contact_client_mismatch")
-    text, phone = _d2_contact_text(snapshot, contact_fields=contact_fields)
+    text, phone = _d2_contact_text(
+        snapshot, contact_fields=contact_fields, contact_branch_id=contact_branch_id,
+    )
     return (
         D2ContactFactBlock(
             request_id=request_id,
@@ -232,8 +245,9 @@ def build_d2_contact_fact_block(
             button_id="contact_call",
             label="Позвонить",
             action_kind="contact",
-        ),
-        CanonicalContactCandidate(source_client_id=snapshot.client_id, phone=phone),
+        ) if phone is not None else None,
+        CanonicalContactCandidate(source_client_id=snapshot.client_id, phone=phone)
+        if phone is not None else None,
     )
 
 
@@ -241,13 +255,52 @@ def _d2_contact_text(
     snapshot: D2TenantSnapshot,
     *,
     contact_fields: tuple[str, ...],
-) -> tuple[str, str]:
-    facts = parse_clinic_contact_facts_from_policies_raw(_policies_raw(snapshot))
-    phone = (facts.phone_display or "").strip()
-    if not phone:
-        raise ValueError("d2_contact_phone_missing")
-    wanted = contact_fields or ("contacts",)
+    contact_branch_id: str | None = None,
+) -> tuple[str, str | None]:
+    if not contact_fields:
+        raise ValueError("d2_contact_fields_required")
+    raw = _policies_raw(snapshot)
+    if validate_clinic_contact_section(raw.get("contact")):
+        raise ValueError("d2_contact_data_invalid")
+    facts = parse_clinic_contact_facts_from_policies_raw(raw)
+    wanted = tuple(dict.fromkeys(
+        expanded
+        for field in contact_fields
+        for expanded in (_GENERAL_CONTACT_FIELDS if field == "contacts" else (field,))
+    ))
     lines: list[str] = []
+    if facts.branches:
+        if contact_branch_id is not None:
+            branch = branch_by_id(facts, contact_branch_id)
+            if branch is None:
+                raise ValueError("d2_contact_branch_unknown")
+            branches = (branch,)
+        else:
+            branches = facts.branches
+        for field in wanted:
+            if field == "contact_whatsapp":
+                value = getattr(facts, _FIELD_TO_ATTR[field])
+                lines.append(
+                    f"{_FIELD_LABEL[field]}: {value}"
+                    if value else _MISSING_CONTACT_TEXT[field]
+                )
+                continue
+            for branch in branches:
+                if field == "contact_phone":
+                    value = ", ".join(branch.phone_displays)
+                else:
+                    value = getattr(branch, _FIELD_TO_ATTR[field])
+                lines.append(
+                    f"{branch.label} — {_FIELD_LABEL[field]}: {value}"
+                    if value else f"{branch.label} — {_MISSING_CONTACT_TEXT[field]}"
+                )
+        phone = branches[0].phone_displays[0] if (
+            len(branches) == 1 and len(branches[0].phone_displays) == 1
+        ) else None
+        return "\n".join(dict.fromkeys(lines)), phone
+
+    if contact_branch_id is not None:
+        raise ValueError("d2_contact_branch_unknown")
     for field in wanted:
         attr = _FIELD_TO_ATTR.get(field)
         if attr is None:
@@ -256,6 +309,8 @@ def _d2_contact_text(
         if isinstance(value, str) and value.strip():
             title = _FIELD_LABEL.get(field, field)
             lines.append(f"{title}: {value.strip()}")
+        elif field in _MISSING_CONTACT_TEXT:
+            lines.append(_MISSING_CONTACT_TEXT[field])
     if not lines:
-        lines.append(f"Телефон: {phone}")
-    return "\n".join(dict.fromkeys(lines)), phone
+        raise ValueError("d2_contact_fields_unresolved")
+    return "\n".join(dict.fromkeys(lines)), facts.phone_display.strip() or None

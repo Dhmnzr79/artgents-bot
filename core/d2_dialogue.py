@@ -1486,6 +1486,7 @@ def _run_reserved_d2_dialogue_turn(
                 tenant,
                 session_key=session_key,
                 contact_fields=tuple(part.contact_fields),
+                contact_branch_id=part.contact_branch_id,
             )
             price = None
             decision = None
@@ -1531,6 +1532,7 @@ def _run_reserved_d2_dialogue_turn(
                     session_key=session_key,
                     request_id=contact_part.request_id,
                     contact_fields=tuple(contact_part.contact_fields),
+                    contact_branch_id=contact_part.contact_branch_id,
                 )
                 exact_contact_blocks.append(block)
                 if exact_contact_button is None:

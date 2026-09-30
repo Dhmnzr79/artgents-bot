@@ -103,6 +103,7 @@ class RequestUnderstandingRequest(BaseModel):
     payment_scheme: PaymentScheme = "unspecified"
     payment_scheme_intent: PaymentSchemeIntent = "unspecified"
     contact_fields: tuple[str, ...] = ()
+    contact_branch_id: str | None = None
     content_text: str | None = None
     content_realization: ContentRealization = "authored"
     content_ref: str | None = None
@@ -170,7 +171,7 @@ class RequestUnderstandingRequest(BaseModel):
             raise ValueError("content_ref_invalid")
         return token
 
-    @field_validator("service_id", "topic_id", "brand_id", "price_detail_offer_id")
+    @field_validator("service_id", "topic_id", "brand_id", "price_detail_offer_id", "contact_branch_id")
     @classmethod
     def _validate_semantic_ref(cls, value: str | None) -> str | None:
         if value is None:
@@ -215,6 +216,10 @@ class RequestUnderstandingRequest(BaseModel):
             raise ValueError("content_text_too_long")
         if self.kind != "contact" and self.contact_fields:
             raise ValueError("contact_fields_forbidden")
+        if self.kind == "contact" and not self.contact_fields:
+            raise ValueError("contact_fields_required")
+        if self.kind != "contact" and self.contact_branch_id is not None:
+            raise ValueError("contact_branch_id_forbidden")
         if self.kind not in {"clinic_policy", "content", "other"} and self.policy_ids:
             raise ValueError("policy_ids_forbidden")
         if self.kind not in {"content", "other"} and self.content_text is not None:

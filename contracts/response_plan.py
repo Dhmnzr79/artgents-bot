@@ -535,7 +535,7 @@ class D2ContactFactBlock(ResponsePlanModel):
     request_id: NonBlankStr
     source_client_id: NonBlankStr
     display_text: NonBlankStr
-    phone: NonBlankStr
+    phone: NonBlankStr | None = None
 
 
 class D2PolicyFactBlock(ResponsePlanModel):

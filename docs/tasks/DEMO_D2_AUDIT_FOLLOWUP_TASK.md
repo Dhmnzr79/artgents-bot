@@ -1,5 +1,62 @@
 # D2-AUDIT-PLAN — документальная сверка после REC-4-P2
 
+## D2-SIM-DOC — действующий документальный checkpoint, 2026-10-01
+
+Owner GO: проверить документы/коммиты/ветки/push, обновить план реализации и
+закрепить правила; три продуктовых решения согласованы в чате. Это продолжение
+существующей задачи, не новая ветка и не разрешение runtime/live/merge/deploy.
+Папка `C:\Cursor Projects\artgents-bot-active`, branch `codex/d2-stage1-contract`.
+Baseline HEAD/origin branch после fetch: `0691217b888b92b49ba2c288452ed8a053f31206`;
+main/merge-base `141ce91fb1731cd990fcf8391550150016c73e7f`. Tracking 0/0;
+main 101/0. Staging пуст. Девять прежних правок правил сохранены; foreign
+`data/`, `docs/MARKETING_ANSWER_SCENARIOS.md` исключены.
+
+Точный write allowlist (15 файлов):
+
+```text
+AGENTS.md
+docs/WORKFLOW_CHECKER.md
+.cursor/agents/checker.md
+.cursor/rules/00-guardrails.mdc
+docs/tasks/DEMO_D2_AUDIT_FOLLOWUP_TASK.md
+docs/tasks/DEMO_D2_CURRENT_STATUS.md
+docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md
+docs/tasks/DEMO_D2_TARGET_CONTRACT.md
+docs/tasks/DEMO_D2_PRODUCT_DECISIONS.md
+docs/tasks/DEMO_D2_ACCEPTANCE.md
+docs/tasks/DEMO_D2_EXECUTION_LOCK.md
+docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md
+docs/tasks/DEMO_D2_CODEX_EXECUTOR_PROMPT.md
+docs/tasks/DEMO_D2_CURSOR_CHECKER_PROMPT.md
+docs/tasks/DEMO_D2_STAGE_TASK_MINI_PROMPT.md
+```
+
+ACCEPTANCE: единый текущий статус; D2-107–109 и C03 без старого финансового
+допуска; Roadmap содержит правила, порядок, owner/removal/dialogue evidence;
+исторические карточки не дают нового GO; незаданные продуктовые детали
+явно ограничивают зависимый этап вместо придуманных правил. Мини-промпт,
+Codex/Checker/Cursor согласованы с действующим планом. Astra даёт совет,
+не продуктовый GO. Runtime-упрощение не заявляется.
+
+Дополнение по прямому запросу владельца «Сделай это»: закрепить пять уточнений
+SIM-1–4 и проверки каждого этапа. В этой итерации меняются только Roadmap,
+Target Contract, Acceptance, Codex Executor Prompt, Stage Task Mini Prompt,
+WORKFLOW_CHECKER, эта карточка и Ledger (внутри прежнего allowlist).
+Прежний PASS документального diff не покрывает это дополнение автоматически;
+нужен сфокусированный независимый review уточнений и их согласованности.
+Не вводятся новые продуктовые правила или runtime GO; C03 уже пересогласован.
+
+Проверки: Git refs/ancestry/status, diff --check, локальные Markdown-ссылки
+из изменённых документов, независимый read-only Checker; затем Cursor.
+Pytest, бот, provider, SMTP не запускать. Не stage/commit/push до review и
+явного разрешения. D2 ROUTE / LEGACY IMPACT: документация, код неизменён.
+FUTURE SCOPE: SIM-0–5/REC-5, технические карточки на принятом SHA.
+
+## Историческая карточка — 2026-09-29
+
+Нижеследующие baseline, allowlist и запреты записи относятся к прежнему
+checkpoint. Они не ограничивают явно разрешённую текущую синхронизацию.
+
 Дата: 2026-09-29. **Разрешена подготовка плана и синхронизация документации;
 реализация исправлений не разрешена этой карточкой.** Основание — прямой запрос
 владельца проверить документацию, остатки старых решений, commit/push и обновить

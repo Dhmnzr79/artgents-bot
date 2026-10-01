@@ -1,5 +1,35 @@
 # D2 — текущее состояние и куда смотреть
 
+## Действующий указатель — 2026-10-01
+
+- Active repo: `C:\Cursor Projects\artgents-bot-active`, ветка
+  `codex/d2-stage1-contract`, HEAD = свежий `origin/codex/d2-stage1-contract`
+  = `0691217b888b92b49ba2c288452ed8a053f31206`.
+- Fetch origin выполнен 2026-10-01. `origin/main` / merge-base =
+  `141ce91fb1731cd990fcf8391550150016c73e7f`; ahead/behind main: 101/0,
+  tracking branch: 0/0. AF-1a `4e435ce` и AF-1b `0691217` опубликованы.
+  Это Git-факт, не новый прогон тестов и не общий архитектурный PASS.
+- Текущий checkpoint: **D2-SIM-DOC**, верхний раздел
+  [Audit Followup Task](DEMO_D2_AUDIT_FOLLOWUP_TASK.md). Разрешены документы;
+  runtime/live не разрешены. Девять прежних tracked правок правил включены
+  в общую документальную сверку, не потеряны. Staging на старте пуст.
+- Действующий план: верхний раздел [Roadmap](DEMO_D2_DELIVERY_ROADMAP.md),
+  SIM-0–5 → REC-5. Контракт: §3 и D2-107–109. Точный состав обзора SIM-0
+  открыт; пример публикации при непригодной финансовой прозе обязателен
+  перед SIM-2. Если он вводит новое UX-правило, его согласуют до реализации;
+  сам принцип D2-108/C03 уже согласован.
+- AF-1a/b приняты только в своих границах. Модельный veto кнопки, неполнота
+  истории и допуск денег из prose остаются в baseline. AF-1c/AF-2 перенесены
+  в SIM-2/3; AF-08/09/10 — в SIM-5 и общий рубеж.
+- Foreign `data/`, `docs/MARKETING_ANSWER_SCENARIOS.md` не открывались и не
+  менялись. Зарегистрированный detached worktree `.kilo/worktrees/tulip-crawdad`
+  на main сохранён; удалённые исторические ветки не удалялись/не сливались.
+- Review текущего diff — независимый Checker, затем Cursor. Commit/push
+  новых документов ещё не выполнены. Исторические тестовые числа ниже
+  не являются результатами текущего checkout. REC-5 остаётся открытым.
+
+## Исторический снимок — 2026-09-29 (не текущая инструкция)
+
 Снимок на 2026-09-29 для `C:\Cursor Projects\artgents-bot-active`, ветка
 `codex/d2-stage1-contract`. Последний принятый Checker/Cursor и отправленный
 runtime checkpoint: **REC-4-P2

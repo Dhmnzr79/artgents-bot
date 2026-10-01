@@ -1,5 +1,57 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Draft — 2026-10-01: D2-SIM-DOC, актуальная сверка
+
+Дополнение по запросу владельца после первого документального PASS: SIM-1
+исключает повторную классификацию; SIM-2 сокращает контракт и не требует
+дробления связной речи; SIM-2/3 проектируются совместно через существующий
+completion/projection, объём связан с услугой; SIM-4 требует механизма,
+поведения неподтверждённой части и оценки сложности; каждый SIM доказывает
+свой результат до закрытия. Согласованы Roadmap/Contract/Acceptance и инструкции
+исполнителя/Checker; конкретный scope итерации — в текущей карточке.
+Baseline неизменён `0691217`; до этой итерации 15 документов уже изменены,
+staging пуст. Старый PASS не заявляется проверкой дополнения; независимый
+review дополнения выполняется отдельно, внешний Cursor ещё впереди.
+
+Документальный checkpoint по верхнему разделу Audit Followup Task (15 путей).
+Baseline `0691217b888b92b49ba2c288452ed8a053f31206`, active branch
+`codex/d2-stage1-contract`; fresh fetch origin подтвердил tracking 0/0,
+main `141ce91fb1731cd990fcf8391550150016c73e7f`, ahead/behind 101/0.
+AF-1a `4e435ce` и AF-1b `0691217` опубликованы; это не новая аттестация runtime.
+Девять ранее изменённых правил сохранены в общем diff; staging пуст,
+foreign `data/` и маркетинговая памятка не затронуты, worktrees не менялись.
+
+ACCEPTANCE: правила в начале Roadmap; D2-107–109, новый C03/S01–S06;
+текущий статус и порядок SIM-0–5/REC-5, явные границы нерешённых деталей.
+Astra read-only: подтверждены конфликт старого финансового допуска,
+необходимость утверждённых обзорных offers и память контактного отвлечения.
+Её рекомендация не является GO. D2 ROUTE/LEGACY IMPACT: только документация;
+удаление runtime-зависимостей не заявляется. Tests/live/provider/SMTP: 0;
+проверки diff/ссылок и независимый Checker — перед передачей. Cursor pending;
+commit/push новых документов не выполнялись. FUTURE SCOPE — runtime карточки.
+Исторические Draft ниже читаются на их дату, не как текущее разрешение.
+
+## Draft — 2026-10-01: D2-ARCH-RULES
+
+Baseline HEAD/local origin `0691217b888b92b49ba2c288452ed8a053f31206`,
+ветка `codex/d2-stage1-contract`, Git root `C:\Cursor Projects\artgents-bot-active`;
+локальные `origin/main`/merge-base `141ce91fb1731cd990fcf8391550150016c73e7f`.
+Tracked diff/staging до работы пусты; foreign untracked `data/` и
+`docs/MARKETING_ANSWER_SCENARIOS.md` сохранены. Тип изменения — документация.
+Owner GO: закрепить согласованные правила упрощения и строгую проверку Cursor.
+Точный write allowlist: `AGENTS.md`, `docs/WORKFLOW_CHECKER.md`,
+`docs/tasks/DEMO_D2_TARGET_CONTRACT.md`, `docs/tasks/DEMO_D2_EXECUTION_LOCK.md`,
+`docs/tasks/DEMO_D2_CODEX_EXECUTOR_PROMPT.md`,
+`docs/tasks/DEMO_D2_CURSOR_CHECKER_PROMPT.md`, этот Ledger,
+`.cursor/rules/00-guardrails.mdc`, `.cursor/agents/checker.md`.
+Allowlist расширен с объяснением до правок двух действующих инструкций Cursor:
+alwaysApply guardrails подключает критерий, агент Checker устраняет task-only
+ограничение. Схема ответственности в них не копируется.
+
+| Checkpoint | Scope и evidence | Review / оставшиеся ворота |
+|---|---|---|
+| D2-ARCH-RULES | **ACCEPTANCE:** единая схема ответственности в Target Contract §3; архитектурное изменение требует «до → после → удаляется», единственного владельца и доказательств по вызываемому коду и целому диалогу. Bug fix и документация отделены от runtime-упрощения. Checker/Cursor обязаны отклонять сохранённую или перенесённую заявленную зависимость; узкая карточка/FUTURE SCOPE не обходят критерий. **D2 ROUTE / LEGACY IMPACT:** документальные правила; runtime не менялся, удаление его зависимостей не заявляется. **OWNER DECISION:** явный запрос владельца 2026-10-01; схема не требует повторного согласования на каждой малой правке. **Evidence:** сверены действующие AGENTS, Lock, контракт, процесс исполнителя и Cursor prompt; приоритет task-first в общем Checker приведён к Lock §6. Новых документов и review-кругов нет. **Test isolation:** документация; pytest/бот/provider/live/SMTP 0. **FUTURE SCOPE:** реализации по обновлённым правилам после согласования конкретных карточек; этот checkpoint не разрешает runtime-правки и не закрывает AF-1a/1c/2 или REC-5. | Draft до независимого Checker и внешнего Cursor review; проверки ссылок и diff выполняются перед review. Staging пуст; commit/push не выполнялись. |
+
 ## Draft — 2026-09-30: реализация D2-AF-1b
 
 Baseline HEAD/local origin `4e435ce8006cc2df07930a40d058f278469a99f6`,

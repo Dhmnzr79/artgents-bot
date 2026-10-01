@@ -51,6 +51,43 @@ Stop if the folder, branch, baseline, or task do not match.
 
 ## Verification
 
+### Architecture simplification — mandatory acceptance
+
+- Fix the general mechanism, never a particular phrase or message sequence.
+  Explain the class of requests covered. Do not invent product behavior,
+  offer-selection policy, missing-data semantics or context carry rules.
+  Show unresolved behavior with an example before implementing it.
+- New scenario branches, semantic heuristics, fallback, model calls, control
+  fields, parallel memory or one layer repairing another layer's decision
+  require separate agreement. First examine removal of the original cause.
+  Established tenant, price, UI authenticity, medical and lead/privacy
+  protections are requirements, not inherently unwanted complexity.
+- For D2 architecture questions consult Astra; its advice does not authorize
+  product or responsibility changes. Stop only dependent work when a new owner
+  decision is needed; discuss it in ordinary chat. Within agreed boundaries,
+  perform routine technical work independently.
+
+- For D2, use the single responsibility table in
+  `docs/tasks/DEMO_D2_TARGET_CONTRACT.md` §3. Apply it to every changed path;
+  do not copy the table into task cards or ask the owner to approve it again.
+- Before implementation, state in the existing card/report whether the change
+  is architecture simplification, a bug fix, or documentation only. For
+  simplification, give a concrete **before → after → removed dependency**,
+  name the sole decision owner, and identify the old reachable decision paths
+  to remove. A bug fix need not remove a decision; do not call it simplification.
+- A narrower card or passing scenario cannot replace the agreed architecture
+  objective. Stop before edits that change agreed responsibility, product
+  behavior, or scope; discuss the conflict with examples in ordinary chat,
+  not a popup. Routine choices within the agreed scheme need no new approval.
+- Independent Checker and any Cursor review must trace the actual call path
+  and verify both removal of the claimed dependency and complete dialogue
+  behavior, including adverse model outputs. Hiding the dependency behind a
+  new condition, prompt instruction, retry, or another layer is not removal.
+- Missing architectural evidence or a contradictory changed path blocks PASS.
+  Follow `docs/WORKFLOW_CHECKER.md`; no extra document or approval round is
+  required. Unrelated existing debt remains explicitly scoped, not silently
+  declared fixed. Report bug-fix success separately from architecture success.
+
 - During implementation, run the smallest targeted offline tests that cover the change.
 - Run one independent Checker review when a coherent checkpoint is ready.
 - After a REJECT, run a focused recheck of the findings; do not restart a full review unless scope changed materially.

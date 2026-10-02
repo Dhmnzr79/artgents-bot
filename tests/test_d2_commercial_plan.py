@@ -17,7 +17,6 @@ import pytest
 from contracts.response_plan import SessionKey
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore
-from core.one_call_envelope_protocol import production_envelope_template
 
 
 NOW = datetime(2026, 9, 22, 12, tzinfo=timezone.utc)
@@ -25,26 +24,11 @@ KEY = SessionKey(client_id="demo", sid="m2-commercial-plan")
 
 
 def _raw_price(service_id: str, topic_id: str) -> str:
-    return json.dumps(
-        production_envelope_template(
-            commercial_intent="price",
-            primary_price_request_id="r1",
-            request_understanding={
-                "subjects": [],
-                "requests": [{
-                    "request_id": "r1",
-                    "kind": "price",
-                    "subject_id": None,
-                    "context": "general_information",
-                    "topic_id": topic_id,
-                    "service_id": service_id,
-                    "statement_mode": "question",
-                    "situation": None,
-                }],
-            },
-        ),
-        ensure_ascii=False,
-    )
+    # The exact service is the sole target; topic comes from its catalog.
+    return json.dumps({"outcome": "dialogue", "blocks": [{
+        "kind": "price", "request_id": "r1",
+        "target": {"type": "service", "id": service_id},
+    }]}, ensure_ascii=False)
 
 
 class RawFakeProvider:

@@ -17,11 +17,10 @@ import pytest
 from contracts.response_plan import SessionKey
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore
-from core.one_call_envelope_protocol import production_envelope_template
 
 
 NOW = datetime(2026, 9, 22, 15, tzinfo=timezone.utc)
-VOLUME = ("one_tooth", "few_teeth", "full_arch", "unknown")
+VOLUME = ("one_tooth", "full_arch", "unknown")
 CLASSIC_THREE = (
     "classic.one_tooth.impro",
     "classic.one_tooth.implantium",
@@ -47,61 +46,23 @@ def _situation(
     }
 
 
-def _raw(
-    topic: str | None,
-    situation: dict[str, object] | None = None,
-    *,
-    service_id: str | None = None,
-    subject_id: str | None = "s1",
-    relation: str = "self",
-) -> str:
-    subjects: list[dict[str, object]] = []
+def _raw(topic: str | None, situation: dict[str, object] | None = None, *,
+         service_id: str | None = None, subject_id: str | None = "s1", relation: str = "self") -> str:
+    operation = {"kind": "price", "request_id": "r1", "situation": situation}
+    if service_id or topic:
+        operation["target"] = {"type": "service", "id": service_id} if service_id else {"type": "topic", "id": topic}
     if subject_id is not None:
-        subjects.append(
-            {"subject_id": subject_id, "relation": relation, "age_group": "unknown"}
-        )
-    return json.dumps(
-        production_envelope_template(
-            commercial_intent="price",
-            primary_price_request_id="r1",
-            request_understanding={
-                "subjects": subjects,
-                "requests": [
-                    {
-                        "request_id": "r1",
-                        "kind": "price",
-                        "subject_id": subject_id,
-                        "context": "general_information",
-                        "topic_id": topic,
-                        "service_id": service_id,
-                        "statement_mode": "question",
-                        "situation": situation,
-                    }
-                ],
-            },
-        ),
-        ensure_ascii=False,
-    )
+        operation["subject"] = {"subject_id": subject_id, "relation": relation, "age_group": "unknown"}
+    if not service_id and not topic:
+        operation = {"kind": "clarification", "request_id": "r1", "missing": "service",
+                     "operation": operation, "choices": ["classic", "all_on_4"]}
+    return json.dumps({"outcome": "dialogue", "blocks": [operation]}, ensure_ascii=False)
 
 
 def _content(*, text: str) -> str:
-    return json.dumps(
-        production_envelope_template(
-            patient_text=None,
-            commercial_intent="none",
-            request_understanding={
-                "subjects": [],
-                "requests": [{
-                    "request_id": "r1",
-                    "kind": "content",
-                    "subject_id": None,
-                    "context": "general_information",
-                    "content_text": text,
-                }],
-            },
-        ),
-        ensure_ascii=False,
-    )
+    return json.dumps({"outcome": "dialogue", "blocks": [
+        {"kind": "content", "request_id": "r1", "content_text": text},
+    ]}, ensure_ascii=False)
 
 
 class RawFakeProvider:
@@ -232,11 +193,11 @@ def test_a01_overview_volume_hypothesis_does_not_overwrite_correction_does(tmp_p
         f"volume:implantation:{extent}" for extent in VOLUME
     ]
     assert [item.label for item in overview.response.ui_projection.quick_replies] == [
-        "Один зуб", "Несколько зубов", "Вся челюсть", "Не знаю",
+        "Один зуб", "Вся челюсть", "Пока не знаю",
     ]
     assert _offer_ids(overview) == CLASSIC_THREE
-    assert "Понимаю" in overview.response.rendered_text
-    assert "Подскажите" in overview.response.rendered_text
+    assert "Цена зависит от протокола и объёма лечения." in overview.response.rendered_text
+    assert "Какой объём вас интересует" in overview.response.rendered_text
     assert saved.state.situation_state is None
     assert overview.response.resolved.terminal_text is None
 
@@ -250,7 +211,9 @@ def test_a01_overview_volume_hypothesis_does_not_overwrite_correction_does(tmp_p
     )
     assert one.response.resolved.d2_price_scope_decision.applied_extent == "one_tooth"
     assert _offer_ids(one) == CLASSIC_THREE
-    assert one.response.ui_projection.quick_replies == ()
+    assert {q.reply_id for q in one.response.ui_projection.quick_replies} == {
+        "price_detail:includes", "price_detail:stages",
+    }
     assert saved.state.situation_state is not None
     assert saved.state.situation_state.extent == "one_tooth"
     owner = saved.state.situation_state.situation_owner_id
@@ -367,15 +330,17 @@ def test_a10_empty_session_price_ask_clarifies_without_inventing_price(tmp_path:
         message="Сколько стоит?",
     )
     assert outcome.focus.action == "clarify_focus"
-    assert outcome.response.resolved.route == "CLARIFY"
+    assert outcome.response.resolved.route == "ANSWER"
     assert outcome.response.resolved.d2_price_block is None
-    assert outcome.response.resolved.session_delta.clarify_pending is True
     assert saved.state.clarify_pending is True
     assert saved.state.clarify_task is not None
+    assert saved.state.clarify_task.missing == "service"
+    assert saved.state.clarify_task.operation.kind == "price"
+    assert saved.state.shown_options_snapshot.service_ids == ("classic", "all_on_4")
     assert saved.state.dialogue_pairs == ()
-    assert saved.state.terminal_state == "clarify"
+    assert saved.state.terminal_state == "none"
     assert saved.state.situation_state is None
-    assert CLARIFY_TEXT in outcome.response.rendered_text
+    assert outcome.response.rendered_text == "Какую услугу вы имеете в виду?"
     assert outcome.response.ui_projection.quick_replies
 
 
@@ -425,7 +390,7 @@ def test_stage2_bounds_live_prose_pairs_and_expires_them_with_context(tmp_path: 
             tmp_path,
             _content(text=f"Проверенная модельная проза {index}."),
             key=key,
-            message=(f"Запрос {index}: " + "т" * 1_200),
+            message=(f"Запрос {index}: " + "Расскажите об этапах лечения и восстановлении. " * 30),
             now=NOW + timedelta(minutes=index),
             clients=clients,
             store_path=store_path,
@@ -446,7 +411,7 @@ def test_stage2_bounds_live_prose_pairs_and_expires_them_with_context(tmp_path: 
     )
     carried_pairs = provider.inputs[0].context.ordinary.dialogue_pairs
     assert [pair.patient_text for pair in carried_pairs] == [
-        (f"Запрос {index}: " + "т" * 1_200)[:1_000]
+        (f"Запрос {index}: " + "Расскажите об этапах лечения и восстановлении. " * 30)[:1_000]
         for index in range(1, 4)
     ]
     assert [pair.assistant_text for pair in carried_pairs] == [
@@ -492,7 +457,6 @@ def test_a10_switch_to_whitening_does_not_carry_implant_prices(tmp_path: Path) -
         now=NOW.replace(minute=1),
         clients=clients,
     )
-    assert second.focus.action == "resolve_topic"
     assert second.focus.carried_situation is None
     assert second.focus.cross_topic_carry is None
     assert _offer_ids(second) == (WHITENING_OFFER,)

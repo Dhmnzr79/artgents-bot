@@ -14,7 +14,22 @@ from core.d2_dialogue_store import D2DialogueStore
 from core.one_call_envelope_protocol import production_envelope_template
 from tests.test_d2_http_contract import FakeProvider, http_env, post, post_sse, sse_events
 from tests.test_d2_no_legacy_path import no_legacy_calls
-from tests.test_d2_ui_b12_scenarios import _content_pain_raw, _price_raw
+from tests.test_d2_sim2_dialogues import raw, price, explanation
+
+
+def _price_raw(topic, situation=None):
+    extra = {}
+    if situation is not None:
+        extra = {"situation": situation,
+                 "subject": {"subject_id": "s1", "relation": "self", "age_group": "unknown"}}
+    return raw(price(topic, **extra))
+
+
+def _content_pain_raw():
+    return raw(explanation("Понимаю этот страх: обсудим обезболивание.",
+        content_ref="implantation__faq__pain.md",
+        target={"type": "service", "id": "classic"}))
+
 
 
 def _ui(events):
@@ -22,32 +37,12 @@ def _ui(events):
 
 
 def _mixed_widget_raw() -> str:
-    return json.dumps(production_envelope_template(
-        commercial_intent="price",
-        primary_price_request_id="r1",
-        request_understanding={
-            "subjects": [{"subject_id": "s1", "relation": "self", "age_group": "unknown"}],
-            "requests": [
-                {
-                    "request_id": "r1", "kind": "price", "subject_id": "s1",
-                    "context": "general_information", "topic_id": "implantation",
-                    "service_id": None, "statement_mode": "question", "situation": None,
-                },
-                {
-                    "request_id": "r2", "kind": "content", "subject_id": None,
-                    "context": "general_information", "topic_id": "implantation",
-                    "service_id": "classic",
-                    "content_text": "Живой mixed-ответ для реального widget harness.",
-                },
-                {
-                    "request_id": "r3", "kind": "clinic_policy", "subject_id": None,
-                    "context": "general_information", "policy_ids": ["no_pediatric_dentistry"],
-                    "payment_scheme": "unspecified", "payment_scheme_intent": "not_requested",
-                    "contact_fields": [], "content_text": None,
-                },
-            ],
-        },
-    ), ensure_ascii=False)
+    return raw(
+        price(),
+        explanation("Живой mixed-ответ для реального widget harness.",
+            request_id="r2", target={"type": "service", "id": "classic"}),
+        {"kind": "clinic_policy", "request_id": "r3", "policy_ids": ["no_pediatric_dentistry"]},
+    )
 
 
 def test_current_scope_click_and_stale_foreign_forged_actions(http_env):
@@ -80,15 +75,12 @@ def test_current_scope_click_and_stale_foreign_forged_actions(http_env):
     assert action.status_code == 200
     clicked = action.get_json()
     assert clicked["revision"] == 2
-    assert fake.inputs[-1].user_message == ""
-    assert fake.inputs[-1].selected_ui_ref is not None
-    assert fake.inputs[-1].selected_ui_ref.reply_id == selected["reply_id"]
-    assert fake.inputs[-1].selected_ui_ref.source_revision == first["revision"]
+    assert len(fake.inputs) == 1  # The verified price click bypasses the provider.
     assert bad(selected["reply_id"], request_id="stale").status_code == 400
     assert bad(selected["reply_id"], revision=2, request_id="not-shown").status_code == 400
-    assert len(fake.inputs) == 2
+    assert len(fake.inputs) == 1
     replay = bad(selected["reply_id"], request_id="scope-click")
-    assert replay.get_json() == clicked and len(fake.inputs) == 2
+    assert replay.get_json() == clicked and len(fake.inputs) == 1
     with D2DialogueStore(db) as store:
         assert store.read(SessionKey(client_id="demo", sid="scope")).state.revision == 2
 
@@ -164,11 +156,7 @@ def test_real_d2_payloads_render_and_retry_in_browser(http_env, tmp_path):
                 ref=f"button:{button['button_id']}", ui_revision=second["revision"]).get_json()
     after_ui = post(client, sid=sid, request_id="b5", q="после UI").get_json()
     manual = post(client, sid=sid, request_id="b6", q="ручной повтор").get_json()
-    fake.raw = json.dumps(production_envelope_template(
-        route="ADMIN", patient_text=None, commercial_intent="none",
-        promotion_scope="none", scenario="none", primary_price_request_id=None,
-        request_understanding={"subjects": [], "requests": []},
-    ), ensure_ascii=False)
+    fake.raw = raw(outcome="admin")
     terminal = post(client, sid="cp6c-terminal", request_id="terminal", q="terminal").get_json()
     assert terminal["ui"]["buttons"] == []
     fake.raw = _content_pain_raw()

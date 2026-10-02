@@ -14,6 +14,7 @@ from contracts.d2_session_context import (
     D2SessionTtlPolicy,
 )
 from contracts.one_call_envelope import OneCallEnvelope, OneCallEnvelopeReferences
+from contracts.d2_dialogue_result import ExplanationOperation, ServiceTarget
 from contracts.request_understanding import (
     RequestTreatmentSituation,
     RequestUnderstanding,
@@ -105,12 +106,13 @@ def _snapshot() -> object:
         terminal_state="clarify",
         clarify_pending=True,
         clarify_task=PersistedClarifyTask(
-            axis="focus",
-            request_ids=("r1",),
-            request_kinds=("price",),
-            topic_ids=("implantation",),
-            service_ids=("all_on_4",),
-            requested_extents=("full_arch",),
+            missing="stage",
+            operation=ExplanationOperation(
+                kind="content",
+                request_id="r1",
+                target=ServiceTarget(type="service", id="all_on_4"),
+                content_text="Как проходит восстановление после All-on-4?",
+            ),
         ),
     )
     return empty_session_snapshot(key).model_copy(
@@ -284,7 +286,9 @@ def test_fresh_context_keeps_typed_ordinary_state_without_interpreting_text() ->
     assert projection.ordinary.dialogue_pairs == snapshot.state.dialogue_pairs  # type: ignore[union-attr]
     assert projection.ordinary.clarify_pending is True
     assert projection.ordinary.clarify_task is not None
-    assert projection.ordinary.clarify_task.requested_extents == ("full_arch",)
+    assert projection.ordinary.clarify_task == snapshot.state.clarify_task
+    assert projection.ordinary.clarify_task.missing == "stage"
+    assert projection.ordinary.clarify_task.operation.service_id == "all_on_4"
 
 
 def test_expired_or_missing_activity_hides_all_ordinary_context_but_retains_nonrepeat_state() -> None:

@@ -43,6 +43,7 @@ from contracts.response_plan_materialization import (
 )
 from contracts.response_plan_post_composer import PostComposerMaterialAuthority, ResponseSituationDelta
 from core.d2_tenant_snapshot import build_d2_bundle, build_d2_model_view
+from core.one_call_envelope_protocol import production_envelope_template
 from core.clinic_contact_policies import (
     format_manual_contact_phone_suffix,
     parse_clinic_contact_facts_from_policies_raw,
@@ -61,16 +62,15 @@ _DEFAULT_FOCUS_CLARIFY = "Могу подсказать по услугам, ц�
 _TYPED_CLARIFY_QUESTIONS = {
     "service": "Какую услугу вы имеете в виду?",
     "term": "Уточните, пожалуйста, что именно вы имеете в виду?",
-    "extent": "Уточните, пожалуйста, речь об одном зубе, нескольких зубах или всей челюсти?",
+    "extent": "Какой объём вас интересует: один зуб, вся челюсть или пока не знаете?",
     "jaw": "Уточните, пожалуйста, речь о верхней или нижней челюсти?",
     "stage": "Уточните, пожалуйста, на каком этапе лечения вы сейчас?",
 }
-_VOLUME_EXTENTS = ("one_tooth", "few_teeth", "full_arch", "unknown")
+_VOLUME_EXTENTS = ("one_tooth", "full_arch", "unknown")
 _DEFAULT_VOLUME_LABELS = {
     "one_tooth": "Один зуб",
-    "few_teeth": "Несколько зубов",
     "full_arch": "Вся челюсть",
-    "unknown": "Не знаю",
+    "unknown": "Пока не знаю",
 }
 
 
@@ -108,86 +108,52 @@ def d2_canonical_topic_ids(
 def resolve_d2_optional_content_claims(
     envelope: OneCallEnvelope, *, snapshot: D2TenantSnapshot,
     model_view: D2ModelView, selected_document_action: D2SelectedDocumentAction | None,
-    selected_action_only: bool,
 ) -> OneCallEnvelope:
     """Resolve ordinary model claims and a selected source before session binding."""
     understanding = envelope.request_understanding
     if envelope.route != "ANSWER" or understanding is None:
         return envelope
     allowed = set(d2_canonical_topic_ids(snapshot, model_view))
-    content_parts = tuple(item for item in understanding.requests if item.kind == "content")
-    selected_part = content_parts[0] if len(content_parts) == 1 else None
-    selected_authority = None
     if selected_document_action is not None:
         action = selected_document_action
-        if action.source_client_id != snapshot.client_id:
-            raise D2SnapshotBindingError("selected_document_client_mismatch")
-        selected_authority = next(
-            (item for item in snapshot.content if item.content_ref == action.content_ref), None,
-        )
+        authority = next((item for item in snapshot.content if item.content_ref == action.content_ref), None)
         if (
-            selected_authority is None
-            or selected_authority.source_client_id != snapshot.client_id
-            or action.section_ref not in {item.section_ref for item in selected_authority.sections}
-            or not any(
-                candidate.reply_id == action.reply_id and section_ref == action.section_ref
-                for candidate, section_ref in _document_followups(
-                    selected_authority, _frontmatter(snapshot, action.content_ref),
-                )
-            )
+            action.source_client_id != snapshot.client_id or authority is None
+            or authority.source_client_id != snapshot.client_id
+            or action.section_ref not in {section.section_ref for section in authority.sections}
         ):
             raise D2SnapshotBindingError("selected_document_binding_mismatch")
-    can_bind = (
-        selected_authority is not None and selected_part is not None
-        and selected_part.content_realization == "model_prose"
-        and bool((selected_part.content_text or "").strip())
-    )
-    optional_click_scope = (
-        can_bind and selected_action_only and len(understanding.requests) == 1
-        and envelope.commercial_intent == "none"
-        and envelope.service_reference_status == "none"
-        and selected_part.situation is None
-    )
-    changed = False
-    requests = []
-    for part in understanding.requests:
-        if (
-            part.kind in {"content", "other"}
-            and part.content_realization == "model_prose"
-            and (part.content_text or "").strip()
-            and part.topic_id is not None
-            and part.topic_id not in allowed
-        ):
-            part = part.model_copy(update={"topic_id": None})
-            changed = True
-        if can_bind and part.request_id == selected_part.request_id:
-            raw_authority = next(
-                (item for item in snapshot.content if item.content_ref == part.content_ref), None,
-            )
-            if raw_authority is not None and raw_authority.source_client_id != snapshot.client_id:
-                raise D2SnapshotBindingError("selected_document_foreign_material")
-            updates = {
-                "content_ref": selected_document_action.content_ref,
-                "content_section_refs": (selected_document_action.section_ref,),
-                "content_fallback_section_ref": None,
-            }
-            if optional_click_scope:
-                if part.service_id is not None:
-                    if part.service_id not in snapshot.bundle.services:
-                        raise D2SnapshotBindingError("selected_document_unknown_service")
-                    if part.service_id not in selected_authority.allowed_service_ids:
-                        updates["service_id"] = None
-                source_topic = _frontmatter(snapshot, selected_document_action.content_ref).get("topic")
-                if part.topic_id is not None and part.topic_id != source_topic:
-                    updates["topic_id"] = None
-            part = part.model_copy(update=updates)
-            changed = True
-        requests.append(part)
-    if not changed:
+        for part in understanding.requests:
+            if part.kind == "content" and (
+                part.content_ref != action.content_ref
+                or part.content_section_refs != (action.section_ref,)
+            ):
+                raise D2SnapshotBindingError("selected_document_task_mismatch")
         return envelope
+    requests = tuple(
+        part.model_copy(update={"topic_id": None})
+        if (
+            part.kind in {"content", "other"} and part.content_realization == "model_prose"
+            and (part.content_text or "").strip() and part.topic_id is not None
+            and part.topic_id not in allowed
+        ) else part
+        for part in understanding.requests
+    )
     return envelope.model_copy(update={
-        "request_understanding": understanding.model_copy(update={"requests": tuple(requests)})
+        "request_understanding": understanding.model_copy(update={"requests": requests}),
     })
+
+
+def build_d2_document_task(snapshot, action):
+    """The verified source supplies a fixed explanation task, not a new route."""
+    from contracts.d2_dialogue_result import D2DialogueResult, ExplanationOperation, TopicTarget
+    topic = _frontmatter(snapshot, action.content_ref).get("topic")
+    return D2DialogueResult(outcome="dialogue", blocks=(ExplanationOperation(
+        request_id="r1", kind="content",
+        target=TopicTarget(type="topic", id=topic) if topic else None,
+        content_text=action.section_title, content_ref=action.content_ref,
+        content_section_refs=(action.section_ref,), content_realization="authored",
+    ),))
 
 
 def _document_followups(content, metadata: dict[str, object]) -> tuple[tuple[UiQuickReplyCandidate, str], ...]:
@@ -236,7 +202,8 @@ def build_d2_snapshot_sources(
     snapshot: D2TenantSnapshot,
     *,
     model_view: D2ModelView,
-    envelope: OneCallEnvelope,
+    envelope: OneCallEnvelope | None = None,
+    operations=None,
     session_key: SessionKey,
     transport_kind: str = "blocking",
     shown_secondary_ref_ids: tuple[str, ...] = (),
@@ -253,9 +220,11 @@ def build_d2_snapshot_sources(
         raise D2SnapshotBindingError("snapshot_view_forged")
     if session_key.client_id != snapshot.client_id:
         raise D2SnapshotBindingError("snapshot_session_mismatch")
-    understanding = envelope.request_understanding
-    if understanding is None:
-        raise D2SnapshotBindingError("request_understanding_required")
+    if operations is None:
+        understanding = envelope.request_understanding if envelope is not None else None
+        if understanding is None:
+            raise D2SnapshotBindingError("request_understanding_required")
+        operations = understanding.requests
     # Wrong/missing content refs are recoverable part failures (D2-078), not
     # snapshot-binding hard errors. Foreign tenant identity stays fatal above.
     # Soft-fail happens in the materializer as d2_content_source_missing.
@@ -265,7 +234,7 @@ def build_d2_snapshot_sources(
     if any(
         request.kind == "price" and request.service_id is None and request.topic_id is not None
         and request.topic_id not in configured_topics
-        for request in understanding.requests
+        for request in operations
     ):
         raise D2SnapshotBindingError("direction_overview_not_configured")
 
@@ -664,7 +633,7 @@ def build_d2_clinic_policy_response(
     snapshot: D2TenantSnapshot,
     *,
     session_key: SessionKey,
-    understanding,
+    understanding=None, request=None, subject=None,
 ) -> MaterializedResponseOutcome:
     """B10/D2-068: typed policy_ids → authored answers from tenant snapshot.
 
@@ -673,14 +642,14 @@ def build_d2_clinic_policy_response(
     if snapshot.client_id != session_key.client_id:
         raise D2SnapshotBindingError("policy_client_mismatch")
     answers = _authored_policy_answers(snapshot)
-    request = understanding.requests[0]
+    if request is None:
+        request = understanding.requests[0]
+        subject = next((s for s in understanding.subjects if s.subject_id == request.subject_id), None)
     inferred: list[str] = list(request.policy_ids)
     if request.payment_scheme_intent == "eligibility_question":
         payment_key = {"oms": "no_oms", "dms": "no_dms"}.get(request.payment_scheme)
         if payment_key and payment_key not in inferred:
             inferred.append(payment_key)
-    subjects = {item.subject_id: item for item in understanding.subjects}
-    subject = subjects.get(request.subject_id) if request.subject_id else None
     if (
         subject is not None
         and subject.age_group == "child"

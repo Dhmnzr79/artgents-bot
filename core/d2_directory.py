@@ -191,7 +191,7 @@ def build_d2_directory_response(
             )
         else:
             lines = [
-                "По этой услуге в клинике работают специалисты по утверждённым карточкам:"
+                "Эту услугу в клинике выполняют:"
             ]
             for doctor in doctors:
                 lines.append(

@@ -19,7 +19,6 @@ import pytest
 from contracts.response_plan import SessionKey
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore
-from core.one_call_envelope_protocol import production_envelope_template
 
 
 NOW = datetime(2026, 9, 22, 16, tzinfo=timezone.utc)
@@ -55,120 +54,33 @@ def _cta_buttons(ui) -> list:
 
 
 def _content_pain_raw() -> str:
-    return json.dumps(
-        production_envelope_template(
-            commercial_intent="none",
-            promotion_scope="none",
-            scenario="pain_fear",
-            primary_price_request_id=None,
-            patient_text=None,
-            request_understanding={
-                "subjects": [],
-                "requests": [
-                    {
-                        "request_id": "r1",
-                        "kind": "content",
-                        "subject_id": None,
-                        "context": "general_information",
-                        "topic_id": "implantation",
-                        "service_id": "classic",
-                        "statement_mode": "question",
-                        "situation": None,
-                        "content_text": PAIN_LIVE,
-                        "content_ref": "implantation__faq__pain.md",
-                        "content_realization": "model_prose",
-                        "content_section_refs": ["a:korotko"],
-                        "content_fallback_section_ref": "a:korotko",
-                    }
-                ],
-            },
-        ),
-        ensure_ascii=False,
-    )
+    return json.dumps({"outcome": "dialogue", "blocks": [{
+        "kind": "content", "request_id": "r1", "target": {"type": "service", "id": "classic"},
+        "content_text": PAIN_LIVE, "content_ref": "implantation__faq__pain.md",
+        "content_realization": "model_prose", "content_section_refs": ["a:korotko"],
+        "content_fallback_section_ref": "a:korotko"}]}, ensure_ascii=False)
 
 
-def _price_raw(
-    topic: str | None,
-    situation: dict[str, object] | None = None,
-    *,
-    service_id: str | None = None,
-    subject_id: str | None = "s1",
-) -> str:
-    subjects: list[dict[str, object]] = []
+def _price_raw(topic: str | None, situation: dict[str, object] | None = None, *,
+               service_id: str | None = None, subject_id: str | None = "s1") -> str:
+    operation = {"kind": "price", "request_id": "r1", "situation": situation}
+    if service_id or topic:
+        operation["target"] = {"type": "service", "id": service_id} if service_id else {"type": "topic", "id": topic}
     if subject_id is not None:
-        subjects.append(
-            {"subject_id": subject_id, "relation": "self", "age_group": "unknown"}
-        )
-    return json.dumps(
-        production_envelope_template(
-            commercial_intent="price",
-            primary_price_request_id="r1",
-            request_understanding={
-                "subjects": subjects,
-                "requests": [
-                    {
-                        "request_id": "r1",
-                        "kind": "price",
-                        "subject_id": subject_id,
-                        "context": "general_information",
-                        "topic_id": topic,
-                        "service_id": service_id,
-                        "statement_mode": "question",
-                        "situation": situation,
-                    }
-                ],
-            },
-        ),
-        ensure_ascii=False,
-    )
+        operation["subject"] = {"subject_id": subject_id, "relation": "self", "age_group": "unknown"}
+    if not service_id and not topic:
+        operation = {"kind": "clarification", "request_id": "r1", "missing": "service",
+                     "operation": operation, "choices": ["classic", "all_on_4"]}
+    return json.dumps({"outcome": "dialogue", "blocks": [operation]}, ensure_ascii=False)
 
 
 def _doctors_raw() -> str:
-    return json.dumps(
-        production_envelope_template(
-            commercial_intent="none",
-            promotion_scope="none",
-            scenario="none",
-            primary_price_request_id=None,
-            patient_text=None,
-            request_understanding={
-                "subjects": [],
-                "requests": [
-                    {
-                        "request_id": "r1",
-                        "kind": "content",
-                        "subject_id": None,
-                        "context": "general_information",
-                        "topic_id": "doctors",
-                        "service_id": "classic",
-                        "statement_mode": "question",
-                        "situation": None,
-                        "content_text": None,
-                        "content_ref": None,
-                        "content_realization": "authored",
-                        "content_section_refs": [],
-                        "content_fallback_section_ref": None,
-                    }
-                ],
-            },
-        ),
-        ensure_ascii=False,
-    )
+    return json.dumps({"outcome": "dialogue", "blocks": [{
+        "kind": "doctors", "request_id": "r1", "target": {"type": "service", "id": "classic"}}]}, ensure_ascii=False)
 
 
 def _admin_raw() -> str:
-    return json.dumps(
-        production_envelope_template(
-            route="ADMIN",
-            patient_text=None,
-            commercial_intent="none",
-            promotion_scope="none",
-            scenario="none",
-            primary_price_request_id=None,
-            request_understanding={"subjects": [], "requests": []},
-        ),
-        ensure_ascii=False,
-    )
+    return json.dumps({"outcome": "admin"})
 
 
 def _run(
@@ -246,7 +158,7 @@ def test_source_cta_from_md_with_secondary_cap(tmp_path: Path) -> None:
 def test_default_price_cta_after_unknown_extent(tmp_path: Path) -> None:
     """B12 default: overview volume QR, then «Не знаю» → one price CTA, no volume QR."""
     key = SessionKey(client_id="demo", sid="b12-default")
-    volume = ("one_tooth", "few_teeth", "full_arch", "unknown")
+    volume = ("one_tooth", "full_arch", "unknown")
     overview, _, _, clients = _run(
         tmp_path,
         message="Сколько стоит имплантация?",
@@ -263,9 +175,8 @@ def test_default_price_cta_after_unknown_extent(tmp_path: Path) -> None:
     ]
     assert [item.label for item in overview.response.ui_projection.quick_replies] == [
         "Один зуб",
-        "Несколько зубов",
         "Вся челюсть",
-        "Не знаю",
+        "Пока не знаю",
     ]
 
     unknown, saved, provider, _ = _run(
@@ -294,7 +205,9 @@ def test_default_price_cta_after_unknown_extent(tmp_path: Path) -> None:
     ctas = _cta_buttons(unknown.response.ui_projection)
     assert [b.button_id for b in ctas] == ["default_consult"]
     assert ctas[0].label == "Записаться на консультацию"
-    assert unknown.response.ui_projection.quick_replies == ()
+    assert {q.reply_id for q in unknown.response.ui_projection.quick_replies} == {
+        "price_detail:includes", "price_detail:stages",
+    }
     assert "бесплатн" not in ctas[0].label.casefold()
     assert saved is not None
     assert len(provider.inputs) == 1
@@ -340,13 +253,45 @@ def test_pure_clarify_has_menu_but_no_lead_cta(tmp_path: Path) -> None:
         key=SessionKey(client_id="demo", sid="b12-clarify"),
         request_id="b12-4",
     )
-    assert outcome.response.resolved.route == "CLARIFY"
+    assert outcome.response.resolved.route == "ANSWER"
     assert outcome.response.resolved.d2_price_block is None
     assert outcome.response.ui_projection.quick_replies
     assert _cta_buttons(outcome.response.ui_projection) == []
     assert saved is not None
-    assert saved.state.terminal_state == "clarify"
+    assert saved.state.clarify_task.missing == "service"
+    assert saved.state.clarify_task.operation.kind == "price"
+    assert saved.state.shown_options_snapshot.service_ids == ("classic", "all_on_4")
+    assert saved.state.terminal_state == "none"
     assert len(provider.inputs) == 1
+
+
+@pytest.mark.parametrize("tail_kind", ["price", "content", "contacts"])
+def test_clarification_cta_preserves_independent_parts(tmp_path: Path, tail_kind: str) -> None:
+    raw = json.loads(_price_raw(None, None, subject_id=None))
+    tails = {
+        "price": {"kind": "price", "request_id": "r2", "target": {"type": "service", "id": "professional_whitening"}},
+        "content": {"kind": "content", "request_id": "r2", "target": {"type": "service", "id": "classic"},
+                    "content_text": PAIN_LIVE, "content_realization": "model_prose"},
+        "contacts": {"kind": "contact", "request_id": "r2", "contact_fields": ["contact_phone"]},
+    }
+    raw["blocks"].append(tails[tail_kind])
+    outcome, saved, _, _ = _run(
+        tmp_path, message="Сколько стоит? И расскажите о клинике.",
+        raw=json.dumps(raw, ensure_ascii=False),
+        key=SessionKey(client_id="demo", sid=f"b12-mixed-{tail_kind}"), request_id="b12-mixed",
+    )
+    assert saved.state.clarify_task.missing == "service"
+    parts = outcome.response.resolved.d2_request_parts
+    if tail_kind == "price":
+        assert parts[1].status == "deferred"
+        assert _cta_buttons(outcome.response.ui_projection) == []
+    else:
+        assert parts[1].status == "answered"
+        assert _cta_buttons(outcome.response.ui_projection)
+    if tail_kind == "content":
+        assert PAIN_LIVE in outcome.response.rendered_text
+    if tail_kind == "contacts":
+        assert any(button.action_kind != "cta" for button in outcome.response.ui_projection.buttons)
 
 
 def test_medical_terminal_and_spam_have_no_cta(tmp_path: Path) -> None:

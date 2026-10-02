@@ -14,14 +14,14 @@
         "pterygoid_implants.default"
       ],
       "introduction_text": "Цена зависит от протокола и объёма лечения.",
-      "unknown_extent_text": "Подскажите, пожалуйста, речь об одном зубе, нескольких зубах или о всей челюсти?"
+      "unknown_extent_text": "Какой объём вас интересует: один зуб, вся челюсть или пока не знаете?"
     },
     {
       "topic_id": "prosthetics",
       "service_ids": ["implant_supported_prosthetics"],
       "offer_ids": ["implant_supported_prosthetics.default"],
       "introduction_text": "Стоимость протезирования зависит от конструкции и объёма лечения. Вот опубликованный ориентир по этому направлению.",
-      "unknown_extent_text": "Подскажите, пожалуйста, речь об одном зубе, нескольких зубах или о всей челюсти?"
+      "unknown_extent_text": "Какой объём вас интересует: один зуб, вся челюсть или пока не знаете?"
     }
   ]
 }

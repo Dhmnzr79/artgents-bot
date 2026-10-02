@@ -27,7 +27,7 @@ from contracts.response_plan_materialization import (
 )
 from contracts.response_plan_post_composer import ResponseSituationDelta
 from core.client_config_loader import resolve_lead_name_prompt, tone_to_txt_dict
-from core.clinic_policy_resolver import resolve_clinic_policies
+from core.clinic_policy_resolver import resolve_clinic_policies, resolve_clinic_policy_operations
 from core.lead_phone_input import parse_unambiguous_lead_phone
 from core.lead_provider_input_privacy import prepare_lead_pending_provider_question
 from core.lead_turn_classifier import classify_lead_active_turn
@@ -215,15 +215,17 @@ def resolve_d2_booking_lead_entry(
     *,
     snapshot: D2TenantSnapshot,
     session_key: SessionKey,
-    understanding: RequestUnderstanding,
+    understanding: RequestUnderstanding | None = None,
+    operations=None, subjects=(),
 ) -> D2LeadBridgeResult | None:
     """Authorize typed booking via existing clinic_policy_resolver; enter name or block."""
-    booking_parts = tuple(item for item in understanding.requests if item.kind == "booking")
+    if operations is None:
+        operations, subjects = understanding.requests, understanding.subjects
+    booking_parts = tuple(item for item in operations if item.kind == "booking")
     if not booking_parts:
         return None
-    policy = resolve_clinic_policies(
-        client_id=session_key.client_id,
-        understanding=understanding,
+    policy = resolve_clinic_policy_operations(
+        client_id=session_key.client_id, operations=operations, subjects=subjects,
     )
     if policy.suppress_forbidden_booking_cta or not policy.active_booking_request_id:
         blocked_key = next(

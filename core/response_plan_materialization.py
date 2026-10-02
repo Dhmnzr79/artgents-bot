@@ -18,6 +18,7 @@ from contracts.response_plan import (
     D2PartDeferredBlock,
     D2PartFailureBlock,
     D2ContactFactBlock,
+    D2ExactTextBlock,
     D2FrozenPriceBlock,
     D2FrozenPriceDetailBlock,
     D2FrozenPriceDetailRow,
@@ -98,6 +99,8 @@ from core.response_plan_fact_projection import (
     fact_explicit_only,
     project_commercial_fact_candidate,
 )
+from contracts.response_plan_fact_policy import RequestedFactPolicyContext
+from core.response_plan_fact_policy import evaluate_requested_fact_display
 from core.response_plan_production_adapter import (
     billing_unit_phrase,
     format_frozen_price_row_display,
@@ -314,47 +317,90 @@ def resolve_d2_envelope_response(
     shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...] = (),
     selected_price_detail_action: D2PriceDetailUiAction | None = None,
 ) -> MaterializedResponseOutcome:
-    """Resolve the D2 lower plan from an already validated D1R envelope.
-
-    This boundary deliberately accepts the parsed D1R object, never a second model
-    payload. It is isolated until S3 wires it to HTTP/SSE.
-    """
-
-    if envelope.route != "ANSWER":
+    """Historical caller adapter; the HTTP D2 path uses operations directly."""
+    if envelope.route != "ANSWER" or envelope.request_understanding is None:
         raise MaterializationContractError("d2_envelope_route_unsupported")
-    understanding = envelope.request_understanding
-    if understanding is None or not understanding.requests:
-        raise MaterializationContractError("d2_request_understanding_required")
+    if selected_document_action is not None:
+        envelope = _d2_validate_selected_document_binding(envelope, sources=sources, action=selected_document_action)
+    return resolve_d2_operations(
+        envelope.request_understanding.requests, envelope.request_understanding.subjects,
+        sources, as_of=as_of, d2_plan_focus_seed=d2_plan_focus_seed,
+        common_route_content_lookup=common_route_content_lookup,
+        exact_contact_blocks=exact_contact_blocks, exact_policy_blocks=exact_policy_blocks,
+        exact_contact_button=exact_contact_button, exact_canonical_contact=exact_canonical_contact,
+        d2_request_order=d2_request_order, shown_price_offer_refs=shown_price_offer_refs,
+        selected_price_detail_action=selected_price_detail_action,
+        promotion_scope=envelope.promotion_scope,
+        requested_fact_ids=envelope.references.direct_fact_ids if envelope.commercial_intent == "payment" else (),
+        legacy_patient_text=envelope.patient_text,
+    )
+
+
+def resolve_d2_operations(
+    operations, subjects, sources, *, as_of,
+    d2_plan_focus_seed=None, common_route_content_lookup=False,
+    exact_contact_blocks=(), exact_policy_blocks=(),
+    exact_contact_button=None, exact_canonical_contact=None,
+    d2_request_order=(), shown_price_offer_refs=(), selected_price_detail_action=None,
+    promotion_scope="none", requested_fact_ids=(), legacy_patient_text=None,
+    exact_text_blocks=(), exact_parts=(), extra_ui=(), deferred_price_parts=(),
+    exact_deferred_blocks=(),
+    commercial_operations=(),
+    directory_cta=None,
+):
+    """Resolve already-decided operations; never reconstruct a semantic envelope."""
     client_id = sources.material_authority.source_client_id
     if client_id != sources.session_key.client_id:
         raise MaterializationOwnershipError("materialization_client_mismatch")
-    if selected_document_action is not None:
-        envelope = _d2_validate_selected_document_binding(
-            envelope, sources=sources, action=selected_document_action,
+    for operation in commercial_operations:
+        texts = []
+        promo_ids = ()
+        if operation.promotion_scope != "none":
+            if operation.promotion_scope == "service" and operation.service_id is None:
+                raise MaterializationContractError("d2_promotion_service_required")
+            local = resolve_d2_commercial_plan(
+                authority=sources.d2_commercial, service_id=operation.service_id,
+                include_packages=False, shown_promo_fact_ids=sources.shown_promo_fact_ids,
+                offer_ids=(), promo_form="full", promotion_scope=operation.promotion_scope,
+                skip_shown=False, max_promo=4,
+                active_promo_ids=frozenset(f.id for f in sources.material_authority.bundle.facts.values() if fact_active_as_of(f, as_of)),
+            )
+            if not local.promo_blocks:
+                raise MaterializationContractError("d2_promotion_no_eligible_facts")
+            texts.extend(b.display_text for b in local.promo_blocks)
+            promo_ids = tuple(b.fact_id for b in local.promo_blocks)
+        facts = _d2_requested_fact_candidates(operation.fact_ids, sources=sources, client_id=client_id, as_of=as_of)
+        topic = operation.topic_id or (unambiguous_topic_for_service_ids(
+            sources.material_authority.bundle, (operation.service_id,)
+        ) if operation.service_id else None)
+        fact_context = RequestedFactPolicyContext(
+            response_scope="service" if operation.service_id else "topic" if topic else "clinic",
+            resolved_topic_id=topic, reference_service_id=operation.service_id,
+            implant_context_confirmed=topic == "implantation",
         )
-        understanding = envelope.request_understanding
-        assert understanding is not None
-    if (
-        len(understanding.requests) == 1
-        and understanding.requests[0].kind == "price_detail"
-        and not exact_contact_blocks and not exact_policy_blocks
-    ):
-        return _resolve_d2_price_detail_response(
-            understanding.requests[0], sources=sources,
-            shown_price_offer_refs=shown_price_offer_refs,
-            selected_action=selected_price_detail_action,
-        )
+        facts = tuple(f for f in facts if evaluate_requested_fact_display(
+            fact=f, context=fact_context, evaluation_purpose="requested",
+        ) == "allowed")
+        texts.extend(f.display_text for f in facts)
+        if not texts:
+            raise MaterializationContractError("d2_commercial_fact_required")
+        exact_text_blocks = (*exact_text_blocks, D2ExactTextBlock(
+            request_id=operation.request_id, source_client_id=client_id,
+            display_text="\n\n".join(texts),
+            requested_fact_ids=tuple(f.fact_id for f in facts), promo_fact_ids=promo_ids,
+        ))
+        exact_parts = (*exact_parts, D2ResolvedRequestPart(
+            request_id=operation.request_id, kind="commercial_fact", status="answered", scope="clinic",
+        ))
 
-    price_parts = tuple(item for item in understanding.requests if item.kind == "price")
-    content_parts = tuple(item for item in understanding.requests if item.kind == "content")
-    detail_parts = tuple(item for item in understanding.requests if item.kind == "price_detail")
+    price_parts = tuple(item for item in operations if item.kind == "price")
+    content_parts = tuple(item for item in operations if item.kind == "content")
+    detail_parts = tuple(item for item in operations if item.kind == "price_detail")
     if len(detail_parts) > 1:
         raise MaterializationContractError("d2_price_detail_multiple_unsupported")
-    direct_promotion = envelope.commercial_intent == "promotion"
-    direct_fact = (
-        envelope.commercial_intent == "payment"
-        and bool(envelope.references.direct_fact_ids)
-    )
+    direct_promotion = promotion_scope != "none"
+    direct_fact = bool(requested_fact_ids)
+
     # The same multi-document presentation applies to comparisons and to
     # independent questions. Neither borrows one document's secondary UI.
     multiple_content_parts = len(content_parts) > 1
@@ -367,6 +413,7 @@ def resolve_d2_envelope_response(
         common_route_content_lookup
         and not direct_promotion
         and not direct_fact
+        and not commercial_operations
         and not multiple_content_parts
         and not ready_comparison
         and not price_parts
@@ -374,21 +421,21 @@ def resolve_d2_envelope_response(
     )
     # A direct commercial fact is an exact addition, not a replacement for
     # ordinary FullContext prose in the same turn. Promotions remain code-only.
-    code_owned_null_content = direct_promotion
+    code_owned_null_content = False
     unsupported = tuple(
         item.request_id
-        for item in understanding.requests
+        for item in operations
         if item.kind not in {"price", "price_detail", "content"}
     )
     if unsupported:
         raise MaterializationContractError("d2_request_kind_unsupported")
-    if not price_parts and not content_parts and not detail_parts:
+    if not (price_parts or content_parts or detail_parts or exact_contact_blocks or exact_policy_blocks or exact_text_blocks or direct_promotion or direct_fact):
         raise MaterializationContractError("d2_price_or_content_part_required")
-    if direct_promotion and envelope.promotion_scope not in {"general", "service", "shown"}:
+    if direct_promotion and promotion_scope not in {"general", "service", "shown"}:
         raise MaterializationContractError("d2_promotion_scope_invalid")
 
     treatment_situation = _d2_treatment_situation(
-        understanding, client_id=client_id, sources=sources
+        operations, subjects=subjects, client_id=client_id, sources=sources
     )
 
     # Resolve content first. Wrong/missing refs soft-fail as part gaps (D2-078);
@@ -424,9 +471,16 @@ def resolve_d2_envelope_response(
 
     price_block: D2FrozenPriceBlock | None = None
     failure_blocks: list[D2PartFailureBlock] = []
-    deferred_blocks: list[D2PartDeferredBlock] = []
+    deferred_blocks: list[D2PartDeferredBlock] = [D2PartDeferredBlock(request_id=p.request_id, source_client_id=client_id) for p in deferred_price_parts]
     price_failure_reason: str | None = None
     price_scopes_by_id: dict[str, tuple[tuple[str, ...], str, str | None]] = {}
+    for part in deferred_price_parts:
+        if part.service_id is None and part.topic_id is None:
+            price_scopes_by_id[part.request_id] = ((), "clinic", None)
+            continue
+        deferred_scope = _d2_price_scope(part, client_id=client_id, sources=sources)
+        _d2_validate_price_scope_ownership(deferred_scope[0], bundle=sources.material_authority.bundle)
+        price_scopes_by_id[part.request_id] = deferred_scope
     if price_parts:
         price_part = price_parts[0]
         for part in price_parts:
@@ -563,7 +617,7 @@ def resolve_d2_envelope_response(
         try:
             detail_block = _d2_price_detail_block(
                 detail_parts[0], sources=sources,
-                shown_price_offer_refs=effective_refs, selected_action=None,
+                shown_price_offer_refs=effective_refs, selected_action=selected_price_detail_action,
             )
         except MaterializationContractError as error:
             if str(error) != "d2_price_detail_context_ambiguous":
@@ -589,13 +643,13 @@ def resolve_d2_envelope_response(
         if topic_id is not None:
             return ("topic", topic_id)
         return (scope, None)
-    if price_parts:
+    if price_parts or deferred_price_parts:
         # D2-080 chooses the first price to show; T4 considers every requested
         # service when deciding whether a single focus may be remembered.
         part_identities.extend(
             _scope_identity(price_scopes_by_id[item.request_id][1], item.service_id,
                             price_scopes_by_id[item.request_id][2])
-            for item in price_parts
+            for item in (*price_parts, *deferred_price_parts)
         )
     part_identities.extend(_scope_identity(scope, part.service_id, topic) for part, (_, scope, topic) in zip(content_parts, content_part_scopes))
     if detail_block is not None:
@@ -604,10 +658,21 @@ def resolve_d2_envelope_response(
         part_identities.append(_scope_identity(
             "service" if detail_service is not None else "mixed", detail_service, None,
         ))
-    plan_scope = response_scope if len(set(part_identities)) == 1 else "mixed"
-    request_parts = []
+    scoped_exact_parts = tuple(part for part in exact_parts if part.scope in {"service", "topic"})
+    if not part_identities and scoped_exact_parts:
+        first_exact = scoped_exact_parts[0]
+        response_scope = first_exact.scope
+        service_ids = (first_exact.service_id,) if first_exact.service_id else ()
+        selected_topic_id = first_exact.topic_id
+    part_identities.extend(_scope_identity(part.scope, part.service_id, part.topic_id) for part in scoped_exact_parts)
+    plan_scope = response_scope if len(set(part_identities)) <= 1 else "mixed"
+    request_parts = [D2ResolvedRequestPart(
+        request_id=p.request_id, kind="price", status="deferred",
+        scope=price_scopes_by_id[p.request_id][1], service_id=p.service_id,
+        topic_id=price_scopes_by_id[p.request_id][2], subject_id=p.subject_id,
+    ) for p in deferred_price_parts]
     content_scopes_by_id = {part.request_id: scope for part, scope in zip(content_parts, content_part_scopes)}
-    for part in understanding.requests:
+    for part in operations:
         if part.kind == "price":
             _, part_scope, part_topic_id = price_scopes_by_id[part.request_id]
             request_parts.append(D2ResolvedRequestPart(
@@ -667,7 +732,8 @@ def resolve_d2_envelope_response(
                 scope="service" if detail_service is not None else "mixed",
                 service_id=detail_service,
             ))
-    if exact_contact_blocks or exact_policy_blocks:
+    if exact_contact_blocks or exact_policy_blocks or exact_text_blocks or exact_parts:
+        supplied_exact_parts = exact_parts
         exact_parts = [
             D2ResolvedRequestPart(
                 request_id=block.request_id,
@@ -685,6 +751,7 @@ def resolve_d2_envelope_response(
             )
             for block in exact_policy_blocks
         ]
+        exact_parts = [*exact_parts, *supplied_exact_parts]
         by_request_id = {part.request_id: part for part in (*request_parts, *exact_parts)}
         if (
             not d2_request_order
@@ -693,6 +760,17 @@ def resolve_d2_envelope_response(
         ):
             raise MaterializationContractError("d2_exact_part_order_invalid")
         request_parts = [by_request_id[request_id] for request_id in d2_request_order]
+    if d2_request_order:
+        by_id = {p.request_id: p for p in request_parts}
+        if set(by_id) != set(d2_request_order):
+            raise MaterializationContractError("d2_exact_part_order_invalid")
+        request_parts = [by_id[i] for i in d2_request_order]
+    deferred_blocks.extend(exact_deferred_blocks)
+    if d2_request_order:
+        deferred_by_id = {b.request_id: b for b in deferred_blocks}
+        if len(deferred_by_id) != len(deferred_blocks):
+            raise MaterializationContractError("d2_part_deferred_block_duplicate")
+        deferred_blocks = [deferred_by_id[i] for i in d2_request_order if i in deferred_by_id]
     frozen_failure_blocks = tuple(failure_blocks)
     frozen_deferred_blocks = tuple(deferred_blocks)
     source_content_ref = None
@@ -704,9 +782,11 @@ def resolve_d2_envelope_response(
         source_content_ref = content_blocks_by_id[content_parts[0].request_id].content_ref
     elif direct_fact and not multiple_content_parts:
         source_content_ref = _d2_direct_fact_source_ref(
-            envelope.references.direct_fact_ids,
+            requested_fact_ids,
             sources,
         )
+    elif len(commercial_operations) == 1 and not multiple_content_parts:
+        source_content_ref = _d2_direct_fact_source_ref(commercial_operations[0].fact_ids, sources)
     if multiple_content_parts:
         # Preserve the ordered source marker, without borrowing one document's UI.
         source_ui, source_ui_diagnostics = UiPlanCandidates(source_content_ref=source_content_ref), ()
@@ -718,6 +798,8 @@ def resolve_d2_envelope_response(
     ui_candidates = _d2_select_ui(
         source_ui=source_ui,
         sources=sources,
+        request_parts=tuple(request_parts),
+        directory_cta=directory_cta,
         suppress_secondary=(
             bool(price_parts or detail_parts)
             or direct_promotion
@@ -751,6 +833,8 @@ def resolve_d2_envelope_response(
         ui_candidates = ui_candidates.model_copy(
             update={"buttons": (*ui_candidates.buttons, exact_contact_button)}
         )
+    if extra_ui:
+        ui_candidates = ui_candidates.model_copy(update={"quick_replies": tuple(extra_ui), "price_detail_actions": ()})
     unavailable_count = sum(part.status == "unavailable" for part in request_parts)
     deferred_count = sum(part.status == "deferred" for part in request_parts)
     result_status = (
@@ -763,10 +847,10 @@ def resolve_d2_envelope_response(
             None if price_block is None and price_parts[0].brand_id is not None
             else price_parts[0].service_id
         )
-    elif direct_promotion and envelope.promotion_scope == "general":
+    elif direct_promotion and promotion_scope == "general":
         commercial_service_id = None
     elif direct_promotion or auto_promo:
-        commercial_service_id = content_parts[0].service_id
+        commercial_service_id = content_parts[0].service_id if content_parts else None
     else:
         commercial_service_id = None
     offer_ids = tuple(row.offer_id for row in price_block.rows) if price_block is not None else ()
@@ -782,12 +866,11 @@ def resolve_d2_envelope_response(
         shown_promo_fact_ids=sources.shown_promo_fact_ids,
         offer_ids=offer_ids,
         promo_form="full" if direct_promotion else "short",
-        promotion_scope=envelope.promotion_scope if direct_promotion else "service",
+        promotion_scope=promotion_scope if direct_promotion else "service",
         skip_shown=not direct_promotion,
         max_promo=4 if direct_promotion else 2,
         active_promo_ids=active_promo_ids,
     )
-    requested_fact_ids = envelope.references.direct_fact_ids if direct_fact else ()
     commercial_facts = _d2_requested_fact_candidates(
         requested_fact_ids,
         sources=sources,
@@ -814,6 +897,7 @@ def resolve_d2_envelope_response(
         d2_part_failure_blocks=frozen_failure_blocks,
         d2_part_deferred_blocks=frozen_deferred_blocks,
         d2_contact_blocks=exact_contact_blocks,
+        d2_exact_text_blocks=exact_text_blocks,
         d2_policy_blocks=exact_policy_blocks,
         d2_canonical_contact=exact_canonical_contact,
         d2_result_status=result_status,
@@ -831,7 +915,9 @@ def resolve_d2_envelope_response(
         ui_candidates=ui_candidates,
         transport_kind=sources.transport_kind,
         d2_commercial_owned=True,
-        d2_commercial_promo_blocks=commercial.promo_blocks,
+        d2_commercial_promo_blocks=tuple(b for b in commercial.promo_blocks if b.fact_id not in {
+            i for exact in exact_text_blocks for i in (*exact.requested_fact_ids, *exact.promo_fact_ids)
+        }),
         d2_price_booster_block=commercial.price_booster_block,
         d2_also_list_block=commercial.also_list_block,
         d2_compatibility_blocks=commercial.compatibility_blocks,
@@ -842,7 +928,7 @@ def resolve_d2_envelope_response(
     composer_result = ComposerResult(
         route="ANSWER",
         mode="standard",
-        patient_text=envelope.patient_text if price_block is not None else None,
+        patient_text=legacy_patient_text if price_block is not None else None,
         requested_fact_ids=requested_fact_ids,
         information_blocks=information_blocks,
         d2_part_failure_blocks=frozen_failure_blocks,
@@ -852,6 +938,7 @@ def resolve_d2_envelope_response(
             (direct_promotion and bool(commercial.promo_blocks))
             or (direct_fact and bool(requested_fact_ids))
             or detail_block is not None
+            or bool(exact_contact_blocks or exact_policy_blocks or exact_text_blocks)
         ),
     )
     resolved = resolve_response_plan(plan, composer_result)
@@ -977,53 +1064,6 @@ def _d2_price_detail_offer_ids(
     return offer_ids
 
 
-def _resolve_d2_price_detail_response(
-    part: RequestUnderstandingRequest,
-    *, sources: ResponsePlanMaterializationSources,
-    shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...],
-    selected_action: D2PriceDetailUiAction | None,
-) -> MaterializedResponseOutcome:
-    detail = _d2_price_detail_block(
-        part, sources=sources, shown_price_offer_refs=shown_price_offer_refs,
-        selected_action=selected_action,
-    )
-    offer_ids = tuple(row.offer_id for row in detail.rows)
-    service_ids = {row.service_id for row in detail.rows}
-    service_id = next(iter(service_ids)) if len(service_ids) == 1 else None
-    detail_replies, detail_actions = _d2_price_detail_ui(sources=sources, offer_ids=offer_ids)
-    base_ui = _d2_select_ui(source_ui=UiPlanCandidates(), sources=sources, suppress_secondary=True)
-    ui = base_ui.model_copy(update={
-        "quick_replies": detail_replies, "price_detail_actions": detail_actions,
-    })
-    plan = PreComposerPlan(
-        session_key=sources.session_key, context_strategy=sources.context_strategy,
-        route_authority=ComposerSelectedRouteAuthority(
-            allowed_route_modes=(RouteModePair(route="ANSWER", mode="standard"),),
-            terminal_candidates=(),
-        ),
-        response_scope="service" if service_id is not None else "mixed",
-        selected_service_id=service_id, price_plan=PricePlan(kind="none"),
-        d2_price_detail_block=detail,
-        d2_request_parts=(D2ResolvedRequestPart(
-            request_id=part.request_id, kind="price_detail", status="answered",
-            subject_id=part.subject_id, scope="service" if service_id is not None else "mixed",
-            service_id=service_id,
-        ),),
-        d2_result_status="complete", ui_candidates=ui,
-        transport_kind=sources.transport_kind, d2_commercial_owned=True,
-    )
-    resolved = resolve_response_plan(plan, ComposerResult(
-        route="ANSWER", mode="standard", code_owned_answer=True,
-    ))
-    return MaterializedResponseOutcome(
-        resolved=resolved, rendered_text=render_response_text(resolved),
-        ui_projection=project_response_ui(resolved),
-        materialization_diagnostics=(), selection_diagnostics=(), adapter_diagnostics=(),
-        situation_delta=ResponseSituationDelta(action="keep"),
-        trace=MaterializationTrace(price_lookup_mode=None, considered_offers=(), selected_offers=()),
-    )
-
-
 def _d2_price_detail_block(
     part: RequestUnderstandingRequest,
     *, sources: ResponsePlanMaterializationSources,
@@ -1065,12 +1105,13 @@ def _d2_price_detail_block(
 
 
 def _d2_treatment_situation(
-    understanding: RequestUnderstanding,
+    operations,
     *,
+    subjects,
     client_id: str,
     sources: ResponsePlanMaterializationSources,
 ) -> D2TreatmentSituationDecision | None:
-    owning_request = next((item for item in understanding.requests if item.situation is not None), None)
+    owning_request = next((item for item in operations if getattr(item, "situation", None) is not None), None)
     if owning_request is None:
         return None
     situation = owning_request.situation
@@ -1094,7 +1135,7 @@ def _d2_treatment_situation(
             raise MaterializationContractError("d2_treatment_service_topic_mismatch")
 
     subject = next(
-        (item for item in understanding.subjects if item.subject_id == owning_request.subject_id),
+        (item for item in subjects if item.subject_id == owning_request.subject_id),
         None,
     )
     return D2TreatmentSituationDecision(
@@ -1320,8 +1361,6 @@ def _d2_validate_selected_document_binding(
     if len(content_parts) != 1:
         return envelope
     part = content_parts[0]
-    if part.content_realization != "model_prose" or not (part.content_text or "").strip():
-        return envelope
     if (
         part.content_ref != action.content_ref
         or part.content_section_refs != (action.section_ref,)
@@ -2080,6 +2119,8 @@ def _d2_select_ui(
     *,
     source_ui: UiPlanCandidates,
     sources: ResponsePlanMaterializationSources,
+    request_parts: tuple[D2ResolvedRequestPart, ...],
+    directory_cta=None,
     suppress_secondary: bool,
 ) -> UiPlanCandidates:
     source_cta = next(
@@ -2091,7 +2132,13 @@ def _d2_select_ui(
         (item for item in global_ui.buttons if item.action_kind == "cta"),
         None,
     )
-    selected_cta = source_cta or global_cta
+    # D2-012 applies to local clarifications as well as the former global route.
+    # Use finalized part types, not a second interpretation of the question.
+    pure_clarification = bool(request_parts) and all(
+        part.kind in {"clarification", "price_clarification"} or part.status == "deferred"
+        for part in request_parts
+    )
+    selected_cta = None if pure_clarification else source_cta or directory_cta or global_cta
     return UiPlanCandidates(
         quick_replies=() if suppress_secondary else source_ui.quick_replies,
         buttons=(selected_cta,) if selected_cta is not None else (),

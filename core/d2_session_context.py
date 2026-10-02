@@ -145,13 +145,17 @@ def bind_d1r_envelope_to_d2_context(
     """
 
     understanding = envelope.request_understanding
-    requests = understanding.requests if understanding is not None else ()
-    subjects_by_id = (
-        {item.subject_id: item for item in understanding.subjects}
-        if understanding is not None
-        else {}
+    return bind_d2_operations_to_context(
+        understanding.requests if understanding else (),
+        understanding.subjects if understanding else (), projection,
     )
-    topic_ids = {request.topic_id for request in requests if request.topic_id is not None}
+
+
+def bind_d2_operations_to_context(requests, subjects, projection):
+    """Bind explicit operation refs to existing TTL-gated state, without envelope."""
+    subjects_by_id = {item.subject_id: item for item in subjects}
+
+    topic_ids = {request.topic_id for request in requests if getattr(request, "topic_id", None) is not None}
     if len(topic_ids) > 1:
         return _binding(projection, outcome="ambiguous_focus")
 
@@ -170,7 +174,7 @@ def bind_d1r_envelope_to_d2_context(
             explicit_topic_id=explicit_topic_id,
         )
 
-    service_ids = {request.service_id for request in requests if request.service_id is not None}
+    service_ids = {request.service_id for request in requests if getattr(request, "service_id", None) is not None}
     if len(service_ids) != 1:
         return _binding(projection, outcome="ambiguous_focus")
     return _bind_exact_service(

@@ -6,39 +6,21 @@ import json
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
 
 from config import DEFAULT_LLM_MODEL
 from core import d2_diagnostics as diagnostics
 from core.d2_full_audit import full_audit
 from contracts.d2_dialogue import D2ProviderInput
+from contracts.d2_dialogue_result import D2DialogueResult
 from core.one_call_prompt_contract import (
-    ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS,
-    ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS,
+    ONE_CALL_KNOWN_TASK_INSTRUCTIONS,
+    D2_OPERATIONS_INSTRUCTIONS,
     one_call_contract_header,
 )
 from llm import LLM_REQUEST_TIMEOUT_SEC, chat_completions_create
 
 
 CP3_MAX_PROVIDER_CALLS = 2
-
-D2_TYPED_ENVELOPE_INSTRUCTIONS = ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS.replace(
-    "content_ref: exact filename from DOCUMENT_INDEX or null.",
-    "content_ref: exact filename from an APPROVED_MD_CORPUS document boundary or null.",
-)
-
-D2_DIALOGUE_FOLLOW_UP_INSTRUCTIONS = """=== D2_DIALOGUE_FOLLOW_UP ===
-D2_SESSION_CONTEXT is authoritative typed context, not prose to repeat. recent_price_scope is the last verified price choice for a fresh conversation; use its topic, service, brand, and extent to understand a short follow-up, but never treat it as a patient's reported treatment situation. Explicit services and independent questions in the current USER_MESSAGE take priority over recent_price_scope, an old active_service, or shown options. When its freshness is fresh, ordinary.situation_state is non-null, and the user explicitly names a different D2 direction in a single price request, emit a price request for that direction: set topic_id to that direction id and service_id=null. Declare a subject with relation=self and age_group=unknown. Set that request's situation to {scope_commitment:"unknown",extent:"unknown",tooth_count:null,jaw:"unknown",continuity:"same"}. The application, not the model, carries the stored situation. Do not select a concrete service merely because the user named a direction. Keep any other independent requests in their original order.
-"""
-
-D2_DIRECTION_PRICE_INSTRUCTIONS = """=== D2_DIRECTION_PRICE ===
-For a direct price question naming a D2 direction in D2_DIRECTION_PRICES, such as "Сколько стоит имплантация?", return route=ANSWER with a kind=price request for that direction: topic_id=implantation for this example, service_id=null, situation=null, and primary_price_request_id naming that request when it is the first price request. Declare subjects=[{subject_id:s1,relation:self,age_group:unknown}] and set the price request's subject_id=s1; unknown age does not mean child. Set commercial_intent=price, clarify_axis=null, and clarify_service_options=null. This is the approved direction price overview, not an ambiguity among individual services: do not return CLARIFY merely because several services or offers exist in the direction. If the user also asks about another named service or a separate topic, preserve that request; the one-price-block limit applies to rendering, not understanding. Do not select a concrete service, infer treatment scope, or put amounts in prose; the application renders published direction prices. A genuinely ambiguous question without a named direction may still require CLARIFY under the normal typed contract.
-"""
-
-D2_BRAND_INSTRUCTIONS = """=== D2_BRAND_REQUESTS ===
-For an implant brand or country question, use BRAND_CATALOG and APPROVED_MD_CORPUS. Set requests[].brand_id to the exact brand ID from BRAND_CATALOG when one brand is identified, including a country-only reference. For a named brand or country absent from BRAND_CATALOG, set brand_id to the lower-case named term; do not claim that the clinic does not offer it. Use brand_id=null when no single brand is requested. On a brand price question, emit kind=price, topic_id=implantation, and the exact service_id if one is named. Never put prices into prose or substitute another brand. On a brand information question, use the matching approved content_ref and grounded section refs from the corpus; do not infer which brand is best for this patient. For Osstem, code supplies the authored availability answer. Country and availability claims must come only from BRAND_CATALOG or an authored clinic policy.
-"""
-
 
 class D2LiveProviderError(RuntimeError):
     pass
@@ -88,9 +70,27 @@ def _clinic_business_policies_block(request: D2ProviderInput) -> str:
 def build_d2_d1r_messages(request: D2ProviderInput) -> tuple[dict[str, str], dict[str, str]]:
     """Reuse the sole production D1R contract with the captured D2 input."""
     directions = [item.model_dump(mode="json") for item in request.model_view.direction_prices]
+    if request.known_task is not None:
+        system = "\n\n".join((
+            one_call_contract_header(),
+            ONE_CALL_KNOWN_TASK_INSTRUCTIONS,
+            "=== CLINIC_BUSINESS_POLICIES ===\n" + request.model_view.clinic_policy_catalog_json,
+            _approved_md_corpus_block(request),
+        ))
+        user = "\n\n".join((
+            "=== D2_SESSION_CONTEXT ===\n" + request.context.model_dump_json(),
+            "=== KNOWN_TASK ===\n" + request.known_task.model_dump_json(),
+            "=== D2_SELECTED_DOCUMENT_ACTION ===\n" + json.dumps(
+                request.selected_document_action.model_dump(mode="json")
+                if request.selected_document_action else None, ensure_ascii=False,
+            ),
+            "=== USER_MESSAGE ===\n" + request.user_message,
+        ))
+        return {"role": "system", "content": system}, {"role": "user", "content": user}
     system = "\n\n".join((
         one_call_contract_header(),
-        "=== TYPED_ENVELOPE_INSTRUCTIONS ===\n" + D2_TYPED_ENVELOPE_INSTRUCTIONS,
+        "=== D2_OPERATIONS_INSTRUCTIONS ===\n" + D2_OPERATIONS_INSTRUCTIONS,
+        "=== D2_RESULT_SCHEMA ===\n" + json.dumps(D2DialogueResult.model_json_schema(), ensure_ascii=False),
         request.model_view.service_reference_catalog.block_text(),
         request.model_view.active_service_catalog.block_text(),
         request.model_view.commercial_fact_catalog.block_text(),
@@ -100,10 +100,7 @@ def build_d2_d1r_messages(request: D2ProviderInput) -> tuple[dict[str, str], dic
         ),
         "=== BRAND_CATALOG ===\n" + request.model_view.brand_catalog.model_dump_json(),
         _approved_md_corpus_block(request),
-        ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS,
-        D2_BRAND_INSTRUCTIONS,
-        D2_DIALOGUE_FOLLOW_UP_INSTRUCTIONS,
-        D2_DIRECTION_PRICE_INSTRUCTIONS,
+
     ))
     user = "\n\n".join((
         "=== D2_SESSION_CONTEXT ===\n" + request.context.model_dump_json(),

@@ -13,12 +13,12 @@ from core.client_config_loader import resolve_pack_client_id
 
 
 def _subject_age(
-    understanding: RequestUnderstanding,
+    subjects,
     subject_id: str | None,
 ) -> str | None:
     if subject_id is None:
         return None
-    for subj in understanding.subjects:
+    for subj in subjects:
         if subj.subject_id == subject_id:
             return subj.age_group
     return None
@@ -39,20 +39,26 @@ def resolve_clinic_policies(
 ) -> ClinicPolicyResolutionResult:
     """Map understanding requests to policy decisions without regex on user text."""
 
+    return resolve_clinic_policy_operations(client_id=client_id,
+        operations=understanding.requests, subjects=understanding.subjects)
+
+
+def resolve_clinic_policy_operations(*, client_id, operations, subjects):
+    """Apply existing clinic rules to narrow operations, without model envelope."""
     allowed_keys = _pack_policy_keys(client_id)
     decisions: list[ClinicPolicyRequestDecision] = []
     ledger: list[RequestLedgerEntry] = []
     suppress_booking = False
     active_booking: str | None = None
 
-    for req in understanding.requests:
+    for req in operations:
         if req.kind == "clinic_policy":
             inferred: list[str] = list(req.policy_ids)
             if req.payment_scheme_intent == "eligibility_question":
                 payment_key = {"oms": "no_oms", "dms": "no_dms"}.get(req.payment_scheme)
                 if payment_key and payment_key not in inferred:
                     inferred.append(payment_key)
-            if (req.context != "past_history" and _subject_age(understanding, req.subject_id) == "child"
+            if (req.context != "past_history" and _subject_age(subjects, req.subject_id) == "child"
                     and "no_pediatric_dentistry" not in inferred):
                 inferred.append("no_pediatric_dentistry")
             answered = False
@@ -63,7 +69,7 @@ def resolve_clinic_policies(
                             request_id=req.request_id,
                             policy_key=policy_key,
                             outcome="no_applicable_rule",
-                            subject_id=req.subject_id,
+                            subject_id=getattr(req, "subject_id", None),
                             reason_code="policy_not_in_pack",
                         )
                     )
@@ -74,14 +80,14 @@ def resolve_clinic_policies(
                         request_id=req.request_id,
                         policy_key=policy_key,
                         outcome="allowed_by_known_rules",
-                        subject_id=req.subject_id,
+                        subject_id=getattr(req, "subject_id", None),
                         reason_code="pack_policy",
                     )
                 )
             if not inferred:
                 decisions.append(ClinicPolicyRequestDecision(
                     request_id=req.request_id, policy_key=None,
-                    outcome="no_applicable_rule", subject_id=req.subject_id,
+                    outcome="no_applicable_rule", subject_id=getattr(req, "subject_id", None),
                     reason_code="policy_rule_absent",
                 ))
             ledger.append(
@@ -89,22 +95,22 @@ def resolve_clinic_policies(
                     request_id=req.request_id,
                     kind=req.kind,
                     status="answered" if answered else "unsupported",
-                    subject_id=req.subject_id,
+                    subject_id=getattr(req, "subject_id", None),
                 )
             )
             continue
 
         if req.kind in {"price", "booking"}:
-            age = _subject_age(understanding, req.subject_id)
+            age = _subject_age(subjects, req.subject_id)
             if req.kind == "booking" and req.context == "past_history":
                 decisions.append(ClinicPolicyRequestDecision(
                     request_id=req.request_id, policy_key=None,
-                    outcome="needs_clarification", subject_id=req.subject_id,
+                    outcome="needs_clarification", subject_id=getattr(req, "subject_id", None),
                     reason_code="booking_in_past_context",
                 ))
                 ledger.append(RequestLedgerEntry(
                     request_id=req.request_id, kind=req.kind,
-                    status="clarification_needed", subject_id=req.subject_id,
+                    status="clarification_needed", subject_id=getattr(req, "subject_id", None),
                 ))
                 continue
             blocked: list[tuple[str, str]] = []
@@ -117,12 +123,12 @@ def resolve_clinic_policies(
                 elif payment_key is not None and not blocked:
                     decisions.append(ClinicPolicyRequestDecision(
                         request_id=req.request_id, policy_key=None,
-                        outcome="needs_clarification", subject_id=req.subject_id,
+                        outcome="needs_clarification", subject_id=getattr(req, "subject_id", None),
                         reason_code="payment_rule_absent",
                     ))
                     ledger.append(RequestLedgerEntry(
                         request_id=req.request_id, kind=req.kind,
-                        status="clarification_needed", subject_id=req.subject_id,
+                        status="clarification_needed", subject_id=getattr(req, "subject_id", None),
                     ))
                     continue
             if blocked:
@@ -132,7 +138,7 @@ def resolve_clinic_policies(
                         request_id=req.request_id,
                         policy_key=block_key,
                         outcome="blocked",
-                        subject_id=req.subject_id,
+                        subject_id=getattr(req, "subject_id", None),
                         reason_code=reason,
                     ))
                 ledger.append(
@@ -140,7 +146,7 @@ def resolve_clinic_policies(
                         request_id=req.request_id,
                         kind=req.kind,
                         status="blocked",
-                        subject_id=req.subject_id,
+                        subject_id=getattr(req, "subject_id", None),
                     )
                 )
                 suppress_booking = True
@@ -152,7 +158,7 @@ def resolve_clinic_policies(
                     request_id=req.request_id,
                     kind=req.kind,
                     status="deferred",
-                    subject_id=req.subject_id,
+                    subject_id=getattr(req, "subject_id", None),
                 )
             )
             continue
@@ -163,7 +169,7 @@ def resolve_clinic_policies(
                     request_id=req.request_id,
                     kind=req.kind,
                     status="answered",
-                    subject_id=req.subject_id,
+                    subject_id=getattr(req, "subject_id", None),
                 )
             )
             continue
@@ -174,7 +180,7 @@ def resolve_clinic_policies(
                     request_id=req.request_id,
                     kind=req.kind,
                     status="answered" if req.content_text else "deferred",
-                    subject_id=req.subject_id,
+                    subject_id=getattr(req, "subject_id", None),
                 )
             )
             continue
@@ -184,7 +190,7 @@ def resolve_clinic_policies(
                 request_id=req.request_id,
                 kind=req.kind,
                 status="unsupported",
-                subject_id=req.subject_id,
+                subject_id=getattr(req, "subject_id", None),
             )
         )
 

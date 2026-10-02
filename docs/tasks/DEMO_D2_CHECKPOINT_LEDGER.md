@@ -1,5 +1,492 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Closure — SIM-1/2, 2026-10-02
+
+Owner «Давай, потом комит и пуш» согласовал закрытие проверенного checkpoint,
+учёт известных ошибок CI как отдельного долга и публикацию текущей ветки.
+Root C:\Cursor Projects\artgents-bot-active, branchcodex/d2-stage1-contract,
+baselineHEAD4d24043, main/merge-base141ce91, staging до подготовки пуст.
+Evidence: актуальный Cursor142 PASS/202.88s, independent Checker,
+widget3 PASS и узкий live4/4 PASS (клик0calls). Код после этих проверок не меняется.
+
+CI debt принят отдельно:672/149/5 в49 offline файлах, сравнение с clean HEAD
+имеет148 совпавших failure IDs и две описанные environmental разницы.
+Полный CI не аттестован; до merge нужен актуальный gate без ослабления тестов
+или возврата старого runtime. SIM-0/3/4/5/REC-5 не закрыты.
+
+Для closure изменены пять документов из SIM2 Task; commit scope38 файлов
+согласованного накопленного SIM-1/2 diff. Foreign data/ и маркетинговый файл,
+отдельный SIM0 Task не включаются. Commit/push разрешены; новый live,
+merge/deploy и cleanup нет. Git SHA/push result подтверждаются после публикации;
+эта строка фиксирует разрешение и closure, не преждевременный Git-факт.
+
+## Live — готовое объяснение prompt29, 2026-10-02
+
+Owner «Делай» согласовал максимум4 вызова, без retries и stop-on-first-error.
+Выполнено4/4 transport attempts, все успешны; SDK max_retries=0 и общий
+счётчик ограничен4 до транспорта. Prompt29, observed model qwen3.8-flash.
+Repo C:\Cursor Projects\artgents-bot-active, branchcodex/d2-stage1-contract,
+HEAD4d24043, origin/main и merge-base141ce91; staging пуст. Runtime не менялся.
+Allowlist отчёта: SIM2 Task, Current Status, этот Ledger. Копии demo/nikadent,
+dialogue/lead базы и логи временные; сервер9001 и foreign WIP не изменялись.
+
+JSON /ask в свежем SID: «Сколько времени занимает классическая имплантация
+одного зуба?» → content/service classic, готовое объяснение20–30 минут установки
+и3–6 месяцев приживления до постоянной коронки. Эти сроки присутствуют в
+implantation__faq__duration.md текущего корпуса. Код добавил две разрешённые
+promo из данных; это не независимая финансовая проза модели.
+
+SSE /ask/stream в другом новом SID: «Я боюсь боли» → content;
+«Сколько стоит имплантация?» → прямая price/topic implantation, прежний обзор
+и три volume кнопки. Проверенный one_tooth click → три classic цены,0 model
+calls. «А сколько времени это займёт?» → готовый content/topic implantation
+с20–30 минут и3–6 месяцев. В каждом SSE: status/typing/ui/done, без error.
+Все5 HTTP ходов200; lead_effect=not_requested, SMTP0, retries0.
+
+Узкий live-критерий объяснения из корпуса: PASS в этих двух диалогах.
+Независимый read-only Checker evidence/бюджета/отчёта: PASS; подтвердил
+4 attempts, SDK0 retries,5HTTP200, volume0calls и готовые сроки из корпуса.
+Checker дополнительных вызовов и тестов не выполнял.
+Не доказана общая надёжность модели, полный CI, визуальный widget или SIM-3/4.
+Обзор SIM-0 не изменён. Бюджет исчерпан, дополнительных вызовов нет.
+Evidence вне Git: C:/Users/denis/AppData/Local/Temp/d2-live29-6ce570e2ef64450f8540594c3110cc2f/
+report.json, provider-results.json, probe.py. Только синтетические вопросы.
+Commit/push/merge/deploy отсутствуют. Для закрытия SIM-1/2 остаётся решение
+владельца об учёте известного незелёного CI; live PASS его не устраняет.
+
+## Cursor PASS актуального SIM-1/2, 2026-10-02
+
+Владелец передал независимый read-only review: PASS актуальному diff,
+блокирующих дефектов нет. Baseline4d24043, branchcodex/d2-stage1-contract,
+main/merge-base141ce91, staging пуст. Reviewer подтвердил удаление повторной
+классификации кнопки, прямой D2 parser/materializer, единый price owner,
+prompt29, D2-112, B11/D2-012 и операцию врачей. Последняя редакционная фраза
+также проверена. Foreign data/ и маркетинговый файл вне review; SIM0 отдельно.
+
+Cursor запустил contract/dialogues/B12/continuation:142 PASS,202.88s,exit0,
+с блокировкой сети/provider и временными базой/логами. Codex не повторял запуск.
+Session58/widget3 и общий CI672/149/5 этим review не повторены; полный CI
+не зелёный. Fake-результаты не доказывают живое понимание модели.
+SIM-1/2 не закрыты: остаются живой критерий объяснения из корпуса и решение
+владельца об учёте известного CI baseline. Live-budget не согласован;
+commit/push/live/merge/deploy не разрешены.
+
+Owner «Ок» разрешил только текущую синхронизацию трёх документов (allowlist
+в SIM2 Task). Старые записи о запрете/отсутствии doctors помечены историческими;
+нового runtime, продуктового правила или тестового запуска здесь нет.
+
+## WIP — согласованная операция врачей для услуги, 2026-10-02
+
+Owner «Давай делаем» разрешил doctors operation с service target и существующий
+catalog renderer. Branch codex/d2-stage1-contract, HEAD4d24043,
+main/merge-base141ce91; baseline предыдущий SIM-1/2 WIP, staging пуст.
+Allowlist и точная схема — верх SIM2 Task. Тип: bug fix D2-035/D2-055/B12,
+не новое доказательство упрощения всего бота. Prompt29, session schema2.
+
+Модель определяет операцию/услугу один раз. Код проверяет active tenant ID,
+прямо вызывает существующий каталог, публикует его точный текст и scoped
+reference part. Старый classify wrapper не вызывается. Directory CTA передана
+общему selector после document source CTA и до default; телефон независим.
+Scoped exact parts участвуют в общем scope: same service остаётся service,
+разные услуги дают mixed; отдельно state не исправляется.
+Добавлены узкий вариант операции, validation, executor branch, внутренний
+directory_cta argument; нет новых model calls/памяти/retries/fallback/regex.
+
+Первый offline запуск:12 PASS/4 FAIL (ошибка API чтения completion в новых
+mixed-тестах, не ответа runtime); чтение исправлено без изменения assertions.
+Набор contract/dialogues/B12:128 PASS/2 FAIL,136.62s. Оба отказа — новые
+same-service тесты с не scoped prose: по прежним правилам это mixed, а не
+service. Тесты теперь отдельно проверяют scoped и unscoped prose; runtime
+не менялся. Focused recheck всех8 сочетаний:8 PASS,12.30s. Не объявлять
+единый повторный130 PASS: полный набор после тестовой коррекции не повторён.
+Старый B12 doctors отказ устранён без ослабления free/expired assertion.
+Независимый read-only Checker по новой операции: PASS; pytest не повторял.
+Условия lead-pause и document-source приоритета подтверждены call path,
+отдельный doctors-combination тест на них не добавлен. Focused Checker
+последней коррекции scoped/unscoped теста: PASS, assertions не ослаблены.
+Прежний docs/widget PASS и
+64 PASS/1 FAIL ниже исторические. Актуальный Cursor review получен, см. верх.
+Provider/live/SMTP0; commit/push/merge/deploy не выполнялись. Foreign data/
+и маркетинговый файл вне scope. SIM-3/4, полный CI и SIM-1/2 closure не заявлены.
+
+## WIP — fixtures/widget и B11/D2-012, 2026-10-02
+
+Owner разрешил «Делаем»: актуальные документы, оставшиеся проверки и Cursor
+handoff. Branch codex/d2-stage1-contract, HEAD4d24043, main/merge-base141ce91.
+Точный allowlist — текущий верх SIM2 Task. Тип: сопровождение тестов/документов
+и bug fixes B11/D2-012. Это не новое архитектурное упрощение и не закрытие SIM-1/2.
+
+Документы указывают prompt28. Сообщение владельца «Работает» записано как
+ручное подтверждение одного диалога о сроках, без самостоятельного live-gate.
+Устаревшие HTTP fixtures переведены на native operations. Сохранены цены,
+JSON/SSE, replay, failure rollback, privacy/lead и запрет старого runtime.
+Historical parser unit consumers проверяются отдельно; active runtime не
+получил старого конвертера/fallback. Session context58 PASS, widget3 PASS,
+включая headless browser и реальные тестовые HTTP payloads. Runtime.enable
+timeout не повторился в этом запуске; прежняя причина не установлена.
+
+Offline CI49 файлов:672 PASS,149 FAIL,5 skipped. Clean HEAD archive:
+672 PASS,149 FAIL,5 skipped;148 одинаковых failure IDs. Local dotenv-test
+и executable-mode test без Git index объясняют несовпавшие IDs; это не полная
+эквивалентность среды CI. Старые sales/D1R HTTP harnesses не подменяют D2.
+CI не зелёный; Linux lint/secret/dependency и PostgreSQL jobs не запускались.
+
+Astra подтвердила B11 regression: новая self-only проверка не сохраняла явно
+reported ситуацию другого человека с новым owner. Проверка удалена; сохранение
+reported/correction возвращено к прежнему правилу, no-carry и hypothetical/
+unknown защищены прежними механизмами. Новых полей/памяти/вызовов нет.
+
+D2-012 восстановлен в существующем UI selector: для только clarification/
+price_clarification/deferred частей общая CTA подавлена; независимый ответ
+сохраняет CTA, точная телефонная кнопка добавляется отдельно. Новый внутренний
+аргумент request_parts и одно условие; wire-поля/память/вызовы не добавлены.
+Фокусный recheck:9 PASS,1 FAIL. Итог шести обновлённых файлов:64 PASS,1 FAIL,
+143.43s; единственный отказ — сохранённая проверка врачей.
+
+Исторический blocker до следующего согласованного checkpoint (снят):
+каталог врачей для услуги с прежней fact-window CTA.
+Native target=topic doctors теряет service; target=service теряет действие.
+Путь тогда не вызывал прежний directory renderer. B12 assertion был сохранён.
+Предложенная операция тогда не была реализована и требовала согласования.
+Затем владелец согласовал её, каталог подключён, B12 прошёл; это историческая
+запись, не действующий запрет.
+Независимый Checker fixtures/widget/B11/D2-012: PASS по read-only коду и
+предоставленным результатам, без повторного pytest. Это узкий checkpoint,
+не закрытие SIM-1/2: doctors blocker и общий незелёный CI сохранены.
+Актуальный Cursor review получен; результаты в начале Ledger.
+Staging пуст; commit/push/PR и новых provider/live/SMTP0. Foreign data/ и
+маркетинговый документ вне scope; raw provider/log evidence в Git не копируется.
+
+## WIP — prompt28 готовое объяснение, 2026-10-02
+
+Тип: исправление ошибки инструкции, не архитектурное упрощение. Owner разрешил
+«Делай» после разбора реального ответа. Branch codex/d2-stage1-contract,
+HEAD4d240430c2ce056dc306c50e215dbb09843c6b8f, main/merge-base141ce91.
+Allowlist: core/one_call_prompt_contract.py, tests/test_d2_sim2_contract.py,
+docs/tasks/DEMO_D2_SIM2_TASK.md, docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md.
+
+Материалы со сроками, тема implantation и one_tooth вошли в запрос модели;
+она вернула описание задания в прямом content_text, опубликованном без
+изменения. Причина выбора моделью не доказана. Подтверждённая неоднозначность
+инструкции устранена: pending question только в clarification.operation,
+прямой content содержит завершённый ответ. Добавлен структурный пример с
+placeholder сроков из текущего tenant, без чисел по умолчанию. Prompt28,
+schema/runtime/память не меняются; новых вызовов, веток и полей нет.
+
+Offline SIM2 contract/dialogues: sandbox-прогон 31 passed, 76 setup errors;
+focused recheck подтвердил WinError5 доступа к временной папке pytest.
+Повтор вне sandbox: 107 passed за 116.87 с; независимый Checker prompt28 PASS,
+read-only, тесты повторно не запускал.
+Примеры actual prompt совместимы с parser, fake-диалоги сохраняют прежние
+пути и контекст, но не доказывают сроки в реальном ответе модели. Live-quality этим
+checkpoint не подтверждается; новых provider/SMTP0. Staging пуст,
+commit/push/PR нет. Прежний own WIP сохранён; foreign data/ и маркетинговый
+документ не открывались. Общий CI и SIM-3/4 остаются вне scope.
+
+## WIP — D2-113 единый владелец ценового ответа, 2026-10-02
+
+Owner согласовал изменение механизма и «Делай». Branch codex/d2-stage1-contract,
+HEAD4d240430c2ce056dc306c50e215dbb09843c6b8f, main/merge-base141ce91.
+Точный allowlist — верх SIM2 Task. Тип: архитектурное упрощение.
+Прежний WIP сохранён; foreign data/ и маркетинговый документ не открывались.
+
+Модельный price+extent/jaw/stage clarification удалён из допустимого union;
+price внутри service/term ограничен неизвестным target. Известный service/topic
+исполняется прямой price через прежний механизм. Информация/details сохраняют
+параметрическое уточнение. Память использует те же ограничения через общий
+TypeAdapter: старый price-parameter pending отвергается, не исправляется.
+Service click создаёт обычную операцию с проверенным target, без повторного
+понимания. Prompt27, schema session2; новых wire/state fields, retry/вызовов,
+семантических regex и изменений offers нет. Astra согласовала подход.
+
+Добавленная сложность: два task-типа ограничений, два производных варианта
+clarification и узкий тип неизвестной price; общий адаптер проверки pending.
+Это разделение разрешённых форм, не новые сценарные решения. Ответственные:
+модель — смысл/предмет; existing price materializer — данные/обзор/пробел/UI;
+сервер — известные кнопки. SIM-0 состав предложений не аттестуется.
+
+Три целевых файла (SIM2 contract/dialogues, SIM1 known actions): 125 PASS
+за 138.18 с, один прогон. Независимый Checker D2-113: PASS, read-only, тесты повторно не запускал.
+Дополнительный test_d2_session_context.py не собрался: legacy fixture с
+axis/request_ids/request_kinds/topic_ids/service_ids/requested_extents вместо
+missing/operation. Файл этим checkpoint не менялся; общий CI не PASS.
+Новых live/provider/SMTP0; прежний live-gate остановлен, не возобновлялся.
+Staging пуст, commit/push/PR нет. Документы не разрешают live/merge/deploy.
+
+## LIVE — prompt26 semantic gate FAIL, 2026-10-01
+
+Owner разрешил ≤8 calls, no retries, stop-on-failure. Baseline codex/d2-stage1-contract
+4d240430c2ce056dc306c50e215dbb09843c6b8f поверх существующего WIP.
+4 live provider calls; 1 дополнительная sandbox-blocked попытка до сети
+учтена консервативно: 5/8. SDK max_retries0, SMTP0, gate stopped.
+Изолированные копии tenant и временные DB/logs, отдельный процесс prompt26;
+работающий виджет не перезапускался. Foreign data/ не открывалась.
+
+Общий price/topic обзор → volume one_tooth (0 calls) → сроки прошёл.
+Страх боли → общая цена: модель вернула корректную clarification.operation
+price/topic implantation, missing extent. Ответ: только уточнение, без цен
+и quick_replies. Это провал согласованного обзорного поведения при успешном
+HTTP, не malformed JSON. Дальнейшие сценарии остановлены; повторов не было.
+Полное evidence/путь временного стенда — верх SIM2 Task. Предыдущие79offline
+и CheckerPASS остаются evidence инструкции, не live-quality PASS.
+Код не менялся; обновлены Task/Current Status/Roadmap/Ledger. Staging пуст,
+commit/push/PR нет; browser/full CI и SIM-3/4 открыты.
+
+## WIP — инструкция уточнения prompt 26, 2026-10-01
+
+Owner разрешил узкое исправление после ручного live-сбоя. Baseline 4d24043,
+branch codex/d2-stage1-contract, main/merge-base 141ce91; прежний WIP сохранён.
+Allowlist и критерии — верх SIM2 Task. Это bug fix, не новый архитектурный этап.
+Инструкция различает operation(kind/request_id) и target(type/id); добавлены
+валидные структурные примеры price/content/overview с tenant placeholders.
+Общий вопрос сохраняет topic; код не исправляет решение модели. Prompt 26,
+schema 2. Два источника текста меню синхронизированы с D2-110; prices/offer IDs
+и few_teeth в свободной речи не менялись. Astra: подход допустим как bug fix.
+
+Предыдущий внешний Cursor PASS предоставлен владельцем: 161 тест одним
+запуском на prompt 25, без browser/live. Последующий ручной live-сбой означает,
+что надёжность генерации не доказана. Документация strict mode исследована;
+автопереключения, retry, новых полей/памяти нет. Подробнее — SIM2 Task.
+Текущая offline-проверка: два SIM2 файла, 79 PASS одним прогоном за 88.91 с.
+13 новых кейсов проверяют реальные prompt examples/parser, JSON/SSE,
+продолжение/replay и сохранение state при malformed operation без retry.
+Независимый Checker текущего исправления PASS (read-only, тесты не повторял). Агентских provider/live/SMTP 0;
+staging пуст; commit/push нет.
+Foreign data/ и маркетинговый документ не открывались/не изменялись.
+
+## WIP — D2-112 runtime и последствия schema 1, 2026-10-01
+
+Разрешение владельца: «Давай». Branch codex/d2-stage1-contract, HEAD
+4d240430c2ce056dc306c50e215dbb09843c6b8f; main/merge-base
+141ce91fb1731cd990fcf8391550150016c73e7f. Allowlist — SIM2 Task §1.
+Предшествующий own WIP сохранён; foreign data/ и маркетинговый документ
+не открывались.
+
+Понятные части публикуются; первое уточнение получает pending/UI, остальные
+явно deferred без очереди. B14 и проверки скрытых choices сохранены. Deferred
+первая цена допустима только после более раннего active clarification;
+price block у deferred/unavailable запрещён. Dead authored service-menu
+ветка удалена: действующие producers её не создают, availability answered.
+Astra согласовала reuse deferred и удаление недостижимой ветки. Prompt 25,
+schema 2; новых model fields/calls или параллельной памяти нет.
+
+161 непересекающийся offline PASS: dialogue 53 полным прогоном, остальные
+contract/action/resolver/renderer 107; новый shape guard отдельно 1. Всего
+54 dialogue cases; единый полный прогон всех 54 не заявляется. Первые падения
+и исправления описаны в SIM2 Task. Focused независимый Checker: PASS по коду,
+сам pytest не запускал. Status/docs обновлены после его P2 о stale формулировках.
+
+Synthetic schema-1 fixtures (JSON/SSE, с active lead/без) подтверждают
+d2_invalid_turn без provider, без изменения dialogue/lead и без оставшегося
+inflight request. Новый SID работает отдельно; старую заявку не переносит.
+Migration/reset не реализованы; реальная data/ не читалась.
+
+Cursor, общий CI, browser acceptance остаются открытыми. Старый CDP timeout
+не стал browser PASS. Provider/live/SMTP 0; staging пуст, commit/push/PR нет.
+
+## Исторический DOC — правило D2-112 до реализации, 2026-10-01
+
+Владелец: «Ок. Фикисруем». Принято: понятные части сразу, первое необходимое
+уточнение по порядку, остальные явно отложены без очереди; клик исполняет
+только сохранённую операцию. Правило внесено в Product Decisions, Target
+Contract, Acceptance, Roadmap, SIM2 Task и Current Status.
+Текущий отказ при втором корректном уточнении ещё не исправлен; прежние
+185 offline PASS и Checker PASS не доказывают D2-112. Новых pytest/live нет.
+
+Baseline — существующий WIP на branch codex/d2-stage1-contract, HEAD
+4d240430c2ce056dc306c50e215dbb09843c6b8f; main/merge-base
+141ce91fb1731cd990fcf8391550150016c73e7f. Allowlist этого шага — семь
+перечисленных документов, включая Ledger. Runtime/test WIP сохранён.
+Foreign data/ и docs/MARKETING_ANSWER_SCENARIOS.md не открывались.
+Commit/push/PR нет; provider/live/SMTP 0. Локальные ссылки и git diff --check:
+PASS. Независимый Checker: PASS документальной фиксации D2-112; runtime
+не проверялся и этим PASS не аттестован.
+
+## WIP — combined SIM-1 + ядро SIM-2, 2026-10-01
+
+Владелец согласовал изменение границы checkpoint и реализацию («Да»).
+Branch codex/d2-stage1-contract, HEAD 4d240430c2ce056dc306c50e215dbb09843c6b8f;
+origin/main и merge-base 141ce91fb1731cd990fcf8391550150016c73e7f.
+Точный активный allowlist и удаления — [SIM2 Task §1/10](DEMO_D2_SIM2_TASK.md).
+Предшествующий own WIP сохранён, foreign data/ и
+docs/MARKETING_ANSWER_SCENARIOS.md не открывались.
+
+Новый D2 protocol → direct operations; saved service task без повторного
+route/kind; локальный clarification + независимая prose; B14 и T4.
+Reported/correction сохраняются независимо от цены. Цена кнопки не создаёт
+медицинский факт; исходный явно сообщённый факт не стирается.
+Одна session schema 2, prompt 24; миграция старой local data не выполнялась.
+
+Astra дала замечания, исправлены: seed вместо пояснения, подмена исходной
+situation, потеря deferred target, конфликт pending UI и unknown brand.
+Checker сначала REJECT: старые offer refs при смене темы и HTTP400 для
+неопределённых details; исправлены. Focused recheck: **PASS** общего checkpoint
+в проверенных границах; reviewer pytest не перезапускал, проверил код и tests.
+Commercial explicit facts сохраняют provenance и не запускают второе auto promo.
+
+Offline: combined contract/dialogue/known-action набор — 62 passed до последних
+дополнений; последний расширенный dialogue набор — 41 passed.
+Числа перекрываются, не складывать. Финальный domain/contracts/actions набор:
+140 passed / 4 failed из-за старого raw envelope в commercial fixtures.
+После перевода только helper на новый формат все четыре прошли; assertions
+цен, packages, акций и dedup сохранены. Это checkpoint fixture incompatibility,
+не названо baseline failure. Итого актуальных непересекающихся PASS: **185**
+(41 dialogues + 140 domain/contracts/actions + 4 commercial).
+Команда domain-набора: test_d2_sim2_contract.py, test_d2_sim1_known_actions_http.py,
+test_d2_price_scope_selection.py, test_d2_commercial_plan.py,
+test_response_plan_fact_policy.py, test_response_plan_resolver.py,
+test_response_text_renderer.py; pytest -q -p no:cacheprovider, изолированные tmp.
+Allowlist расширен tests/test_d2_commercial_plan.py, до редактирования объяснено.
+Widget: 2 passed, 1 failed на CDP timeout Runtime.enable; browser PASS отсутствует.
+Это не live-оценка понимания, не полный CI и не закрытие SIM-1/2.
+SIM-3/4/5 и отдельный Cursor остаются открытыми. Live/provider/SMTP 0.
+Staging пуст; новых commit/push/PR нет.
+
+
+## DOC — зависимость SIM-1 от ядра SIM-2, 2026-10-01
+
+Branch `codex/d2-stage1-contract`, HEAD `4d24043`, main/merge-base `141ce91`.
+После разрешения продолжить проверены оба endpoint, producer/parser,
+service-click, запись ситуации и конкретные shared-потребители. Astra
+подтвердила: реализация D2-111 и прямого service-click затрагивает ядро SIM-2.
+Подготовлено конкретное предложение общего checkpoint в SIM2 Task §9;
+порядок Roadmap без согласования не изменён, runtime не редактировался.
+Уточнены unresolved target и необязательная situation у owning блока;
+обнаружена зависимость записи reported/correction от ценового applied_extent.
+Полная транзитивная недостижимость legacy не заявляется.
+
+Allowlist: SIM2 Task, SIM1 Task, Roadmap, Current Status, Ledger.
+Прежний runtime/test/doc WIP сохранён. Foreign `data/` и
+`docs/MARKETING_ANSWER_SCENARIOS.md` не открывались. Pytest/provider/live/SMTP 0;
+staging пуст; новых commit/push/PR нет. Локальные ссылки пяти документов и
+git diff --check: PASS. Независимый Checker: PASS документального уточнения
+зависимости и предложения общего checkpoint; runtime не аттестован.
+
+## DOC — технический проект SIM-1/2/3, 2026-10-01
+
+Ветка `codex/d2-stage1-contract`, HEAD `4d24043`, main/merge-base `141ce91`.
+По разрешению владельца подготовлена [карточка SIM-2](DEMO_D2_SIM2_TASK.md):
+локальное уточнение одной операции, независимое объяснение, D2-111/B14,
+производители и потребители, перечень удалений и общая граница памяти.
+Astra участвовала read-only. Проект не разрешает runtime и не закрывает SIM-1.
+Явные пробелы: разрез реализации SIM-1/2, привязка ситуации, shared consumers,
+финансовая публикация соответствующего этапа. Пример неверных денег показан,
+защита от них новым форматом не доказана.
+
+Allowlist: SIM2 Task (новый), SIM1 Task, Roadmap, Current Status, Ledger.
+Существующий runtime/test/doc WIP сохранён; foreign `data/` и
+`docs/MARKETING_ANSWER_SCENARIOS.md` не открывались. Pytest/provider/live/SMTP 0.
+Локальные ссылки пяти документов и git diff --check: PASS. Независимый
+Checker: PASS технического проекта, не готовности к реализации. Его P2 о
+соседних полях response/context/focus в D2CompletedTurn исправлен. Staging пуст;
+новых commit/push/PR нет. Это документация, не свидетельство упрощения runtime.
+
+## DOC — D2-111: независимый ответ сразу, уточнение цены в том же сообщении
+
+2026-10-01, branch codex/d2-stage1-contract, HEAD 4d24043,
+main/merge-base 141ce91. Владелец выбрал «Да, первый»: понятная независимая
+информационная часть публикуется сразу вместе с уточнением ценовой задачи;
+проверенный клик продолжает сохранённую цену. D2-111 принят, не реализован.
+Следующий шаг — общий технический контракт SIM-1/SIM-2 с удалениями.
+Дополнительный model call, новая память и изменение D2-080/B14 не разрешены.
+
+Allowlist: Product Decisions, Target Contract, Acceptance, SIM1 Task,
+Roadmap, Current Status, Ledger (docs/tasks). Это фиксация UX-решения;
+runtime/test WIP сохранён. Pytest/provider/live/SMTP 0. Локальные ссылки и
+git diff --check: PASS. Независимый Checker: PASS документальной фиксации
+D2-111; runtime не перепроверялся. Staging пуст, commit/push/PR нет.
+Foreign data/ и docs/MARKETING_ANSWER_SCENARIOS.md не открывались.
+Ниже — история проектирования и прежней частичной реализации.
+
+## DOC WIP — согласован совместный проект service clarification SIM-1/SIM-2
+
+2026-10-01, та же ветка codex/d2-stage1-contract и HEAD 4d24043,
+main/merge-base 141ce91. Владелец согласился проектировать компактную задачу
+совместно с SIM-2, без универсальной разметки всех частей разговора.
+Это согласие на направление проектирования, не новый runtime PASS/GO.
+
+В [карточке SIM-1](DEMO_D2_SIM1_TASK.md) предложена структурная связь
+выбора с конкретной операцией/задачей пояснения в существующем owner;
+отдельный глобальный target-ID список и полный старый envelope не обязательны.
+Предыдущая рекомендация обязательного нового поля уточнена после Astra-разбора.
+Добавлены примеры двух цен и информационного уточнения, владельцы по Contract §3,
+удаляемые массивы/повторная классификация/post-model override.
+Момент независимого информационного ответа оставлен открытым. Две цены
+сохраняют D2-080/B14: первая primary, вторая явно deferred. Связь кнопки
+с primary задачей не угадывают заново по позиции в разрозненных массивах.
+
+Allowlist: SIM1_TASK, DELIVERY_ROADMAP, CURRENT_STATUS, CHECKPOINT_LEDGER
+в docs/tasks. Предшествующий runtime/doc WIP сохранён. В этом дополнении
+код и тесты не менялись; pytest/provider/live/SMTP 0. Локальные Markdown-ссылки
+и git diff --check: PASS. Независимый документальный Checker: PASS после
+уточнения сохранения D2-080/B14; runtime повторно не аттестован.
+Staging пуст, commit/push/PR нет.
+Foreign data/ и docs/MARKETING_ANSWER_SCENARIOS.md не открывались.
+Ниже — evidence предшествующей частичной реализации, не её повторная аттестация.
+
+## WIP — SIM-1 runtime: volume/document; service требует решения владельца
+
+2026-10-01, baseline `4d24043`, branch `codex/d2-stage1-contract`,
+main/merge-base `141ce91`. Реализация разрешена владельцем. Volume получает
+typed price task до provider (0 calls), document — готовую section task и
+только пояснение через существующий decoder; post-model volume repair и
+document source rebinding удалены. D2-110: три кнопки, few_teeth free text
+сохранён. Details сохраняет прежний прямой путь. SIM-1 НЕ закрыт.
+
+Astra выявила отсутствующую связь service clarification → исходные request IDs.
+Сохранение полного understanding само по себе её не создаёт. Черновой service
+рефакторинг снят; baseline service-path остаётся до решения владельца.
+Нельзя угадать адресата уточнения по пустому service_id/topic/порядку частей.
+Scope и вопрос приведены в [карточке](DEMO_D2_SIM1_TASK.md).
+
+Baseline: 130 PASS / 4 FAIL (3 прежних snapshot expectations, widget CDP timeout).
+Новые SIM-1 cases: 19 PASS; HTTP/lead/terminal/medical: 30 PASS.
+Document/widget/details: 54 PASS / 2 CDP timeout; browser не подтверждён.
+Старые дополнительные failures (B12/continuation/prompt v19) воспроизведены
+на чистом git archive HEAD. Числа прогонов не суммируются, детали в карточке.
+Независимый Checker PASS только частичного checkpoint по коду/assertions,
+без повторного pytest. Cursor review runtime ещё не получен.
+Live/provider/SMTP 0; staging пуст, runtime commit/push не выполнены.
+Foreign `data/`, `docs/MARKETING_ANSWER_SCENARIOS.md` не открывались.
+Следующие Draft разделы — история подготовки, не текущий статус runtime.
+
+## Draft — SIM-1: подготовка карточки известного действия
+
+Baseline `4d24043`, branch `codex/d2-stage1-contract`, main/merge-base `141ce91`.
+Предшествующий WIP SIM-0/D2-110 сохранён; foreign data/маркетинговая памятка
+не открываются. Документальный allowlist: `DEMO_D2_SIM1_TASK.md` и Ledger.
+Owner instruction — продолжить Roadmap. Read-only Astra подтвердила:
+volume task уже достаточен, details уже обходят модель; service clarify
+теряет связи исходных частей, document action ещё зависит от модельного
+маршрута. Карточка требует замены producer/consumer пояснения и существующей
+записи уточнения, а не override после полной повторной классификации.
+ACCEPTANCE — S01/S06 и D2-110 как план доказательств; runtime PASS отсутствует.
+LEGACY IMPACT/D2 ROUTE — документальный план прежнего общего входа.
+Карточка передаётся независимому Checker; код/тесты/live/provider/SMTP 0,
+staging пуст, commit/push не выполнены. FUTURE SCOPE — реализация SIM-1,
+продуктовые детали SIM-0 и остальные этапы.
+
+## Draft — SIM-0: подготовка состава обзоров
+
+Дополнение D2-110: владелец согласовал три кнопки объёма и сохранение
+нескольких зубов в свободной речи. Обновлены Roadmap, Contract, Acceptance,
+Decisions и карточка SIM-0; allowlist дополнения — эти пять файлов и Ledger.
+Удаление UI/его отдельного кода запланировано в SIM-1, не выполнено в runtime.
+Состав offers не объявлен принятым. Проверка — ссылки/diff и независимый
+документальный Checker; тесты/provider 0. Baseline остаётся `4d24043`.
+
+Начало реализации Roadmap по прямому запросу владельца; baseline `4d24043`,
+branch `codex/d2-stage1-contract`, main/merge-base `141ce91`.
+На старте tracked/staging чисты, foreign `data/` и маркетинговая памятка
+сохранены. Allowlist: `DEMO_D2_SIM0_TASK.md` и этот Ledger в `docs/tasks/`.
+Тип — документация/подготовка решения; ACCEPTANCE — S04/D2-107 на уровне
+инвентаризации данных. Проверены JSON direction/offer demo; предложение
+включений и исключений отделено от решения владельца. Продуктовый состав
+не утверждён, SIM-0 не закрыт. D2 ROUTE/LEGACY IMPACT: runtime не меняется.
+Тесты/бот/provider/live/SMTP: 0. Проверка ссылок/diff и независимый Checker
+подготовки — перед передачей. Commit/push не выполнялись, staging пуст.
+FUTURE SCOPE: решение состава, SIM-1 карточка и дальнейшие этапы.
+
 ## Draft — 2026-10-01: D2-SIM-DOC, актуальная сверка
 
 Дополнение по запросу владельца после первого документального PASS: SIM-1

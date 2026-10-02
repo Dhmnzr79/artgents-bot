@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contracts.d2_dialogue_result import PendingOperation, CLARIFY_TASK_ADAPTER
+
 import hashlib
 import json
 from dataclasses import asdict
@@ -33,7 +35,7 @@ from contracts.response_plan_post_composer import (
     SituationStage,
 )
 
-SESSION_SCHEMA_VERSION = 1
+SESSION_SCHEMA_VERSION = 2
 FINGERPRINT_FORMAT_VERSION = 3
 
 ActiveServiceProvenance = Literal["explicit_current", "active_session"]
@@ -228,28 +230,18 @@ class D2SelectedUiRef(ResponsePlanModel):
 
 
 class PersistedClarifyTask(ResponsePlanModel):
-    """Typed source task retained while a D2 clarification is unfinished."""
-
-    axis: str
-    request_ids: tuple[str, ...]
-    request_kinds: tuple[str, ...]
-    topic_ids: tuple[str, ...] = ()
-    service_ids: tuple[str, ...] = ()
-    requested_extents: tuple[str, ...] = ()
+    """One unfinished operation; UI membership remains owned by completion."""
+    missing: Literal["service", "term", "extent", "jaw", "stage"]
+    operation: PendingOperation
 
     @model_validator(mode="after")
-    def _validate(self) -> Self:
-        require_exact_nonblank_id("clarify_axis", self.axis)
-        if not self.request_kinds:
-            raise ValueError("clarify_task_requests_empty")
-        _validate_unique_ids("clarify_task_request_id", self.request_ids)
-        if not self.request_ids:
-            raise ValueError("clarify_task_request_ids_empty")
-        _validate_unique_ids("clarify_task_request_kind", self.request_kinds)
-        _validate_unique_ids("clarify_task_topic_id", self.topic_ids)
-        _validate_unique_ids("clarify_task_service_id", self.service_ids)
-        _validate_unique_ids("clarify_task_requested_extent", self.requested_extents)
+    def valid_clarification_task(self) -> Self:
+        # Share the wire constraints; old price/extent pending tasks are not repaired.
+        CLARIFY_TASK_ADAPTER.validate_python({"missing": self.missing,
+                                             "operation": self.operation.model_dump()})
         return self
+
+
 
 
 class PersistedShownCommercialIds(ResponsePlanModel):

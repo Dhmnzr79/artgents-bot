@@ -385,6 +385,7 @@ D2PartFailureReason = Literal[
 D2ResultStatus = Literal["complete", "degraded", "failed"]
 D2ContentPublication = Literal["authored", "model_prose", "fallback"]
 D2_PRICE_DEFERRAL_TEXT = "Стоимость следующей услуги можно спросить следующим сообщением"
+D2_CLARIFICATION_DEFERRAL_TEXT = "Этот вопрос пока отложим. Его можно задать следующим сообщением."
 
 
 class D2FrozenPriceRow(ResponsePlanModel):
@@ -529,6 +530,15 @@ class InformationSourceBlock(ResponsePlanModel):
         return self
 
 
+class D2ExactTextBlock(ResponsePlanModel):
+    """Code-owned local clarification or reference result; not model prose."""
+    request_id: NonBlankStr
+    source_client_id: NonBlankStr
+    display_text: NonBlankStr
+    requested_fact_ids: tuple[str, ...] = ()
+    promo_fact_ids: tuple[str, ...] = ()
+
+
 class D2ContactFactBlock(ResponsePlanModel):
     """Exact tenant contact data attached to one D2 request part."""
 
@@ -564,7 +574,7 @@ class D2PartFailureBlock(ResponsePlanModel):
 
 
 class D2PartDeferredBlock(ResponsePlanModel):
-    """Frozen code-owned notice for a price request deferred to a later turn."""
+    """Frozen notice for an explicitly deferred task; not an automatic queue."""
 
     request_id: NonBlankStr
     source_client_id: NonBlankStr
@@ -572,7 +582,7 @@ class D2PartDeferredBlock(ResponsePlanModel):
 
     @model_validator(mode="after")
     def _validate_display_text(self) -> Self:
-        if self.display_text != D2_PRICE_DEFERRAL_TEXT:
+        if self.display_text not in {D2_PRICE_DEFERRAL_TEXT, D2_CLARIFICATION_DEFERRAL_TEXT}:
             raise ValueError("d2_deferred_part_display_text_invalid")
         return self
 
@@ -872,7 +882,7 @@ class D2PriceScopeChoice(ResponsePlanModel):
 
 class D2ResolvedRequestPart(ResponsePlanModel):
     request_id: NonBlankStr
-    kind: Literal["price", "price_detail", "content", "contact", "clinic_policy"]
+    kind: Literal["price", "price_detail", "content", "contact", "clinic_policy", "clarification", "reference", "commercial_fact", "price_clarification", "price_reference"]
     status: Literal["answered", "recovered", "unavailable", "deferred"]
     failure_reason: D2PartFailureReason | None = None
     subject_id: NonBlankStr | None = None
@@ -903,7 +913,7 @@ class D2ResolvedRequestPart(ResponsePlanModel):
         if self.status == "answered" and self.failure_reason is not None:
             raise ValueError("d2_answered_part_failure_reason_forbidden")
         if self.status == "deferred":
-            if self.kind != "price":
+            if self.kind not in {"price", "clarification"}:
                 raise ValueError("d2_deferred_part_kind_invalid")
             if self.failure_reason is not None:
                 raise ValueError("d2_deferred_part_failure_reason_forbidden")
@@ -975,7 +985,7 @@ def _validate_d2_part_result_shape(
     ids = [part.request_id for part in parts]
     if len(ids) != len(set(ids)):
         raise ValueError("d2_request_part_duplicate")
-    price_parts = [part for part in parts if part.kind == "price"]
+    price_parts = [part for part in parts if part.kind in {"price", "price_clarification", "price_reference"}]
     failure_ids = [block.request_id for block in failure_blocks]
     if len(failure_ids) != len(set(failure_ids)):
         raise ValueError("d2_part_failure_block_duplicate")
@@ -998,17 +1008,25 @@ def _validate_d2_part_result_shape(
     if any(block.request_id not in ids for block in deferred_blocks):
         raise ValueError("d2_part_deferred_block_linkage_invalid")
     if price_parts:
-        first_price_index = next(index for index, part in enumerate(parts) if part.kind == "price")
-        if parts[first_price_index].status == "deferred" or any(
-            part.status != "deferred" for part in parts[first_price_index + 1:] if part.kind == "price"
+        first_price_index = next(index for index, part in enumerate(parts) if part.kind in {"price", "price_clarification", "price_reference"})
+        earlier_active_clarification = any(
+            part.kind == "clarification" and part.status == "answered"
+            for part in parts[:first_price_index]
+        )
+        if (parts[first_price_index].status == "deferred" and not earlier_active_clarification) or any(
+            part.status != "deferred" for part in parts[first_price_index + 1:] if part.kind in {"price", "price_clarification", "price_reference"}
         ):
             raise ValueError("d2_request_part_price_linkage_invalid")
         price_part = parts[first_price_index]
-        if price_part.status == "answered" and d2_price_block is None:
+        if price_part.kind != "price" and d2_price_block is not None:
             raise ValueError("d2_request_part_price_linkage_invalid")
-        if price_part.status == "unavailable" and d2_price_block is not None:
+        if price_part.kind == "price" and price_part.status == "answered" and d2_price_block is None:
             raise ValueError("d2_request_part_price_linkage_invalid")
-        if price_part.status not in {"answered", "unavailable"}:
+        if price_part.status in {"unavailable", "deferred"} and d2_price_block is not None:
+            raise ValueError("d2_request_part_price_linkage_invalid")
+        if price_part.status not in {"answered", "unavailable"} and not (
+            price_part.status == "deferred" and earlier_active_clarification
+        ):
             raise ValueError("d2_request_part_price_linkage_invalid")
     elif d2_price_block is not None:
         raise ValueError("d2_request_part_price_linkage_invalid")
@@ -1056,6 +1074,7 @@ class PreComposerPlan(ResponsePlanModel):
     d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()
     d2_part_deferred_blocks: tuple[D2PartDeferredBlock, ...] = ()
     d2_contact_blocks: tuple[D2ContactFactBlock, ...] = ()
+    d2_exact_text_blocks: tuple[D2ExactTextBlock, ...] = ()
     d2_policy_blocks: tuple[D2PolicyFactBlock, ...] = ()
     d2_canonical_contact: CanonicalContactCandidate | None = None
     d2_result_status: D2ResultStatus | None = None
@@ -1376,11 +1395,11 @@ def _assert_no_commerce(plan: ResolvedResponsePlan) -> None:
 
 def _validate_fact_role_uniqueness(plan: ResolvedResponsePlan) -> None:
     groups = {
-        "requested": tuple(block.fact_id for block in plan.requested_fact_blocks),
+        "requested": tuple(block.fact_id for block in plan.requested_fact_blocks) + tuple(i for b in plan.d2_exact_text_blocks for i in b.requested_fact_ids),
         "service_value": (
             (plan.service_value_block.fact_id,) if plan.service_value_block is not None else ()
         ),
-        "promo": tuple(block.fact_id for block in plan.promo_blocks),
+        "promo": tuple(block.fact_id for block in plan.promo_blocks) + tuple(i for b in plan.d2_exact_text_blocks for i in b.promo_fact_ids),
         "amplifier": tuple(block.fact_id for block in plan.automatic_amplifier_blocks),
     }
     for name, ids in groups.items():
@@ -1404,9 +1423,9 @@ def _finalized_shown_service_option_ids(plan: ResolvedResponsePlan) -> tuple[str
 
 def _validate_finalized_ids(plan: ResolvedResponsePlan) -> None:
     finalized = plan.finalized_commercial_ids
-    if finalized.requested_fact_ids != tuple(block.fact_id for block in plan.requested_fact_blocks):
+    if finalized.requested_fact_ids != tuple(block.fact_id for block in plan.requested_fact_blocks) + tuple(i for b in plan.d2_exact_text_blocks for i in b.requested_fact_ids):
         raise ValueError("finalized_requested_fact_ids_mismatch")
-    if finalized.promo_fact_ids != tuple(block.fact_id for block in plan.promo_blocks):
+    if finalized.promo_fact_ids != tuple(block.fact_id for block in plan.promo_blocks) + tuple(i for b in plan.d2_exact_text_blocks for i in b.promo_fact_ids):
         raise ValueError("finalized_promo_fact_ids_mismatch")
     if finalized.amplifier_fact_ids != tuple(
         block.fact_id for block in plan.automatic_amplifier_blocks
@@ -1494,6 +1513,18 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
     if len(block_ids) != len(set(block_ids)):
         raise ValueError("d2_request_part_content_block_duplicate")
     content_by_request = {block.request_id: block for block in plan.information_blocks}
+    exact_by_id = {b.request_id: b for b in plan.d2_exact_text_blocks}
+    exact_parts = [p for p in parts if p.kind in {"clarification", "reference", "commercial_fact", "price_clarification", "price_reference"}
+                   and not (p.kind == "clarification" and p.status == "deferred")]
+    if len(exact_by_id) != len(plan.d2_exact_text_blocks) or {p.request_id for p in exact_parts} != set(exact_by_id):
+        raise ValueError("d2_exact_text_linkage_invalid")
+    for part in exact_parts:
+        block = exact_by_id[part.request_id]
+        if part.status != "answered":
+            raise ValueError("d2_exact_text_status_invalid")
+        if (block.requested_fact_ids or block.promo_fact_ids) and part.kind != "commercial_fact":
+            raise ValueError("d2_exact_fact_provenance_invalid")
+
     contact_ids = [block.request_id for block in plan.d2_contact_blocks]
     if len(contact_ids) != len(set(contact_ids)):
         raise ValueError("d2_request_part_contact_block_duplicate")
@@ -1595,7 +1626,7 @@ def _validate_resolved_client_ownership(plan: ResolvedResponsePlan) -> None:
         _check(block)
     for block in plan.d2_part_deferred_blocks:
         _check(block)
-    for block in plan.d2_contact_blocks:
+    for block in (*plan.d2_contact_blocks, *plan.d2_exact_text_blocks):
         _check(block)
     for block in plan.d2_policy_blocks:
         _check(block)
@@ -1659,6 +1690,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
     d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()
     d2_part_deferred_blocks: tuple[D2PartDeferredBlock, ...] = ()
     d2_contact_blocks: tuple[D2ContactFactBlock, ...] = ()
+    d2_exact_text_blocks: tuple[D2ExactTextBlock, ...] = ()
     d2_policy_blocks: tuple[D2PolicyFactBlock, ...] = ()
     d2_canonical_contact: CanonicalContactCandidate | None = None
     d2_result_status: D2ResultStatus | None = None
@@ -1700,6 +1732,9 @@ class ResolvedResponsePlan(ResponsePlanModel):
                 and not self.promo_blocks
                 and not self.requested_fact_blocks
                 and self.authored_service_alternative_block is None
+                and not self.d2_contact_blocks
+                and not self.d2_policy_blocks
+                and not self.d2_exact_text_blocks
             ):
                 raise ValueError("answer_requires_patient_text")
             if self.terminal_text is not None:

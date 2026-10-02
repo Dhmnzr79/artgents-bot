@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from contracts.request_understanding import RequestUnderstanding
+from contracts.d2_dialogue_result import D2DialogueResult
 from contracts.one_call_envelope import (
     ENVELOPE_NORMALIZED_ANSWER_CLARIFY_FIELDS_CLEARED,
     ENVELOPE_NORMALIZED_DIRECT_FACT_ID_DEDUPED,
@@ -726,8 +727,10 @@ def parse_production_envelope_json(
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
     commercial_fact_catalog: CommercialFactCatalogSnapshot,
-) -> OneCallEnvelope:
-    """Parse and validate a production v5 envelope from provider raw text."""
+    known_task: OneCallEnvelope | D2DialogueResult | None = None,
+    d2_contract: bool = False,
+) -> OneCallEnvelope | D2DialogueResult:
+    """One strict JSON decoder; validate the explicitly selected protocol."""
 
     _clear_envelope_input_normalizations()
 
@@ -739,6 +742,49 @@ def parse_production_envelope_json(
         raise OneCallEnvelopeProtocolError("envelope_oversized")
 
     payload = _loads_strict_json_object(raw)
+    if d2_contract:
+        from contracts.d2_dialogue_result import validate_d2_payload
+        try:
+            return validate_d2_payload(
+                payload, active_service_ids=active_service_catalog.active_service_ids,
+                known_task=known_task,
+            )
+        except ValueError as exc:
+            raise OneCallEnvelopeProtocolError(str(exc)) from exc
+    if known_task is not None:
+        # Same decoder and entry point, but no semantic model envelope is
+        # requested or interpreted for an already authorized task.
+        understanding = known_task.request_understanding
+        expected = tuple(p for p in understanding.requests if p.kind in {"content", "other"})
+        if set(payload) != {"explanations"} or not isinstance(payload["explanations"], list):
+            raise OneCallEnvelopeProtocolError("known_task_explanations_required")
+        items = payload["explanations"]
+        if len(items) != len(expected):
+            raise OneCallEnvelopeProtocolError("known_task_explanations_mismatch")
+        replacements = {}
+        for part, item in zip(expected, items):
+            if (
+                not isinstance(item, dict)
+                or set(item) - {"request_id", "content_text", "content_realization"}
+                or item.get("request_id") != part.request_id
+            ):
+                raise OneCallEnvelopeProtocolError("known_task_explanation_invalid")
+            if item.get("content_realization") != "authored" and (
+                not isinstance(item.get("content_text"), str) or not item["content_text"].strip()
+            ):
+                raise OneCallEnvelopeProtocolError("known_task_explanation_text_required")
+            values = part.model_dump(mode="json")
+            values.pop("content_realization", None)
+            values["content_text"] = item.get("content_text")
+            if "content_realization" in item:
+                values["content_realization"] = item["content_realization"]
+            replacements[part.request_id] = values
+        values = known_task.model_dump(mode="json")
+        values["request_understanding"]["requests"] = [
+            replacements.get(p.request_id, p.model_dump(mode="json"))
+            for p in understanding.requests
+        ]
+        return OneCallEnvelope.model_validate(values)
     payload, normalization_codes = _normalize_production_payload(payload)
     _record_envelope_input_normalizations(normalization_codes)
     envelope = _validate_structure(payload, commercial_fact_catalog=commercial_fact_catalog)

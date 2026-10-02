@@ -32,11 +32,14 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
         deferred_by_request = {
             block.request_id: block for block in plan.d2_part_deferred_blocks
         }
+        exact_by_request = {b.request_id: b for b in plan.d2_exact_text_blocks}
         for part in plan.d2_request_parts:
             if part.status == "unavailable":
                 parts.append(failures_by_request[part.request_id].display_text.strip())
             elif part.status == "deferred":
                 parts.append(deferred_by_request[part.request_id].display_text.strip())
+            elif part.kind in {"clarification", "reference", "commercial_fact", "price_clarification", "price_reference"}:
+                parts.append(exact_by_request[part.request_id].display_text.strip())
             elif part.kind == "price":
                 if plan.d2_price_block is not None and plan.patient_text:
                     parts.append(plan.patient_text.strip())

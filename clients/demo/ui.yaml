@@ -50,21 +50,17 @@ scope_nav:
   implantation:
     one_tooth:
       label: "Один зуб"
-    few_teeth:
-      label: "Несколько зубов"
     full_arch:
       label: "Вся челюсть"
     unknown:
-      label: "Не знаю"
+      label: "Пока не знаю"
   prosthetics:
     one_tooth:
       label: "Один зуб"
-    few_teeth:
-      label: "Несколько зубов"
     full_arch:
       label: "Вся челюсть"
     unknown:
-      label: "Не знаю"
+      label: "Пока не знаю"
 
 stage_nav:
   prosthetics:

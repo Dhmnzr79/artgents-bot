@@ -7,8 +7,7 @@ import inspect
 import sys
 from contextlib import contextmanager
 
-from tests.d1r_envelope_fixtures import envelope_clinic_policy_only
-from tests.test_d2_http_contract import FakeProvider, http_env, post, post_sse, sse_events
+from tests.test_d2_http_contract import FakeProvider, http_env, post, post_sse, sse_events, _policy_raw
 
 
 FORBIDDEN_MODULES = (
@@ -50,7 +49,7 @@ def no_legacy_calls(*, ordinary: bool):
 
 def test_success_error_and_typed_lead_action_never_call_legacy(http_env):
     client, _, use_provider, _ = http_env
-    fake = use_provider(FakeProvider(envelope_clinic_policy_only("no_pediatric_dentistry")))
+    fake = use_provider(FakeProvider(_policy_raw("no_pediatric_dentistry")))
     with no_legacy_calls(ordinary=True) as calls:
         assert post(client, sid="ordinary").status_code == 200
     assert ("core.d2_dialogue", "run_d2_dialogue_turn") in calls
@@ -79,7 +78,7 @@ def test_json_route_dependency_is_direct_d2_adapter():
 
 def test_sse_success_error_and_lead_action_never_call_legacy(http_env):
     client, _, use_provider, _ = http_env
-    fake = use_provider(FakeProvider(envelope_clinic_policy_only("no_pediatric_dentistry")))
+    fake = use_provider(FakeProvider(_policy_raw("no_pediatric_dentistry")))
     with no_legacy_calls(ordinary=True) as calls:
         assert sse_events(post_sse(client, sid="sse-ordinary"))[-1][0] == "done"
     assert ("core.d2_dialogue", "run_d2_dialogue_turn") in calls

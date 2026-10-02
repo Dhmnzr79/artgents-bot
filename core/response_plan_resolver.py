@@ -152,6 +152,7 @@ def _collect_owned_candidates(plan: PreComposerPlan) -> list[object]:
     items.extend(plan.d2_part_failure_blocks)
     items.extend(plan.d2_part_deferred_blocks)
     items.extend(plan.d2_contact_blocks)
+    items.extend(plan.d2_exact_text_blocks)
     items.extend(plan.d2_policy_blocks)
     if plan.d2_canonical_contact is not None:
         items.append(plan.d2_canonical_contact)
@@ -381,6 +382,10 @@ def _resolve_composer_answer(
         service_options_block,
         authored_service_alternative_block,
     )
+    finalized = finalized.model_copy(update={
+        "requested_fact_ids": finalized.requested_fact_ids + tuple(i for b in plan.d2_exact_text_blocks for i in b.requested_fact_ids),
+        "promo_fact_ids": finalized.promo_fact_ids + tuple(i for b in plan.d2_exact_text_blocks for i in b.promo_fact_ids),
+    })
     session_delta = _build_session_delta(plan, finalized, terminal_state="none")
     return ResolvedResponsePlan(
         route=composer.route,
@@ -396,6 +401,7 @@ def _resolve_composer_answer(
         d2_part_failure_blocks=plan.d2_part_failure_blocks,
         d2_part_deferred_blocks=plan.d2_part_deferred_blocks,
         d2_contact_blocks=plan.d2_contact_blocks,
+        d2_exact_text_blocks=plan.d2_exact_text_blocks,
         d2_policy_blocks=plan.d2_policy_blocks,
         d2_canonical_contact=plan.d2_canonical_contact,
         d2_result_status=plan.d2_result_status,

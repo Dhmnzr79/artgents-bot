@@ -18,8 +18,17 @@ from contracts.d2_dialogue import (
 )
 from contracts.d2_session_context import D2RecentPriceScope, D2SessionActivity, D2SessionTtlPolicy
 from contracts.response_plan import D2PriceDetailUiAction, SessionKey
-from contracts.one_call_envelope import OneCallEnvelope
-from contracts.response_plan_materialization import D2SelectedDocumentAction, MaterializationContractError
+from contracts.d2_dialogue_result import (
+    D2DialogueResult, PriceOperation, ExplanationOperation, DetailOperation,
+    ContactOperation, DoctorsOperation, PolicyOperation, CommercialOperation, ClarificationOperation,
+    ServiceTarget, TopicTarget, UnresolvedTarget, ScopedOperation, OffTopicOperation,
+)
+from contracts.request_understanding import RequestTreatmentSituation
+from contracts.response_plan import (
+    D2ExactTextBlock, D2ResolvedRequestPart, D2PartDeferredBlock,
+    D2_CLARIFICATION_DEFERRAL_TEXT,
+)
+from contracts.response_plan_materialization import D2SelectedDocumentAction
 from contracts.response_plan_session import (
     SESSION_SCHEMA_VERSION, D2ShownPriceOfferRef, PersistedActiveService, PersistedActiveTopic,
     PersistedClarifyTask, PersistedShownCommercialIds, PersistedShownOptionsSnapshot,
@@ -38,7 +47,7 @@ from core.d2_lead_bridge import (
     resolve_d2_lead_pre_provider,
 )
 from core.d2_session_context import (
-    bind_d1r_envelope_to_d2_context, bind_implicit_price_service,
+    bind_d2_operations_to_context,
     project_d2_session_context, seed_d2_plan_focus,
 )
 from core.d2_snapshot_sources import (
@@ -46,27 +55,27 @@ from core.d2_snapshot_sources import (
     build_d2_manual_contact_terminal_response,
     build_d2_snapshot_sources,
     build_d2_clinic_policy_response,
-    build_d2_clinic_policy_fact_block,
     build_d2_brand_policy_response,
     build_d2_service_availability_response,
     build_d2_unknown_reference_response,
+    build_d2_unknown_brand_response,
     resolve_d2_clarify_service_topic,
-    resolve_d2_optional_content_claims,
     resolve_d2_selected_document_action,
+    build_d2_document_task,
 )
 from core.d2_spam_gate import build_d2_spam_gate_response, is_d2_garbage_message
-from core.d2_contacts_cta import build_d2_contact_fact_block, build_d2_contact_response
-from core.d2_offtopic import build_d2_offtopic_response, is_d2_offtopic_envelope
+from core.d2_contacts_cta import build_d2_contact_fact_block
+from core.d2_offtopic import build_d2_offtopic_response
+from core.d2_directory import build_d2_directory_response
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
 from core.one_call_envelope_protocol import (
     parse_production_envelope_json,
-    production_envelope_template,
 )
-from core.response_plan_materialization import resolve_d2_envelope_response
+from core.response_plan_materialization import resolve_d2_operations
 from core.user_text_privacy import provider_message_has_substance, provider_safe_user_text
+from core.clinic_policy_resolver import resolve_clinic_policy_operations
 from lead_interrupt import LEAD_PENDING_ANSWER_REF
 from session import peek_lead_paused
-import json
 
 
 @dataclass(frozen=True)
@@ -98,76 +107,9 @@ def _turn_from_completion(completion: D2CompletedTurn, *, idempotent_replay: boo
     )
 
 
-def _d2_supported_price_shape_failure_codes(*, part: object, subject: object) -> tuple[str, ...]:
-    """Return typed gate failures only; never include model prose or payload values."""
-    failures: list[str] = []
-    if part.kind != "price":
-        failures.append("request_kind_not_price")
-    # Empty/ambiguous «Сколько стоит?» (A10 / D2-077): no topic and no service → clarify.
-    if part.service_id is None and part.topic_id is None:
-        if subject is not None and subject.age_group == "child":
-            failures.append("subject_age_group_child")
-        return tuple(failures)
-    if part.service_id is None:
-        if subject is None:
-            failures.append("subject_missing")
-        else:
-            if subject.age_group == "child":
-                failures.append("subject_age_group_child")
-            # B11: relation=other is allowed; carry is blocked in session binding.
-        # situation=None is the direction overview turn (volume choices).
-        if part.situation is not None and part.situation.scope_commitment not in {
-            "reported",
-            "unknown",
-            "correction",
-            "hypothetical",
-            "reset",
-        }:
-            failures.append("situation_scope_unsupported")
-    return tuple(failures)
-
-
-def _d2_multipart_shape_ok(*, parts: tuple, subjects_by_id: dict) -> bool:
-    """True when the envelope is an assembled multi-part turn (A05/A06/B14 / D2-080).
-
-    Each part must already carry typed refs. Multi-topic is allowed: parts stay
-    independent (D2-042 / T2). No patient_text / regex inference.
-    """
-    if len(parts) < 2 or len(parts) > 3:
-        return False
-    if any(item.kind not in {"price", "price_detail", "content", "contact", "clinic_policy"} for item in parts):
-        return False
-    price_parts = tuple(item for item in parts if item.kind == "price")
-    content_parts = tuple(item for item in parts if item.kind == "content")
-    detail_parts = tuple(item for item in parts if item.kind == "price_detail")
-    contact_parts = tuple(item for item in parts if item.kind == "contact")
-    policy_parts = tuple(item for item in parts if item.kind == "clinic_policy")
-    if not price_parts and not content_parts and not detail_parts:
-        return False
-    # Typed exact facts may be added to an ordinary FullContext/price answer.
-    if len(price_parts) + len(detail_parts) + len(content_parts) + len(contact_parts) + len(policy_parts) != len(parts):
-        return False
-    if len(detail_parts) > 1:
-        return False
-    if any(not item.policy_ids for item in policy_parts):
-        return False
-    for item in price_parts:
-        subject = subjects_by_id.get(item.subject_id) if item.subject_id else None
-        if _d2_supported_price_shape_failure_codes(part=item, subject=subject):
-            return False
-        # Direct service or typed topic overview (A05 prices); never empty focus.
-        if item.service_id is None and item.topic_id is None:
-            return False
-    # FullContext prose has optional provenance. A missing content_ref must not
-    # prevent it from being combined with a typed price request.
-    return True
-
-
 def _shown_secondary_ref_ids(response) -> tuple[str, ...]:
     ui = response.ui_projection
-    shown: list[str] = []
-    if ui.video is not None:
-        shown.append(ui.video.video_id)
+    shown = [ui.video.video_id] if ui.video is not None else []
     shown.extend(item.reply_id for item in ui.quick_replies)
     return tuple(shown)
 
@@ -241,30 +183,6 @@ def _next_d2_dialogue_pairs(
     return (*previous_pairs, pair)[-ttl_policy.history_pair_limit:]
 
 
-def _d2_clarify_task(*, envelope) -> PersistedClarifyTask:
-    """Persist the unresolved typed request; never derive it from dialogue prose."""
-    understanding = envelope.request_understanding
-    if understanding is None:
-        raise ValueError("d2_clarify_task_understanding_required")
-    requests = understanding.requests
-    return PersistedClarifyTask(
-        axis=envelope.clarify_axis or "focus",
-        request_ids=tuple(item.request_id for item in requests),
-        request_kinds=tuple(dict.fromkeys(item.kind for item in requests)),
-        topic_ids=tuple(dict.fromkeys(
-            item.topic_id for item in requests if item.topic_id is not None
-        )),
-        service_ids=tuple(dict.fromkeys(
-            item.service_id for item in requests if item.service_id is not None
-        )),
-        requested_extents=tuple(dict.fromkeys(
-            item.situation.extent
-            for item in requests
-            if item.situation is not None
-        )),
-    )
-
-
 def _next_d2_shown_price_offer_refs(*, snapshot, price, context):
     """Retain only verified D2 offer IDs and display order, never price prose."""
     if price is None:
@@ -307,89 +225,16 @@ def _current_d2_shown_price_offer_refs(context) -> tuple[D2ShownPriceOfferRef, .
     return refs
 
 
-def _bind_selected_volume_price_task(
-    envelope: OneCallEnvelope,
-    action: _SelectedVolumePriceTask,
-    *,
-    tenant,
-) -> OneCallEnvelope:
-    """Keep a clean, verified scope click attached to its frozen price task."""
-
-    understanding = envelope.request_understanding
-    if envelope.route != "ANSWER" or understanding is None or not understanding.requests:
-        raise ValueError("d2_ui_volume_price_task_unresolved")
-    price_claims = [item for item in understanding.requests if item.kind == "price"]
-    if len(price_claims) == 1:
-        part = price_claims[0]
-    elif not price_claims and len(understanding.requests) == 1:
-        part = understanding.requests[0]
-    else:
-        raise ValueError("d2_ui_volume_price_task_unresolved")
-    if part.kind not in {"price", "content", "other"}:
-        raise ValueError("d2_ui_volume_price_task_unresolved")
-    if part.topic_id not in {None, action.topic_id}:
-        raise ValueError("d2_ui_volume_price_task_topic_mismatch")
-    if part.brand_id not in {None, action.brand_id}:
-        raise ValueError("d2_ui_volume_price_task_brand_mismatch")
-    if part.service_id is not None and resolve_d2_clarify_service_topic(
-        tenant, (part.service_id,)
-    ) != action.topic_id:
-        raise ValueError("d2_ui_volume_price_task_service_mismatch")
-    if action.service_id is not None and part.service_id not in {None, action.service_id}:
-        raise ValueError("d2_ui_volume_price_task_service_mismatch")
-    if envelope.service_id is not None and envelope.service_id != part.service_id:
-        raise ValueError("d2_ui_volume_price_task_service_mismatch")
-    if envelope.extent is not None and envelope.extent != action.extent:
-        raise ValueError("d2_ui_volume_price_task_extent_mismatch")
-    if part.situation is not None and part.situation.extent != action.extent:
-        raise ValueError("d2_ui_volume_price_task_extent_mismatch")
-    commitment = "unknown" if action.extent == "unknown" else "hypothetical"
-    situation = {
-        "scope_commitment": commitment,
-        "extent": action.extent,
-        "tooth_count": 1 if action.extent == "one_tooth" else None,
-        "jaw": "unknown",
-        "continuity": "same",
-    }
-    existing_subject_ids = {item.subject_id for item in understanding.subjects}
-    subject_number = 1
-    while f"s{subject_number}" in existing_subject_ids:
-        subject_number += 1
-    subject_id = f"s{subject_number}"
-    price_part = {
-        "request_id": part.request_id, "kind": "price", "subject_id": subject_id,
-        "context": "general_information", "topic_id": action.topic_id,
-        "service_id": action.service_id, "brand_id": action.brand_id,
-        "statement_mode": "question", "situation": situation,
-    }
-    requests = []
-    for item in understanding.requests:
-        requests.append(price_part if item is part else item.model_dump(mode="json"))
-    if part.kind in {"content", "other"} and part.content_realization == "model_prose":
-        if (part.content_text or "").strip():
-            existing_request_ids = {item.request_id for item in understanding.requests}
-            content_number = 1
-            while f"r{content_number}" in existing_request_ids:
-                content_number += 1
-            content_id = f"r{content_number}"
-            requests.append({
-                "request_id": content_id, "kind": "content", "subject_id": None,
-                "context": "general_information", "topic_id": action.topic_id,
-                "service_id": None, "content_text": part.content_text,
-                "content_realization": "model_prose", "statement_mode": "question",
-            })
-    return OneCallEnvelope.model_validate(production_envelope_template(
-        commercial_intent="price",
-        patient_text=envelope.patient_text,
-        primary_price_request_id=part.request_id,
-        request_understanding={
-            "subjects": [
-                *(item.model_dump(mode="json") for item in understanding.subjects),
-                {"subject_id": subject_id, "relation": "unknown", "age_group": "unknown"},
-            ],
-            "requests": requests,
-        },
-    ))
+def _volume_price_task(action: _SelectedVolumePriceTask) -> D2DialogueResult:
+    target = ServiceTarget(type="service", id=action.service_id) if action.service_id else TopicTarget(type="topic", id=action.topic_id)
+    return D2DialogueResult(outcome="dialogue", blocks=(PriceOperation(
+        request_id="r1", kind="price", target=target, brand_id=action.brand_id,
+        situation=RequestTreatmentSituation(
+            scope_commitment="unknown" if action.extent == "unknown" else "hypothetical",
+            extent=action.extent, tooth_count=1 if action.extent == "one_tooth" else None,
+            jaw="unknown", continuity="unknown",
+        ),
+    ),))
 
 
 def run_d2_dialogue_turn(
@@ -701,28 +546,7 @@ def _run_spam_gate_turn(
     response = build_d2_spam_gate_response(tenant, session_key=session_key, kind=kind)
     if response.resolved.route != "ADMIN" or not response.rendered_text.strip():
         raise ValueError("d2_experiment_spam_gate_not_resolved")
-    raw = json.dumps(
-        production_envelope_template(
-            route="ADMIN",
-            patient_text=None,
-            commercial_intent="none",
-            promotion_scope="none",
-            scenario="none",
-            primary_price_request_id=None,
-            request_understanding={"subjects": [], "requests": []},
-        ),
-        ensure_ascii=False,
-    )
-    view = build_d2_model_view(tenant)
-    diagnostics.stage("parse")
-    envelope = parse_production_envelope_json(
-        raw,
-        active_service_catalog=view.active_service_catalog,
-        service_reference_catalog=view.service_reference_catalog,
-        commercial_fact_catalog=view.commercial_fact_catalog,
-    )
-    binding = bind_d1r_envelope_to_d2_context(envelope, context)
-    focus = seed_d2_plan_focus(binding)
+    focus = seed_d2_plan_focus(bind_d2_operations_to_context((), (), context))
     return _commit_non_price_d2_turn(
         session_key=session_key,
         store=store,
@@ -793,43 +617,7 @@ def _run_lead_pre_provider_turn(
                     return "demo_stub"
 
             effect_dispatcher = effect_dispatcher or _DemoStubDispatcher()
-    # Synthetic empty envelope: lead does not reinterpret ordinary focus.
-    raw = json.dumps(
-        production_envelope_template(
-            route="ANSWER",
-            patient_text=None,
-            commercial_intent="none",
-            promotion_scope="none",
-            scenario="none",
-            primary_price_request_id=None,
-            request_understanding={
-                "subjects": [],
-                "requests": [
-                    {
-                        "request_id": "r1",
-                        "kind": "booking",
-                        "subject_id": None,
-                        "context": "general_information",
-                        "policy_ids": [],
-                        "payment_scheme": "unspecified",
-                        "payment_scheme_intent": "not_requested",
-                        "contact_fields": [],
-                        "content_text": None,
-                    }
-                ],
-            },
-        ),
-        ensure_ascii=False,
-    )
-    view = build_d2_model_view(tenant)
-    diagnostics.stage("parse")
-    envelope = parse_production_envelope_json(
-        raw, active_service_catalog=view.active_service_catalog,
-        service_reference_catalog=view.service_reference_catalog,
-        commercial_fact_catalog=view.commercial_fact_catalog,
-    )
-    binding = bind_d1r_envelope_to_d2_context(envelope, context)
-    focus = seed_d2_plan_focus(binding)
+    focus = seed_d2_plan_focus(bind_d2_operations_to_context((), (), context))
     return _commit_non_price_d2_turn(
         session_key=session_key,
         store=store,
@@ -871,6 +659,7 @@ def _commit_non_price_d2_turn(
     dialogue_pairs: tuple[SessionDialoguePair, ...] | None = None,
     d2_shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...] | None = None,
     clarify_task: PersistedClarifyTask | None = None,
+    prepared_state=None, recent_price_scope=None,
     lead_pause_response: bool = False,
 ) -> D2DialogueTurn:
     """Persist lead/terminal/clarify-style turns without mutating price situation."""
@@ -955,6 +744,8 @@ def _commit_non_price_d2_turn(
             clarify_task if response.resolved.session_delta.clarify_pending else None
         ),
     )
+    if prepared_state is not None:
+        state = prepared_state
     initial_effect = (
         D2LeadEffect(effect_id=lead_effect_id, status="pending")
         if lead_effect_id is not None else D2LeadEffect()
@@ -967,6 +758,7 @@ def _commit_non_price_d2_turn(
         focus=focus,
         committed_revision=state.revision,
         lead_effect=initial_effect,
+        recent_price_scope=recent_price_scope,
     )
     full_audit("commit_intent", state=state, completion=completion, branch="non_price")
     diagnostics.stage("commit")
@@ -1035,882 +827,310 @@ def _run_reserved_d2_dialogue_turn(
         "model_context", record=previous, state=snapshot.state,
         context=context, tenant_fingerprint=tenant.fingerprint,
     )
-    if selected_price_detail_action is not None and not safe_user_message.strip():
-        # The current completion's verified action is authority for a clean
-        # click. Build a typed request directly; no second parser or LLM call.
-        envelope = OneCallEnvelope.model_validate(production_envelope_template(
-            patient_text=None,
-            service_id=selected_price_detail_action.service_id,
-            commercial_intent=(
-                "included" if selected_price_detail_action.aspect == "includes"
-                else "payment_stages"
-            ),
-            request_understanding={
-                "subjects": [],
-                "requests": [{
-                    "request_id": "r1", "kind": "price_detail", "subject_id": None,
-                    "context": "general_information", "price_detail_aspect": selected_price_detail_action.aspect,
-                    "service_id": selected_price_detail_action.service_id,
-                }],
-            },
-        ))
+    known_task = None
+    if selected_service_id is not None:
+        pending = context.ordinary.clarify_task
+        if pending is None or pending.missing != "service":
+            raise ValueError("d2_ui_service_task_missing")
+        if selected_service_id not in view.active_service_catalog.active_service_ids:
+            raise ValueError("d2_ui_service_selection_mismatch")
+        # A verified click completes the task as a regular operation,
+        # rather than retaining the narrower unresolved-price subtype.
+        known_task = D2DialogueResult.model_validate({"outcome": "dialogue", "blocks": [{
+            **pending.operation.model_dump(),
+            "target": {"type": "service", "id": selected_service_id},
+        }]})
+    elif selected_volume_price_task is not None:
+        known_task = _volume_price_task(selected_volume_price_task)
+    elif selected_document_action is not None:
+        known_task = build_d2_document_task(tenant, selected_document_action)
+    elif selected_price_detail_action is not None:
+        known_task = D2DialogueResult(outcome="dialogue", blocks=(DetailOperation(
+            request_id="r1", kind="price_detail",
+            target=(ServiceTarget(type="service", id=selected_price_detail_action.service_id)
+                    if selected_price_detail_action.service_id else None),
+            price_detail_aspect=selected_price_detail_action.aspect,
+        ),))
+    needs_explanation = known_task is not None and any(isinstance(b, ExplanationOperation) for b in known_task.blocks)
+    if known_task is not None and not needs_explanation:
+        result = known_task
     else:
-        diagnostics.stage("provider")
         provider_input = D2ProviderInput(
-            user_message=safe_user_message,
-            model_view=view,
-            context=context,
-            selected_ui_ref=selected_ui_ref,
-            selected_document_action=selected_document_action,
+            user_message=safe_user_message, model_view=view, context=context,
+            selected_ui_ref=selected_ui_ref, selected_document_action=selected_document_action,
+            known_task=known_task,
         )
         full_audit("provider_input", provider_input=provider_input)
+        diagnostics.stage("provider")
         raw = provider.generate(provider_input)
         full_audit("raw_model_response", raw=raw)
         diagnostics.stage("parse")
-        envelope = parse_production_envelope_json(
+        result = parse_production_envelope_json(
             raw, active_service_catalog=view.active_service_catalog,
             service_reference_catalog=view.service_reference_catalog,
             commercial_fact_catalog=view.commercial_fact_catalog,
+            known_task=known_task, d2_contract=True,
         )
-    full_audit("parsed_envelope", envelope=envelope)
-    diagnostics.stage("binding")
-    selected_topic = None
-    if selected_service_id is not None:
-        selected_topic = resolve_d2_clarify_service_topic(tenant, (selected_service_id,))
-        understanding_for_click = envelope.request_understanding
-        if envelope.route not in {"ANSWER", "CLARIFY"} or understanding_for_click is None or len(understanding_for_click.requests) != 1:
-            raise ValueError("d2_ui_service_selection_unresolved")
-        if envelope.route == "CLARIFY" and envelope.clarify_axis == "service":
-            raise ValueError("d2_ui_service_selection_unresolved")
-        selected_part = understanding_for_click.requests[0]
-        if (
-            selected_part.kind not in {"content", "price"}
-            or selected_part.service_id not in {None, selected_service_id}
-            or selected_part.topic_id not in {None, selected_topic}
-        ):
-            raise ValueError("d2_ui_service_selection_mismatch")
-        selected_part = selected_part.model_copy(update={
-            "service_id": selected_service_id, "topic_id": selected_topic,
-        })
-        understanding_for_click = understanding_for_click.model_copy(update={
-            "requests": (selected_part,),
-        })
-        envelope = envelope.model_copy(update={"request_understanding": understanding_for_click})
-    understanding = envelope.request_understanding
-    # ``other`` with actual prose is an ordinary answer, not a menu route.
-    # Keep empty ``other`` for the explicit off-topic response below.
-    if (
-        envelope.route == "ANSWER"
-        and understanding is not None
-        and len(understanding.requests) == 1
-        and understanding.requests[0].kind == "other"
-        and (understanding.requests[0].content_text or "").strip()
-    ):
-        ordinary = understanding.requests[0].model_copy(update={"kind": "content"})
-        envelope = envelope.model_copy(update={
-            "request_understanding": understanding.model_copy(update={"requests": (ordinary,)})
-        })
-        understanding = envelope.request_understanding
-    envelope = resolve_d2_optional_content_claims(
-        envelope, snapshot=tenant, model_view=view,
-        selected_document_action=selected_document_action,
-        selected_action_only=not safe_user_message.strip(),
+    full_audit("parsed_result", result=result)
+    scoped = tuple(p for p in result.requests if isinstance(p, ScopedOperation))
+    focus = seed_d2_plan_focus(bind_d2_operations_to_context(scoped, result.subjects, context))
+    commit_args = dict(
+        session_key=session_key, store=store, snapshot=snapshot, context=context,
+        focus=focus, tenant_fingerprint=tenant.fingerprint, now=now,
+        request_id=request_id, request_fingerprint=request_fingerprint,
+        lead_effect_id=lead_effect_id, lead_effect_dispatcher=lead_effect_dispatcher,
+        lead_pause_response=lead_pause_response,
     )
-    if selected_volume_price_task is not None and not safe_user_message.strip():
-        envelope = _bind_selected_volume_price_task(
-            envelope, selected_volume_price_task, tenant=tenant,
-        )
-    envelope = bind_implicit_price_service(
-        envelope, context,
-        active_service_ids=view.active_service_catalog.active_service_ids,
-    )
-    understanding = envelope.request_understanding
-    full_audit("effective_envelope", envelope=envelope, selected_service_id=selected_service_id)
-    if (
-        envelope.route == "ANSWER" and understanding is not None
-        and len(understanding.requests) == 1
-        and understanding.requests[0].kind == "price_detail"
-    ):
-        if context.retained_terminal_state not in {"none", "clarify", "spam_warn"}:
-            raise ValueError("d2_experiment_terminal_session_unsupported")
-        detail_part = understanding.requests[0]
-        binding = bind_d1r_envelope_to_d2_context(envelope, context)
-        focus = seed_d2_plan_focus(binding)
-        shown_refs = _current_d2_shown_price_offer_refs(context)
-        active_service = context.ordinary.active_service
-        sources = build_d2_snapshot_sources(
-            tenant, model_view=view, envelope=envelope, session_key=session_key,
-            shown_promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
-            shown_secondary_ref_ids=context.retained_shown_ids.secondary_ref_ids,
-        )
-        try:
-            response = resolve_d2_envelope_response(
-                envelope, sources, as_of=now.date(),
-                shown_price_offer_refs=shown_refs,
-                selected_price_detail_action=(
-                    selected_price_detail_action if not safe_user_message.strip() else None
-                ),
-            )
-        except MaterializationContractError as exc:
-            if str(exc) != "d2_price_detail_context_ambiguous":
-                raise
-            response = build_d2_focus_clarify_response(tenant, session_key=session_key)
-            return _commit_non_price_d2_turn(
-                session_key=session_key, store=store, snapshot=snapshot, context=context,
-                focus=focus, response=response, tenant_fingerprint=tenant.fingerprint,
-                now=now, request_id=request_id, request_fingerprint=request_fingerprint,
-                lead_effect_id=lead_effect_id, lead_effect_dispatcher=lead_effect_dispatcher,
-                lead_pause_response=lead_pause_response,
-            )
-        if not response.rendered_text.strip():
-            raise ValueError("d2_price_detail_not_resolved")
-        detail_rows = response.resolved.d2_price_detail_block.rows
-        detail_services = {row.service_id for row in detail_rows}
-        detail_service_id = next(iter(detail_services)) if len(detail_services) == 1 else None
-        previous_service_id = active_service.service_id if active_service is not None else None
-        service_switched = detail_service_id is not None and detail_service_id != previous_service_id
-        retained_refs = (
-            shown_refs
-            if shown_refs and not service_switched and (
-                detail_part.price_detail_offer_ordinal is not None
-                or detail_part.price_detail_offer_id is not None
-            ) else tuple(D2ShownPriceOfferRef(
-                source_client_id=row.source_client_id, offer_id=row.offer_id,
-                service_id=row.service_id,
-            ) for row in detail_rows)
-        )
-        return _commit_non_price_d2_turn(
-            session_key=session_key, store=store, snapshot=snapshot, context=context,
-            focus=focus, response=response, tenant_fingerprint=tenant.fingerprint,
-            now=now, request_id=request_id, request_fingerprint=request_fingerprint,
-            lead_effect_id=lead_effect_id, lead_effect_dispatcher=lead_effect_dispatcher,
-            selected_service_id=detail_service_id if service_switched else None,
-            selected_service_topic=(
-                resolve_d2_clarify_service_topic(tenant, (detail_service_id,))
-                if service_switched else None
-            ),
-            clear_situation=service_switched,
-            dialogue_pairs=_next_d2_dialogue_pairs(
-                snapshot=snapshot, safe_user_message=safe_user_message,
-                selected_ui_ref=selected_ui_ref, response=response,
-                turn=snapshot.current_turn_index, ttl_policy=ttl_policy, context=context,
-            ),
-            d2_shown_price_offer_refs=retained_refs,
-            lead_pause_response=lead_pause_response,
-        )
-    diagnostics.stage("materialize")
-    admin_terminal = envelope.route == "ADMIN"
-    if admin_terminal:
-        # B03/D2-023: one authored stub; no ordinary parts / focus required.
+    if result.outcome == "admin":
         if context.retained_terminal_state not in {"none", "clarify", "admin", "medical_terminal"}:
             raise ValueError("d2_experiment_terminal_session_unsupported")
         response = build_d2_manual_contact_terminal_response(tenant, session_key=session_key)
-        if response.resolved.route != "ADMIN" or not response.rendered_text.strip():
-            raise ValueError("d2_experiment_admin_terminal_not_resolved")
-        binding = bind_d1r_envelope_to_d2_context(envelope, context)
-        focus = seed_d2_plan_focus(binding)
-        price = None
-        decision = None
-        part = None
-        price_focus_clarify = False
-        clinic_policy = False
-        service_availability = False
-        unknown_brand = False
-        unknown_term = False
-        clinic_contact = False
-        offtopic = False
-        direct_promotion = False
-        direct_fact = False
-        content_lookup = False
-        multi_part = False
-        parts = ()
-        directory_kind = None
-    elif envelope.route == "CLARIFY":
-        if context.retained_terminal_state not in {"none", "clarify", "spam_warn"}:
-            raise ValueError("d2_experiment_terminal_session_unsupported")
-        response = build_d2_focus_clarify_response(
-            tenant,
-            session_key=session_key,
-            clarify_axis=envelope.clarify_axis,
-            service_options=envelope.clarify_service_options,
+        return _commit_non_price_d2_turn(response=response, **commit_args)
+    if context.retained_terminal_state not in {"none", "clarify", "spam_warn"}:
+        raise ValueError("d2_experiment_terminal_session_unsupported")
+    if lead_bridge:
+        if not d2_lead_session_client_matches(session_key):
+            raise ValueError("d2_lead_session_client_required")
+        booking = resolve_d2_booking_lead_entry(
+            snapshot=tenant, session_key=session_key,
+            operations=tuple(p for p in result.requests if p.kind in {"booking", "price", "clinic_policy"}),
+            subjects=result.subjects,
         )
-        if response.resolved.route != "CLARIFY" or not response.rendered_text.strip():
-            raise ValueError("d2_experiment_clarify_not_resolved")
-        binding = bind_d1r_envelope_to_d2_context(envelope, context)
-        focus = seed_d2_plan_focus(binding)
-        shown_topic = (
-            resolve_d2_clarify_service_topic(tenant, envelope.clarify_service_options)
-            if envelope.clarify_service_options else None
-        )
-        clicked_part = understanding.requests[0] if selected_service_id is not None else None
-        clicked_subject = (
-            next((item for item in understanding.subjects
-                  if item.subject_id == clicked_part.subject_id), None)
-            if clicked_part is not None and clicked_part.subject_id is not None else None
-        )
-        click_breaks_situation = (
-            selected_service_id is not None
-            and (
-                context.ordinary.active_service is None
-                or context.ordinary.active_service.service_id != selected_service_id
-                or (clicked_part is not None and clicked_part.subject_id is not None
-                    and (clicked_subject is None or clicked_subject.relation != "self"))
-                or (clicked_part is not None and clicked_part.situation is not None
-                    and (
-                        clicked_part.situation.scope_commitment == "reset"
-                        or (clicked_part.situation.scope_commitment in {"reported", "correction"}
-                            and clicked_part.situation.continuity != "same")
-                    ))
+        if booking is not None:
+            return _commit_non_price_d2_turn(response=booking.response, **commit_args)
+
+    operations, contact_blocks, policy_blocks = [], [], []
+    exact_text, exact_parts, extra_ui, deferred = [], [], [], []
+    exact_deferred = []
+    pending = None
+    first_price_seen = False
+    contact_button = canonical_contact = None
+    commercial_operations = []
+    directory_cta = None
+    for block in result.blocks:
+        operation = block.operation if isinstance(block, ClarificationOperation) else block
+        is_price = isinstance(operation, PriceOperation)
+        if is_price and first_price_seen:
+            deferred.append(operation)
+            continue
+        first_price_seen |= is_price
+        if isinstance(block, DoctorsOperation):
+            answer = build_d2_directory_response(
+                tenant, session_key=session_key, kind="doctors_for_service",
+                service_id=block.service_id, as_of=now.date(),
             )
-        )
-        return _commit_non_price_d2_turn(
-            session_key=session_key, store=store, snapshot=snapshot, context=context,
-            focus=focus, response=response, tenant_fingerprint=tenant.fingerprint,
-            now=now, request_id=request_id, request_fingerprint=request_fingerprint,
-            lead_effect_id=lead_effect_id, lead_effect_dispatcher=lead_effect_dispatcher,
-            shown_service_options=(
-                envelope.clarify_service_options
-                or ((selected_service_id,) if selected_service_id is not None else ())
-            ),
-            shown_service_topic=(shown_topic or selected_topic),
-            selected_service_id=(selected_service_id if selected_service_id is not None else None),
-            selected_service_topic=(selected_topic if selected_service_id is not None else shown_topic),
-            clear_active_service=(selected_service_id is None and shown_topic is not None),
-            clear_situation=(
-                context.ordinary.situation_state is not None
-                and (
-                    click_breaks_situation
-                    or (
-                        (selected_topic if selected_service_id is not None else shown_topic) is not None
-                        and context.ordinary.situation_state.topic_id
-                        != (selected_topic if selected_service_id is not None else shown_topic)
-                    )
-                )
-            ),
-            dialogue_pairs=_next_d2_dialogue_pairs(
-                snapshot=snapshot,
-                safe_user_message=safe_user_message,
-                selected_ui_ref=selected_ui_ref,
-                response=response,
-                turn=snapshot.current_turn_index,
-                ttl_policy=ttl_policy,
-                context=context,
-            ),
-            d2_shown_price_offer_refs=_next_d2_shown_price_offer_refs(
-                snapshot=snapshot, price=None, context=context,
-            ) if not envelope.clarify_service_options else (),
-            clarify_task=_d2_clarify_task(envelope=envelope),
-            lead_pause_response=lead_pause_response,
-        )
-    else:
-        if envelope.route != "ANSWER" or understanding is None or not understanding.requests:
-            raise ValueError("d2_experiment_single_price_required")
-        offtopic = is_d2_offtopic_envelope(envelope)
-        if offtopic:
-            if context.retained_terminal_state not in {"none", "clarify", "spam_warn"}:
-                raise ValueError("d2_experiment_terminal_session_unsupported")
-            response = build_d2_offtopic_response(tenant, session_key=session_key)
-            if not response.rendered_text.strip():
-                raise ValueError("d2_experiment_offtopic_not_resolved")
-            binding = bind_d1r_envelope_to_d2_context(envelope, context)
-            focus = seed_d2_plan_focus(binding)
-            return _commit_non_price_d2_turn(
-                session_key=session_key,
-                store=store,
-                snapshot=snapshot,
-                context=context,
-                focus=focus,
-                response=response,
-                tenant_fingerprint=tenant.fingerprint,
-                now=now,
-                request_id=request_id,
-                request_fingerprint=request_fingerprint,
-                lead_effect_id=lead_effect_id,
-                lead_effect_dispatcher=lead_effect_dispatcher,
-                lead_pause_response=lead_pause_response,
+            exact_text.append(D2ExactTextBlock(request_id=block.request_id,
+                source_client_id=session_key.client_id, display_text=answer.rendered_text))
+            exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
+                kind="reference", status="answered", scope="service", service_id=block.service_id,
+                topic_id=resolve_d2_clarify_service_topic(tenant, (block.service_id,))))
+            directory_cta = directory_cta or next(
+                (button for button in answer.resolved.ui_plan.buttons if button.action_kind == "cta"), None,
             )
-        booking_entry = None
-        if lead_bridge:
-            if not d2_lead_session_client_matches(session_key):
-                raise ValueError("d2_lead_session_client_required")
-            booking_entry = resolve_d2_booking_lead_entry(
-                snapshot=tenant,
-                session_key=session_key,
-                understanding=understanding,
+            continue
+        if isinstance(block, OffTopicOperation):
+            answer = build_d2_offtopic_response(tenant, session_key=session_key)
+            exact_text.append(D2ExactTextBlock(request_id=block.request_id,
+                source_client_id=session_key.client_id, display_text=answer.rendered_text))
+            exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
+                kind="reference", status="answered", scope="clinic"))
+            continue
+        if isinstance(block, ClarificationOperation):
+            # Only unresolved service/term price tasks can reach this branch.
+            # Known prices go directly to the price owner below.
+            if pending is not None:
+                if is_price:
+                    deferred.append(operation)
+                else:
+                    exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
+                        kind="clarification", status="deferred", scope="clinic"))
+                    exact_deferred.append(D2PartDeferredBlock(request_id=block.request_id,
+                        source_client_id=session_key.client_id, display_text=D2_CLARIFICATION_DEFERRAL_TEXT))
+                continue
+            pending = PersistedClarifyTask(missing=block.missing, operation=block.operation)
+            answer = build_d2_focus_clarify_response(
+                tenant, session_key=session_key, clarify_axis=block.missing,
+                service_options=block.choices if block.missing == "service" else None,
             )
-        if booking_entry is not None:
-            response = booking_entry.response
-            if not response.rendered_text.strip():
-                raise ValueError("d2_experiment_lead_not_resolved")
-            binding = bind_d1r_envelope_to_d2_context(envelope, context)
-            focus = seed_d2_plan_focus(binding)
-            return _commit_non_price_d2_turn(
-                session_key=session_key,
-                store=store,
-                snapshot=snapshot,
-                context=context,
-                focus=focus,
-                response=response,
-                tenant_fingerprint=tenant.fingerprint,
-                now=now,
-                request_id=request_id,
-                request_fingerprint=request_fingerprint,
-                lead_effect_id=lead_effect_id,
-                lead_effect_dispatcher=lead_effect_dispatcher,
-                lead_pause_response=lead_pause_response,
+            exact_text.append(D2ExactTextBlock(request_id=block.request_id,
+                source_client_id=session_key.client_id, display_text=answer.rendered_text))
+            exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
+                kind="price_clarification" if is_price else "clarification", status="answered", scope="clinic"))
+            extra_ui.extend(answer.resolved.ui_plan.quick_replies)
+            continue
+        if isinstance(block, ContactOperation):
+            text, button, canonical = build_d2_contact_fact_block(
+                tenant, session_key=session_key, request_id=block.request_id,
+                contact_fields=block.contact_fields, contact_branch_id=block.contact_branch_id,
             )
-        parts = understanding.requests
-        part = parts[0]
-        contact_parts = tuple(item for item in parts if item.kind == "contact")
-        policy_parts = tuple(item for item in parts if item.kind == "clinic_policy")
-        subjects_by_id = {item.subject_id: item for item in understanding.subjects}
-        multi_part = _d2_multipart_shape_ok(parts=parts, subjects_by_id=subjects_by_id)
-        clinic_policy = (
-            len(parts) == 1
-            and part.kind == "clinic_policy"
-        )
-        clinic_contact = (
-            envelope.commercial_intent == "none"
-            and len(parts) == 1
-            and part.kind == "contact"
-        )
-        # Ordinary FullContext prose is the default. These narrow exceptions
-        # are driven by typed IDs/statuses, never by a second pass over text.
-        service_availability = (
-            envelope.service_reference_status == "resolved"
-            and envelope.requested_service_id is not None
-            and envelope.requested_service_id in view.service_reference_catalog.inactive_service_ids
-        )
-        unknown_brand = (
-            len(parts) == 1
-            and part.kind in {"price", "content"}
-            and part.brand_id is not None
-            and part.brand_id not in view.brand_catalog.brands
-        )
-        unknown_term = envelope.service_reference_status == "unresolved"
-        brand_policy = (
-            build_d2_brand_policy_response(tenant, session_key=session_key, brand_id=part.brand_id)
-            if part.brand_id is not None else None
-        )
-        directory_kind = None
-        direct_promotion = (
-            envelope.commercial_intent == "promotion"
-            and envelope.promotion_scope in {"general", "service", "shown"}
-            and len(parts) == 1
-            and part.kind == "content"
-        )
-        direct_fact = (
-            envelope.commercial_intent == "payment"
-            and bool(envelope.references.direct_fact_ids)
-            and 1 <= len(parts) <= 3
-            and all(item.kind == "content" for item in parts)
-        )
-        content_lookup = (
-            envelope.commercial_intent == "none"
-            and 1 <= len(parts) <= 2
-            and all(item.kind == "content" for item in parts)
-        )
-        if not (
-            direct_promotion
-            or direct_fact
-            or content_lookup
-            or multi_part
-            or clinic_policy
-            or clinic_contact
-            or service_availability
-            or unknown_brand
-            or unknown_term
-            or brand_policy is not None
-            or directory_kind is not None
-        ):
-            if len(parts) != 1:
-                raise ValueError("d2_experiment_single_price_required")
-            if part.kind != "price":
-                raise ValueError("d2_experiment_single_price_required")
-            subject = subjects_by_id.get(part.subject_id) if part.subject_id else None
-            shape_failures = _d2_supported_price_shape_failure_codes(part=part, subject=subject)
-            if shape_failures:
-                raise ValueError("d2_experiment_a08_shape_required:" + ",".join(shape_failures))
-        elif direct_promotion and envelope.promotion_scope == "service" and part.service_id is None:
-            raise ValueError("d2_experiment_promotion_service_required")
-        # Clarify and spam_warn are soft; hard terminals remain unsupported on ordinary answers.
-        if context.retained_terminal_state not in {"none", "clarify", "spam_warn"}:
-            raise ValueError("d2_experiment_terminal_session_unsupported")
-        binding = bind_d1r_envelope_to_d2_context(envelope, context)
-        focus = seed_d2_plan_focus(binding)
-        price_focus_clarify = (
-            focus.action == "clarify_focus"
-            and part.kind == "price"
-            and part.service_id is None
-            and part.topic_id is None
-            and binding.outcome == "ambiguous_focus"
-        )
-        if not (direct_promotion and envelope.promotion_scope == "general"):
-            if (
-                price_focus_clarify
-                # A direct service ID is already sufficient for the
-                # catalog-owned price lookup. Session binding deliberately
-                # does not infer its topic from dialogue text or labels.
-                or (part.kind == "price" and part.service_id is not None and part.topic_id is None)
-                or multi_part
-                or content_lookup
-                or clinic_policy
-                or clinic_contact
-                or service_availability
-                or unknown_brand
-                or unknown_term
-                or brand_policy is not None
-                or directory_kind is not None
-            ):
-                # Independent content parts and typed special routes need no single-topic focus.
-                pass
-            elif (
-                focus.action != "resolve_topic"
-                or binding.outcome not in {"explicit_new_topic", "clear_continuation"}
-            ):
-                raise ValueError("d2_experiment_resolved_topic_required")
-        if price_focus_clarify:
-            response = build_d2_focus_clarify_response(tenant, session_key=session_key)
-            price = None
-            decision = None
-        elif clinic_policy:
-            response = build_d2_clinic_policy_response(
-                tenant,
-                session_key=session_key,
-                understanding=understanding,
+            contact_blocks.append(text)
+            contact_button = contact_button or button
+            canonical_contact = canonical_contact or canonical
+            continue
+        if isinstance(block, PolicyOperation):
+            answer = build_d2_clinic_policy_response(
+                tenant, session_key=session_key, request=block, subject=block.subject,
             )
-            price = None
-            decision = None
-        elif clinic_contact:
-            response = build_d2_contact_response(
-                tenant,
-                session_key=session_key,
-                contact_fields=tuple(part.contact_fields),
-                contact_branch_id=part.contact_branch_id,
-            )
-            price = None
-            decision = None
-        elif service_availability:
-            assert envelope.requested_service_id is not None
-            response = build_d2_service_availability_response(
-                tenant,
-                session_key=session_key,
-                service_id=envelope.requested_service_id,
-            )
-            price = None
-            decision = None
-        elif brand_policy is not None:
-            response = brand_policy
-            price = None
-            decision = None
-        elif unknown_brand or unknown_term:
-            response = build_d2_unknown_reference_response(
-                tenant,
-                session_key=session_key,
-            )
-            price = None
-            decision = None
-        else:
-            sources = build_d2_snapshot_sources(
-                tenant,
-                model_view=view,
-                envelope=envelope,
-                session_key=session_key,
-                shown_promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
-                shown_secondary_ref_ids=context.retained_shown_ids.secondary_ref_ids,
-            )
-            # The common lower materializer owns free prose and price. Contacts
-            # and policies enter its pre-resolver plan as exact tenant facts;
-            # they never trigger a second render or UI projection.
-            resolution_envelope = envelope
-            exact_contact_blocks = []
-            exact_contact_button = None
-            exact_canonical_contact = None
-            for contact_part in contact_parts:
-                block, button, canonical_contact = build_d2_contact_fact_block(
-                    tenant,
-                    session_key=session_key,
-                    request_id=contact_part.request_id,
-                    contact_fields=tuple(contact_part.contact_fields),
-                    contact_branch_id=contact_part.contact_branch_id,
-                )
-                exact_contact_blocks.append(block)
-                if exact_contact_button is None:
-                    exact_contact_button = button
-                if exact_canonical_contact is None:
-                    exact_canonical_contact = canonical_contact
-            exact_policy_blocks = tuple(
-                build_d2_clinic_policy_fact_block(
-                    tenant,
-                    session_key=session_key,
-                    understanding=understanding,
-                    request_id=policy_part.request_id,
-                )
-                for policy_part in policy_parts
-            )
-            if contact_parts or policy_parts:
-                resolution_envelope = envelope.model_copy(
-                    update={
-                        "request_understanding": understanding.model_copy(
-                            update={
-                                "requests": tuple(
-                                    item for item in parts
-                                    if item.kind not in {"contact", "clinic_policy"}
-                                )
-                            }
-                        )
-                    }
-                )
-            diagnostics.stage("materialize")
-            full_audit(
-                "materialization_input", envelope=resolution_envelope,
-                sources=sources, focus=focus,
-                exact_contact_blocks=tuple(exact_contact_blocks),
-                exact_policy_blocks=tuple(exact_policy_blocks),
-            )
-            response = resolve_d2_envelope_response(
-                resolution_envelope,
-                sources,
-                as_of=now.date(),
-                d2_plan_focus_seed=focus,
-                common_route_direct_service_only=True,
-                common_route_content_lookup=True,
-                exact_contact_blocks=tuple(exact_contact_blocks),
-                exact_policy_blocks=exact_policy_blocks,
-                exact_contact_button=exact_contact_button,
-                exact_canonical_contact=exact_canonical_contact,
-                d2_request_order=tuple(item.request_id for item in parts),
-                selected_document_action=selected_document_action,
-                shown_price_offer_refs=_current_d2_shown_price_offer_refs(context),
-            )
-            price = response.resolved.d2_price_block
-            decision = response.resolved.d2_price_scope_decision
-    diagnostics.stage("gate")
+            # Rules have already been applied to this local operation. The final
+            # renderer receives code-owned text, not a second route decision.
+            exact_text.append(D2ExactTextBlock(request_id=block.request_id,
+                source_client_id=session_key.client_id, display_text=answer.rendered_text))
+            exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
+                kind="reference", status="answered", scope="clinic"))
+            continue
+        if isinstance(block, CommercialOperation):
+            commercial_operations.append(block)
+            continue
+        if isinstance(block, PriceOperation):
+            policy = resolve_clinic_policy_operations(client_id=session_key.client_id,
+                operations=(block,), subjects=result.subjects)
+            blocked = tuple(d.policy_key for d in policy.decisions if d.outcome == "blocked" and d.policy_key)
+            if blocked:
+                rule = PolicyOperation(request_id=block.request_id, kind="clinic_policy",
+                    policy_ids=blocked, subject=block.subject, context=block.context)
+                answer = build_d2_clinic_policy_response(tenant, session_key=session_key,
+                    request=rule, subject=rule.subject)
+                exact_text.append(D2ExactTextBlock(request_id=block.request_id,
+                    source_client_id=session_key.client_id, display_text=answer.rendered_text))
+                exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
+                    kind="price_reference", status="answered", scope="clinic"))
+                continue
+        target = getattr(block, "target", None)
+        brand = getattr(block, "brand_id", None)
+        reference_response = None
+        if brand is not None and brand not in view.brand_catalog.brands:
+            reference_response = build_d2_unknown_brand_response(tenant, session_key=session_key, brand_id=brand)
+        elif isinstance(target, UnresolvedTarget):
+            reference_response = build_d2_unknown_reference_response(tenant, session_key=session_key)
+        elif isinstance(target, ServiceTarget) and target.id in view.service_reference_catalog.inactive_service_ids:
+            reference_response = build_d2_service_availability_response(tenant, session_key=session_key, service_id=target.id)
+        elif brand is not None:
+            reference_response = build_d2_brand_policy_response(tenant, session_key=session_key, brand_id=brand)
+        if reference_response is not None:
+            exact_text.append(D2ExactTextBlock(request_id=block.request_id,
+                source_client_id=session_key.client_id, display_text=reference_response.rendered_text))
+            exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
+                kind="price_reference" if is_price else "reference", status="answered", scope="clinic"))
+            # These producers publish an exact availability/reference fact,
+            # with no service-choice UI. Only explicit clarification owns a task.
+            continue
+        if isinstance(block, PriceOperation) and block.target is None:
+            raise ValueError("d2_price_target_required")
+        operations.append(block)
+    sources = build_d2_snapshot_sources(
+        tenant, model_view=view, operations=tuple(operations), session_key=session_key,
+        shown_promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
+        shown_secondary_ref_ids=context.retained_shown_ids.secondary_ref_ids,
+    )
+    price_operations = tuple(p for p in operations if isinstance(p, PriceOperation))
+    price_focus = seed_d2_plan_focus(bind_d2_operations_to_context(
+        price_operations, result.subjects, context,
+    )) if price_operations else focus
+    render_order = tuple(b.request_id for b in result.blocks)
+    response = resolve_d2_operations(
+        tuple(operations), result.subjects, sources, as_of=now.date(),
+        d2_plan_focus_seed=price_focus,
+        common_route_content_lookup=bool(operations) and all(isinstance(p, ExplanationOperation) for p in operations),
+        exact_contact_blocks=tuple(contact_blocks), exact_policy_blocks=tuple(policy_blocks),
+        exact_contact_button=contact_button, exact_canonical_contact=canonical_contact,
+        exact_text_blocks=tuple(exact_text), exact_parts=tuple(exact_parts),
+        extra_ui=tuple(extra_ui), deferred_price_parts=tuple(deferred),
+        exact_deferred_blocks=tuple(exact_deferred),
+        d2_request_order=render_order,
+        shown_price_offer_refs=_current_d2_shown_price_offer_refs(context),
+        selected_price_detail_action=selected_price_detail_action,
+        commercial_operations=tuple(commercial_operations),
+        directory_cta=directory_cta,
+    )
+    if not response.rendered_text.strip():
+        raise ValueError("d2_empty_completed_answer")
     if lead_pause_response:
         response = _apply_lead_pause_without_detail_actions(response)
-    if admin_terminal:
-        pass
-    elif price_focus_clarify:
-        if response.resolved.route != "CLARIFY" or not response.rendered_text.strip():
-            raise ValueError("d2_experiment_focus_clarify_not_resolved")
-    elif clinic_policy or clinic_contact or service_availability or brand_policy is not None or unknown_brand or unknown_term or directory_kind is not None:
-        if not response.rendered_text.strip():
-            raise ValueError("d2_experiment_directory_or_availability_not_resolved")
-    elif direct_promotion:
-        if not response.rendered_text.strip() or not response.resolved.promo_blocks:
-            raise ValueError("d2_experiment_promotion_not_resolved")
-    elif direct_fact:
-        if not response.rendered_text.strip() or not response.resolved.requested_fact_blocks:
-            raise ValueError("d2_experiment_fact_not_resolved")
-    elif content_lookup:
-        if not response.rendered_text.strip():
-            raise ValueError("d2_experiment_content_not_resolved")
-        if len(parts) == 1 and not response.resolved.information_blocks:
-            raise ValueError("d2_experiment_content_not_resolved")
-    elif multi_part:
-        resolved_parts = response.resolved.d2_request_parts
-        if not response.rendered_text.strip():
-            raise ValueError("d2_experiment_multipart_not_resolved")
-        if not any(item.status in {"answered", "recovered"} for item in resolved_parts):
-            raise ValueError("d2_experiment_multipart_not_resolved")
-        # Anchor persistence on the first answered price part when present (D2-080).
-        answered_price = next(
-            (
-                item
-                for item in resolved_parts
-                if item.kind == "price" and item.status == "answered"
-            ),
-            None,
-        )
-        if answered_price is not None:
-            part = next(item for item in parts if item.request_id == answered_price.request_id)
-    elif (
-        part.kind == "price"
-        and part.brand_id is not None
-        and price is None
-        and response.resolved.d2_part_failure_blocks
-        and response.rendered_text.strip()
-    ):
-        # Exact brand/service without a published offer is an honest gap.
-        pass
-    elif (
-        selected_volume_price_task is not None
-        and not safe_user_message.strip()
-        and price is None
-        and response.resolved.d2_part_failure_blocks
-        and response.rendered_text.strip()
-    ):
-        # The verified volume can have no published offer in the current pack.
-        pass
-    elif price is None or (part.service_id is None and decision is None) or not response.rendered_text.strip():
-        raise ValueError("d2_experiment_price_not_resolved")
-    full_audit("materialized_response", response=response, focus=focus, branch="ordinary")
+        pending = None
     turn = snapshot.current_turn_index
-    diagnostics.stage("state_build")
-    # Persist only finalized facts. Hypothetical/overview/unknown must not wipe
-    # a previously reported or corrected situation (D2-003).
-    ordinary_situation = context.ordinary.situation_state
-    situation = ordinary_situation
-    if (
-        admin_terminal
-        or price_focus_clarify
-        or clinic_policy
-        or clinic_contact
-        or service_availability
-        or unknown_brand
-        or unknown_term
-        or directory_kind is not None
-    ):
-        situation = ordinary_situation
-    elif multi_part and (price is None or decision is None or decision.applied_extent is None):
-        # Independent parts: do not invent a situation from deferred/unavailable price.
-        if (
-            ordinary_situation is not None
-            and part.topic_id is not None
-            and ordinary_situation.topic_id != part.topic_id
-            and focus.cross_topic_carry is None
+    delta = response.resolved.session_delta
+    price = response.resolved.d2_price_block
+    decision = response.resolved.d2_price_scope_decision
+    ordinary = context.ordinary
+    scope = response.resolved.response_scope
+    active_service = ordinary.active_service if scope == "clinic" else (
+        PersistedActiveService(service_id=delta.active_service_id, provenance="explicit_current", set_at_turn=turn)
+        if delta.active_service_id else None
+    )
+    topic_id = delta.active_topic_id
+    if topic_id is None and active_service is not None and scope == "service":
+        topic_id = resolve_d2_clarify_service_topic(tenant, (active_service.service_id,))
+    active_topic = ordinary.active_topic if scope == "clinic" else (
+        PersistedActiveTopic(topic_id=topic_id, provenance="explicit_topic", set_at_turn=turn) if topic_id else None
+    )
+    situation = ordinary.situation_state
+    reported = response.resolved.d2_treatment_situation
+    if reported is not None:
+        situation_topic = reported.topic_id
+        if situation_topic is None and reported.service_id:
+            situation_topic = resolve_d2_clarify_service_topic(tenant, (reported.service_id,))
+        if reported.scope_commitment == "reset":
+            situation = None
+        elif reported.scope_commitment in {"reported", "correction"} and situation_topic and reported.extent in {"one_tooth", "few_teeth", "full_arch"}:
+            owner = (situation.situation_owner_id if reported.scope_commitment == "correction" and situation is not None and situation.topic_id == situation_topic else uuid4().hex)
+            situation = PersistedSituationState(
+                session_key=session_key, topic_id=situation_topic, extent=reported.extent,
+                jaw=reported.jaw, stage="unknown", modifiers=(), set_at_turn=turn,
+                situation_owner_id=owner, tooth_count=reported.tooth_count,
+            )
+        elif price_focus.cross_topic_carry is not None and decision is not None and decision.applied_extent is not None:
+            source = price_focus.cross_topic_carry.source_situation
+            situation = source.model_copy(update={"topic_id": topic_id, "set_at_turn": turn})
+    if situation is ordinary.situation_state and scope != "clinic" and not (reported and reported.scope_commitment in {"hypothetical", "unknown"}):
+        if (active_topic and situation and situation.topic_id != active_topic.topic_id) or (
+            active_service and (ordinary.active_service is None or active_service.service_id != ordinary.active_service.service_id)
         ):
             situation = None
-    elif decision is not None and decision.applied_extent is not None:
-        current = part.situation
-        carried = focus.carried_situation
-        if (
-            current is not None
-            and carried is not None
-            and current.continuity == "same"
-            and carried.situation_owner_id is not None
-            and carried.session_key == session_key
-            and carried.topic_id == part.topic_id
-            and carried.extent == decision.applied_extent
-        ):
-            situation = PersistedSituationState(
-                session_key=session_key, topic_id=part.topic_id, extent=carried.extent,
-                jaw=carried.jaw, stage=carried.stage, modifiers=carried.modifiers, set_at_turn=turn,
-                situation_owner_id=carried.situation_owner_id, tooth_count=carried.tooth_count,
-            )
-        elif (
-            current is not None
-            and current.scope_commitment in {"reported", "correction"}
-            and current.extent == decision.applied_extent
-        ):
-            situation = PersistedSituationState(
-                session_key=session_key, topic_id=part.topic_id, extent=current.extent,
-                jaw=current.jaw, stage="unknown", modifiers=(), set_at_turn=turn,
-                situation_owner_id=(
-                    ordinary_situation.situation_owner_id
-                    if (
-                        current.scope_commitment == "correction"
-                        and ordinary_situation is not None
-                        and ordinary_situation.situation_owner_id is not None
-                        and ordinary_situation.topic_id == part.topic_id
-                    )
-                    else uuid4().hex
-                ),
-                tooth_count=current.tooth_count,
-            )
-        elif focus.cross_topic_carry is not None:
-            source = focus.cross_topic_carry.source_situation
-            if source.extent != decision.applied_extent:
-                raise ValueError("d2_experiment_carry_extent_mismatch")
-            situation = PersistedSituationState(
-                session_key=session_key, topic_id=part.topic_id, extent=source.extent,
-                jaw=source.jaw, stage=source.stage, modifiers=source.modifiers, set_at_turn=turn,
-                situation_owner_id=source.situation_owner_id, tooth_count=source.tooth_count,
-            )
-        elif current is not None and current.scope_commitment == "hypothetical":
-            situation = ordinary_situation
-    elif decision is not None and decision.reason == "overview":
-        current = part.situation
-        if current is not None and current.scope_commitment in {"unknown", "reset"}:
-            situation = None
-        else:
-            situation = ordinary_situation
-    elif (
-        ordinary_situation is not None
-        and part.topic_id is not None
-        and ordinary_situation.topic_id != part.topic_id
-        and focus.cross_topic_carry is None
-        and (decision is None or decision.applied_extent is None)
-    ):
-        # Explicit new topic without carried extent: do not keep prior situation (D2-032).
-        situation = None
-    shown_services = tuple(dict.fromkeys(row.service_id for row in price.rows)) if price is not None else ()
-    extra_offers = tuple(row.offer_id for row in price.rows) if price is not None else ()
-    shown_offers = tuple(dict.fromkeys((*context.retained_shown_ids.price_offer_ids, *extra_offers)))
-    session_delta = response.resolved.session_delta
-    response_scope = response.resolved.response_scope
-    if admin_terminal or response_scope == "clinic":
-        active_service = context.ordinary.active_service
-        active_topic = context.ordinary.active_topic
-        shown_options_snapshot = context.ordinary.shown_options_snapshot
-    elif response_scope == "mixed":
-        active_service = None
-        active_topic = None
-        shown_options_snapshot = None
-    else:
-        active_service = (
-            PersistedActiveService(
-                service_id=session_delta.active_service_id,
-                provenance="explicit_current", set_at_turn=turn,
-            ) if session_delta.active_service_id is not None else None
-        )
-        active_topic = (
-            PersistedActiveTopic(
-                topic_id=session_delta.active_topic_id,
-                provenance="explicit_topic", set_at_turn=turn,
-            ) if session_delta.active_topic_id is not None else None
-        )
-        previous_options = context.ordinary.shown_options_snapshot
-        shown_options_snapshot = (
-            previous_options
-            if previous_options is not None and active_topic is not None
-            and previous_options.topic_id == active_topic.topic_id
-            and (active_service is None or active_service.service_id in previous_options.service_ids)
-            else None
-        )
-        if price is not None and active_topic is not None:
-            shown_options_snapshot = PersistedShownOptionsSnapshot(
-                session_key=session_key, topic_id=active_topic.topic_id,
-                service_ids=shown_services, shown_at_turn=turn,
-                provenance="finalized_plan_price_offers",
-            )
-    if (
-        response_scope == "service"
-        and active_service is not None
-        and (
-            context.ordinary.active_service is None
-            or active_service.service_id != context.ordinary.active_service.service_id
-        )
-        and situation is ordinary_situation
-        and not (
-            part is not None and part.situation is not None
-            and part.situation.scope_commitment in {"hypothetical", "unknown"}
-        )
-    ):
-        # A new exact service cannot silently inherit an earlier patient's
-        # treatment facts. A newly established or explicitly carried situation
-        # was materialized above as a distinct state value.
-        situation = None
+    shown_services = tuple(dict.fromkeys(row.service_id for row in price.rows)) if price else ()
+    options = ordinary.shown_options_snapshot if scope == "clinic" else None
+    if price is not None and active_topic is not None:
+        options = PersistedShownOptionsSnapshot(session_key=session_key, topic_id=active_topic.topic_id,
+            service_ids=shown_services, shown_at_turn=turn, provenance="finalized_plan_price_offers")
+    if pending is not None:
+        service_ids = tuple(q.reply_id.removeprefix("service:") for q in extra_ui if q.reply_id.startswith("service:"))
+        shown_topic = resolve_d2_clarify_service_topic(tenant, service_ids) if service_ids else None
+        options = PersistedShownOptionsSnapshot(session_key=session_key, topic_id=shown_topic,
+            service_ids=service_ids, shown_at_turn=turn) if service_ids and shown_topic else None
     if lead_pause_response:
-        # The lead resume/cancel controls replace volume/service choices. Do
-        # not persist hidden choices as if the patient had seen them.
-        shown_options_snapshot = None
+        options = None
+    refs = _next_d2_shown_price_offer_refs(snapshot=snapshot, price=price, context=context)
+    if response.resolved.d2_price_detail_block is not None:
+        refs = tuple(D2ShownPriceOfferRef(source_client_id=r.source_client_id, offer_id=r.offer_id, service_id=r.service_id)
+                     for r in response.resolved.d2_price_detail_block.rows)
+    if pending is not None or scope == "mixed":
+        refs = ()
+    elif price is None and response.resolved.d2_price_detail_block is None:
+        if (
+            scope == "service" and active_service is not None
+            and any(ref.service_id != active_service.service_id for ref in refs)
+        ) or (
+            scope == "topic" and active_topic is not None and ordinary.active_topic is not None
+            and active_topic.topic_id != ordinary.active_topic.topic_id
+        ):
+            refs = ()
+    accumulated = context.retained_shown_ids.model_copy(update={
+        "requested_fact_ids": tuple(dict.fromkeys((*context.retained_shown_ids.requested_fact_ids, *delta.shown_requested_fact_ids))),
+        "promo_fact_ids": tuple(dict.fromkeys((*context.retained_shown_ids.promo_fact_ids, *delta.shown_promo_ids))),
+        "price_offer_ids": tuple(dict.fromkeys((*context.retained_shown_ids.price_offer_ids, *(r.offer_id for r in price.rows)))) if price else context.retained_shown_ids.price_offer_ids,
+        "secondary_ref_ids": tuple(dict.fromkeys((*context.retained_shown_ids.secondary_ref_ids, *_shown_secondary_ref_ids(response)))),
+    })
     state = ResponsePlanSessionState(
         schema_version=SESSION_SCHEMA_VERSION, session_key=session_key,
-        revision=snapshot.state.revision + 1, last_committed_turn_index=turn,
-        active_service=active_service,
-        active_topic=active_topic,
-        situation_state=situation,
-        shown_options_snapshot=shown_options_snapshot,
-        dialogue_pairs=_next_d2_dialogue_pairs(
-            snapshot=snapshot,
-            safe_user_message=safe_user_message,
-            selected_ui_ref=selected_ui_ref,
-            response=response,
-            turn=turn,
-            ttl_policy=ttl_policy,
-            context=context,
-        ),
-        d2_shown_price_offer_refs=(
-            tuple(D2ShownPriceOfferRef(
-                source_client_id=row.source_client_id, offer_id=row.offer_id,
-                service_id=row.service_id,
-            ) for row in response.resolved.d2_price_detail_block.rows)
-            if (
-                price is None and response.resolved.d2_price_detail_block is not None
-                and response_scope != "mixed"
-            )
-            else _next_d2_shown_price_offer_refs(
-                snapshot=snapshot, price=price, context=context,
-            ) if (
-                (price is not None and response_scope != "mixed")
-                or (
-                    response_scope != "mixed"
-                    and not (
-                        response_scope == "service" and active_service is not None
-                        and any(ref.service_id != active_service.service_id
-                                for ref in snapshot.state.d2_shown_price_offer_refs)
-                    )
-                    and not (
-                        response_scope == "topic" and active_topic is not None
-                        and context.ordinary.active_topic is not None
-                        and active_topic.topic_id != context.ordinary.active_topic.topic_id
-                    )
-                )
-            ) else ()
-        ),
-        accumulated_shown_ids=PersistedShownCommercialIds(
-            requested_fact_ids=tuple(dict.fromkeys((
-                *context.retained_shown_ids.requested_fact_ids,
-                *response.resolved.session_delta.shown_requested_fact_ids,
-            ))),
-            promo_fact_ids=tuple(dict.fromkeys((
-                *context.retained_shown_ids.promo_fact_ids,
-                *response.resolved.session_delta.shown_promo_ids,
-            ))),
-            amplifier_fact_ids=context.retained_shown_ids.amplifier_fact_ids,
-            service_value_ids=context.retained_shown_ids.service_value_ids,
-            price_offer_ids=shown_offers,
-            required_offer_condition_ids=context.retained_shown_ids.required_offer_condition_ids,
-            shown_service_option_ids=context.retained_shown_ids.shown_service_option_ids,
-            secondary_ref_ids=tuple(dict.fromkeys((
-                *context.retained_shown_ids.secondary_ref_ids,
-                *_shown_secondary_ref_ids(response),
-            ))),
-        ),
-        terminal_state=response.resolved.session_delta.terminal_state,
-        clarify_pending=response.resolved.session_delta.clarify_pending,
-        clarify_task=(
-            _d2_clarify_task(envelope=envelope)
-            if response.resolved.session_delta.clarify_pending
-            else None
-        ),
+        revision=snapshot.state.revision+1, last_committed_turn_index=turn,
+        active_service=active_service, active_topic=active_topic, situation_state=situation,
+        shown_options_snapshot=options, d2_shown_price_offer_refs=refs,
+        dialogue_pairs=_next_d2_dialogue_pairs(snapshot=snapshot, safe_user_message=safe_user_message,
+            selected_ui_ref=selected_ui_ref, response=response, turn=turn, ttl_policy=ttl_policy, context=context),
+        accumulated_shown_ids=accumulated, terminal_state=delta.terminal_state,
+        clarify_pending=pending is not None, clarify_task=pending,
     )
-    initial_effect = (
-        D2LeadEffect(effect_id=lead_effect_id, status="pending")
-        if lead_effect_id is not None else D2LeadEffect()
-    )
-    completion = D2CompletedTurn(
-        request_id=request_id,
-        request_fingerprint=request_fingerprint,
-        response=response,
-        context=context,
-        focus=focus,
-        committed_revision=state.revision,
-        lead_effect=initial_effect,
-        recent_price_scope=(
-            D2RecentPriceScope(
-                topic_id=selected_volume_price_task.topic_id,
-                service_id=selected_volume_price_task.service_id,
-                brand_id=selected_volume_price_task.brand_id,
-                extent=selected_volume_price_task.extent,
-            )
-            if selected_volume_price_task is not None and not safe_user_message.strip()
-            else None
-        ),
-    )
-    full_audit("commit_intent", state=state, completion=completion, branch="ordinary")
-    diagnostics.stage("commit")
-    store.complete(D2DialogueRecord(
-        state=state, activity=D2SessionActivity(session_key=session_key, last_user_turn_at=now),
-        tenant_fingerprint=tenant.fingerprint,
-    ), expected_revision=snapshot.state.revision, completion=completion)
-    diagnostics.committed()
-    full_audit("commit_confirmed", state=state, completion=completion, branch="ordinary")
-    if lead_effect_dispatcher is not None and lead_effect_id is not None:
-        diagnostics.stage("effect")
-        try:
-            effect_status = lead_effect_dispatcher.dispatch(effect_id=lead_effect_id)
-            if effect_status not in {"sent", "failed", "unknown", "demo_stub"}:
-                raise ValueError("d2_lead_effect_dispatch_status_invalid")
-        except Exception:
-            effect_status = "unknown"
-        completion = store.update_lead_effect(
-            session_key,
-            request_id=request_id,
-            effect=D2LeadEffect(effect_id=lead_effect_id, status=effect_status),
-        )
-        full_audit("effect_result", status=effect_status, completion=completion)
-    turn_result = _turn_from_completion(completion, idempotent_replay=False)
-    full_audit("turn_return", turn=turn_result)
-    return turn_result
+    recent = D2RecentPriceScope(topic_id=selected_volume_price_task.topic_id,
+        service_id=selected_volume_price_task.service_id, brand_id=selected_volume_price_task.brand_id,
+        extent=selected_volume_price_task.extent) if selected_volume_price_task else None
+    return _commit_non_price_d2_turn(response=response, prepared_state=state,
+        recent_price_scope=recent, **commit_args)

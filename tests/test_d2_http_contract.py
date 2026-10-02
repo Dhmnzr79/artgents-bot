@@ -12,8 +12,6 @@ import pytest
 
 from contracts.response_plan import SessionKey
 from core.d2_dialogue_store import D2DialogueStore
-from core.one_call_envelope_protocol import production_envelope_template
-from tests.d1r_envelope_fixtures import envelope_adult_booking_only, envelope_clinic_policy_only
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -95,39 +93,34 @@ def sse_events(response):
 
 
 def _mixed_price_content_policy_raw() -> str:
-    return json.dumps(production_envelope_template(
-        commercial_intent="price",
-        primary_price_request_id="r1",
-        request_understanding={
-            "subjects": [],
-            "requests": [
-                {
-                    "request_id": "r1", "kind": "price", "subject_id": None,
-                    "context": "general_information", "topic_id": "implantation",
-                    "service_id": "all_on_4", "statement_mode": "question",
-                    "situation": {"scope_commitment": "reported", "extent": "full_arch",
-                                  "tooth_count": None, "jaw": "unknown", "continuity": "new"},
-                },
-                {
-                    "request_id": "r2", "kind": "content", "subject_id": None,
-                    "context": "general_information", "topic_id": "implantation",
-                    "service_id": "all_on_4",
-                    "content_text": "Живой ответ модели о восстановлении всей челюсти.",
-                },
-                {
-                    "request_id": "r3", "kind": "clinic_policy", "subject_id": None,
-                    "context": "general_information", "policy_ids": ["no_pediatric_dentistry"],
-                    "payment_scheme": "unspecified", "payment_scheme_intent": "not_requested",
-                    "contact_fields": [], "content_text": None,
-                },
-            ],
-        },
-    ), ensure_ascii=False)
+    return json.dumps({"outcome": "dialogue", "blocks": [
+        {"request_id": "r1", "kind": "price",
+         "target": {"type": "service", "id": "all_on_4"},
+         "situation": {"scope_commitment": "reported", "extent": "full_arch",
+                       "tooth_count": None, "jaw": "unknown", "continuity": "new"}},
+        {"request_id": "r2", "kind": "content",
+         "target": {"type": "service", "id": "all_on_4"},
+         "content_text": "Живой ответ модели о восстановлении всей челюсти."},
+        {"request_id": "r3", "kind": "clinic_policy", "policy_ids": ["no_pediatric_dentistry"]},
+    ]}, ensure_ascii=False)
+
+
+def _policy_raw(policy_id="no_pediatric_dentistry"):
+    return json.dumps({"outcome": "dialogue", "blocks": [
+        {"kind": "clinic_policy", "request_id": "r1", "policy_ids": [policy_id]},
+    ]})
+
+
+def _booking_raw():
+    return json.dumps({"outcome": "dialogue", "blocks": [
+        {"kind": "booking", "request_id": "r1",
+         "subject": {"subject_id": "s1", "relation": "self", "age_group": "adult"}},
+    ]})
 
 
 def test_endpoint_persists_exact_final_text_ui_actions_and_replays(http_env):
     client, db, use_provider, tmp_path = http_env
-    fake = use_provider(FakeProvider(envelope_clinic_policy_only("no_pediatric_dentistry")))
+    fake = use_provider(FakeProvider(_policy_raw("no_pediatric_dentistry")))
     first = post(client)
     assert first.status_code == 200
     body = first.get_json()
@@ -169,7 +162,7 @@ def test_invalid_provider_and_commit_failure_have_no_final_result(http_env, monk
     assert response.status_code != 200
     with D2DialogueStore(db) as store:
         assert store.read(SessionKey(client_id="demo", sid="bad")) is None
-    fake.raw = envelope_clinic_policy_only("no_pediatric_dentistry")
+    fake.raw = _policy_raw("no_pediatric_dentistry")
     def fail_commit(*_args, **_kwargs):
         raise RuntimeError("commit refused")
     monkeypatch.setattr(D2DialogueStore, "complete", fail_commit)
@@ -183,7 +176,7 @@ def test_invalid_provider_and_commit_failure_have_no_final_result(http_env, monk
 
 def test_lead_commit_failure_restores_existing_owner(http_env, monkeypatch):
     client, db, use_provider, _ = http_env
-    use_provider(FakeProvider(envelope_adult_booking_only()))
+    use_provider(FakeProvider(_booking_raw()))
     def fail_commit(*_args, **_kwargs):
         raise RuntimeError("commit refused")
     monkeypatch.setattr(D2DialogueStore, "complete", fail_commit)
@@ -197,7 +190,7 @@ def test_lead_commit_failure_restores_existing_owner(http_env, monkeypatch):
 
 def test_phone_commit_failure_keeps_lead_pending_without_effect(http_env, monkeypatch):
     client, db, use_provider, _ = http_env
-    use_provider(FakeProvider(envelope_adult_booking_only()))
+    use_provider(FakeProvider(_booking_raw()))
     sid = "phone-fail"
     assert post(client, sid=sid, request_id="book", q="Хочу записаться").status_code == 200
     assert post(client, sid=sid, request_id="name", q="Анна").status_code == 200
@@ -226,7 +219,7 @@ def test_phone_commit_failure_keeps_lead_pending_without_effect(http_env, monkey
 
 def test_json_sse_parity_in_both_replay_directions(http_env):
     client, db, use_provider, _ = http_env
-    fake = use_provider(FakeProvider(envelope_clinic_policy_only("no_pediatric_dentistry")))
+    fake = use_provider(FakeProvider(_policy_raw("no_pediatric_dentistry")))
     json_result = post(client, sid="json-first", request_id="shared").get_json()
     events = sse_events(post_sse(client, sid="json-first", request_id="shared"))
     assert [kind for kind, _ in events] == ["status", "typing", "ui", "done"]
@@ -263,8 +256,9 @@ def test_mixed_plan_has_json_sse_parity_and_replays_without_reselection(http_env
         assert saved is not None
         assert saved.response.rendered_text == first["answer"]
         assert [part.kind for part in saved.response.resolved.d2_request_parts] == [
-            "price", "content", "clinic_policy",
+            "price", "content", "reference",
         ]
+        assert [part.request_id for part in saved.response.resolved.d2_request_parts] == ["r1", "r2", "r3"]
     (tmp_path / "clients" / "demo" / "clinic_policies.yaml").write_text(
         "policies: {}\n", encoding="utf-8"
     )
@@ -274,11 +268,7 @@ def test_mixed_plan_has_json_sse_parity_and_replays_without_reselection(http_env
 
 def test_sse_terminal_and_error_are_single_outcomes(http_env):
     client, db, use_provider, _ = http_env
-    admin = json.dumps(production_envelope_template(
-        route="ADMIN", patient_text=None, commercial_intent="none",
-        promotion_scope="none", scenario="none", primary_price_request_id=None,
-        request_understanding={"subjects": [], "requests": []},
-    ), ensure_ascii=False)
+    admin = json.dumps({"outcome": "admin"})
     fake = use_provider(FakeProvider(admin))
     terminal = sse_events(post_sse(client, sid="terminal", request_id="terminal",
                                    q="Срочная медицинская проблема"))
@@ -295,7 +285,7 @@ def test_sse_terminal_and_error_are_single_outcomes(http_env):
 
 def test_sse_commit_refusal_is_error_then_retry_can_complete(http_env, monkeypatch):
     client, db, use_provider, _ = http_env
-    fake = use_provider(FakeProvider(envelope_clinic_policy_only("no_pediatric_dentistry")))
+    fake = use_provider(FakeProvider(_policy_raw("no_pediatric_dentistry")))
     original_complete = D2DialogueStore.complete
 
     def fail_commit(*_args, **_kwargs):
@@ -314,7 +304,7 @@ def test_sse_commit_refusal_is_error_then_retry_can_complete(http_env, monkeypat
 
 def test_sse_framing_error_preserves_saved_result_for_replay(http_env, monkeypatch):
     client, db, use_provider, _ = http_env
-    fake = use_provider(FakeProvider(envelope_clinic_policy_only("no_pediatric_dentistry")))
+    fake = use_provider(FakeProvider(_policy_raw("no_pediatric_dentistry")))
     import app
 
     def fail_framing(*_args, **_kwargs):

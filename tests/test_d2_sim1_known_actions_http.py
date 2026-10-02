@@ -1,4 +1,5 @@
 """SIM-1: known actions execute without a second semantic model decision."""
+from core.d2_completion_context import discussion_scope
 
 import json
 
@@ -44,7 +45,7 @@ def test_three_volume_actions_execute_without_provider_and_keep_context(http_env
     with D2DialogueStore(db) as store:
         key = SessionKey(client_id="demo", sid="sim1-volume")
         saved = store.read_latest_completion(key)
-        assert saved.recent_price_scope.extent == extent
+        assert discussion_scope(saved.response.resolved).extent == extent
         assert store.read(key).state.situation_state is None
         assert saved.response.resolved.d2_price_block is not None
         expected = (
@@ -60,7 +61,7 @@ def test_three_volume_actions_execute_without_provider_and_keep_context(http_env
     fake.raw = _raw("Сроки зависят от этапов лечения и заживления.")
     followup = _body(send(client, sid="sim1-volume", request_id="next", q="А сколько это займёт?"), transport)
     assert "Сроки" in followup["answer"]
-    assert fake.inputs[-1].context.recent_price_scope.extent == extent
+    assert fake.inputs[-1].context.ordinary.discussion_scope.extent == extent
     assert len(fake.inputs) == 2
 
 

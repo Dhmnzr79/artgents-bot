@@ -16,7 +16,7 @@ from contracts.d2_dialogue import (
     D2CompletedTurn, D2DialogueRecord, D2DialogueTurn, D2LeadEffect,
     D2LeadEffectDispatcher, D2ProviderInput, D2RawProvider, D2SelectedUiRef,
 )
-from contracts.d2_session_context import D2RecentPriceScope, D2SessionActivity, D2SessionTtlPolicy
+from contracts.d2_session_context import D2SessionActivity, D2SessionTtlPolicy
 from contracts.response_plan import D2PriceDetailUiAction, SessionKey
 from contracts.d2_dialogue_result import (
     D2DialogueResult, PriceOperation, ExplanationOperation, DetailOperation,
@@ -33,9 +33,10 @@ from contracts.response_plan_session import (
     SESSION_SCHEMA_VERSION, D2ShownPriceOfferRef, PersistedActiveService, PersistedActiveTopic,
     PersistedClarifyTask, PersistedShownCommercialIds, PersistedShownOptionsSnapshot,
     PersistedSituationState, ResponsePlanSessionSnapshot, ResponsePlanSessionState,
-    SessionDialoguePair, empty_session_snapshot,
+    D2DialogueReceiptRef, empty_session_snapshot,
 )
 from core.d2_dialogue_store import D2DialogueStore
+from core.d2_completion_context import project_completed_dialogue, retain_discussion_reference
 from core.d2_lead_bridge import (
     apply_d2_lead_pause_ui,
     d2_paused_lead_profile_name,
@@ -117,70 +118,6 @@ def _shown_secondary_ref_ids(response) -> tuple[str, ...]:
 def _bounded_d2_text(value: str, *, limit: int) -> str:
     """Keep only bounded, provider-safe prose in the D2 dialogue memory."""
     return value.strip()[:limit].strip()
-
-
-def _d2_live_prose_for_history(response) -> str | None:
-    """Return only free model prose; frozen price and authored blocks are excluded."""
-    resolved = response.resolved
-    if resolved.route != "ANSWER":
-        return None
-    if resolved.d2_request_parts:
-        blocks_by_request = {
-            block.request_id: block.display_text
-            for block in resolved.information_blocks
-            if block.publication == "model_prose"
-        }
-        prose: list[str] = []
-        for part in resolved.d2_request_parts:
-            if part.status != "answered":
-                continue
-            if part.kind == "price" and resolved.d2_price_block is not None:
-                if resolved.patient_text:
-                    prose.append(resolved.patient_text)
-            elif part.kind == "content" and part.request_id in blocks_by_request:
-                prose.append(blocks_by_request[part.request_id])
-        return "\n\n".join(prose) if prose else None
-    if resolved.is_price_answer:
-        return None
-    if resolved.patient_text is not None:
-        return resolved.patient_text
-    blocks = tuple(
-        block.display_text
-        for block in resolved.information_blocks
-        if block.publication == "model_prose"
-    )
-    return "\n\n".join(blocks) if blocks else None
-
-
-def _next_d2_dialogue_pairs(
-    *, snapshot: ResponsePlanSessionSnapshot, safe_user_message: str,
-    selected_ui_ref: D2SelectedUiRef | None, response, turn: int,
-    ttl_policy: D2SessionTtlPolicy, context,
-) -> tuple[SessionDialoguePair, ...]:
-    """Append one live-prose pair; code-owned prices and terminal stubs stay out."""
-    assistant_text = _d2_live_prose_for_history(response)
-    previous_pairs = (
-        snapshot.state.dialogue_pairs if context.freshness == "fresh" else ()
-    )
-    if assistant_text is None:
-        return previous_pairs
-    assistant_text = _bounded_d2_text(
-        assistant_text, limit=ttl_policy.history_text_max_chars,
-    )
-    if not assistant_text:
-        return previous_pairs
-    patient_text = _bounded_d2_text(
-        safe_user_message, limit=ttl_policy.history_text_max_chars,
-    )
-    if selected_ui_ref is None and not patient_text:
-        return previous_pairs
-    pair = SessionDialoguePair(
-        patient_text=patient_text if selected_ui_ref is None else None,
-        selected_ui_ref=selected_ui_ref,
-        assistant_text=assistant_text,
-        committed_at_turn=turn,
-    )
-    return (*previous_pairs, pair)[-ttl_policy.history_pair_limit:]
 
 
 def _next_d2_shown_price_offer_refs(*, snapshot, price, context):
@@ -656,10 +593,9 @@ def _commit_non_price_d2_turn(
     selected_service_topic: str | None = None,
     clear_active_service: bool = False,
     clear_situation: bool = False,
-    dialogue_pairs: tuple[SessionDialoguePair, ...] | None = None,
     d2_shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...] | None = None,
     clarify_task: PersistedClarifyTask | None = None,
-    prepared_state=None, recent_price_scope=None,
+    prepared_state=None, safe_user_message=None, selected_ui_ref=None, ttl_policy=None,
     lead_pause_response: bool = False,
 ) -> D2DialogueTurn:
     """Persist lead/terminal/clarify-style turns without mutating price situation."""
@@ -696,15 +632,7 @@ def _commit_non_price_d2_turn(
             if shown_service_options and shown_service_topic is not None
             else (None if selected_service_id is not None else context.ordinary.shown_options_snapshot)
         ),
-        dialogue_pairs=(
-            (
-                snapshot.state.dialogue_pairs
-                if context.freshness == "fresh"
-                else ()
-            )
-            if dialogue_pairs is None
-            else dialogue_pairs
-        ),
+        dialogue_pairs=snapshot.state.dialogue_pairs if context.freshness == "fresh" else (),
         d2_shown_price_offer_refs=(
             (
                 snapshot.state.d2_shown_price_offer_refs
@@ -746,6 +674,15 @@ def _commit_non_price_d2_turn(
     )
     if prepared_state is not None:
         state = prepared_state
+    if ttl_policy is not None:
+        refs = snapshot.state.dialogue_pairs if context.freshness == "fresh" else ()
+        if response.resolved.route in {"ANSWER", "CLARIFY"} and (selected_ui_ref is not None or safe_user_message):
+            ref = D2DialogueReceiptRef(request_id=request_id,
+                patient_text=_bounded_d2_text(safe_user_message, limit=ttl_policy.history_text_max_chars) if selected_ui_ref is None else None,
+                selected_ui_ref=selected_ui_ref, committed_at_turn=turn)
+            refs = (*refs, ref)[-ttl_policy.history_pair_limit:]
+        state = state.model_copy(update={"dialogue_pairs": refs})
+        state = retain_discussion_reference(state, snapshot.state, context, response.resolved, request_id)
     initial_effect = (
         D2LeadEffect(effect_id=lead_effect_id, status="pending")
         if lead_effect_id is not None else D2LeadEffect()
@@ -758,7 +695,6 @@ def _commit_non_price_d2_turn(
         focus=focus,
         committed_revision=state.revision,
         lead_effect=initial_effect,
-        recent_price_scope=recent_price_scope,
     )
     full_audit("commit_intent", state=state, completion=completion, branch="non_price")
     diagnostics.stage("commit")
@@ -814,15 +750,7 @@ def _run_reserved_d2_dialogue_turn(
         snapshot, expected_session_key=session_key,
         activity=previous.activity if previous else None, policy=ttl_policy, now=now,
     )
-    if context.freshness == "fresh":
-        shown = store.read_latest_completion(session_key)
-        if (
-            shown is not None and shown.committed_revision == snapshot.state.revision
-            and shown.context.session_key == session_key
-        ):
-            context = context.model_copy(update={
-                "recent_price_scope": shown.recent_price_scope,
-            })
+    context = project_completed_dialogue(context, snapshot, store, ttl_policy)
     full_audit(
         "model_context", record=previous, state=snapshot.state,
         context=context, tenant_fingerprint=tenant.fingerprint,
@@ -879,7 +807,8 @@ def _run_reserved_d2_dialogue_turn(
         focus=focus, tenant_fingerprint=tenant.fingerprint, now=now,
         request_id=request_id, request_fingerprint=request_fingerprint,
         lead_effect_id=lead_effect_id, lead_effect_dispatcher=lead_effect_dispatcher,
-        lead_pause_response=lead_pause_response,
+        lead_pause_response=lead_pause_response, safe_user_message=safe_user_message,
+        selected_ui_ref=selected_ui_ref, ttl_policy=ttl_policy,
     )
     if result.outcome == "admin":
         if context.retained_terminal_state not in {"none", "clarify", "admin", "medical_terminal"}:
@@ -974,7 +903,7 @@ def _run_reserved_d2_dialogue_turn(
             # Rules have already been applied to this local operation. The final
             # renderer receives code-owned text, not a second route decision.
             exact_text.append(D2ExactTextBlock(request_id=block.request_id,
-                source_client_id=session_key.client_id, display_text=answer.rendered_text))
+                source_client_id=session_key.client_id, display_text=answer.rendered_text, policy_ids=block.policy_ids))
             exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
                 kind="reference", status="answered", scope="clinic"))
             continue
@@ -1049,6 +978,15 @@ def _run_reserved_d2_dialogue_turn(
         pending = None
     turn = snapshot.current_turn_index
     delta = response.resolved.session_delta
+    price_operations_by_id = {p.request_id: p for p in operations if isinstance(p, PriceOperation)}
+    parts = tuple(part.model_copy(update={
+        "brand_id": price_operations_by_id[part.request_id].brand_id,
+        "topic_id": part.topic_id or (resolve_d2_clarify_service_topic(tenant, (part.service_id,)) if part.service_id else None),
+    }) if part.kind == "price" and part.request_id in price_operations_by_id else part
+        for part in response.resolved.d2_request_parts)
+    # Freeze proven source IDs, without changing published text or repricing.
+    enriched = type(response.resolved).model_validate({**response.resolved.model_dump(), "d2_request_parts": parts})
+    response = replace(response, resolved=enriched)
     price = response.resolved.d2_price_block
     decision = response.resolved.d2_price_scope_decision
     ordinary = context.ordinary
@@ -1059,7 +997,9 @@ def _run_reserved_d2_dialogue_turn(
     )
     topic_id = delta.active_topic_id
     if topic_id is None and active_service is not None and scope == "service":
-        topic_id = resolve_d2_clarify_service_topic(tenant, (active_service.service_id,))
+        topic_id = next((p.topic_id for p in parts if p.kind == "price" and p.service_id == active_service.service_id), None)
+        if topic_id is None:
+            topic_id = resolve_d2_clarify_service_topic(tenant, (active_service.service_id,))
     active_topic = ordinary.active_topic if scope == "clinic" else (
         PersistedActiveTopic(topic_id=topic_id, provenance="explicit_topic", set_at_turn=turn) if topic_id else None
     )
@@ -1124,13 +1064,8 @@ def _run_reserved_d2_dialogue_turn(
         revision=snapshot.state.revision+1, last_committed_turn_index=turn,
         active_service=active_service, active_topic=active_topic, situation_state=situation,
         shown_options_snapshot=options, d2_shown_price_offer_refs=refs,
-        dialogue_pairs=_next_d2_dialogue_pairs(snapshot=snapshot, safe_user_message=safe_user_message,
-            selected_ui_ref=selected_ui_ref, response=response, turn=turn, ttl_policy=ttl_policy, context=context),
+        dialogue_pairs=(),
         accumulated_shown_ids=accumulated, terminal_state=delta.terminal_state,
         clarify_pending=pending is not None, clarify_task=pending,
     )
-    recent = D2RecentPriceScope(topic_id=selected_volume_price_task.topic_id,
-        service_id=selected_volume_price_task.service_id, brand_id=selected_volume_price_task.brand_id,
-        extent=selected_volume_price_task.extent) if selected_volume_price_task else None
-    return _commit_non_price_d2_turn(response=response, prepared_state=state,
-        recent_price_scope=recent, **commit_args)
+    return _commit_non_price_d2_turn(response=response, prepared_state=state, **commit_args)

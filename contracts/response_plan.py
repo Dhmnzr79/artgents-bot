@@ -537,6 +537,7 @@ class D2ExactTextBlock(ResponsePlanModel):
     display_text: NonBlankStr
     requested_fact_ids: tuple[str, ...] = ()
     promo_fact_ids: tuple[str, ...] = ()
+    policy_ids: tuple[str, ...] = ()
 
 
 class D2ContactFactBlock(ResponsePlanModel):
@@ -889,6 +890,7 @@ class D2ResolvedRequestPart(ResponsePlanModel):
     scope: ResponseScope
     service_id: NonBlankStr | None = None
     topic_id: NonBlankStr | None = None
+    brand_id: NonBlankStr | None = None
     content_ref: NonBlankStr | None = None
     content_section_refs: tuple[NonBlankStr, ...] = ()
     content_publication: D2ContentPublication | None = None

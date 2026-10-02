@@ -17,7 +17,7 @@ from contracts.d2_session_context import (
 from contracts.one_call_envelope import OneCallEnvelope
 from contracts.request_understanding import RequestUnderstandingRequest
 from contracts.response_plan import SessionKey
-from contracts.response_plan_session import ResponsePlanSessionSnapshot
+from contracts.response_plan_session import ResponsePlanSessionSnapshot, SessionDialoguePair
 
 
 def bind_implicit_price_service(
@@ -118,7 +118,7 @@ def project_d2_session_context(
         freshness="fresh",
         last_user_turn_at=last_user_turn_at,
         ordinary=D2OrdinarySessionContext(
-            dialogue_pairs=source.dialogue_pairs,
+            dialogue_pairs=tuple(p for p in source.dialogue_pairs if isinstance(p, SessionDialoguePair)),
             active_service=source.active_service,
             active_topic=source.active_topic,
             situation_state=source.situation_state,

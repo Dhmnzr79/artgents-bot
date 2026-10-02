@@ -12,6 +12,7 @@ from typing import Literal, Self
 from pydantic import Field, field_validator, model_validator
 
 from contracts.response_plan import (
+    NonBlankStr,
     FrozenPriceOfferRow,
     ResponsePlanModel,
     ResponseUIProjection,
@@ -35,7 +36,7 @@ from contracts.response_plan_post_composer import (
     SituationStage,
 )
 
-SESSION_SCHEMA_VERSION = 2
+SESSION_SCHEMA_VERSION = 3
 FINGERPRINT_FORMAT_VERSION = 3
 
 ActiveServiceProvenance = Literal["explicit_current", "active_session"]
@@ -177,6 +178,7 @@ class PersistedActiveService(ResponsePlanModel):
 
 
 class PersistedActiveTopic(ResponsePlanModel):
+    discussion_request_id: NonBlankStr | None = None
     topic_id: str
     provenance: ActiveTopicProvenance
     set_at_turn: int
@@ -190,6 +192,21 @@ class PersistedActiveTopic(ResponsePlanModel):
     def _validate(self) -> Self:
         require_strict_non_negative_int("set_at_turn", self.set_at_turn)
         require_exact_nonblank_id("active_topic_id", self.topic_id)
+        return self
+
+
+class D2DialogueReceiptRef(ResponsePlanModel):
+    """Request-side index into the same store's atomic completed result."""
+    request_id: NonBlankStr
+    patient_text: NonBlankStr | None = None
+    selected_ui_ref: D2SelectedUiRef | None = None
+    committed_at_turn: int
+
+    @model_validator(mode="after")
+    def _validate(self) -> Self:
+        require_strict_positive_int("committed_at_turn", self.committed_at_turn)
+        if (self.patient_text is None) == (self.selected_ui_ref is None):
+            raise ValueError("dialogue_requires_text_or_selected_ui_ref")
         return self
 
 
@@ -414,7 +431,7 @@ class ResponsePlanSessionState(ResponsePlanModel):
     session_key: SessionKey
     revision: int
     last_committed_turn_index: int
-    dialogue_pairs: tuple[SessionDialoguePair, ...] = ()
+    dialogue_pairs: tuple[SessionDialoguePair | D2DialogueReceiptRef, ...] = ()
     active_service: PersistedActiveService | None = None
     active_topic: PersistedActiveTopic | None = None
     situation_state: PersistedSituationState | None = None

@@ -1,5 +1,59 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Closure — SIM-3, 2026-10-02
+
+Владелец «Делаем» согласовал запись результатов Cursor и закрытие проверенного
+offline объёма SIM-3. Cursor PASS предоставлен владельцем: собственные прогоны
+reviewer 13 + 66 + 142 = 221 PASS, 0 FAIL. Independent Checker PASS после
+focused recheck двух замечаний; результаты исполнителя и ограничения — ниже.
+Runtime после review не менялся. Исполнитель эти Cursor-запуски не повторял.
+
+Root C:\Cursor Projects\artgents-bot-active, branch codex/d2-stage1-contract,
+HEAD/origin branch 5cb58d5629bb78b07736246e12d951844bbe6c55,
+origin/main и merge-base 141ce91fb1731cd990fcf8391550150016c73e7f.
+Staging пуст. Closure diff: SIM3 Task, Current Status, Roadmap, Ledger,
+Product Decisions (статус D2-109). Foreign WIP сохранён.
+
+Удаление prose-only истории и recent_price_scope подтверждено по actual call path
+обоих endpoint. Completion остаётся источником результата; store — writer,
+projection — reader. Новых модельных вызовов и повторной классификации нет.
+Live/provider/SMTP: 0. Browser/live-model и полный CI не аттестованы.
+SIM0/4/5/REC5 остаются открыты. Владелец «Давай комит и пуш» отдельно
+разрешил публикацию SIM-3 в текущую ветку. Commit/push result подтверждается
+после выполнения; merge/deploy и новые live не разрешены.
+Нижний checkpoint — история проверки до закрытия.
+
+## Checkpoint — SIM-3 completion context, 2026-10-02
+
+Owner «ПРинимаю» согласовал продолжительный контекст услуги/объёма через
+контактные отвлечения до явной смены темы/услуги либо существующего TTL.
+Root C:\Cursor Projects\artgents-bot-active, branch codex/d2-stage1-contract,
+HEAD/origin branch 5cb58d5629bb78b07736246e12d951844bbe6c55,
+origin/main и merge-base 141ce91fb1731cd990fcf8391550150016c73e7f.
+Allowlist: [SIM-3 Task](DEMO_D2_SIM3_TASK.md); staging пуст; foreign WIP не изменён.
+
+Архитектурное упрощение: завершённый completion → существующая projection →
+следующий ход. dialogue_pairs хранит ссылки, не вторую копию assistant prose.
+Удалены prose-only eligibility и recent_price_scope. В existing active_topic
+сохраняется ссылка на завершённый ценовой результат; объём не медицинский факт.
+Schema 3 без миграции тестовых SID; правила lead/privacy и TTL сохранены.
+
+Offline: 176 PASS / 174.20 s (SIM3, SIM1, SIM2, session context).
+Independent Checker: новый SIM3 набор 11 PASS / 28.04 s; removal trace обоих
+endpoint подтверждён. Первый verdict REJECT: недостающий тест «оба филиала →
+следующий input» и отсутствующий Draft Ledger; runtime blocker не найден.
+Добавлен пропорциональный JSON/SSE тест. Independent focused recheck: PASS,
+2 PASS / 3.79 s; оба замечания устранены. Финальный набор
+SIM3/continuation/document/AF1a: 56 PASS / 129.30 s на актуальном коде.
+Markdown: 87 локальных ссылок разрешаются; git diff --check exit0.
+
+Старые price presentation/lead interrupt fixtures: 27 FAIL / 1 PASS на clean
+5cb58d5, те же 27 failure IDs в текущем checkout; это прежний долг, не регрессия
+SIM3. Полный CI, живое понимание модели, browser/widget не аттестованы.
+Provider/live/SMTP: 0. Commit/push, merge/deploy не разрешены.
+Реализация и independent Checker завершены; Cursor gate и закрытие SIM3 впереди;
+SIM0/4/5/REC5 этим checkpoint не закрываются.
+
 ## Closure — SIM-1/2, 2026-10-02
 
 Owner «Давай, потом комит и пуш» согласовал закрытие проверенного checkpoint,

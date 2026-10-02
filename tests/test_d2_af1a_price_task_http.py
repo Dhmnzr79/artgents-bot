@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from tests.test_d2_continuation_scenarios import projected_history
+
+from core.d2_completion_context import discussion_scope
+
 import json
 from datetime import datetime, timedelta, timezone
 
@@ -85,11 +89,12 @@ def test_volume_click_keeps_price_brand_without_model_and_replays(
                 "classic.one_tooth.nobel",
             }
         pairs = store.read(key).state.dialogue_pairs
-        assert pairs == ()  # Both responses are code-only; SIM-3 replaces this limitation.
+        assert len(pairs) == 2
+        assert [p.request_id for p in pairs] == ["overview", "choice"]
         assert store.read(key).state.situation_state is None
-        assert saved.recent_price_scope is not None
-        assert saved.recent_price_scope.extent == "one_tooth"
-        assert saved.recent_price_scope.brand_id == brand_id
+        assert discussion_scope(saved.response.resolved) is not None
+        assert discussion_scope(saved.response.resolved).extent == "one_tooth"
+        assert discussion_scope(saved.response.resolved).brand_id == brand_id
     replay = send(client, **args)
     assert replay.status_code == 200
     assert _body(replay, transport) == body
@@ -167,7 +172,7 @@ def test_model_hypothesis_does_not_turn_price_choice_into_patient_fact(
     with D2DialogueStore(db) as store:
         key = SessionKey(client_id="demo", sid=sid)
         assert store.read(key).state.situation_state is None
-        assert store.read_latest_completion(key).recent_price_scope.extent == "one_tooth"
+        assert discussion_scope(store.read_latest_completion(key).response.resolved).extent == "one_tooth"
 
 
 def test_branded_few_teeth_text_keeps_honest_gap(http_env) -> None:
@@ -211,12 +216,12 @@ def test_price_choice_is_next_turn_context_not_patient_fact(
     with D2DialogueStore(db) as store:
         key = SessionKey(client_id="demo", sid=sid)
         assert store.read(key).state.situation_state is None
-        assert store.read_latest_completion(key).recent_price_scope.extent == extent
+        assert discussion_scope(store.read_latest_completion(key).response.resolved).extent == extent
     fake.raw = _wrong_kind_raw(topic_id="implantation")
     followup = post(client, sid=sid, request_id="duration", q="А сколько это займёт?")
     assert followup.status_code == 200, followup.get_json()
     assert PROSE in followup.get_json()["answer"]
-    seen = fake.inputs[-1].context.recent_price_scope
+    seen = fake.inputs[-1].context.ordinary.discussion_scope
     assert seen is not None
     assert (seen.topic_id, seen.brand_id, seen.extent) == (
         "implantation", brand_id, extent,
@@ -225,7 +230,7 @@ def test_price_choice_is_next_turn_context_not_patient_fact(
         assert store.read(SessionKey(client_id="demo", sid=sid)).state.situation_state is None
 
 
-def test_recent_price_scope_expires_before_next_provider_input(http_env) -> None:
+def test_discussion_scope_expires_before_next_provider_input(http_env) -> None:
     client, db, use_provider, _ = http_env
     fake = use_provider(FakeProvider(_overview_raw()))
     sid = "af1a-scope-ttl"
@@ -253,10 +258,10 @@ def test_recent_price_scope_expires_before_next_provider_input(http_env) -> None
     next_turn = post(client, sid=sid, request_id="duration", q="Сколько займёт имплантация?")
     assert next_turn.status_code == 200, next_turn.get_json()
     assert fake.inputs[-1].context.freshness == "expired"
-    assert fake.inputs[-1].context.recent_price_scope is None
+    assert fake.inputs[-1].context.ordinary.discussion_scope is None
 
 
-def test_new_topic_replaces_recent_price_scope(http_env) -> None:
+def test_new_topic_replaces_discussion_scope(http_env) -> None:
     client, _, use_provider, _ = http_env
     fake = use_provider(FakeProvider(_overview_raw()))
     sid = "af1a-scope-switch"
@@ -271,11 +276,11 @@ def test_new_topic_replaces_recent_price_scope(http_env) -> None:
     fake.raw = _wrong_kind_raw(topic_id="whitening")
     switched = post(client, sid=sid, request_id="switch", q="Расскажите про отбеливание")
     assert switched.status_code == 200, switched.get_json()
-    assert fake.inputs[-1].context.recent_price_scope.extent == "one_tooth"
+    assert fake.inputs[-1].context.ordinary.discussion_scope.extent == "one_tooth"
     fake.raw = _wrong_kind_raw(topic_id="whitening")
     followup = post(client, sid=sid, request_id="after-switch", q="А сколько это займёт?")
     assert followup.status_code == 200, followup.get_json()
-    assert fake.inputs[-1].context.recent_price_scope is None
+    assert fake.inputs[-1].context.ordinary.discussion_scope is None
 
 
 def test_unknown_choice_does_not_repeat_menu_or_store_reported_extent(http_env) -> None:
@@ -383,7 +388,8 @@ def test_mixed_price_and_information_survive_verified_volume_choice(http_env) ->
         key = SessionKey(client_id="demo", sid=sid)
         saved = store.read_latest_completion(key)
         assert {part.kind for part in saved.response.resolved.d2_request_parts} == {"price"}
-        assert any("Живой mixed-ответ" in p.assistant_text for p in store.read(key).state.dialogue_pairs)
+        assert any("Живой mixed-ответ" in p.assistant_text for p in projected_history(store, key))
+        assert store.read(key).state.dialogue_pairs[-1].request_id == store.read_latest_completion(key).request_id
         assert store.read(key).state.situation_state is None
     replay = post(client, sid=sid, request_id="choice", q="",
                   ref=choice["reply_id"], ui_revision=overview["revision"])

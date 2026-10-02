@@ -1,4 +1,5 @@
 """Combined SIM-1/2 through actual transports with offline raw model output."""
+from core.d2_completion_context import discussion_scope
 import json
 from datetime import datetime, timedelta, timezone
 
@@ -305,7 +306,7 @@ def test_unbound_detail_asks_once_instead_of_transport_error(http_env, expired):
     assert len(fake.inputs) == before + 1
     if expired:
         assert fake.inputs[-1].context.freshness == "expired"
-        assert fake.inputs[-1].context.recent_price_scope is None
+        assert fake.inputs[-1].context.ordinary.discussion_scope is None
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
@@ -478,7 +479,7 @@ def test_volume_no_provider_and_followup_context(http_env, extent):
     fake.generate = original
     fake.raw = raw(explanation("Сроки зависят от этапов заживления."))
     assert post(client, sid="volume", request_id="next", q="А сколько займёт?").status_code == 200
-    assert fake.inputs[-1].context.recent_price_scope.extent == extent
+    assert fake.inputs[-1].context.ordinary.discussion_scope.extent == extent
 
 
 @pytest.mark.parametrize("reverse", [False, True])

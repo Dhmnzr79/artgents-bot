@@ -1,4 +1,5 @@
 """D2-DOC-CLICK: verified section task and ordinary prose through real HTTP."""
+from tests.test_d2_continuation_scenarios import projected_history
 
 import json
 
@@ -120,7 +121,8 @@ def test_current_document_question_is_explicit_before_provider_and_replays(
             pair = store.read(key).state.dialogue_pairs[-1]
             assert pair.patient_text is None
             assert pair.selected_ui_ref == request.selected_ui_ref
-            assert pair.assistant_text == prose
+            assert pair.request_id == saved.request_id
+            assert projected_history(store, key)[-1].assistant_text == prose
             assert saved.response.rendered_text == body["answer"]
         assert _body(send(client, **args), transport) == body
         assert len(fake.inputs) == index + 1
@@ -180,7 +182,8 @@ def test_missing_authored_source_publishes_gap_not_untrusted_live_prose(http_env
         saved = store.read_latest_completion(key)
         assert saved.response.resolved.d2_request_parts[0].status == "unavailable"
         assert saved.response.resolved.d2_request_parts[0].failure_reason == "d2_content_source_missing"
-        assert store.read(key).state.dialogue_pairs == ()
+        assert len(store.read(key).state.dialogue_pairs) == 1
+        assert projected_history(store, key)[0].parts[0].status == saved.response.resolved.d2_request_parts[0].status
     assert len(fake.inputs) == 1
 
 
@@ -198,7 +201,8 @@ def test_off_topic_operation_produces_existing_boundary_without_live_prose(http_
         assert saved is not None
         assert not any(block.publication == "model_prose"
                        for block in saved.response.resolved.information_blocks)
-        assert store.read(key).state.dialogue_pairs == ()
+        assert len(store.read(key).state.dialogue_pairs) == 1
+        assert projected_history(store, key)[0].parts[0].status == saved.response.resolved.d2_request_parts[0].status
     assert len(fake.inputs) == 1
 
 

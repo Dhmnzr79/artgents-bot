@@ -12,7 +12,7 @@ from typing import Literal, Self
 
 from pydantic import field_validator, model_validator
 
-from contracts.response_plan import NonBlankStr, ResponsePlanModel, SessionKey, TerminalState
+from contracts.response_plan import NonBlankStr, ResponsePlanModel, SessionKey, TerminalState, D2ResolvedRequestPart
 from contracts.response_plan_session import (
     D2ShownPriceOfferRef,
     HistoricalPriceOffersSnapshot,
@@ -24,6 +24,7 @@ from contracts.response_plan_session import (
     PersistedClarifyTask,
     ResponsePlanSessionSnapshot,
     SessionDialoguePair,
+    D2SelectedUiRef,
 )
 
 DEFAULT_D2_SESSION_IDLE_TTL_SECONDS = 30 * 60
@@ -78,10 +79,32 @@ class D2SessionActivity(ResponsePlanModel):
         return self
 
 
+class D2DiscussionScope(ResponsePlanModel):
+    """Read-only scope of a completed discussion, never a medical fact."""
+    topic_id: NonBlankStr
+    service_id: NonBlankStr | None = None
+    brand_id: NonBlankStr | None = None
+    extent: Literal["one_tooth", "few_teeth", "full_arch", "unknown"]
+
+
+class D2ProjectedDialoguePair(ResponsePlanModel):
+    patient_text: str | None = None
+    selected_ui_ref: D2SelectedUiRef | None = None
+    assistant_text: str = ""
+    committed_at_turn: int
+    parts: tuple[D2ResolvedRequestPart, ...] = ()
+    price_scope: D2DiscussionScope | None = None
+    offers: tuple[D2ShownPriceOfferRef, ...] = ()
+    detail_aspect: str | None = None
+    policy_ids: tuple[str, ...] = ()
+    fact_ids: tuple[str, ...] = ()
+
+
 class D2OrdinarySessionContext(ResponsePlanModel):
     """Ordinary dialogue state made available by a fresh activity record only."""
 
-    dialogue_pairs: tuple[SessionDialoguePair, ...] = ()
+    dialogue_pairs: tuple[SessionDialoguePair | D2ProjectedDialoguePair, ...] = ()
+    discussion_scope: D2DiscussionScope | None = None
     active_service: PersistedActiveService | None = None
     active_topic: PersistedActiveTopic | None = None
     situation_state: PersistedSituationState | None = None
@@ -90,15 +113,6 @@ class D2OrdinarySessionContext(ResponsePlanModel):
     d2_shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...] = ()
     clarify_pending: bool = False
     clarify_task: PersistedClarifyTask | None = None
-
-
-class D2RecentPriceScope(ResponsePlanModel):
-    """A verified price choice for conversation continuity, not a patient fact."""
-
-    topic_id: NonBlankStr
-    service_id: NonBlankStr | None = None
-    brand_id: NonBlankStr | None = None
-    extent: Literal["one_tooth", "few_teeth", "full_arch", "unknown"]
 
 
 class D2SessionContextProjection(ResponsePlanModel):
@@ -110,7 +124,6 @@ class D2SessionContextProjection(ResponsePlanModel):
     freshness: D2SessionContextFreshness
     last_user_turn_at: datetime | None = None
     ordinary: D2OrdinarySessionContext = D2OrdinarySessionContext()
-    recent_price_scope: D2RecentPriceScope | None = None
     retained_terminal_state: TerminalState
     retained_shown_ids: PersistedShownCommercialIds
 

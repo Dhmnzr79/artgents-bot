@@ -81,6 +81,18 @@ class D2DialogueStore:
         ).fetchone()
         return D2CompletedTurn.model_validate_json(row[0]) if row and row[0] else None
 
+    def read_completion(self, key: SessionKey, request_id: str) -> D2CompletedTurn | None:
+        """Read an exact tenant/session receipt, never a historical price search."""
+        row = self._connection.execute(
+            "SELECT payload FROM d2_turn_request WHERE client_id=? AND sid=? "
+            "AND request_id=? AND status='complete'",
+            (key.client_id, key.sid, request_id),
+        ).fetchone()
+        result = D2CompletedTurn.model_validate_json(row[0]) if row and row[0] else None
+        if result is not None and (result.context.session_key != key or result.request_id != request_id):
+            raise ValueError("d2_completion_owner_mismatch")
+        return result
+
     def reserve_request(
         self, key: SessionKey, *, request_id: str, request_fingerprint: str,
     ) -> D2RequestReservation:

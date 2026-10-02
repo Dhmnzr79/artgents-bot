@@ -17,6 +17,19 @@ import pytest
 from contracts.response_plan import SessionKey
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore
+from core.d2_completion_context import project_completed_dialogue
+from core.d2_session_context import project_d2_session_context
+from contracts.d2_session_context import D2SessionTtlPolicy
+from contracts.response_plan_session import ResponsePlanSessionSnapshot
+
+
+def projected_history(store, key):
+    record = store.read(key)
+    snapshot = ResponsePlanSessionSnapshot(state=record.state, exists_in_store=True)
+    policy = D2SessionTtlPolicy()
+    context = project_d2_session_context(snapshot, expected_session_key=key,
+        activity=record.activity, policy=policy, now=record.activity.last_user_turn_at)
+    return project_completed_dialogue(context, snapshot, store, policy).ordinary.dialogue_pairs
 
 
 NOW = datetime(2026, 9, 22, 15, tzinfo=timezone.utc)
@@ -337,7 +350,8 @@ def test_a10_empty_session_price_ask_clarifies_without_inventing_price(tmp_path:
     assert saved.state.clarify_task.missing == "service"
     assert saved.state.clarify_task.operation.kind == "price"
     assert saved.state.shown_options_snapshot.service_ids == ("classic", "all_on_4")
-    assert saved.state.dialogue_pairs == ()
+    assert len(saved.state.dialogue_pairs) == 1
+    assert saved.state.dialogue_pairs[0].request_id == outcome.request_id
     assert saved.state.terminal_state == "none"
     assert saved.state.situation_state is None
     assert outcome.response.rendered_text == "Какую услугу вы имеете в виду?"
@@ -359,7 +373,8 @@ def test_stage2_keeps_ordered_price_refs_without_price_text_for_second_option_fo
     offer_ids = _offer_ids(first)
     assert len(offer_ids) == 3
     assert [item.offer_id for item in saved.state.d2_shown_price_offer_refs] == list(offer_ids)
-    assert saved.state.dialogue_pairs == ()
+    assert len(saved.state.dialogue_pairs) == 1
+    assert saved.state.dialogue_pairs[0].request_id == first.request_id
 
     _, saved, provider, _, _ = _run(
         tmp_path,
@@ -398,7 +413,7 @@ def test_stage2_bounds_live_prose_pairs_and_expires_them_with_context(tmp_path: 
     assert saved is not None
     assert len(saved.state.dialogue_pairs) == 3
     assert all(len(pair.patient_text or "") <= 1_000 for pair in saved.state.dialogue_pairs)
-    assert all(len(pair.assistant_text) <= 1_000 for pair in saved.state.dialogue_pairs)
+    assert all(not hasattr(pair, "assistant_text") for pair in saved.state.dialogue_pairs)
 
     _, saved, provider, _, _ = _run(
         tmp_path,

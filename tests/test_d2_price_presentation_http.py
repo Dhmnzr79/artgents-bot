@@ -10,12 +10,12 @@ import pytest
 from contracts.response_plan import SessionKey
 from core.d2_dialogue_store import D2DialogueStore
 from core.one_call_envelope_protocol import production_envelope_template
-from core.response_plan_materialization import resolve_d2_envelope_response
+from core.response_plan_materialization import resolve_d2_operations
 from tests.test_d2_http_contract import FakeProvider, http_env, post, post_sse, sse_events
 from tests.test_d2_rec3_memory_http import _price_part
 from tests.test_d2_ui_b12_scenarios import _price_raw as _overview_raw
 from tests.test_d2_price_scope_selection import (
-    _envelope as _scope_envelope, _situation, _with_scope_failure_authority,
+    _envelope as _scope_envelope, _volume, _with_scope_failure_authority,
 )
 from tests.test_d2_multi_request import _sources
 from tests.test_target_offer_projection import _bundle
@@ -40,7 +40,7 @@ def _content_part(request_id: str, text: str) -> dict:
         "service_id": "classic",
         "topic_id": "implantation",
         "statement_mode": "question",
-        "situation": None,
+        "volume": None,
         "content_text": text,
         "content_ref": None,
     }
@@ -236,11 +236,11 @@ def test_exact_duplicate_intro_does_not_replace_independent_content(http_env):
 
 
 def test_optional_intro_does_not_turn_unavailable_price_into_an_answer():
-    envelope = _scope_envelope(_situation("few_teeth")).model_copy(
+    envelope = _scope_envelope(_volume("few_teeth")).model_copy(
         update={"patient_text": "Вот варианты для одного зуба."}
     )
     sources = _with_scope_failure_authority(_sources(_bundle()))
-    outcome = resolve_d2_envelope_response(envelope, sources, as_of=date(2026, 9, 18))
+    outcome = resolve_d2_operations((envelope).blocks, sources, as_of=date(2026, 9, 18))
     assert outcome.resolved.d2_result_status == "failed"
     assert outcome.resolved.d2_price_block is None
     assert outcome.resolved.patient_text is None

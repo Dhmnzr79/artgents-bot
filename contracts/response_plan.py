@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contracts.d2_dialogue_result import DiscussionScope
 from typing import Annotated, Literal, Self, Union
 
 from contracts.response_schema import RequestedDisplayPolicy
@@ -828,27 +829,6 @@ class UiPlanCandidates(ResponsePlanModel):
     price_detail_actions: tuple[D2PriceDetailUiAction, ...] = ()
 
 
-class D2TreatmentSituationDecision(ResponsePlanModel):
-    """Verified D1R treatment situation frozen before rendering and UI projection."""
-
-    source_request_id: NonBlankStr
-    subject_relation: Literal["self", "other", "unknown"] | None = None
-    subject_age_group: Literal["adult", "child", "unknown"] | None = None
-    service_id: NonBlankStr | None = None
-    topic_id: NonBlankStr | None = None
-    scope_commitment: Literal["unknown", "reported", "correction", "hypothetical", "reset"]
-    extent: Literal["unknown", "one_tooth", "few_teeth", "full_arch"]
-    tooth_count: int | None = Field(default=None, ge=1)
-    jaw: Literal["unknown", "upper", "lower", "both"]
-    continuity: Literal["new", "same", "unknown"]
-
-    @model_validator(mode="after")
-    def _validate_subject_pair(self) -> Self:
-        if (self.subject_relation is None) != (self.subject_age_group is None):
-            raise ValueError("treatment_subject_metadata_incomplete")
-        return self
-
-
 class D2PriceScopeDecision(ResponsePlanModel):
     source_request_id: NonBlankStr
     topic_id: NonBlankStr
@@ -886,7 +866,7 @@ class D2ResolvedRequestPart(ResponsePlanModel):
     kind: Literal["price", "price_detail", "content", "contact", "clinic_policy", "clarification", "reference", "commercial_fact", "price_clarification", "price_reference"]
     status: Literal["answered", "recovered", "unavailable", "deferred"]
     failure_reason: D2PartFailureReason | None = None
-    subject_id: NonBlankStr | None = None
+    discussion_scope: DiscussionScope | None = None
     scope: ResponseScope
     service_id: NonBlankStr | None = None
     topic_id: NonBlankStr | None = None
@@ -1070,7 +1050,6 @@ class PreComposerPlan(ResponsePlanModel):
     price_plan: PricePlan
     d2_price_block: D2FrozenPriceBlock | None = None
     d2_price_detail_block: D2FrozenPriceDetailBlock | None = None
-    d2_treatment_situation: D2TreatmentSituationDecision | None = None
     d2_price_scope_decision: D2PriceScopeDecision | None = None
     d2_request_parts: tuple[D2ResolvedRequestPart, ...] = ()
     d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()
@@ -1686,7 +1665,6 @@ class ResolvedResponsePlan(ResponsePlanModel):
     price_block: ResolvedPriceBlock | None = None
     d2_price_block: D2FrozenPriceBlock | None = None
     d2_price_detail_block: D2FrozenPriceDetailBlock | None = None
-    d2_treatment_situation: D2TreatmentSituationDecision | None = None
     d2_price_scope_decision: D2PriceScopeDecision | None = None
     d2_request_parts: tuple[D2ResolvedRequestPart, ...] = ()
     d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()

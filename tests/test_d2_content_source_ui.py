@@ -10,7 +10,7 @@ from contracts.response_plan_materialization import (
     D2SourceUiAuthority,
     ResponsePlanMaterializationSources,
 )
-from core.response_plan_materialization import resolve_d2_envelope_response
+from core.response_plan_materialization import resolve_d2_operations
 from tests.test_d2_single_request import (
     _content_request,
     _parsed_envelope,
@@ -85,8 +85,8 @@ def test_content_uses_only_the_selected_source_ui_and_keeps_source_cta() -> None
         commercial_intent="none",
     )
 
-    outcome = resolve_d2_envelope_response(
-        envelope, _content_sources(), as_of=date(2026, 9, 18)
+    outcome = resolve_d2_operations(
+        (envelope).blocks, _content_sources(), as_of=date(2026, 9, 18)
     )
 
     assert outcome.resolved.ui_plan.source_content_ref == "pain.md"
@@ -103,14 +103,14 @@ def test_two_clean_calls_do_not_repeat_selected_secondary_refs() -> None:
         commercial_intent="none",
     )
 
-    first = resolve_d2_envelope_response(
-        envelope, _content_sources(), as_of=date(2026, 9, 18)
+    first = resolve_d2_operations(
+        (envelope).blocks, _content_sources(), as_of=date(2026, 9, 18)
     )
     shown = tuple(
         item.reply_id for item in first.ui_projection.quick_replies
     ) + ((first.ui_projection.video.video_id,) if first.ui_projection.video is not None else ())
-    outcome = resolve_d2_envelope_response(
-        envelope, _content_sources(shown=shown), as_of=date(2026, 9, 18)
+    outcome = resolve_d2_operations(
+        (envelope).blocks, _content_sources(shown=shown), as_of=date(2026, 9, 18)
     )
 
     assert outcome.ui_projection.video is None
@@ -128,8 +128,8 @@ def test_warranty_does_not_inherit_pain_navigation() -> None:
         commercial_intent="none",
     )
 
-    outcome = resolve_d2_envelope_response(
-        envelope, _content_sources(), as_of=date(2026, 9, 18)
+    outcome = resolve_d2_operations(
+        (envelope).blocks, _content_sources(), as_of=date(2026, 9, 18)
     )
 
     assert outcome.resolved.ui_plan.source_content_ref == "warranty.md"
@@ -148,7 +148,7 @@ def test_missing_source_ui_keeps_the_approved_text_without_borrowing_navigation(
     payload["d2_source_ui"] = []
     source = ResponsePlanMaterializationSources.model_validate(payload)
 
-    outcome = resolve_d2_envelope_response(envelope, source, as_of=date(2026, 9, 18))
+    outcome = resolve_d2_operations((envelope).blocks, source, as_of=date(2026, 9, 18))
 
     assert outcome.rendered_text == MODEL_PROSE
     assert outcome.ui_projection.quick_replies == ()
@@ -170,8 +170,8 @@ def test_price_plus_content_suppresses_source_secondary_but_keeps_source_cta() -
         commercial_intent="price",
     )
 
-    outcome = resolve_d2_envelope_response(
-        envelope, _content_sources(), as_of=date(2026, 9, 18)
+    outcome = resolve_d2_operations(
+        (envelope).blocks, _content_sources(), as_of=date(2026, 9, 18)
     )
 
     assert outcome.resolved.d2_price_block is not None
@@ -192,8 +192,8 @@ def test_two_independent_documents_do_not_borrow_first_document_cta() -> None:
         commercial_intent="none",
     )
 
-    outcome = resolve_d2_envelope_response(
-        envelope, _content_sources(), as_of=date(2026, 9, 18),
+    outcome = resolve_d2_operations(
+        (envelope).blocks, _content_sources(), as_of=date(2026, 9, 18),
     )
 
     assert len(outcome.resolved.information_blocks) == 2
@@ -201,6 +201,34 @@ def test_two_independent_documents_do_not_borrow_first_document_cta() -> None:
     assert outcome.ui_projection.buttons == ()
     assert outcome.ui_projection.quick_replies == ()
     assert outcome.ui_projection.video is None
+
+
+@pytest.mark.parametrize("second_ref", ["pain.md", "warranty.md", None, "missing.md"])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_multiple_parts_share_ui_only_when_every_source_is_verified_and_the_same(second_ref, reverse):
+    requests = [
+        _content_request(content_ref="pain.md", service_id="service_one",
+                         topic_id="implantation", request_id="r1"),
+        _content_request(content_ref=second_ref, service_id="service_one",
+                         topic_id="implantation", request_id="r2"),
+    ]
+    requests[0]["content_text"] = "Первое объяснение."
+    requests[1]["content_text"] = "Независимое объяснение."
+    if reverse:
+        requests.reverse()
+    result = resolve_d2_operations(
+        _parsed_envelope(requests=requests, commercial_intent="none").blocks,
+        _content_sources(), as_of=date(2026, 9, 18),
+    )
+    assert all(request["content_text"] in result.rendered_text for request in requests)
+    if second_ref == "pain.md":
+        assert result.ui_projection.video.video_id == "pain_video"
+        assert [r.reply_id for r in result.ui_projection.quick_replies] == ["pain_follow"]
+        assert [b.button_id for b in result.ui_projection.buttons] == ["pain_cta"]
+    else:
+        assert result.ui_projection.video is None
+        assert result.ui_projection.quick_replies == ()
+        assert result.ui_projection.buttons == ()
 
 
 def test_foreign_source_ui_is_rejected_at_the_tenant_boundary() -> None:
@@ -224,7 +252,7 @@ def test_invalid_optional_source_cta_is_omitted_with_a_diagnostic() -> None:
     payload["d2_source_ui"][0]["cta"]["action_kind"] = "contact"
     source = ResponsePlanMaterializationSources.model_validate(payload)
 
-    outcome = resolve_d2_envelope_response(envelope, source, as_of=date(2026, 9, 18))
+    outcome = resolve_d2_operations((envelope).blocks, source, as_of=date(2026, 9, 18))
 
     assert outcome.rendered_text == MODEL_PROSE
     assert outcome.ui_projection.buttons == ()

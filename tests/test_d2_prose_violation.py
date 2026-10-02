@@ -6,8 +6,8 @@ import pytest
 
 from contracts.response_plan import UiQuickReplyCandidate
 from contracts.response_plan_materialization import D2SourceUiAuthority
-from core.one_call_envelope_protocol import OneCallEnvelopeProtocolError
-from core.response_plan_materialization import resolve_d2_envelope_response
+from pydantic import ValidationError
+from core.response_plan_materialization import resolve_d2_operations
 from tests.test_d2_prose_realization import _AS_OF, _content_authority, _prose_request, _resolve
 from tests.test_d2_single_request import _parsed_envelope, _price_request, _sources
 
@@ -41,7 +41,7 @@ def test_non_http_uri_scheme_does_not_block_prose() -> None:
 
 
 def test_empty_model_prose_remains_invalid_at_parser() -> None:
-    with pytest.raises(OneCallEnvelopeProtocolError, match="model_prose_text_required"):
+    with pytest.raises(ValidationError, match="content_text"):
         _resolve(_prose_request(text="", fallback="s:anesthesia"))
 
 
@@ -91,8 +91,8 @@ def test_missing_source_does_not_authorize_citation_or_hide_prose() -> None:
     bad = _prose_request(fallback="s:anesthesia")
     bad["content_ref"] = "missing.md"
     envelope = _parsed_envelope(requests=[bad], commercial_intent="none")
-    outcome = resolve_d2_envelope_response(
-        envelope, _sources(content=(_content_authority(),)), as_of=_AS_OF
+    outcome = resolve_d2_operations(
+        (envelope).blocks, _sources(content=(_content_authority(),)), as_of=_AS_OF
     )
     assert outcome.resolved.d2_result_status == "complete"
     assert outcome.resolved.d2_request_parts[0].status == "answered"
@@ -117,7 +117,7 @@ def test_unverified_primary_source_ui_is_not_transferred() -> None:
         }
     )
     envelope = _parsed_envelope(requests=[bad, good], commercial_intent="none")
-    outcome = resolve_d2_envelope_response(envelope, source, as_of=_AS_OF)
+    outcome = resolve_d2_operations((envelope).blocks, source, as_of=_AS_OF)
 
     assert outcome.resolved.d2_result_status == "complete"
     assert outcome.resolved.ui_plan.source_content_ref is None

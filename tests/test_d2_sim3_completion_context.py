@@ -11,7 +11,7 @@ from core.d2_dialogue_store import D2DialogueStore
 from tests.test_d2_http_contract import FakeProvider, http_env, post, post_sse
 from tests.test_d2_document_click_task_http import _body
 from tests.test_d2_sim2_dialogues import raw, price, explanation, clarify
-from tests.test_d2_continuation_scenarios import _situation
+from tests.test_d2_continuation_scenarios import _volume
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
@@ -51,11 +51,11 @@ def test_scope_survives_more_than_three_contact_turns_and_receipts_are_bounded(h
         answer = _body(send(client, sid=sid, request_id=f"contact{i}", q=f"Какой {field}?"), transport)
         assert answer["answer"]
     fake.raw = raw(explanation("Установка занимает 20–30 минут, приживление — 3–6 месяцев.",
-        target={"type": "topic", "id": "implantation"}))
+        target={"type": "topic", "id": "implantation"}, volume=_volume()))
     args = dict(sid=sid, request_id="duration", q="А сколько займёт лечение?")
     answer = _body(send(client, **args), transport)
     context = fake.inputs[-1].context
-    assert context.ordinary.discussion_scope.extent == "one_tooth"
+    assert context.ordinary.discussion_scope.volume.extent == "one_tooth"
     assert context.ordinary.discussion_scope.topic_id == "implantation"
     assert len(context.ordinary.dialogue_pairs) == 3
     assert all(p.parts[0].kind == "contact" for p in context.ordinary.dialogue_pairs)
@@ -66,8 +66,8 @@ def test_scope_survives_more_than_three_contact_turns_and_receipts_are_bounded(h
     assert len(fake.inputs) == count
     with D2DialogueStore(db) as store:
         state = store.read(key).state
-        assert state.situation_state is None
-        assert state.active_topic.discussion_request_id == "volume"
+        assert "situation_state" not in state.model_dump()
+        assert state.discussion_request_id == "duration"
         assert len(state.dialogue_pairs) == 3
         assert all(not hasattr(p, "assistant_text") for p in state.dialogue_pairs)
         assert state.dialogue_pairs[-1].request_id == "duration"
@@ -85,7 +85,7 @@ def test_new_service_replaces_scope_and_never_inherits_old_extent(http_env, next
     fake.raw = raw(explanation("Сроки новой услуги."))
     assert post(client, request_id="next", q="А сроки?").status_code == 200
     scope = fake.inputs[-1].context.ordinary.discussion_scope
-    assert scope is None or scope.extent == "unknown"
+    assert scope is None or scope.volume is None
     if scope:
         assert scope.service_id == next_block["target"]["id"]
 
@@ -149,20 +149,20 @@ def test_receipt_reference_cannot_read_foreign_or_inflight_result(http_env):
 def test_direct_text_extent_and_explicit_unknown_replace_old_discussion_without_patient_fact(http_env):
     client, db, use, _ = http_env
     fake = use(FakeProvider(raw(price("classic", "service", brand_id="implantium",
-        situation=_situation(commitment="hypothetical")))))
+        volume=_volume()))))
     assert post(client, request_id="direct", q="Если имплантация одного зуба Implantium, сколько стоит?").status_code == 200
     fake.raw = raw(explanation("Сроки обсуждаемой услуги.", target={"type": "service", "id": "classic"}))
     assert post(client, request_id="next", q="А сроки?").status_code == 200
     scope = fake.inputs[-1].context.ordinary.discussion_scope
-    assert (scope.service_id, scope.brand_id, scope.extent) == ("classic", "implantium", "one_tooth")
+    assert (scope.service_id, scope.brand_id, scope.volume.extent) == ("classic", "implantium", "one_tooth")
     fake.raw = raw(price())
     first = post(client, request_id="overview", q="А вообще какие варианты имплантации?").get_json()
     assert post(client, request_id="unknown", q="", ref="volume:implantation:unknown", ui_revision=first["revision"]).status_code == 200
     fake.raw = raw(explanation("Общие сроки."))
     assert post(client, request_id="last", q="А сроки?").status_code == 200
-    assert fake.inputs[-1].context.ordinary.discussion_scope.extent == "unknown"
+    assert fake.inputs[-1].context.ordinary.discussion_scope.volume.extent == "unknown"
     with D2DialogueStore(db) as store:
-        assert store.read(SessionKey(client_id="demo", sid="cp6a")).state.situation_state is None
+        assert "situation_state" not in store.read(SessionKey(client_id="demo", sid="cp6a")).state.model_dump()
 
 
 @pytest.mark.parametrize("block", [clarify("content"),
@@ -176,7 +176,7 @@ def test_clarification_policy_and_fact_results_reach_next_model_input(http_env, 
     assert post(client, request_id="next", q="А подробнее?").status_code == 200
     pair = fake.inputs[-1].context.ordinary.dialogue_pairs[-1]
     assert pair.parts and pair.patient_text == "Расскажите об условиях клиники?"
-    if block["kind"] == "clarification":
+    if block.get("clarification") is not None:
         assert pair.parts[0].kind == "clarification"
         assert fake.inputs[-1].context.ordinary.clarify_task is not None
     elif block["kind"] == "clinic_policy":

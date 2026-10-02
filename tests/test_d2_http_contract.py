@@ -96,8 +96,8 @@ def _mixed_price_content_policy_raw() -> str:
     return json.dumps({"outcome": "dialogue", "blocks": [
         {"request_id": "r1", "kind": "price",
          "target": {"type": "service", "id": "all_on_4"},
-         "situation": {"scope_commitment": "reported", "extent": "full_arch",
-                       "tooth_count": None, "jaw": "unknown", "continuity": "new"}},
+         "volume": {"extent": "full_arch",
+                       "tooth_count": None, "jaw": "unknown", }},
         {"request_id": "r2", "kind": "content",
          "target": {"type": "service", "id": "all_on_4"},
          "content_text": "Живой ответ модели о восстановлении всей челюсти."},
@@ -114,7 +114,7 @@ def _policy_raw(policy_id="no_pediatric_dentistry"):
 def _booking_raw():
     return json.dumps({"outcome": "dialogue", "blocks": [
         {"kind": "booking", "request_id": "r1",
-         "subject": {"subject_id": "s1", "relation": "self", "age_group": "adult"}},
+         "age_group": "adult"},
     ]})
 
 

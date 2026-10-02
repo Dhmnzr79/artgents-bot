@@ -1,7 +1,7 @@
-"""Opt-in, PII-inclusive local transcript of the current D2 HTTP attempt.
+"""PII-inclusive local transcript of the current D2 HTTP attempt.
 
-Never use this as an application event log. It is disabled by default and in
-production; the separate REC-1 diagnostic channel remains text-free.
+Enabled by default locally, explicitly opt-out, and always disabled in production;
+the separate REC-1 diagnostic channel remains text-free.
 """
 
 from __future__ import annotations
@@ -33,9 +33,10 @@ _SECRET_PATTERNS = (
 
 
 def full_audit_enabled() -> bool:
+    environment = (os.getenv("APP_ENV") or "local").strip().lower()
     return (
-        os.getenv("D2_FULL_AUDIT_LOG") == "1"
-        and (os.getenv("APP_ENV") or "local").strip().lower() not in {"prod", "production"}
+        os.getenv("D2_FULL_AUDIT_LOG", "1" if environment == "local" else "0") == "1"
+        and environment not in {"prod", "production"}
     )
 
 

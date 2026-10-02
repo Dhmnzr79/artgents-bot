@@ -216,17 +216,17 @@ def resolve_d2_booking_lead_entry(
     snapshot: D2TenantSnapshot,
     session_key: SessionKey,
     understanding: RequestUnderstanding | None = None,
-    operations=None, subjects=(),
+    operations=None,
 ) -> D2LeadBridgeResult | None:
     """Authorize typed booking via existing clinic_policy_resolver; enter name or block."""
     if operations is None:
-        operations, subjects = understanding.requests, understanding.subjects
+        operations = understanding.requests
     booking_parts = tuple(item for item in operations if item.kind == "booking")
     if not booking_parts:
         return None
-    policy = resolve_clinic_policy_operations(
-        client_id=session_key.client_id, operations=operations, subjects=subjects,
-    )
+    policy = (resolve_clinic_policies(client_id=session_key.client_id, understanding=understanding)
+        if understanding is not None else resolve_clinic_policy_operations(
+            client_id=session_key.client_id, operations=operations))
     if policy.suppress_forbidden_booking_cta or not policy.active_booking_request_id:
         blocked_key = next(
             (

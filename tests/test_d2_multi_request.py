@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import date
+from contracts.d2_dialogue_result import ServiceTarget, TopicTarget
 
 from contracts.response_plan import SessionKey
 from contracts.response_plan_adapter import (
@@ -20,58 +21,18 @@ from contracts.response_plan_post_composer import PostComposerMaterialAuthority
 from core.one_call_envelope_protocol import parse_production_envelope_json, production_envelope_template
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
-from core.response_plan_materialization import resolve_d2_envelope_response
+from core.response_plan_materialization import resolve_d2_operations
 from core.d2_published_offer_terms import build_d2_published_offer_terms
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from tests.test_target_offer_projection import _bundle
 
 
 def _envelope():
-    payload = production_envelope_template(
-        patient_text="Служебный текст D1R.",
-        commercial_intent="price",
-        request_understanding={
-            "subjects": [],
-            "requests": [
-                {
-                    "request_id": "r1",
-                    "kind": "price",
-                    "subject_id": None,
-                    "context": "general_information",
-                    "policy_ids": [],
-                    "payment_scheme": "unspecified",
-                    "payment_scheme_intent": "not_requested",
-                    "contact_fields": [],
-                    "content_text": None,
-                    "service_id": "service_one",
-                    "topic_id": "implantation",
-                    "statement_mode": "question",
-                },
-                {
-                    "request_id": "r2",
-                    "kind": "content",
-                    "subject_id": None,
-                    "context": "general_information",
-                    "policy_ids": [],
-                    "payment_scheme": "unspecified",
-                    "payment_scheme_intent": "not_requested",
-                    "contact_fields": [],
-                    "content_text": "Текст выбирается из утверждённого материала.",
-                    "content_ref": "pain.md",
-                    "service_id": "service_one",
-                    "topic_id": "implantation",
-                    "statement_mode": "question",
-                },
-            ],
-        },
-        primary_price_request_id="r1",
-    )
-    return parse_production_envelope_json(
-        json.dumps(payload, ensure_ascii=False),
-        active_service_catalog=ActiveServiceCatalogSnapshot(canonical_json="{}"),
-        service_reference_catalog=ServiceReferenceCatalogSnapshot(canonical_json="{}"),
-        commercial_fact_catalog=CommercialFactCatalogSnapshot(canonical_json="{}"),
-    )
+    from tests.test_d2_single_request import _parsed_envelope, _price_request, _content_request
+    return _parsed_envelope(requests=[
+        _price_request(service_id="service_one",topic_id="implantation"),
+        _content_request(content_ref="pain.md",service_id="service_one",topic_id="implantation",request_id="r2"),
+    ], commercial_intent="price")
 
 
 def _sources(bundle):
@@ -114,8 +75,8 @@ def _sources(bundle):
 
 
 def test_price_plus_content_uses_one_d1r_envelope_and_frozen_plan() -> None:
-    outcome = resolve_d2_envelope_response(
-        _envelope(), _sources(_bundle()), as_of=date(2026, 9, 18)
+    outcome = resolve_d2_operations(
+        (_envelope()).blocks, _sources(_bundle()), as_of=date(2026, 9, 18)
     )
 
     assert outcome.resolved.price_block is None
@@ -132,24 +93,13 @@ def test_price_plus_content_uses_one_d1r_envelope_and_frozen_plan() -> None:
 
 def test_content_for_another_service_is_rejected() -> None:
     envelope = _envelope().model_copy(
-        update={
-            "request_understanding": _envelope().request_understanding.model_copy(
-                update={
-                    "requests": (
-                        _envelope().request_understanding.requests[0],
-                        _envelope().request_understanding.requests[1].model_copy(
-                            update={"service_id": "other_service"}
-                        ),
-                    )
-                }
-            )
-        }
+        update={'blocks': (_envelope().blocks[0], _envelope().blocks[1].model_copy(update={'target': ServiceTarget(type='service', id='other_service')}))}
     )
 
     from contracts.response_plan_materialization import MaterializationContractError
 
     try:
-        resolve_d2_envelope_response(envelope, _sources(_bundle()), as_of=date(2026, 9, 18))
+        resolve_d2_operations((envelope).blocks, _sources(_bundle()), as_of=date(2026, 9, 18))
     except MaterializationContractError as error:
         assert str(error) == "d2_content_service_mismatch"
     else:  # pragma: no cover - assertion helper
@@ -158,25 +108,14 @@ def test_content_for_another_service_is_rejected() -> None:
 
 def test_model_content_text_cannot_replace_bound_authored_source() -> None:
     parsed = _envelope()
-    understanding = parsed.request_understanding
+    understanding = parsed
     assert understanding is not None
     envelope = parsed.model_copy(
-        update={
-            "request_understanding": understanding.model_copy(
-                update={
-                    "requests": (
-                        understanding.requests[0],
-                        understanding.requests[1].model_copy(
-                            update={"content_text": "999 999 ₽ и неутверждённое обещание."}
-                        ),
-                    )
-                }
-            )
-        }
+        update={'blocks': (understanding.blocks[0], understanding.blocks[1].model_copy(update={'content_text': '999 999 ₽ и неутверждённое обещание.'}))}
     )
 
-    outcome = resolve_d2_envelope_response(
-        envelope, _sources(_bundle()), as_of=date(2026, 9, 18)
+    outcome = resolve_d2_operations(
+        (envelope).blocks, _sources(_bundle()), as_of=date(2026, 9, 18)
     )
 
     assert "Одобренный текст клиники о боли." in outcome.rendered_text
@@ -185,23 +124,14 @@ def test_model_content_text_cannot_replace_bound_authored_source() -> None:
 
 def test_direction_price_uses_explicit_clinic_mapping_not_exact_service() -> None:
     parsed = _envelope()
-    understanding = parsed.request_understanding
+    understanding = parsed
     assert understanding is not None
     envelope = parsed.model_copy(
-        update={
-            "request_understanding": understanding.model_copy(
-                update={
-                    "requests": (
-                        understanding.requests[0].model_copy(update={"service_id": None}),
-                        understanding.requests[1].model_copy(update={"service_id": None}),
-                    )
-                }
-            )
-        }
+        update={'blocks': (understanding.blocks[0].model_copy(update={'target': TopicTarget(type='topic', id='implantation')}), understanding.blocks[1].model_copy(update={'target': TopicTarget(type='topic', id='implantation')}))}
     )
 
-    outcome = resolve_d2_envelope_response(
-        envelope, _sources(_bundle()), as_of=date(2026, 9, 18)
+    outcome = resolve_d2_operations(
+        (envelope).blocks, _sources(_bundle()), as_of=date(2026, 9, 18)
     )
 
     assert outcome.resolved.response_scope == "topic"
@@ -211,27 +141,10 @@ def test_direction_price_uses_explicit_clinic_mapping_not_exact_service() -> Non
 
 def test_another_direction_uses_its_own_approved_service_map() -> None:
     parsed = _envelope()
-    understanding = parsed.request_understanding
+    understanding = parsed
     assert understanding is not None
     envelope = parsed.model_copy(
-        update={
-            "request_understanding": understanding.model_copy(
-                update={
-                    "requests": (
-                        understanding.requests[0].model_copy(
-                            update={"service_id": None, "topic_id": "therapy"}
-                        ),
-                        understanding.requests[1].model_copy(
-                            update={
-                                "service_id": None,
-                                "topic_id": "therapy",
-                                "content_ref": "therapy.md",
-                            }
-                        ),
-                    )
-                }
-            )
-        }
+        update={'blocks': (understanding.blocks[0].model_copy(update={'target': TopicTarget(type='topic', id='therapy')}), understanding.blocks[1].model_copy(update={'content_ref': 'therapy.md', 'target': TopicTarget(type='topic', id='therapy')}))}
     )
     base = _sources(_bundle())
     sources = base.model_copy(
@@ -248,7 +161,7 @@ def test_another_direction_uses_its_own_approved_service_map() -> None:
         }
     )
 
-    outcome = resolve_d2_envelope_response(envelope, sources, as_of=date(2026, 9, 18))
+    outcome = resolve_d2_operations((envelope).blocks, sources, as_of=date(2026, 9, 18))
 
     assert outcome.resolved.session_delta.active_topic_id == "therapy"
     assert outcome.trace.price_candidate_service_ids == ("service_two",)
@@ -284,7 +197,7 @@ def test_price_suppresses_available_secondary_ui_but_keeps_selected_cta() -> Non
         }
     )
 
-    outcome = resolve_d2_envelope_response(_envelope(), sources, as_of=date(2026, 9, 18))
+    outcome = resolve_d2_operations((_envelope()).blocks, sources, as_of=date(2026, 9, 18))
 
     assert [item.button_id for item in outcome.ui_projection.buttons] == ["consult"]
     assert outcome.ui_projection.widget is None

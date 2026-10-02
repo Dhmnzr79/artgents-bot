@@ -6,17 +6,17 @@ from typing import Literal, Protocol, Self
 from pydantic import model_validator
 
 from contracts.d2_session_context import (
-    D2PlanFocusSeed, D2SessionActivity, D2SessionContextProjection,
+    D2SessionState, D2SessionActivity, D2SessionContextProjection,
 )
 from contracts.d2_tenant_snapshot import D2ModelView
 from contracts.d2_dialogue_result import D2DialogueResult
 from contracts.response_plan import ResponsePlanModel
 from contracts.response_plan_materialization import D2SelectedDocumentAction, MaterializedResponseOutcome
-from contracts.response_plan_session import D2SelectedUiRef, ResponsePlanSessionState
+from contracts.response_plan_session import D2SelectedUiRef
 
 
 class D2DialogueRecord(ResponsePlanModel):
-    state: ResponsePlanSessionState
+    state: D2SessionState
     activity: D2SessionActivity
     tenant_fingerprint: str
 
@@ -79,7 +79,6 @@ class D2CompletedTurn(ResponsePlanModel):
     request_fingerprint: str
     response: MaterializedResponseOutcome
     context: D2SessionContextProjection
-    focus: D2PlanFocusSeed
     committed_revision: int
     lead_effect: D2LeadEffect = D2LeadEffect()
 
@@ -98,7 +97,6 @@ class D2CompletedTurn(ResponsePlanModel):
 class D2DialogueTurn:
     response: MaterializedResponseOutcome
     context: D2SessionContextProjection
-    focus: D2PlanFocusSeed
     committed_revision: int
     request_id: str
     idempotent_replay: bool = False

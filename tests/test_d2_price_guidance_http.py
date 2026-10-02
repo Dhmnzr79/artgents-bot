@@ -11,8 +11,8 @@ from tests.test_d2_sim2_dialogues import raw, price, explanation
 
 
 def scope(count):
-    return dict(scope_commitment="hypothetical", extent="one_tooth" if count == 1 else "few_teeth",
-                tooth_count=count, jaw="unknown", continuity="new")
+    return dict(extent="one_tooth" if count == 1 else "few_teeth",
+                tooth_count=count, jaw="unknown")
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
@@ -20,7 +20,7 @@ def scope(count):
 @pytest.mark.parametrize("count", [1, 2, 3, None])
 def test_price_guidance_keeps_requested_scope_units_and_continuation(http_env, transport, topic, count):
     client, db, use, _ = http_env
-    fake = use(FakeProvider(raw(price(topic, "topic", situation=scope(count)))))
+    fake = use(FakeProvider(raw(price(topic, "topic", volume=scope(count)))))
     send = post if transport == "json" else post_sse
     args = dict(sid="guidance", request_id="price", q=f"Стоимость: {topic}, зубов: {count or 'несколько'}")
     response = send(client, **args)
@@ -40,9 +40,9 @@ def test_price_guidance_keeps_requested_scope_units_and_continuation(http_env, t
         saved = store.read_latest_completion(key)
         result = saved.response.resolved
         assert tuple(r.offer_id for r in result.d2_price_block.rows) == expected
-        assert result.d2_treatment_situation.tooth_count == count
-        assert result.d2_treatment_situation.extent == scope(count)["extent"]
-        assert store.read(key).state.situation_state is None
+        assert result.d2_request_parts[0].discussion_scope.volume.tooth_count == count
+        assert result.d2_request_parts[0].discussion_scope.volume.extent == scope(count)["extent"]
+        assert "situation_state" not in store.read(key).state.model_dump()
     assert "All-on-4" not in answer and "All-on-6" not in answer
     if topic != "prosthetics":
         assert "76 200" in answer and "одного зуба" in answer
@@ -62,7 +62,7 @@ def test_price_guidance_keeps_requested_scope_units_and_continuation(http_env, t
     fake.raw = raw(explanation("Сроки зависят от плана лечения."))
     assert send(client, sid="guidance", request_id="next", q="А сколько времени это займёт?").status_code == 200
     discussion = fake.inputs[-1].context.ordinary.discussion_scope
-    assert discussion.topic_id == topic and discussion.extent == scope(count)["extent"]
+    assert discussion.topic_id == topic and discussion.volume.extent == scope(count)["extent"]
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
@@ -102,7 +102,7 @@ def test_partial_overview_keeps_numeric_price_and_authored_no_price_row(http_env
     offer = json.loads(path.read_text(encoding="utf-8"))
     offer["price"] = {"mode": "no_public_price", "approved_text": "Цена частичного протеза не опубликована. Её можно уточнить у администратора."}
     path.write_text(json.dumps(offer, ensure_ascii=False), encoding="utf-8")
-    fake = use(FakeProvider(raw(price("restoration", "topic", situation=scope(3)))))
+    fake = use(FakeProvider(raw(price("restoration", "topic", volume=scope(3)))))
     send = post if transport == "json" else post_sse
     response = send(client, sid="partial", request_id="price", q="Сколько стоит восстановить три зуба?")
     assert response.status_code == 200
@@ -126,7 +126,7 @@ def test_exact_whitening_preserves_published_price_and_does_not_get_tooth_guidan
 
 def test_missing_brand_does_not_select_a_different_reference(http_env):
     client, db, use, _ = http_env
-    use(FakeProvider(raw(price("implantation", "topic", brand_id="impro", situation=scope(3)))))
+    use(FakeProvider(raw(price("implantation", "topic", brand_id="impro", volume=scope(3)))))
     body = post(client, q="Сколько стоят три импланта Impro?").get_json()
     assert "76 200" not in body["answer"].replace("\u00a0", " ")
     assert "Стоимость по вашему запросу не указана" in body["answer"]

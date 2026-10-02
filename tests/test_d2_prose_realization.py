@@ -11,7 +11,7 @@ from contracts.response_plan_materialization import (
     D2AuthoredContentSection,
     D2SourceUiAuthority,
 )
-from core.response_plan_materialization import resolve_d2_envelope_response
+from core.response_plan_materialization import resolve_d2_operations
 from core.response_text_renderer import render_response_text
 from core.response_ui_projection import project_response_ui
 from tests.test_d2_single_request import _parsed_envelope, _price_request, _sources
@@ -29,20 +29,12 @@ def _prose_request(
     return {
         "request_id": request_id,
         "kind": "content",
-        "subject_id": None,
-        "context": "general_information",
-        "policy_ids": [],
-        "payment_scheme": "unspecified",
-        "payment_scheme_intent": "not_requested",
-        "contact_fields": [],
         "content_realization": "model_prose",
         "content_text": text,
         "content_ref": "pain.md",
         "content_section_refs": ["s:anesthesia", "s:preparation"],
         "content_fallback_section_ref": fallback,
-        "service_id": "service_one",
-        "topic_id": "implantation",
-        "statement_mode": "question",
+        "target": {"type":"service","id":"service_one"},
     }
 
 
@@ -71,7 +63,7 @@ def _resolve(*requests: dict[str, object]):
     source = _sources(content=(_content_authority(),)).model_copy(
         update={"d2_snapshot_fingerprint": "snapshot-c8"}
     )
-    return resolve_d2_envelope_response(envelope, source, as_of=_AS_OF), source
+    return resolve_d2_operations((envelope).blocks, source, as_of=_AS_OF), source
 
 
 def test_human_prose_is_rendered() -> None:
@@ -98,7 +90,7 @@ def test_any_published_section_can_ground_prose() -> None:
         "content_text": "Обезболивание подбирают после оценки ситуации.",
     })
     snapshot, envelope, source = _parsed_demo_envelope(raw)
-    outcome = resolve_d2_envelope_response(envelope, source, as_of=_AS_OF)
+    outcome = resolve_d2_operations((envelope).blocks, source, as_of=_AS_OF)
 
     assert snapshot.fingerprint == outcome.resolved.information_blocks[0].snapshot_fingerprint
     assert outcome.resolved.information_blocks[0].source_section_refs == ("a:sedatsiya-i-narkoz",)
@@ -121,8 +113,7 @@ def test_two_content_parts_keep_distinct_sources() -> None:
     other = _prose_request("r2", text="Второй самостоятельный информационный ответ.")
     other["content_ref"] = "other.md"
     other["content_section_refs"] = ["s:other"]
-    other["service_id"] = "service_two"
-    other["topic_id"] = "therapy"
+    other["target"] = {"type":"service","id":"service_two"}
     authority = D2AuthoredContentAuthority(
         source_client_id="demo", content_ref="other.md", display_text="Другой материал.",
         allowed_service_ids=("service_two",),
@@ -132,7 +123,7 @@ def test_two_content_parts_keep_distinct_sources() -> None:
     source = _sources(content=(_content_authority(), authority)).model_copy(
         update={"d2_snapshot_fingerprint": "snapshot-c8"}
     )
-    outcome = resolve_d2_envelope_response(envelope, source, as_of=_AS_OF)
+    outcome = resolve_d2_operations((envelope).blocks, source, as_of=_AS_OF)
 
     assert [block.content_ref for block in outcome.resolved.information_blocks] == ["pain.md", "other.md"]
     assert [block.display_text for block in outcome.resolved.information_blocks] == [

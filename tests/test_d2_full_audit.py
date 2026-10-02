@@ -1,4 +1,4 @@
-"""Opt-in local transcript of the real D2 HTTP turn, with fake providers only."""
+"""Local transcript of the real D2 HTTP turn, with fake providers only."""
 
 from __future__ import annotations
 
@@ -32,10 +32,11 @@ def _trace_for(rows: list[dict], request_id: str) -> list[dict]:
     return [row for row in rows if row["trace_id"] == start["trace_id"]]
 
 
-def test_full_audit_is_opt_in_and_production_disabled(http_env, monkeypatch):
+def test_full_audit_local_default_opt_out_and_production_disabled(http_env, monkeypatch):
+    from tests.test_d2_sim2_dialogues import raw, explanation
     client, _db, use_provider, _ = http_env
-    use_provider(FakeProvider(_content_raw(text="Точный ответ.")))
-    monkeypatch.delenv("D2_FULL_AUDIT_LOG", raising=False)
+    use_provider(FakeProvider(raw(explanation("Точный ответ."))))
+    monkeypatch.setenv("D2_FULL_AUDIT_LOG", "0")
     assert post(client, sid="audit-off", request_id="off").status_code == 200
     assert not full_audit_path().exists()
 
@@ -45,8 +46,24 @@ def test_full_audit_is_opt_in_and_production_disabled(http_env, monkeypatch):
     assert not full_audit_path().exists()
 
     monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.delenv("D2_FULL_AUDIT_LOG", raising=False)
     assert post(client, sid="audit-on", request_id="on").status_code == 200
     assert full_audit_path().exists()
+
+
+@pytest.mark.parametrize("environment,setting,expected", [
+    (None, None, True), ("local", None, True), ("local", "0", False),
+    ("prod", "1", False), ("production", "1", False),
+    ("staging", None, False), ("staging", "1", True),
+])
+def test_full_audit_environment_defaults(monkeypatch, environment, setting, expected):
+    from core.d2_full_audit import full_audit_enabled
+    for key, value in (("APP_ENV", environment), ("D2_FULL_AUDIT_LOG", setting)):
+        if value is None:
+            monkeypatch.delenv(key, raising=False)
+        else:
+            monkeypatch.setenv(key, value)
+    assert full_audit_enabled() is expected
 
 
 def test_json_and_sse_capture_exact_frozen_answer_provider_and_wire(http_env, monkeypatch):
@@ -267,7 +284,8 @@ def test_writer_failure_does_not_change_http_result_and_credentials_are_scrubbed
 
     full_audit("broken_serialization", trace_id="audit-secret", value=BrokenSerialization())
 
-    fake = use_provider(FakeProvider(_content_raw(text="Сохранённый ответ.")))
+    from tests.test_d2_sim2_dialogues import raw, explanation
+    fake = use_provider(FakeProvider(raw(explanation("Сохранённый ответ."))))
     blocked = tmp_path / "not_a_directory"
     blocked.write_text("occupied", encoding="utf-8")
     monkeypatch.setattr("core.d2_full_audit.full_audit_path", lambda: blocked / "audit.jsonl")

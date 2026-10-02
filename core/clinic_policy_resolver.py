@@ -40,10 +40,10 @@ def resolve_clinic_policies(
     """Map understanding requests to policy decisions without regex on user text."""
 
     return resolve_clinic_policy_operations(client_id=client_id,
-        operations=understanding.requests, subjects=understanding.subjects)
+        operations=understanding.requests, request_ages={r.request_id: _subject_age(understanding.subjects, r.subject_id) for r in understanding.requests})
 
 
-def resolve_clinic_policy_operations(*, client_id, operations, subjects):
+def resolve_clinic_policy_operations(*, client_id, operations, request_ages=None):
     """Apply existing clinic rules to narrow operations, without model envelope."""
     allowed_keys = _pack_policy_keys(client_id)
     decisions: list[ClinicPolicyRequestDecision] = []
@@ -52,13 +52,14 @@ def resolve_clinic_policy_operations(*, client_id, operations, subjects):
     active_booking: str | None = None
 
     for req in operations:
+        age = getattr(req, "age_group", "unknown") if request_ages is None else request_ages.get(req.request_id)
         if req.kind == "clinic_policy":
             inferred: list[str] = list(req.policy_ids)
             if req.payment_scheme_intent == "eligibility_question":
                 payment_key = {"oms": "no_oms", "dms": "no_dms"}.get(req.payment_scheme)
                 if payment_key and payment_key not in inferred:
                     inferred.append(payment_key)
-            if (req.context != "past_history" and _subject_age(subjects, req.subject_id) == "child"
+            if (req.context != "past_history" and age == "child"
                     and "no_pediatric_dentistry" not in inferred):
                 inferred.append("no_pediatric_dentistry")
             answered = False
@@ -101,7 +102,6 @@ def resolve_clinic_policy_operations(*, client_id, operations, subjects):
             continue
 
         if req.kind in {"price", "booking"}:
-            age = _subject_age(subjects, req.subject_id)
             if req.kind == "booking" and req.context == "past_history":
                 decisions.append(ClinicPolicyRequestDecision(
                     request_id=req.request_id, policy_key=None,

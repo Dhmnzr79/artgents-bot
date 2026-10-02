@@ -45,8 +45,8 @@ def test_three_volume_actions_execute_without_provider_and_keep_context(http_env
     with D2DialogueStore(db) as store:
         key = SessionKey(client_id="demo", sid="sim1-volume")
         saved = store.read_latest_completion(key)
-        assert discussion_scope(saved.response.resolved).extent == extent
-        assert store.read(key).state.situation_state is None
+        assert discussion_scope(saved.response.resolved).volume.extent == extent
+        assert "situation_state" not in store.read(key).state.model_dump()
         assert saved.response.resolved.d2_price_block is not None
         expected = {
             "one_tooth": ("classic.one_tooth.implantium", "one_stage.one_tooth.implantium"),
@@ -61,7 +61,7 @@ def test_three_volume_actions_execute_without_provider_and_keep_context(http_env
     fake.raw = _raw("Сроки зависят от этапов лечения и заживления.")
     followup = _body(send(client, sid="sim1-volume", request_id="next", q="А сколько это займёт?"), transport)
     assert "Сроки" in followup["answer"]
-    assert fake.inputs[-1].context.ordinary.discussion_scope.extent == extent
+    assert fake.inputs[-1].context.ordinary.discussion_scope.volume.extent == extent
     assert len(fake.inputs) == 2
 
 
@@ -78,6 +78,9 @@ def test_document_realization_preserves_frozen_section(http_env, mode):
     fake.raw = json.dumps({"explanations": [item]})
     clicked = post(client, sid="sim1-doc", request_id="click", q="", ref=ref, ui_revision=first["revision"])
     assert clicked.status_code == 200, clicked.get_json()
+    pending = fake.inputs[-1].known_task.blocks[0]
+    assert pending.pending_question == "Какую анестезию используют"
+    assert not hasattr(pending, "content_text")
     with D2DialogueStore(db) as store:
         saved = store.read_latest_completion(SessionKey(client_id="demo", sid="sim1-doc"))
         block = saved.response.resolved.information_blocks[0]
@@ -95,6 +98,10 @@ def test_document_realization_preserves_frozen_section(http_env, mode):
     "{bad-json",
     {"route": "CLARIFY", "explanations": []},
     {"explanations": [{"request_id": "r1", "content_text": "Текст", "service_id": "veneers"}]},
+    {"explanations": [{"request_id": "r1", "content_text": "Текст", "target": {"type": "service", "id": "veneers"}}]},
+    {"explanations": [{"request_id": "r1", "pending_question": "Новый вопрос"}]},
+    {"explanations": [{"request_id": "r1", "content_text": "Текст", "clarification": {"missing": "stage", "choices": []}}]},
+    {"explanations": [{"request_id": "r2", "content_text": "Другой ID"}]},
     {"explanations": [{"request_id": "r1", "content_text": "Текст", "content_realization": None}]},
     {"explanations": [{"request_id": "r1", "content_text": "Текст", "content_realization": "bad"}]},
     {"explanations": [{"request_id": "r1", "content_text": ""}]},

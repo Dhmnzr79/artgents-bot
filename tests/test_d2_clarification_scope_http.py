@@ -6,6 +6,7 @@ import pytest
 
 from contracts.response_plan import SessionKey
 from core.d2_dialogue_store import D2DialogueStore
+from core.d2_completion_context import discussion_scope
 from core.d2_live_provider import build_d2_d1r_messages
 from core.one_call_prompt_contract import D2_OPERATIONS_INSTRUCTIONS
 from tests.test_d2_http_contract import FakeProvider, http_env, post, post_sse
@@ -18,10 +19,10 @@ def scoped_clarification():
     # unresolved-task shape with scope from the direct-price example; this
     # fixture checks persistence, not whether a live model should clarify.
     examples = [json.loads(x) for x in re.findall(r"```json\n(.*?)\n```", D2_OPERATIONS_INSTRUCTIONS, re.S)]
-    example = next(x for x in examples if x["blocks"][0].get("operation", {}).get("kind") == "price")
-    scoped = next(x["blocks"][0] for x in examples if x["blocks"][0].get("situation"))
-    example["blocks"][0]["operation"]["situation"] = scoped["situation"]
-    example["blocks"][0]["choices"] = ["classic", "implant_supported_prosthetics"]
+    example = next(x for x in examples if x["blocks"][0]["kind"] == "price" and x["blocks"][0].get("clarification"))
+    scoped = next(x["blocks"][0] for x in examples if x["blocks"][0].get("volume"))
+    example["blocks"][0]["volume"] = scoped["volume"]
+    example["blocks"][0]["clarification"]["choices"] = ["classic", "implant_supported_prosthetics"]
     return example["blocks"][0]
 
 
@@ -37,9 +38,11 @@ def test_service_clarification_keeps_scope_through_click_replay_and_next_input(
 ):
     client, db, use, _ = http_env
     pending = scoped_clarification()
-    pending["operation"]["situation"].update(
-        extent=extent, tooth_count=count, scope_commitment=commitment, jaw=jaw)
-    pending["operation"]["brand_id"] = "implantium"
+    pending["volume"].update(
+        extent=extent, tooth_count=count, jaw=jaw)
+    pending["brand_id"] = "implantium"
+    pending["payment_scheme"] = "self_pay"
+    pending["payment_scheme_intent"] = "requested_payment"
     fake = use(FakeProvider(raw(pending, explanation("Адрес можно уточнить отдельно.", request_id="r2"))))
     send = post if transport == "json" else post_sse
     query = f"Если восстановить {count or 'все'} зубов, сколько это стоит?"
@@ -51,9 +54,13 @@ def test_service_clarification_keeps_scope_through_click_replay_and_next_input(
     assert _body(send(client, **first_args), transport) == first
     with D2DialogueStore(db) as store:
         key = SessionKey(client_id="demo", sid="clarify-scope")
-        task = store.read(key).state.clarify_task.operation
-        assert task.situation.model_dump() == pending["operation"]["situation"]
+        task = store.read(key).state.clarify_task
+        assert task.volume.model_dump() == pending["volume"]
         assert task.brand_id == "implantium"
+        assert task.payment_scheme == "self_pay"
+        assert task.payment_scheme_intent == "requested_payment"
+        assert task.request_id == pending["request_id"]
+        assert task.context == pending.get("context", "general_information")
 
     def forbidden(*_args):
         raise AssertionError("known price click must not invoke the model")
@@ -68,11 +75,11 @@ def test_service_clarification_keeps_scope_through_click_replay_and_next_input(
     with D2DialogueStore(db) as store:
         saved = store.read_latest_completion(key)
         result = saved.response.resolved
-        assert result.d2_treatment_situation.extent == extent
-        assert result.d2_treatment_situation.tooth_count == count
-        assert result.d2_treatment_situation.jaw == jaw
+        assert result.d2_request_parts[0].discussion_scope.volume.extent == extent
+        assert result.d2_request_parts[0].discussion_scope.volume.tooth_count == count
+        assert result.d2_request_parts[0].discussion_scope.volume.jaw == jaw
         assert store.read(key).state.clarify_task is None
-        assert store.read(key).state.situation_state is None
+        assert "situation_state" not in store.read(key).state.model_dump()
         if extent in {"one_tooth", "few_teeth"}:
             assert tuple(r.offer_id for r in result.d2_price_block.rows) == ("classic.one_tooth.implantium",)
             assert "76 200" in clicked["answer"].replace("\u00a0", " ")
@@ -88,7 +95,7 @@ def test_service_clarification_keeps_scope_through_click_replay_and_next_input(
     fake.raw = raw(explanation("Срок зависит от выбранного плана лечения."))
     assert send(client, sid="clarify-scope", request_id="next", q="А сколько времени?").status_code == 200
     scope = fake.inputs[-1].context.ordinary.discussion_scope
-    assert scope.extent == extent and scope.service_id == "classic" and scope.brand_id == "implantium"
+    assert scope.volume.extent == extent and scope.service_id == "classic" and scope.brand_id == "implantium"
     assert len(fake.inputs) == 2
 
 
@@ -100,11 +107,12 @@ def test_known_direction_and_explicit_three_teeth_use_unit_reference_after_infor
     fake = use(FakeProvider(raw(information)))
     send = post if transport == "json" else post_sse
     assert send(client, sid="known-topic", request_id="info", q="Как проходит имплантация?").status_code == 200
-    operation = scoped_clarification()["operation"]
+    operation = scoped_clarification()
+    del operation["clarification"]
     operation["target"] = {"type": "topic", "id": "implantation"}
     fake.raw = raw(operation)
     body = _body(send(client, sid="known-topic", request_id="price", q="Сколько стоит восстановить три зуба?"), transport)
-    assert fake.inputs[-1].context.ordinary.active_topic.topic_id == "implantation"
+    assert fake.inputs[-1].context.ordinary.discussion_scope.topic_id == "implantation"
     # Check the revised instructions actually reach the ordinary provider path.
     assert D2_OPERATIONS_INSTRUCTIONS in build_d2_d1r_messages(fake.inputs[-1])[0]["content"]
     assert "76 200" in body["answer"].replace("\u00a0", " ")
@@ -114,7 +122,7 @@ def test_known_direction_and_explicit_three_teeth_use_unit_reference_after_infor
         result = store.read_latest_completion(SessionKey(client_id="demo", sid="known-topic")).response.resolved
         assert tuple(r.offer_id for r in result.d2_price_block.rows) == ("classic.one_tooth.implantium",)
         assert result.d2_request_parts[0].status == "answered"
-        assert result.d2_treatment_situation.tooth_count == 3
+        assert result.d2_request_parts[0].discussion_scope.volume.tooth_count == 3
 
 
 def test_omitted_scope_is_not_recovered_by_a_second_semantic_owner(http_env):
@@ -122,7 +130,7 @@ def test_omitted_scope_is_not_recovered_by_a_second_semantic_owner(http_env):
     # guarantee model compliance, and the server must not guess from raw text.
     client, db, use, _ = http_env
     pending = scoped_clarification()
-    del pending["operation"]["situation"]
+    del pending["volume"]
     fake = use(FakeProvider(raw(pending)))
     first = post(client, sid="omitted", request_id="first", q="Сколько стоит восстановить три зуба?").get_json()
     clicked = post(client, sid="omitted", request_id="click", q="", ref="service:classic",
@@ -131,23 +139,22 @@ def test_omitted_scope_is_not_recovered_by_a_second_semantic_owner(http_env):
     with D2DialogueStore(db) as store:
         key = SessionKey(client_id="demo", sid="omitted")
         result = store.read_latest_completion(key).response.resolved
-        assert result.d2_treatment_situation is None
+        assert result.d2_request_parts[0].discussion_scope.volume is None
         assert result.d2_price_block is not None
-        assert store.read(key).state.situation_state is None
+        assert "situation_state" not in store.read(key).state.model_dump()
 
 
-def test_price_scenario_does_not_replace_existing_reported_patient_scope(http_env):
+def test_price_scenario_replaces_current_discussion_without_personal_memory(http_env):
     client, db, use, _ = http_env
     information = explanation("План лечения определяется после диагностики.")
     information["target"] = {"type": "topic", "id": "implantation"}
-    information["subject"] = {"subject_id": "s1", "relation": "self", "age_group": "adult"}
-    information["situation"] = dict(scope_commitment="reported", extent="one_tooth",
-                                   tooth_count=1, jaw="lower", continuity="new")
+    information["volume"] = dict(extent="one_tooth",
+                                   tooth_count=1, jaw="lower", )
     fake = use(FakeProvider(raw(information)))
     assert post(client, sid="personal", request_id="reported", q="У меня отсутствует один нижний зуб.").status_code == 200
     key = SessionKey(client_id="demo", sid="personal")
     with D2DialogueStore(db) as store:
-        previous = store.read(key).state.situation_state
+        previous = discussion_scope(store.read_latest_completion(key).response.resolved).volume
         assert previous is not None
     fake.raw = raw(scoped_clarification())
     first = post(client, sid="personal", request_id="scenario", q="А если восстановить три зуба, сколько стоит?").get_json()
@@ -155,7 +162,8 @@ def test_price_scenario_does_not_replace_existing_reported_patient_scope(http_en
                    ui_revision=first["revision"])
     assert clicked.status_code == 200 and len(fake.inputs) == 2
     with D2DialogueStore(db) as store:
-        assert store.read(key).state.situation_state == previous
+        assert previous.tooth_count == 1
+        assert discussion_scope(store.read_latest_completion(key).response.resolved).volume.tooth_count == 3
         result = store.read_latest_completion(key).response.resolved
-        assert result.d2_treatment_situation.tooth_count == 3
+        assert result.d2_request_parts[0].discussion_scope.volume.tooth_count == 3
         assert tuple(r.offer_id for r in result.d2_price_block.rows) == ("classic.one_tooth.implantium",)

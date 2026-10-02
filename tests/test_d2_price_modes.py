@@ -8,7 +8,7 @@ from contracts.response_plan_materialization import (
     D2PartFailureAuthority,
     OfferConditionEvidence,
 )
-from core.response_plan_materialization import resolve_d2_envelope_response
+from core.response_plan_materialization import resolve_d2_operations
 from tests.test_d2_multi_request import _envelope, _sources
 from tests.test_target_offer_projection import _bundle
 
@@ -31,8 +31,8 @@ def test_d2_price_modes_are_frozen_without_model_prose(
         offer["active"] = offer["offer_id"] == offer_id
     narrowed = bundle.__class__.model_validate(payload)
 
-    outcome = resolve_d2_envelope_response(
-        _envelope(), _sources(narrowed), as_of=date(2026, 9, 18)
+    outcome = resolve_d2_operations(
+        (_envelope()).blocks, _sources(narrowed), as_of=date(2026, 9, 18)
     )
 
     assert outcome.resolved.d2_price_block is not None
@@ -64,7 +64,7 @@ def test_missing_optional_conditions_do_not_suppress_published_price() -> None:
     }
     sources = type(_sources(bundle)).model_validate(payload)
 
-    outcome = resolve_d2_envelope_response(_envelope(), sources, as_of=date(2026, 9, 18))
+    outcome = resolve_d2_operations((_envelope()).blocks, sources, as_of=date(2026, 9, 18))
     assert outcome.resolved.d2_result_status == "complete"
     assert outcome.resolved.d2_price_block is not None
     assert "120\u00a0000\u00a0₽" in outcome.rendered_text

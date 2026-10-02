@@ -11,7 +11,7 @@ from contracts.response_plan import SessionKey
 from core.d2_snapshot_sources import D2SnapshotBindingError, build_d2_snapshot_sources
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
 from core.one_call_envelope_protocol import parse_production_envelope_json, production_envelope_template
-from core.response_plan_materialization import resolve_d2_envelope_response
+from core.response_plan_materialization import resolve_d2_operations
 from core.response_text_renderer import render_response_text
 from core.response_ui_projection import project_response_ui
 
@@ -28,46 +28,21 @@ def _request(
     content_ref: str | None = None,
     section_refs: list[str] | None = None,
 ) -> dict[str, object]:
-    return {
-        "request_id": request_id,
-        "kind": kind,
-        "subject_id": None,
-        "context": "general_information",
-        "policy_ids": [],
-        "payment_scheme": "unspecified",
-        "payment_scheme_intent": "not_requested",
-        "contact_fields": [],
-        "content_text": "Нужен точный материал." if kind == "content" else None,
-        "content_ref": content_ref,
-        "content_section_refs": section_refs or [],
-        "service_id": service_id,
-        "topic_id": topic_id,
-        "statement_mode": "question",
-    }
+    target = {"type":"service","id":service_id} if service_id else ({"type":"topic","id":topic_id} if topic_id else None)
+    block = {"request_id":request_id,"kind":kind,"target":target}
+    if kind == "content":
+        block.update(content_text="Нужен точный материал.",content_ref=content_ref,content_section_refs=section_refs or [])
+    return block
+
 
 
 def _parsed_demo_envelope(*requests: dict[str, object]):
     snapshot = load_d2_tenant_snapshot("demo", clients_root=Path("clients"))
     view = build_d2_model_view(snapshot)
     price_ids = [item["request_id"] for item in requests if item["kind"] == "price"]
-    payload = production_envelope_template(
-        patient_text="Служебный D1R текст.",
-        commercial_intent="price" if price_ids else "none",
-        primary_price_request_id=price_ids[0] if price_ids else None,
-        request_understanding={"subjects": [], "requests": list(requests)},
-    )
-    envelope = parse_production_envelope_json(
-        json.dumps(payload, ensure_ascii=False),
-        active_service_catalog=view.active_service_catalog,
-        service_reference_catalog=view.service_reference_catalog,
-        commercial_fact_catalog=view.commercial_fact_catalog,
-    )
-    sources = build_d2_snapshot_sources(
-        snapshot,
-        model_view=view,
-        envelope=envelope,
-        session_key=SessionKey(client_id="demo", sid="c7-demo"),
-    )
+    payload = {"outcome":"dialogue","blocks":list(requests)}
+    envelope = parse_production_envelope_json(json.dumps(payload, ensure_ascii=False), active_service_catalog=view.active_service_catalog, service_reference_catalog=view.service_reference_catalog, commercial_fact_catalog=view.commercial_fact_catalog, d2_contract=True)
+    sources = build_d2_snapshot_sources(snapshot, model_view=view, operations=envelope.blocks, session_key=SessionKey(client_id='demo', sid='c7-demo'))
     return snapshot, envelope, sources
 
 
@@ -78,8 +53,8 @@ def _parsed_demo_envelope(*requests: dict[str, object]):
 def test_real_simple_prices_without_metadata(service_id: str, expected_minimum: int) -> None:
     _, envelope, sources = _parsed_demo_envelope(_request("r1", "price", service_id=service_id))
 
-    outcome = resolve_d2_envelope_response(
-        envelope, sources, as_of=_AS_OF, common_route_direct_service_only=True
+    outcome = resolve_d2_operations(
+        (envelope).blocks, sources, as_of=_AS_OF
     )
 
     assert outcome.resolved.d2_result_status == "complete"
@@ -107,8 +82,8 @@ def test_exact_extraction_price_ignores_content_direction_count(direction_count:
         ) + chosen,
     })
 
-    outcome = resolve_d2_envelope_response(
-        envelope, sources, as_of=_AS_OF, common_route_direct_service_only=True
+    outcome = resolve_d2_operations(
+        (envelope).blocks, sources, as_of=_AS_OF
     )
 
     assert [row.offer_id for row in outcome.resolved.d2_price_block.rows] == [
@@ -136,8 +111,8 @@ def test_exact_service_without_authored_price_order_still_answers(
         ),
     })
 
-    outcome = resolve_d2_envelope_response(
-        envelope, sources, as_of=_AS_OF, common_route_direct_service_only=True
+    outcome = resolve_d2_operations(
+        (envelope).blocks, sources, as_of=_AS_OF
     )
 
     assert outcome.resolved.d2_price_block is not None
@@ -151,7 +126,7 @@ def test_exact_service_without_authored_price_order_still_answers(
 def test_real_implant_short_price_keeps_scope_and_required_conditions() -> None:
     _, envelope, sources = _parsed_demo_envelope(_request("r1", "price", service_id="classic", topic_id="implantation"))
 
-    outcome = resolve_d2_envelope_response(envelope, sources, as_of=_AS_OF)
+    outcome = resolve_d2_operations((envelope).blocks, sources, as_of=_AS_OF)
 
     assert outcome.resolved.d2_price_block is not None
     impro = next(row for row in outcome.resolved.d2_price_block.rows if row.offer_id == "classic.one_tooth.impro")
@@ -181,7 +156,7 @@ def test_real_content_below_korotko() -> None:
         ),
     )
 
-    outcome = resolve_d2_envelope_response(envelope, sources, as_of=_AS_OF)
+    outcome = resolve_d2_operations((envelope).blocks, sources, as_of=_AS_OF)
 
     assert len(outcome.resolved.information_blocks) == 2
     assert "Седация и наркоз" in outcome.resolved.information_blocks[0].display_text
@@ -200,7 +175,7 @@ def test_real_price_and_section_are_ordered(reverse: bool) -> None:
     )
     _, envelope, sources = _parsed_demo_envelope(*(([content, price]) if reverse else ([price, content])))
 
-    outcome = resolve_d2_envelope_response(envelope, sources, as_of=_AS_OF)
+    outcome = resolve_d2_operations((envelope).blocks, sources, as_of=_AS_OF)
 
     assert outcome.resolved.d2_request_parts[0].request_id == ("r2" if reverse else "r1")
     assert outcome.rendered_text.index("85 200 ₽") < outcome.rendered_text.index("Седация и наркоз") if not reverse else outcome.rendered_text.index("Седация и наркоз") < outcome.rendered_text.index("85 200 ₽")
@@ -212,16 +187,10 @@ def test_real_price_and_section_are_ordered(reverse: bool) -> None:
 def test_overview_readiness_is_not_optional_ui() -> None:
     snapshot = load_d2_tenant_snapshot("demo", clients_root=Path("clients"))
     view = build_d2_model_view(snapshot)
-    payload = production_envelope_template(
-        patient_text="Служебный D1R текст.", commercial_intent="price", primary_price_request_id="r1",
-        request_understanding={"subjects": [], "requests": [_request("r1", "price", topic_id="implantation")]},
-    )
-    envelope = parse_production_envelope_json(
-        json.dumps(payload, ensure_ascii=False), active_service_catalog=view.active_service_catalog,
-        service_reference_catalog=view.service_reference_catalog, commercial_fact_catalog=view.commercial_fact_catalog,
-    )
+    payload = {"outcome":"dialogue","blocks":[_request('r1', 'price', topic_id='implantation')]}
+    envelope = parse_production_envelope_json(json.dumps(payload, ensure_ascii=False), active_service_catalog=view.active_service_catalog, service_reference_catalog=view.service_reference_catalog, commercial_fact_catalog=view.commercial_fact_catalog, d2_contract=True)
     with pytest.raises(D2SnapshotBindingError, match="direction_overview_not_configured"):
-        build_d2_snapshot_sources(snapshot, model_view=view, envelope=envelope, session_key=SessionKey(client_id="demo", sid="overview"))
+        build_d2_snapshot_sources(snapshot, model_view=view, operations=envelope.blocks, session_key=SessionKey(client_id='demo', sid='overview'))
 
 
 def test_real_path_never_calls_legacy_or_network(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -238,6 +207,6 @@ def test_real_path_never_calls_legacy_or_network(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(materialization, "resolve_materialized_response", forbidden)
     monkeypatch.setattr(live_backend, "chat_completions_create", forbidden)
     monkeypatch.setattr(socket, "create_connection", forbidden)
-    outcome = materialization.resolve_d2_envelope_response(envelope, sources, as_of=_AS_OF)
+    outcome = materialization.resolve_d2_operations((envelope).blocks, sources, as_of=_AS_OF)
     assert render_response_text(outcome.resolved) == outcome.rendered_text
     assert project_response_ui(outcome.resolved) == outcome.ui_projection

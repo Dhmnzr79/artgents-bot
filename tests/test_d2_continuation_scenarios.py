@@ -17,15 +17,15 @@ import pytest
 from contracts.response_plan import SessionKey
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore
-from core.d2_completion_context import project_completed_dialogue
+from core.d2_completion_context import project_completed_dialogue, discussion_scope
 from core.d2_session_context import project_d2_session_context
 from contracts.d2_session_context import D2SessionTtlPolicy
-from contracts.response_plan_session import ResponsePlanSessionSnapshot
+from contracts.d2_session_context import D2SessionSnapshot
 
 
 def projected_history(store, key):
     record = store.read(key)
-    snapshot = ResponsePlanSessionSnapshot(state=record.state, exists_in_store=True)
+    snapshot = D2SessionSnapshot(state=record.state, exists_in_store=True)
     policy = D2SessionTtlPolicy()
     context = project_d2_session_context(snapshot, expected_session_key=key,
         activity=record.activity, policy=policy, now=record.activity.last_user_turn_at)
@@ -43,32 +43,16 @@ WHITENING_OFFER = "professional_whitening.default"
 CLARIFY_TEXT = "Могу подсказать по услугам, ценам, врачам или записи. Что вас интересует?"
 
 
-def _situation(
-    *,
-    commitment: str = "reported",
-    extent: str = "one_tooth",
-    tooth_count: int | None = 1,
-    continuity: str = "new",
-) -> dict[str, object]:
-    return {
-        "scope_commitment": commitment,
-        "extent": extent,
-        "tooth_count": tooth_count,
-        "jaw": "unknown",
-        "continuity": continuity,
-    }
+def _volume(*, extent="one_tooth", tooth_count=1, jaw="unknown"):
+    return {"extent": extent, "tooth_count": tooth_count, "jaw": jaw}
 
 
-def _raw(topic: str | None, situation: dict[str, object] | None = None, *,
-         service_id: str | None = None, subject_id: str | None = "s1", relation: str = "self") -> str:
-    operation = {"kind": "price", "request_id": "r1", "situation": situation}
+def _raw(topic, volume=None, *, service_id=None):
+    operation = {"kind": "price", "request_id": "r1", "volume": volume}
     if service_id or topic:
         operation["target"] = {"type": "service", "id": service_id} if service_id else {"type": "topic", "id": topic}
-    if subject_id is not None:
-        operation["subject"] = {"subject_id": subject_id, "relation": relation, "age_group": "unknown"}
-    if not service_id and not topic:
-        operation = {"kind": "clarification", "request_id": "r1", "missing": "service",
-                     "operation": operation, "choices": ["classic", "all_on_4"]}
+    else:
+        operation["clarification"] = {"missing": "service", "choices": ["classic", "all_on_4"]}
     return json.dumps({"outcome": "dialogue", "blocks": [operation]}, ensure_ascii=False)
 
 
@@ -189,7 +173,7 @@ def _offer_ids(outcome) -> tuple[str, ...]:
     return tuple(row.offer_id for row in block.rows)
 
 
-def test_a01_overview_volume_hypothesis_does_not_overwrite_correction_does(tmp_path: Path) -> None:
+def test_a01_alternative_and_correction_both_replace_discussed_volume(tmp_path: Path) -> None:
     key = SessionKey(client_id="demo", sid="c2a-a01")
     overview, saved, _, calls, clients = _run(
         tmp_path,
@@ -211,12 +195,12 @@ def test_a01_overview_volume_hypothesis_does_not_overwrite_correction_does(tmp_p
     assert _offer_ids(overview) == CLASSIC_THREE
     assert "Цена зависит от протокола и объёма лечения." in overview.response.rendered_text
     assert "Какой объём вас интересует" in overview.response.rendered_text
-    assert saved.state.situation_state is None
+    assert "situation_state" not in saved.state.model_dump()
     assert overview.response.resolved.terminal_text is None
 
     one, saved, _, _, _ = _run(
         tmp_path,
-        _raw("implantation", _situation()),
+        _raw("implantation", _volume()),
         key=key,
         message="Один зуб",
         now=NOW.replace(minute=1),
@@ -227,15 +211,14 @@ def test_a01_overview_volume_hypothesis_does_not_overwrite_correction_does(tmp_p
     assert {q.reply_id for q in one.response.ui_projection.quick_replies} == {
         "price_detail:includes", "price_detail:stages",
     }
-    assert saved.state.situation_state is not None
-    assert saved.state.situation_state.extent == "one_tooth"
-    owner = saved.state.situation_state.situation_owner_id
+    assert saved.state.discussion_request_id is not None
+    assert discussion_scope(one.response.resolved).volume.extent == "one_tooth"
 
     hypo, saved, _, _, _ = _run(
         tmp_path,
         _raw(
             "implantation",
-            _situation(commitment="hypothetical", extent="few_teeth", tooth_count=3, continuity="same"),
+            _volume(extent="few_teeth", tooth_count=3, ),
         ),
         key=key,
         message="А если три?",
@@ -243,16 +226,15 @@ def test_a01_overview_volume_hypothesis_does_not_overwrite_correction_does(tmp_p
         clients=clients,
     )
     assert hypo.response.resolved.d2_price_scope_decision.applied_extent == "few_teeth"
-    assert "pterygoid_implants.default" in _offer_ids(hypo)
-    assert saved.state.situation_state is not None
-    assert saved.state.situation_state.extent == "one_tooth"
-    assert saved.state.situation_state.situation_owner_id == owner
+    assert "classic.one_tooth.implantium" in _offer_ids(hypo)
+    assert saved.state.discussion_request_id is not None
+    assert discussion_scope(hypo.response.resolved).volume.tooth_count == 3
 
     corr, saved, _, _, _ = _run(
         tmp_path,
         _raw(
             "implantation",
-            _situation(commitment="correction", extent="few_teeth", tooth_count=3, continuity="same"),
+            _volume(extent="few_teeth", tooth_count=3, ),
         ),
         key=key,
         message="Нет, всё-таки три",
@@ -260,10 +242,8 @@ def test_a01_overview_volume_hypothesis_does_not_overwrite_correction_does(tmp_p
         clients=clients,
     )
     assert corr.response.resolved.d2_price_scope_decision.applied_extent == "few_teeth"
-    assert saved.state.situation_state is not None
-    assert saved.state.situation_state.extent == "few_teeth"
-    assert saved.state.situation_state.tooth_count == 3
-    assert saved.state.situation_state.situation_owner_id == owner
+    assert saved.state.discussion_request_id is not None
+    assert discussion_scope(corr.response.resolved).volume.tooth_count == 3
     assert sum(name == "select_target_marketing" for _, name in calls) == 0
 
 
@@ -282,7 +262,7 @@ def test_a07_unknown_keeps_overview_without_repeating_volume_or_starting_lead(tm
         tmp_path,
         _raw(
             "prosthetics",
-            _situation(commitment="unknown", extent="unknown", tooth_count=None, continuity="same"),
+            _volume(extent="unknown", tooth_count=None, ),
         ),
         key=key,
         message="Не знаю",
@@ -301,59 +281,57 @@ def test_a07_unknown_keeps_overview_without_repeating_volume_or_starting_lead(tm
     assert second.response.ui_projection.buttons[0].action_kind == "cta"
     assert second.response.resolved.terminal_text is None
     assert saved.state.terminal_state == "none"
-    assert saved.state.situation_state is None
+    assert "situation_state" not in saved.state.model_dump()
     assert "Подскажите" not in second.response.rendered_text
     assert "ориентир" in second.response.rendered_text.lower()
     assert second.response.resolved.d2_price_block is not None
     assert second.response.resolved.d2_price_block.rows
 
 
-def test_ttl_expiry_drops_carried_situation_on_ambiguous_followup(tmp_path: Path) -> None:
+def test_ttl_expiry_drops_carried_volume_on_ambiguous_followup(tmp_path: Path) -> None:
     key = SessionKey(client_id="demo", sid="c2a-ttl")
     first, saved, _, _, clients = _run(
         tmp_path,
-        _raw("implantation", _situation()),
+        _raw("implantation", _volume()),
         key=key,
         message="Нет одного зуба, сколько стоит?",
     )
-    assert saved.state.situation_state is not None
+    assert saved.state.discussion_request_id is not None
     assert _offer_ids(first) == CLASSIC_THREE
 
     second, saved, provider, _, _ = _run(
         tmp_path,
-        _raw("implantation", _situation(commitment="unknown", extent="unknown", tooth_count=None, continuity="same")),
+        _raw("implantation", _volume(extent="unknown", tooth_count=None, )),
         key=key,
         message="А сколько стоит?",
         now=NOW + timedelta(minutes=30),
         clients=clients,
     )
     assert provider.inputs[0].context.freshness == "expired"
-    assert second.focus.carried_situation is None
     assert second.response.resolved.d2_price_scope_decision.applied_extent is None
     assert second.response.resolved.d2_price_scope_decision.reason == "overview"
-    assert saved.state.situation_state is None
+    assert "situation_state" not in saved.state.model_dump()
 
 
 def test_a10_empty_session_price_ask_clarifies_without_inventing_price(tmp_path: Path) -> None:
     key = SessionKey(client_id="demo", sid="c2b-a10-empty")
     outcome, saved, _, _, _ = _run(
         tmp_path,
-        _raw(None, subject_id=None),
+        _raw(None),
         key=key,
         message="Сколько стоит?",
     )
-    assert outcome.focus.action == "clarify_focus"
     assert outcome.response.resolved.route == "ANSWER"
     assert outcome.response.resolved.d2_price_block is None
     assert saved.state.clarify_pending is True
     assert saved.state.clarify_task is not None
-    assert saved.state.clarify_task.missing == "service"
-    assert saved.state.clarify_task.operation.kind == "price"
-    assert saved.state.shown_options_snapshot.service_ids == ("classic", "all_on_4")
+    assert saved.state.clarify_task.clarification.missing == "service"
+    assert saved.state.clarify_task.kind == "price"
+    assert saved.state.clarify_task.clarification.choices == ("classic", "all_on_4")
     assert len(saved.state.dialogue_pairs) == 1
     assert saved.state.dialogue_pairs[0].request_id == outcome.request_id
     assert saved.state.terminal_state == "none"
-    assert saved.state.situation_state is None
+    assert "situation_state" not in saved.state.model_dump()
     assert outcome.response.rendered_text == "Какую услугу вы имеете в виду?"
     assert outcome.response.ui_projection.quick_replies
 
@@ -365,7 +343,7 @@ def test_stage2_keeps_ordered_price_refs_without_price_text_for_second_option_fo
     store_path = tmp_path / "shared-dialogue.sqlite"
     first, saved, _, _, clients = _run(
         tmp_path,
-        _raw("implantation", _situation()),
+        _raw("implantation", _volume()),
         key=key,
         message="Нет одного зуба, сколько стоит?",
         store_path=store_path,
@@ -378,7 +356,7 @@ def test_stage2_keeps_ordered_price_refs_without_price_text_for_second_option_fo
 
     _, saved, provider, _, _ = _run(
         tmp_path,
-        _raw("implantation", _situation(continuity="same")),
+        _raw("implantation", _volume()),
         key=key,
         message="Что входит во второй?",
         now=NOW + timedelta(minutes=1),
@@ -390,7 +368,7 @@ def test_stage2_keeps_ordered_price_refs_without_price_text_for_second_option_fo
     assert [item.service_id for item in carried] == [
         row.service_id for row in first.response.resolved.d2_price_block.rows
     ]
-    assert provider.inputs[0].context.ordinary.historical_price_offers is None
+    assert "historical_price_offers" not in provider.inputs[0].context.ordinary.model_dump()
     assert all(not hasattr(item, "display_text") for item in carried)
     assert [item.offer_id for item in saved.state.d2_shown_price_offer_refs] == list(offer_ids)
 
@@ -454,7 +432,7 @@ def test_a10_switch_to_whitening_does_not_carry_implant_prices(tmp_path: Path) -
     key = SessionKey(client_id="demo", sid="c2b-a10-switch")
     first, saved, _, _, clients = _run(
         tmp_path,
-        _raw("implantation", _situation()),
+        _raw("implantation", _volume()),
         key=key,
         message="Нет одного зуба, сколько стоит?",
     )
@@ -465,51 +443,44 @@ def test_a10_switch_to_whitening_does_not_carry_implant_prices(tmp_path: Path) -
         _raw(
             "whitening",
             service_id="professional_whitening",
-            subject_id=None,
+
         ),
         key=key,
         message="А отбеливание сколько?",
         now=NOW.replace(minute=1),
         clients=clients,
     )
-    assert second.focus.carried_situation is None
-    assert second.focus.cross_topic_carry is None
     assert _offer_ids(second) == (WHITENING_OFFER,)
     assert all(row.offer_id != CLASSIC_THREE[0] for row in second.response.resolved.d2_price_block.rows)
     assert second.response.resolved.d2_price_scope_decision is None
-    assert saved.state.situation_state is None
-    assert saved.state.active_topic is not None
-    assert saved.state.active_topic.topic_id == "whitening"
+    assert "situation_state" not in saved.state.model_dump()
+    assert discussion_scope(second.response.resolved).service_id == "professional_whitening"
+    assert discussion_scope(second.response.resolved).volume is None
 
 
-def test_b11_other_person_does_not_inherit_prior_situation(tmp_path: Path) -> None:
+def test_b11_other_person_does_not_inherit_prior_volume(tmp_path: Path) -> None:
     key = SessionKey(client_id="demo", sid="c2b-b11-person")
     first, saved, _, _, clients = _run(
         tmp_path,
-        _raw("implantation", _situation()),
+        _raw("implantation", _volume()),
         key=key,
         message="Нет одного зуба, сколько стоит?",
     )
-    owner = saved.state.situation_state.situation_owner_id
     assert _offer_ids(first) == CLASSIC_THREE
 
     second, saved, _, _, _ = _run(
         tmp_path,
         _raw(
             "implantation",
-            _situation(commitment="reported", extent="one_tooth", tooth_count=1, continuity="same"),
-            subject_id="s2",
-            relation="other",
+            _volume(extent="one_tooth", tooth_count=1, ),
         ),
         key=key,
         message="А жене тоже один зуб, сколько?",
         now=NOW.replace(minute=1),
         clients=clients,
     )
-    assert second.focus.carried_situation is None
-    assert second.focus.cross_topic_carry is None
     assert second.response.resolved.d2_price_scope_decision.applied_extent == "one_tooth"
     assert _offer_ids(second) == CLASSIC_THREE
-    assert saved.state.situation_state is not None
-    assert saved.state.situation_state.extent == "one_tooth"
-    assert saved.state.situation_state.situation_owner_id != owner
+    assert saved.state.discussion_request_id is not None
+    assert discussion_scope(second.response.resolved).volume.tooth_count == 1
+    assert "situation_state" not in saved.state.model_dump()

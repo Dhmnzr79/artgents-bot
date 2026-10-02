@@ -7,12 +7,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
-
-from contracts.request_understanding import (
-    RequestUnderstandingSubject, RequestTreatmentSituation,
-)
-
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 class Closed(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -39,11 +34,28 @@ class Operation(Closed):
     request_id: str = Field(pattern=r"^r[1-9][0-9]*$")
 
 
-class ScopedOperation(Operation):
-    target: Target | None = None
-    subject: RequestUnderstandingSubject | None = None
-    situation: RequestTreatmentSituation | None = None
-    context: Literal["current_care", "general_information", "past_history", "unknown"] = "general_information"
+class DiscussionVolume(Closed):
+    """Parameters of the current discussion, without patient ownership."""
+    extent: Literal["unknown", "one_tooth", "few_teeth", "full_arch"] = "unknown"
+    tooth_count: int | None = Field(default=None, strict=True, ge=1)
+    jaw: Literal["unknown", "upper", "lower", "both"] = "unknown"
+
+    @model_validator(mode="after")
+    def count_matches_extent(self):
+        if self.extent == "unknown" and self.tooth_count is not None:
+            raise ValueError("discussion_unknown_extent_forbids_count")
+        if self.extent == "one_tooth" and self.tooth_count not in {None, 1}:
+            raise ValueError("discussion_count_extent_conflict")
+        if self.extent == "few_teeth" and self.tooth_count == 1:
+            raise ValueError("discussion_count_extent_conflict")
+        return self
+
+
+class DiscussionScope(Closed):
+    """Frozen parameters of one discussed option, shared by receipts and input."""
+    target: Annotated[Union[ServiceTarget, TopicTarget], Field(discriminator="type")]
+    volume: DiscussionVolume | None = None
+    brand_id: str | None = None
 
     @property
     def service_id(self):
@@ -53,29 +65,45 @@ class ScopedOperation(Operation):
     def topic_id(self):
         return self.target.id if isinstance(self.target, TopicTarget) else None
 
+
+class ScopedOperation(Operation):
+    target: Target | None = None
+    volume: DiscussionVolume | None = None
+
     @property
-    def subject_id(self):
-        return self.subject.subject_id if self.subject else None
+    def service_id(self):
+        return self.target.id if isinstance(self.target, ServiceTarget) else None
+
+    @property
+    def topic_id(self):
+        return self.target.id if isinstance(self.target, TopicTarget) else None
 
     @model_validator(mode="after")
-    def situation_owner(self):
-        if self.situation is not None and self.situation.continuity == "same" and self.subject is None:
-            raise ValueError("treatment_same_requires_subject")
+    def service_clarification_target(self):
+        clarification = getattr(self, "clarification", None)
+        if clarification is not None and clarification.missing == "service" and (
+            self.target is not None and not isinstance(self.target, UnresolvedTarget)
+        ):
+            raise ValueError("clarify_service_already_known")
         return self
 
 
-class PriceOperation(ScopedOperation):
+class PolicyScope(ScopedOperation):
+    age_group: Literal["adult", "child", "unknown"] = "unknown"
+    context: Literal["current_care", "general_information", "past_history", "unknown"] = "general_information"
+
+
+class PriceOperation(PolicyScope):
     kind: Literal["price"]
     brand_id: str | None = None
     payment_scheme: Literal["oms", "dms", "self_pay", "unspecified"] = "unspecified"
     payment_scheme_intent: Literal["eligibility_question", "requested_payment", "not_requested", "unspecified"] = "unspecified"
 
 
-class ExplanationOperation(ScopedOperation):
+class ExplanationFields(ScopedOperation):
     # Keep the domain spelling 'content'; it is a single connected explanation,
     # not a mandatory classification of each sentence/question.
     kind: Literal["content"]
-    content_text: str = Field(min_length=1, max_length=4000)
     content_realization: Literal["model_prose", "authored"] = "model_prose"
     content_ref: str | None = None
     content_section_refs: tuple[str, ...] = ()
@@ -101,7 +129,13 @@ class ExplanationOperation(ScopedOperation):
         return self
 
 
+class ExplanationOperation(ExplanationFields):
+    """Completed explanation; unfinished questions cannot occupy this field."""
+    content_text: str = Field(min_length=1, max_length=4000)
+
+
 class DetailOperation(ScopedOperation):
+    brand_id: str | None = None
     kind: Literal["price_detail"]
     price_detail_aspect: Literal["includes", "stages"]
     price_detail_offer_id: str | None = None
@@ -129,14 +163,14 @@ class DoctorsOperation(Operation):
         return self.target.id
 
 
-class PolicyOperation(ScopedOperation):
+class PolicyOperation(PolicyScope):
     kind: Literal["clinic_policy"]
     policy_ids: tuple[str, ...] = ()
     payment_scheme: Literal["oms", "dms", "self_pay", "unspecified"] = "unspecified"
     payment_scheme_intent: Literal["eligibility_question", "requested_payment", "not_requested", "unspecified"] = "unspecified"
 
 
-class BookingOperation(ScopedOperation):
+class BookingOperation(PolicyScope):
     kind: Literal["booking"]
     payment_scheme: Literal["oms", "dms", "self_pay", "unspecified"] = "unspecified"
     payment_scheme_intent: Literal["eligibility_question", "requested_payment", "not_requested", "unspecified"] = "unspecified"
@@ -154,65 +188,64 @@ class OffTopicOperation(Operation):
     kind: Literal["off_topic"]
 
 
-PendingOperation = Annotated[Union[PriceOperation, ExplanationOperation, DetailOperation], Field(discriminator="kind")]
-
-
-class UnresolvedPriceOperation(PriceOperation):
-    """Only an unidentified price subject can wait for model clarification."""
-    target: UnresolvedTarget | None = None
-
-
-MeaningPendingOperation = Annotated[Union[UnresolvedPriceOperation, ExplanationOperation, DetailOperation], Field(discriminator="kind")]
-ParameterPendingOperation = Annotated[Union[ExplanationOperation, DetailOperation], Field(discriminator="kind")]
-
-
-class MeaningClarifyTask(Closed):
-    missing: Literal["service", "term"]
-    operation: MeaningPendingOperation
-
-
-class ParameterClarifyTask(Closed):
-    missing: Literal["extent", "jaw", "stage"]
-    operation: ParameterPendingOperation
-
-
-ClarifyTask = Annotated[Union[MeaningClarifyTask, ParameterClarifyTask], Field(discriminator="missing")]
-CLARIFY_TASK_ADAPTER = TypeAdapter(ClarifyTask)
-
-
-class ClarificationOperation(Operation):
-    kind: Literal["clarification"]
-    # Only the narrow subclasses below are accepted by the model contract.
-    choices: tuple[str, ...] = ()
+class ServiceClarification(Closed):
+    missing: Literal["service"]
+    choices: tuple[str, ...] = Field(min_length=2, max_length=3)
 
     @model_validator(mode="after")
-    def local_task(self):
-        if self.request_id != self.operation.request_id:
-            raise ValueError("clarification_identity_mismatch")
-        if self.missing == "service":
-            if not 2 <= len(self.choices) <= 3 or len(set(self.choices)) != len(self.choices):
-                raise ValueError("clarify_service_options_invalid")
-            if self.operation.target is not None and not isinstance(self.operation.target, UnresolvedTarget):
-                raise ValueError("clarify_service_already_known")
-        elif self.choices:
-            raise ValueError("clarify_options_forbidden")
+    def unique_choices(self):
+        if len(set(self.choices)) != len(self.choices):
+            raise ValueError("clarify_service_options_invalid")
         return self
 
 
-class MeaningClarificationOperation(MeaningClarifyTask, ClarificationOperation):
-    pass
+class TermClarification(Closed):
+    missing: Literal["term"]
+    choices: tuple[str, ...] = Field(default=(), max_length=0)
 
 
-class ParameterClarificationOperation(ParameterClarifyTask, ClarificationOperation):
-    pass
+class ParameterClarification(Closed):
+    missing: Literal["extent", "jaw", "stage"]
+    choices: tuple[str, ...] = Field(default=(), max_length=0)
 
 
-Clarification = Annotated[Union[MeaningClarificationOperation, ParameterClarificationOperation], Field(discriminator="missing")]
+MeaningClarification = Annotated[Union[ServiceClarification, TermClarification], Field(discriminator="missing")]
+Clarification = Annotated[Union[ServiceClarification, TermClarification, ParameterClarification], Field(discriminator="missing")]
 
 
-Block = Annotated[Union[PriceOperation, ExplanationOperation, DetailOperation,
+class PendingPriceOperation(PriceOperation):
+    target: UnresolvedTarget | None = None
+    clarification: MeaningClarification
+
+
+class PendingExplanationOperation(ExplanationFields):
+    """The same explanation task before its explanation-only completion."""
+    pending_question: str = Field(min_length=1, max_length=4000)
+    clarification: Clarification | None = None
+
+
+class PendingDetailOperation(DetailOperation):
+    clarification: Clarification
+
+
+PendingOperation = Annotated[Union[PendingPriceOperation, PendingExplanationOperation,
+    PendingDetailOperation], Field(discriminator="kind")]
+
+
+def _require_clarification(operation):
+    if operation.clarification is None:
+        raise ValueError("pending_clarification_required")
+    return operation
+
+
+# A storage boundary on the same operation types, not a persisted wrapper.
+ClarifiedOperation = Annotated[PendingOperation, AfterValidator(_require_clarification)]
+
+
+Block = Union[PriceOperation, PendingPriceOperation, ExplanationOperation,
+    PendingExplanationOperation, DetailOperation, PendingDetailOperation,
     ContactOperation, PolicyOperation, BookingOperation, CommercialOperation,
-    Clarification, OffTopicOperation, DoctorsOperation], Field(discriminator="kind")]
+    OffTopicOperation, DoctorsOperation]
 
 
 class D2DialogueResult(Closed):
@@ -227,31 +260,16 @@ class D2DialogueResult(Closed):
             raise ValueError("dialogue_blocks_required")
         if len({b.request_id for b in self.blocks}) != len(self.blocks):
             raise ValueError("request_id_duplicate")
-        if sum(getattr(b, "situation", None) is not None for b in self.requests) > 1:
-            raise ValueError("treatment_multiple_situations")
-        subjects = {}
-        for block in self.requests:
-            subject = getattr(block, "subject", None)
-            if subject is not None:
-                if subject.subject_id in subjects and subjects[subject.subject_id] != subject:
-                    raise ValueError("subject_binding_conflict")
-                subjects[subject.subject_id] = subject
         return self
 
     @property
     def requests(self):
         """One ordered domain view, no reclassification or copied payload."""
-        return tuple(b.operation if isinstance(b, ClarificationOperation) else b for b in self.blocks)
-
-    @property
-    def subjects(self):
-        return tuple({b.subject.subject_id: b.subject for b in self.requests
-                      if getattr(b, "subject", None) is not None}.values())
-
+        return self.blocks
 
 def validate_d2_payload(payload: dict, *, active_service_ids: frozenset[str], known_task=None):
     if known_task is not None:
-        expected = tuple(b for b in known_task.blocks if isinstance(b, ExplanationOperation))
+        expected = tuple(b for b in known_task.blocks if isinstance(b, PendingExplanationOperation))
         items = payload.get("explanations")
         if set(payload) != {"explanations"} or not isinstance(items, list) or len(items) != len(expected):
             raise ValueError("known_task_explanations_required")
@@ -262,17 +280,25 @@ def validate_d2_payload(payload: dict, *, active_service_ids: frozenset[str], kn
             if not isinstance(item.get("content_text"), str) or not item["content_text"].strip():
                 raise ValueError("known_task_explanation_text_required")
             values = original.model_dump()
+            values.pop("pending_question")
+            values.pop("clarification")
             values.update(item)
             values.setdefault("content_realization", "model_prose")
             if "content_realization" not in item:
                 values["content_realization"] = "model_prose"
             replacements[original.request_id] = ExplanationOperation.model_validate(values)
-        result = known_task.model_copy(update={"blocks": tuple(replacements.get(b.request_id, b) for b in known_task.blocks)})
+        result = D2DialogueResult.model_validate({
+            "outcome": known_task.outcome,
+            "blocks": tuple(replacements.get(b.request_id, b) for b in known_task.blocks),
+        })
     else:
         result = D2DialogueResult.model_validate(payload)
+        if any(isinstance(b, PendingExplanationOperation) and b.clarification is None for b in result.blocks):
+            raise ValueError("pending_clarification_required")
     for block in result.blocks:
         if isinstance(block, DoctorsOperation) and block.service_id not in active_service_ids:
             raise ValueError("doctors_service_not_active")
-        if isinstance(block, ClarificationOperation) and any(c not in active_service_ids for c in block.choices):
+        clarification = getattr(block, "clarification", None)
+        if clarification is not None and any(c not in active_service_ids for c in clarification.choices):
             raise ValueError("clarify_service_not_active")
     return result

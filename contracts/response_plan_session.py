@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from contracts.d2_dialogue_result import PendingOperation, CLARIFY_TASK_ADAPTER
+from contracts.d2_dialogue_result import ClarifiedOperation
 
 import hashlib
 import json
@@ -36,7 +36,7 @@ from contracts.response_plan_post_composer import (
     SituationStage,
 )
 
-SESSION_SCHEMA_VERSION = 3
+SESSION_SCHEMA_VERSION = 4
 FINGERPRINT_FORMAT_VERSION = 3
 
 ActiveServiceProvenance = Literal["explicit_current", "active_session"]
@@ -246,21 +246,6 @@ class D2SelectedUiRef(ResponsePlanModel):
         return self
 
 
-class PersistedClarifyTask(ResponsePlanModel):
-    """One unfinished operation; UI membership remains owned by completion."""
-    missing: Literal["service", "term", "extent", "jaw", "stage"]
-    operation: PendingOperation
-
-    @model_validator(mode="after")
-    def valid_clarification_task(self) -> Self:
-        # Share the wire constraints; old price/extent pending tasks are not repaired.
-        CLARIFY_TASK_ADAPTER.validate_python({"missing": self.missing,
-                                             "operation": self.operation.model_dump()})
-        return self
-
-
-
-
 class PersistedShownCommercialIds(ResponsePlanModel):
     requested_fact_ids: tuple[str, ...] = ()
     promo_fact_ids: tuple[str, ...] = ()
@@ -443,7 +428,7 @@ class ResponsePlanSessionState(ResponsePlanModel):
     )
     terminal_state: TerminalState = "none"
     clarify_pending: bool = False
-    clarify_task: PersistedClarifyTask | None = None
+    clarify_task: ClarifiedOperation | None = None
 
     @field_validator("schema_version", "revision", "last_committed_turn_index", mode="before")
     @classmethod

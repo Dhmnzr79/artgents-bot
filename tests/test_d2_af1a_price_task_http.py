@@ -27,7 +27,7 @@ def _overview_raw(*, brand_id: str | None = None, service_id: str | None = None,
     operation = {"kind": "price", "request_id": "r1",
         "target": {"type": "service", "id": service_id} if service_id else {"type": "topic", "id": "implantation"},
         "brand_id": brand_id,
-        "subject": {"subject_id": "s1", "relation": relation, "age_group": "unknown"}}
+        "age_group": "unknown"}
     # A general hypothetical question supplies no reported situation or extent.
     # statement_mode is no longer an independent wire field.
     return json.dumps({"outcome": "dialogue", "blocks": [operation]}, ensure_ascii=False)
@@ -90,9 +90,9 @@ def test_volume_click_keeps_price_brand_without_model_and_replays(
         pairs = store.read(key).state.dialogue_pairs
         assert len(pairs) == 2
         assert [p.request_id for p in pairs] == ["overview", "choice"]
-        assert store.read(key).state.situation_state is None
+        assert "situation_state" not in store.read(key).state.model_dump()
         assert discussion_scope(saved.response.resolved) is not None
-        assert discussion_scope(saved.response.resolved).extent == "one_tooth"
+        assert discussion_scope(saved.response.resolved).volume.extent == "one_tooth"
         assert discussion_scope(saved.response.resolved).brand_id == brand_id
     replay = send(client, **args)
     assert replay.status_code == 200
@@ -124,7 +124,7 @@ def test_other_person_or_hypothesis_gets_price_without_personal_situation(
     assert "76\u00a0200\u00a0₽" in clicked.get_json()["answer"]
     with D2DialogueStore(db) as store:
         key = SessionKey(client_id="demo", sid=sid)
-        assert store.read(key).state.situation_state is None
+        assert "situation_state" not in store.read(key).state.model_dump()
     assert len(fake.inputs) == 1
 
 
@@ -143,7 +143,7 @@ def test_unknown_subject_choice_gives_price_without_personal_state(http_env) -> 
     assert clicked.status_code == 200, clicked.get_json()
     assert "76\u00a0200\u00a0₽" in clicked.get_json()["answer"]
     with D2DialogueStore(db) as store:
-        assert store.read(SessionKey(client_id="demo", sid="af1a-unknown-subject")).state.situation_state is None
+        assert "situation_state" not in store.read(SessionKey(client_id="demo", sid="af1a-unknown-subject")).state.model_dump()
 
 
 @pytest.mark.parametrize("model_claim", ["statement", "situation"])
@@ -170,17 +170,16 @@ def test_model_hypothesis_does_not_turn_price_choice_into_patient_fact(
     assert clicked.status_code == 200, clicked.get_json()
     with D2DialogueStore(db) as store:
         key = SessionKey(client_id="demo", sid=sid)
-        assert store.read(key).state.situation_state is None
-        assert discussion_scope(store.read_latest_completion(key).response.resolved).extent == "one_tooth"
+        assert "situation_state" not in store.read(key).state.model_dump()
+        assert discussion_scope(store.read_latest_completion(key).response.resolved).volume.extent == "one_tooth"
 
 
 @pytest.mark.parametrize("brand_id,has_reference", [("implantium", True), ("impro", False)])
 def test_branded_few_teeth_text_keeps_reference_or_honest_gap(http_env, brand_id, has_reference) -> None:
     client, db, use_provider, _ = http_env
     raw = json.loads(_overview_raw(brand_id=brand_id))
-    raw["blocks"][0]["situation"] = {
-        "scope_commitment": "hypothetical", "extent": "few_teeth",
-        "tooth_count": 3, "jaw": "unknown", "continuity": "new",
+    raw["blocks"][0]["volume"] = {
+        "extent": "few_teeth", "tooth_count": 3, "jaw": "unknown",
     }
     fake = use_provider(FakeProvider(json.dumps(raw)))
     reply = post(client, sid="af1a-gap", request_id="text",
@@ -191,7 +190,7 @@ def test_branded_few_teeth_text_keeps_reference_or_honest_gap(http_env, brand_id
         if has_reference:
             assert "ориентир за один зуб" in reply.get_json()["answer"]
             assert tuple(r.offer_id for r in saved.response.resolved.d2_price_block.rows) == ("classic.one_tooth.implantium",)
-            assert saved.response.resolved.d2_treatment_situation.tooth_count == 3
+            assert saved.response.resolved.d2_request_parts[0].discussion_scope.volume.tooth_count == 3
         else:
             assert "Стоимость по вашему запросу не указана" in reply.get_json()["answer"]
             assert saved.response.resolved.d2_price_block is None
@@ -220,19 +219,19 @@ def test_price_choice_is_next_turn_context_not_patient_fact(
     assert clicked.status_code == 200, clicked.get_json()
     with D2DialogueStore(db) as store:
         key = SessionKey(client_id="demo", sid=sid)
-        assert store.read(key).state.situation_state is None
-        assert discussion_scope(store.read_latest_completion(key).response.resolved).extent == extent
+        assert "situation_state" not in store.read(key).state.model_dump()
+        assert discussion_scope(store.read_latest_completion(key).response.resolved).volume.extent == extent
     fake.raw = _wrong_kind_raw(topic_id="implantation")
     followup = post(client, sid=sid, request_id="duration", q="А сколько это займёт?")
     assert followup.status_code == 200, followup.get_json()
     assert PROSE in followup.get_json()["answer"]
     seen = fake.inputs[-1].context.ordinary.discussion_scope
     assert seen is not None
-    assert (seen.topic_id, seen.brand_id, seen.extent) == (
+    assert (seen.topic_id, seen.brand_id, seen.volume.extent) == (
         "implantation", brand_id, extent,
     )
     with D2DialogueStore(db) as store:
-        assert store.read(SessionKey(client_id="demo", sid=sid)).state.situation_state is None
+        assert "situation_state" not in store.read(SessionKey(client_id="demo", sid=sid)).state.model_dump()
 
 
 def test_discussion_scope_expires_before_next_provider_input(http_env) -> None:
@@ -281,11 +280,12 @@ def test_new_topic_replaces_discussion_scope(http_env) -> None:
     fake.raw = _wrong_kind_raw(topic_id="whitening")
     switched = post(client, sid=sid, request_id="switch", q="Расскажите про отбеливание")
     assert switched.status_code == 200, switched.get_json()
-    assert fake.inputs[-1].context.ordinary.discussion_scope.extent == "one_tooth"
+    assert fake.inputs[-1].context.ordinary.discussion_scope.volume.extent == "one_tooth"
     fake.raw = _wrong_kind_raw(topic_id="whitening")
     followup = post(client, sid=sid, request_id="after-switch", q="А сколько это займёт?")
     assert followup.status_code == 200, followup.get_json()
-    assert fake.inputs[-1].context.ordinary.discussion_scope is None
+    seen = fake.inputs[-1].context.ordinary.discussion_scope
+    assert seen.topic_id == "whitening" and seen.volume is None
 
 
 def test_unknown_choice_does_not_repeat_menu_or_store_reported_extent(http_env) -> None:
@@ -303,7 +303,7 @@ def test_unknown_choice_does_not_repeat_menu_or_store_reported_extent(http_env) 
     assert not any(item["reply_id"].startswith("volume:")
                    for item in clicked.get_json()["ui"]["quick_replies"])
     with D2DialogueStore(db) as store:
-        assert store.read(SessionKey(client_id="demo", sid="af1a-unknown")).state.situation_state is None
+        assert "situation_state" not in store.read(SessionKey(client_id="demo", sid="af1a-unknown")).state.model_dump()
 
 
 @pytest.mark.parametrize("extent", ["full_arch"])
@@ -395,7 +395,7 @@ def test_mixed_price_and_information_survive_verified_volume_choice(http_env) ->
         assert {part.kind for part in saved.response.resolved.d2_request_parts} == {"price"}
         assert any("Живой mixed-ответ" in p.assistant_text for p in projected_history(store, key))
         assert store.read(key).state.dialogue_pairs[-1].request_id == store.read_latest_completion(key).request_id
-        assert store.read(key).state.situation_state is None
+        assert "situation_state" not in store.read(key).state.model_dump()
     replay = post(client, sid=sid, request_id="choice", q="",
                   ref=choice["reply_id"], ui_revision=overview["revision"])
     assert replay.get_json() == clicked.get_json()

@@ -149,12 +149,12 @@ def resolve_d2_optional_content_claims(
 
 def build_d2_document_task(snapshot, action):
     """The verified source supplies a fixed explanation task, not a new route."""
-    from contracts.d2_dialogue_result import D2DialogueResult, ExplanationOperation, TopicTarget
+    from contracts.d2_dialogue_result import D2DialogueResult, PendingExplanationOperation, TopicTarget
     topic = _frontmatter(snapshot, action.content_ref).get("topic")
-    return D2DialogueResult(outcome="dialogue", blocks=(ExplanationOperation(
+    return D2DialogueResult(outcome="dialogue", blocks=(PendingExplanationOperation(
         request_id="r1", kind="content",
         target=TopicTarget(type="topic", id=topic) if topic else None,
-        content_text=action.section_title, content_ref=action.content_ref,
+        pending_question=action.section_title, content_ref=action.content_ref,
         content_section_refs=(action.section_ref,), content_realization="authored",
     ),))
 
@@ -636,7 +636,7 @@ def build_d2_clinic_policy_response(
     snapshot: D2TenantSnapshot,
     *,
     session_key: SessionKey,
-    understanding=None, request=None, subject=None,
+    understanding=None, request=None,
 ) -> MaterializedResponseOutcome:
     """B10/D2-068: typed policy_ids → authored answers from tenant snapshot.
 
@@ -647,15 +647,16 @@ def build_d2_clinic_policy_response(
     answers = _authored_policy_answers(snapshot)
     if request is None:
         request = understanding.requests[0]
-        subject = next((s for s in understanding.subjects if s.subject_id == request.subject_id), None)
+        age = next((s.age_group for s in understanding.subjects if s.subject_id == request.subject_id), "unknown")
+    else:
+        age = request.age_group
     inferred: list[str] = list(request.policy_ids)
     if request.payment_scheme_intent == "eligibility_question":
         payment_key = {"oms": "no_oms", "dms": "no_dms"}.get(request.payment_scheme)
         if payment_key and payment_key not in inferred:
             inferred.append(payment_key)
     if (
-        subject is not None
-        and subject.age_group == "child"
+        age == "child"
         and request.context != "past_history"
         and "no_pediatric_dentistry" not in inferred
         and "no_pediatric_dentistry" in answers

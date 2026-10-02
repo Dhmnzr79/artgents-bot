@@ -10,7 +10,7 @@ from contracts.response_plan_materialization import (
     D2PartFailureAuthority,
     MaterializationOwnershipError,
 )
-from core.response_plan_materialization import resolve_d2_envelope_response
+from core.response_plan_materialization import resolve_d2_operations
 from core.response_text_renderer import render_response_text
 from core.response_ui_projection import project_response_ui
 from tests.test_d2_independent_request_parts import _envelope, _part, _sources_ab
@@ -33,7 +33,7 @@ def _price(request_id: str, service_id: str) -> dict[str, object]:
 def test_first_price_request_in_request_order_is_the_only_materialized_price(
     requests, selected_service_id: str, deferred_request_id: str
 ) -> None:
-    outcome = resolve_d2_envelope_response(_envelope(requests), _sources_ab(), as_of=_AS_OF)
+    outcome = resolve_d2_operations((_envelope(requests)).blocks, _sources_ab(), as_of=_AS_OF)
 
     assert outcome.resolved.d2_result_status == "degraded"
     assert [part.status for part in outcome.resolved.d2_request_parts] == ["answered", "deferred"]
@@ -48,12 +48,12 @@ def test_first_price_request_in_request_order_is_the_only_materialized_price(
 
 
 def test_three_price_requests_freeze_one_price_and_two_linked_deferrals() -> None:
-    outcome = resolve_d2_envelope_response(
-        _envelope([
+    outcome = resolve_d2_operations(
+        (_envelope([
             _price("r1", "service_one"),
             _price("r2", "service_two"),
             _price("r3", "service_one"),
-        ]),
+        ])).blocks,
         _sources_ab(),
         as_of=_AS_OF,
     )
@@ -68,12 +68,12 @@ def test_three_price_requests_freeze_one_price_and_two_linked_deferrals() -> Non
 
 
 def test_price_content_price_preserves_independent_content_and_request_order() -> None:
-    outcome = resolve_d2_envelope_response(
-        _envelope([
+    outcome = resolve_d2_operations(
+        (_envelope([
             _price("r1", "service_one"),
             _part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"),
             _price("r3", "service_two"),
-        ]),
+        ])).blocks,
         _sources_ab(),
         as_of=_AS_OF,
     )
@@ -100,8 +100,8 @@ def test_unavailable_first_price_never_falls_through_to_deferred_second_price() 
     ]
     sources = type(base).model_validate(payload)
 
-    outcome = resolve_d2_envelope_response(
-        _envelope([_price("r1", "service_one"), _price("r2", "service_two")]),
+    outcome = resolve_d2_operations(
+        (_envelope([_price("r1", "service_one"), _price("r2", "service_two")])).blocks,
         sources,
         as_of=_AS_OF,
     )
@@ -119,8 +119,8 @@ def test_unavailable_first_price_never_falls_through_to_deferred_second_price() 
 
 def test_deferred_price_is_frozen_linked_and_does_not_rerender_or_change_ui() -> None:
     sources = _sources_ab()
-    outcome = resolve_d2_envelope_response(
-        _envelope([_price("r1", "service_one"), _price("r2", "service_two")]),
+    outcome = resolve_d2_operations(
+        (_envelope([_price("r1", "service_one"), _price("r2", "service_two")])).blocks,
         sources,
         as_of=_AS_OF,
     )
@@ -154,8 +154,8 @@ def test_deferred_price_is_frozen_linked_and_does_not_rerender_or_change_ui() ->
 )
 def test_deferred_price_foreign_tenant_reference_fails_closed(deferred) -> None:
     with pytest.raises(MaterializationOwnershipError, match="materialization_foreign_material"):
-        resolve_d2_envelope_response(
-            _envelope([_price("r1", "service_one"), deferred]),
+        resolve_d2_operations(
+            (_envelope([_price("r1", "service_one"), deferred])).blocks,
             _sources_ab(),
             as_of=_AS_OF,
         )

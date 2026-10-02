@@ -99,6 +99,12 @@ def test_current_document_question_is_explicit_before_provider_and_replays(
         assert request.selected_ui_ref.reply_id == action.reply_id
         assert request.selected_ui_ref.source_revision == action.source_revision
         assert request.user_message == ""
+        pending = request.known_task.blocks[0]
+        assert pending.request_id == "r1" and pending.kind == "content"
+        assert pending.pending_question == title
+        assert pending.clarification is None
+        assert not hasattr(pending, "content_text")
+        assert not hasattr(pending, "operation")
         system, user = fake.messages[-1]
         block = user["content"].split("=== D2_SELECTED_DOCUMENT_ACTION ===\n", 1)[1]
         task = json.loads(block.split("\n\n=== USER_MESSAGE ===", 1)[0])
@@ -109,6 +115,7 @@ def test_current_document_question_is_explicit_before_provider_and_replays(
         assert "Do not answer the previous question again" in system["content"]
         assert "Use only its declared reply_id" not in system["content"]
         assert body["answer"] == prose
+        assert title not in body["answer"]
         with D2DialogueStore(db) as store:
             key = SessionKey(client_id="demo", sid=sid)
             saved = store.read_latest_completion(key)

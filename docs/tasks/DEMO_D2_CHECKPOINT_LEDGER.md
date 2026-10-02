@@ -1,5 +1,228 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## D2-119 — согласование правил и плана, 2026-10-02 (DOC)
+
+Действующие правила — Product Decisions D2-119, план — Interface Task §10.
+Это изменение документации, не новый runtime PASS. Пункты 1–11 владельцем
+согласованы. Ordinary authored подлежит удалению; unknown получает утверждённую
+фразу/CTA; price-details скрывают **нажатое**, новая услуга допускает свои кнопки;
+medical/admin сохраняет существующую фразу/телефон. Patient-state и stage-меню
+не возвращаются. Content/video скрывают показанное по прежнему правилу.
+
+| Область | Согласовано | Реализовано / offline | Widget |
+|---|---|---|---|
+| Clarification и D2-117 контекст | Да | Прежние scoped PASS, не повторять замену | Частичные наблюдения, не общий PASS |
+| D2-118 source binding/UI | Да | Прежний scoped PASS | Кнопки появляются; ordinary authored дефект открыт |
+| D2-119 prose-only, unknown, detail неповтор | Да | Новые исправления не выполнены | Подтверждены исходные проблемы |
+| Medical / возраст | Да, существующие правила | Исправления текущих дефектов впереди | Ordinary вместо admin и один malformed child payload |
+| DOC согласование | Да | Семь документов обновлены | Не является runtime проверкой |
+
+Baseline `%TEMP%/d2-rules-doc-baseline-xza1b8ng`, текущий WIP на a53e6b4;
+branch codex/d2-stage1-contract, origin/main/merge-base 141ce91.
+Exact allowlist и неизменяемые пути — Task §10.1. Исторические отчёты ниже
+относятся к своему времени: их «widget не выполнен» не описывает нынешний статус.
+Журнал пользователя найден в BOT_LOG_DIR `%TEMP%/d2-widget-20261002-192344`;
+44 хода анализируемого отрезка не являются агентским live-прогоном. Raw не добавлен.
+Текущий агентский DOC шаг: provider/live/SMTP/tests 0, staging пуст,
+commit/push/PR/merge/deploy нет. Независимый DOC Checker: **PASS**, P0/P1 и открытых P2 нет.
+Сверены 1 621 файл вне allowlist (хэши совпали), 105 локальных ссылок (missing 0),
+§3 идентичен baseline, diff --check чист. P2 указатель Acceptance исправлен
+на Task §10 и перепроверен. Это PASS правил/плана, не исправлений runtime.
+
+## Runtime D2-118 — документные кнопки, 2026-10-02
+
+Owner GO после обсуждения правил: исправить и затем Cursor → widget.
+**Bug fix**, не архитектурное упрощение. Prompt v36 требует existing ref
+использованного документа вместе с объяснением; пример duration согласован.
+Две content-части одного валидированного источника сохраняют его source UI.
+Два разных/неустановленных источника не заимствуют UI первого. Не изменены
+приоритет видео/follow-up, лимиты, неповтор, CTA, price/choice/detail запреты,
+маркетинговые правила, tenant/revision/medical/lead/privacy.
+Known document click сохраняет совпадающие параметры source-parts. Проверка
+всех групп кнопок дополнительно воспроизвела и исправила потерю объёма/бренда
+при price→includes→stages: используется descriptor уже показанного detail.
+Разные объёмы не выбираются по позиции. Новых полей/классификаторов/calls нет.
+
+Пригодная prose с пропущенным ref сохраняется без выдуманных кнопок; retry,
+refusal и выбор материала сервером не добавлены. Фактический выбор источника
+моделью ещё требует live проверки. [Отчёт, Cursor prompt и widget сценарии —
+Interface Task §9](DEMO_D2_INTERFACE_TASK.md#9-d2-118--источник-ответа-и-показ-продолжений-2026-10-02).
+
+Root/Git top C:\Cursor Projects\artgents-bot-active, branch codex/d2-stage1-contract,
+HEAD a53e6b4f37e1d35474f6e8c8c41bcdcb0767bddf,
+origin/main/merge-base 141ce91fb1731cd990fcf8391550150016c73e7f.
+Baseline этого шага: snapshot `d2-followup-baseline-70ysjbqa` = HEAD + 50 файлов
+предыдущего WIP. Exact allowlist §9: 10 файлов (3 runtime, 2 tests, 5 docs).
+Staging пуст, commit/push/PR/merge/deploy нет; foreign data/, marketing/SIM0 docs
+не читались и не менялись. Предыдущая замена D2-117 сохраняется.
+
+Исполнитель: source UI/новые HTTP **37 PASS**; новые probes на baseline
+4 PASS/7 FAIL (потеря UI у одного документа с двумя частями + prompt).
+Regression **131 PASS/19 FAIL**; все 19 fail IDs/сообщения совпали с baseline
+3 PASS/19 FAIL (old price-details raw fixtures + прежнее menu-copy ожидание).
+Новая detail-chain: до fix 2 FAIL, после fix и known-detail recheck **5 PASS**.
+Артефакты и времена в Task §9.1; числа не суммировать. Полный CI не зелёный.
+Independent Checker: первый набор 41 PASS; найдена P1, когда source-part без
+scope исключалась до проверки одинаковости и click заимствовал чужой объём.
+Исправлено, добавлены оба порядка JSON/SSE с replay/next; focused recheck
+6 PASS, P1 закрыта. Всего независимых 59 уникальных cases / 61 executions
+(41 + 14 + 6; два повторных detail-chain), failures 0. Исполнительский
+полный повтор нового HTTP-файла: 27 PASS, 54.06 с. AST 45 корректны,
+103 локальные ссылки/missing0, diff --check чист. Окончательный verdict:
+**PASS — D2-118**, P0/P1 нет; bug fix, без live/widget аттестации.
+Provider/live/SMTP **0**. Cursor и
+ручной widget проход с лимитом 40 действий подготовлены, ещё не выполнены.
+
+## Runtime D2-117 — единый контекст обсуждения, 2026-10-02
+
+После «Делаем» реализована архитектурная замена: operation.volume → прямой
+price extent → DiscussionScope в завершённой части → одна receipt projection
+следующего input. Из активного D2 удалены subject/situation, patient state/focus,
+current/same/cross carry, bind/seed и старый envelope materialization adapter.
+Обсуждение не превращается в медицинскую запись. Возрастные/payment правила
+используют прямые age_group/context; прежние medical/price/UI/lead защиты
+сохранены. Единственные владельцы — Target Contract §3.
+
+Трасса, удаления, добавления, точные allowlist/файлы, Astra consult и риски:
+[Interface Task §8.7](DEMO_D2_INTERFACE_TASK.md#87-runtime-d2-117--результат-и-границы-evidence-2026-10-02).
+Новый state/schema5 отклоняет старые schema4 SID/completion, включая replay,
+без migration/reset/recovery. SQLite state/request/lead rows byte-equal после
+отказа; активное имя и сохранённый submitted receipt не удалены. Новый SID
+контактов не наследует. Это локальный baseline, не production deployment.
+
+Отдельно исправлен known document click после recovered authored fallback:
+он сохраняет показанные target/volume/brand, как после answered. Независимая P1
+воспроизведена и закрыта focused recheck. **D2-118 целиком не закрыт:** первичный
+source-free ответ без content_ref может остаться без follow-up, согласованный
+исход его отсутствия открыт в §8.4. Виджет не менялся; source fallback и новый
+call не вводились.
+
+Исполнитель: общий offline **447 PASS / 96 FAIL**, 511.70 с; 32 ошибки миграции
+tests исправлены, targeted повтор **57 PASS / 0 FAIL**, 88.11 с. Оставшиеся
+64 fail cases сопоставлены с baseline HEAD + 21-file WIP; разбивка и особый
+diagnostics/materialize случай приведены в §8.7. Отдельный новый context/scope
+набор 47 PASS. Прогоны пересекаются, числа не суммировать; полный CI не зелёный.
+Checker: **PASS**, P0/P1 нет; собственные 77 уникальных PASS, P1 закрыта;
+stage report, удаление зависимостей и 45 файлов сверены независимо.
+Diff --check чист, AST 44 Python корректен, 102 ссылки/missing 0.
+Provider/live/SMTP 0; fixtures не доказывают живое
+понимание, strict provider, widget или архитектуру всего бота.
+
+Root/Git top `C:\Cursor Projects\artgents-bot-active`; branch
+`codex/d2-stage1-contract`, HEAD `a53e6b4f37e1d35474f6e8c8c41bcdcb0767bddf`,
+origin/main/merge-base `141ce91fb1731cd990fcf8391550150016c73e7f`.
+Этот этап: 13 runtime + 28 existing tests + новый test + 3 existing docs = 45
+файлов относительно сохранённого baseline. Накопленный diff к HEAD: 49 tracked
+modified + новый test. Staging пуст, commit/push/PR/merge/deploy не выполнялись.
+Foreign data/, MARKETING_ANSWER_SCENARIOS.md, DEMO_D2_SIM0_TASK.md сохранены и
+не читались. Предыдущие checkpoint ниже — история, их PASS не заменяет текущий.
+
+## DOC — единый контекст и follow-up, 2026-10-02
+
+Владелец выбрал один discussion context без отдельной личной ситуации и
+потребовал учесть исправление тематических follow-up. Зафиксированы D2-117/118,
+конкретный план замены в Interface Task §8 и приёмка. Новых правил workflow
+и новых документов нет; изменены шесть existing task docs. Runtime не изменён
+этим шагом; ниже сохранена история его 17-file checkpoint.
+
+Branch `codex/d2-stage1-contract`, HEAD `a53e6b4f37e1d35474f6e8c8c41bcdcb0767bddf`,
+origin/main и merge-base `141ce91fb1731cd990fcf8391550150016c73e7f`.
+Baseline: этот HEAD + прежний 17-file WIP; staging пуст, commit/push/PR нет.
+Foreign data/, MARKETING_ANSWER_SCENARIOS.md и DEMO_D2_SIM0_TASK.md не читались
+и не менялись. AGENTS/WORKFLOW_CHECKER остаются прежними.
+
+Продуктовое решение принято; volume/age_group/замещающий state — конкретное
+техническое предложение до реализации. Удаления patient mechanism описаны как
+будущие, не объявлены сделанными. Поведение старой schema/replay нужно проверить
+на новой форме; прежний PASS не переносится автоматически.
+
+Read-only Astra consult: разделять existing known-click source и первичный
+ответ без source ref. Source выбирает существующий вызов модели; code/renderer
+не выбирает pain/duration материал по общему topic. Исход пригодной prose без
+ref пока требует конкретизации, не закрывается словом «follow-up исправлен».
+Follow-up включён в карту и приёмку, но не реализован этим DOC-шагом.
+
+Наблюдения ручного widget-теста владельца отделены от agent calls: повтор
+price3 → duration давал treatment_same_requires_subject; pain/duration без
+content_ref давали пустой quick_replies. Это найденные live-проблемы, не PASS
+качества. Агент не вызывал provider/SMTP. Raw логи/разговоры в Git не добавлены.
+Проверки исполнителя: 101 локальная файловая ссылка, missing 0; git diff --check
+чистый. Хэши 70 runtime/test файлов совпали со snapshot до DOC-шага; bot/provider
+тесты не запускались. Independent DOC Checker: **PASS**, P0/P1/P2 нет;
+те же 101 ссылки и 70 хэшей проверены независимо. Это согласованность документов,
+не runtime/source-UI PASS; исход первичного missing-ref остаётся открытым.
+
+## Runtime — одна операция с локальным уточнением, 2026-10-02
+
+Владелец явно разрешил реализацию exact allowlist17files Interface Task §3.3,
+offline, без live/commit/push/расширения. Branch `codex/d2-stage1-contract`,
+HEAD/baseline `a53e6b4f37e1d35474f6e8c8c41bcdcb0767bddf`; main/merge-base
+`141ce91fb1731cd990fcf8391550150016c73e7f`. Staging пуст; публикация отсутствует.
+Foreign data/, marketing, SIM0 Task сохранены и не читались.
+
+**Архитектурное сокращение:** wrapper+nested operation → одна операция/один rN ID
+с локальным clarification → удалены repeated ID check, два unwrap, все старые
+clarification wrapper types/adapter и PersistedClarifyTask. State/context/click
+читают ту же runtime-операцию. Pending_question заменяет seed content_text как
+для service clarification, так и document known_task. Ready/pending закрытые
+альтернативы generated schema; никакого нового-to-old converter/phase/handler.
+Sole owners Target Contract §3, B14/D2-112, price/source/UI/medical/lead/privacy
+сохранены. Price/detail click без модели; content один existing explanation-only
+call, adverse answers отклоняются без retry/публикации seed.
+
+Schema3→4 без migration/reset/recovery. Старый SID новый ход отклоняет прежним
+JSON/SSE error; ordinarypayload/requestrows/leadrow остаются byte-equal.
+Активная заявка сохранна; completed demo_stub receipt сохраняется и replay
+возвращает его без новой заявки. Явный новый SID независим, ПД не наследует.
+External delivery/store не редактировались и live не проверены.
+
+Evidence/actual line trace/подробности — [Interface Task §7](DEMO_D2_INTERFACE_TASK.md#7-runtime-checkpoint--фактическая-реализация-2026-10-02).
+106PASS/4baselineFAIL первого набора; assembled176PASS/22FAIL, из них21baseline,
+одна собственная promptошибка исправлена; final contract/session/known/document
+143PASS/1baselineFAIL; scope8PASS; oldschema/detailclick8PASS; receipt-replay2PASS.
+Selected old detail9FAIL воспроизведены baseline9FAIL. Пересечения не суммировать.
+Всего34 уникальных baselinefailIDs подтверждены чистым archivea53e6b4; полныйCI
+не объявлен зелёным. Independent Checker **PASS**, P0/P1нет, собственные32PASS/0FAIL;
+actualpath/removal/tests/финальныйотчёт проверены. Diff--check чистый,
+AST15pyvalid,40localdoclinks/missing0. Cursor independent review **PASS** передан
+владельцем 2026-10-02: P0/P1 нет, собственные **164 PASS / 1 baseline FAIL**,
+115.22 с; extent-menu-copy тот же. Числа не суммируются с другими прогонами.
+P2 reviewer: исторический DOC-only/e6756ee в верхе Roadmap (вне allowlist,
+не менялся); schema допускает pending без clarification, ordinary parser
+отвергает, server known_task допускает — согласованная граница §3.1.
+Provider/live/network/SMTP0; live/strictmode/widget evidence и следующие этапы
+карты не выполнены. Narrow PASS не разрешает commit/push или следующий этап.
+
+## История DOC — конкретное предложение интерфейса, 2026-10-02
+
+Только подготовка по передаче владельца, runtime GO отсутствует. Root/Git top
+`C:\Cursor Projects\artgents-bot-active`; branch `codex/d2-stage1-contract`.
+HEAD/tracking/удалённая ветка `a53e6b4f37e1d35474f6e8c8c41bcdcb0767bddf`;
+main/merge-base `141ce91fb1731cd990fcf8391550150016c73e7f`, remote сверён
+read-only ls-remote. До DOC tracked diff/staging пусты; checkpoint опубликован.
+Исторический WIP/неисполненное разрешение ниже не являются текущим Git status.
+
+Allowlist записи: Interface Task и этот Ledger. Трассировка schema/prompt →
+parser → executor → pending → click → publication → completion → next input
+показана в [Interface Task §3](DEMO_D2_INTERFACE_TASK.md).
+Будущая форма — одна операция + optional clarification, content_text XOR
+pending_question. Найден второй consumer двойного смысла: document known_task
+использует section_title в content_text; предложение включает его замену.
+Astra read-only консультация поддержала форму, шесть runtime-файлов и прежних
+владельцев; это не Checker PASS/owner GO. Ordinary/known_task context boundary
+остаётся в существующем parser; provider strict mode отдельно, live не проверен.
+
+Документированы будущие удаления, добавления и их основания, exact runtime/test
+allowlist, полные offline диалоги и неопределённости. Runtime/prompt/tests/data
+не менялись; фактического архитектурного сокращения/изменения поведения пока нет.
+Исторические 13 baseline failures D2-116 и общий CI-долг не перезапускались;
+старые PASS не объявлены свежими, число пересекающихся прогонов не суммируется.
+Проверка текущего DOC: diff --check; independent DOC Checker verdict и link
+validation указываются в отчёте текущего чата после review. Bot pytest не нужен
+для этой документации и не запускался. Новых provider/live/SMTP0;
+stage/commit/push/PR/merge/deploy0. Foreign data/, marketing и SIM0 Task
+сохранены, не читались. Следующий шаг — обсуждение конкретного runtime GO.
+
 ## Разрешение checkpoint — 2026-10-02
 
 Владелец разрешил commit/push накопленного WIP и документов под именем

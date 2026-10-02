@@ -41,9 +41,8 @@ def price(target="implantation", target_kind="topic", **extra):
 def clarify(kind="price"):
     op = {"kind": kind, "request_id": "r1"}
     if kind == "content":
-        op["content_text"] = "Как проходит выбранная процедура?"
-    return {"kind": "clarification", "request_id": "r1", "missing": "service",
-            "operation": op, "choices": ["classic", "all_on_4"]}
+        op["pending_question"] = "Как проходит выбранная процедура?"
+    return {**op, "clarification": {"missing": "service", "choices": ["classic", "all_on_4"]}}
 
 
 def forbidden(*_args, **_kwargs):
@@ -72,13 +71,12 @@ def test_doctors_catalog_replay_and_next_turn_focus(http_env, transport):
     assert len(fake.inputs) == 2
     with D2DialogueStore(db) as store:
         state = store.read(SessionKey(client_id="demo", sid="cp6a")).state
-        assert state.active_service.service_id == "classic"
-        assert state.active_topic.topic_id == "implantation"
-        assert state.situation_state is None
+        assert discussion_scope(store.read_latest_completion(SessionKey(client_id="demo", sid="cp6a")).response.resolved).service_id == "classic"
+        assert "situation_state" not in state.model_dump()
         assert state.clarify_task is None
     fake.raw = raw(explanation("Можно обсудить врача на консультации."))
     _body(send(client, request_id="next", q="А как записаться к нему?"), transport)
-    assert fake.inputs[-1].context.ordinary.active_service.service_id == "classic"
+    assert fake.inputs[-1].context.ordinary.discussion_scope.service_id == "classic"
 
 
 @pytest.mark.parametrize("other_service,expected_scope", [("classic", "service"), ("professional_whitening", "mixed")])
@@ -108,7 +106,7 @@ def test_doctors_preserves_independent_price_contact_and_prose(http_env, other_s
         assert resolved.d2_contact_blocks[0].display_text in body["answer"]
         assert len([b for b in resolved.ui_plan.buttons if b.action_kind == "cta"]) == 1
         assert any(b.action_kind == "contact" for b in resolved.ui_plan.buttons)
-        assert record.state.active_service is None if expected_scope == "mixed" else record.state.active_service.service_id == "classic"
+        assert discussion_scope(resolved) is None if expected_scope == "mixed" else discussion_scope(resolved).service_id == "classic"
 
 
 @pytest.mark.parametrize("service", ["foreign-service", "braces"])
@@ -127,8 +125,8 @@ def test_multiple_clarifications_answer_clear_part_keep_only_first_task(http_env
     client, db, use, _ = http_env
     cost = clarify()
     info = clarify("content")
-    info.update(request_id="r2", choices=["veneers", "professional_whitening"])
-    info["operation"].update(request_id="r2", content_text="Как улучшить внешний вид улыбки?")
+    info.update(request_id="r2", pending_question="Как улучшить внешний вид улыбки?")
+    info["clarification"]["choices"] = ["veneers", "professional_whitening"]
     blocks = [info, cost] if information_first else [cost, info]
     contact = {"kind": "contact", "request_id": "r3", "contact_fields": ["contact_address"]}
     blocks.insert(0 if information_first else 2, contact)
@@ -136,7 +134,7 @@ def test_multiple_clarifications_answer_clear_part_keep_only_first_task(http_env
     send = post if transport == "json" else post_sse
     first = _body(send(client, q="Вопрос о восстановлении, улыбке и адресе в указанном порядке."), transport)
     first_task, later = (info, cost) if information_first else (cost, info)
-    assert {q["reply_id"] for q in first["ui"]["quick_replies"]} == {"service:" + id for id in first_task["choices"]}
+    assert {q["reply_id"] for q in first["ui"]["quick_replies"]} == {"service:" + id for id in first_task["clarification"]["choices"]}
     key = SessionKey(client_id="demo", sid="cp6a")
     with D2DialogueStore(db) as store:
         completed = store.read_latest_completion(key).response.resolved
@@ -144,12 +142,12 @@ def test_multiple_clarifications_answer_clear_part_keep_only_first_task(http_env
         parts = {p.request_id: p for p in completed.d2_request_parts}
         assert parts[later["request_id"]].status == "deferred"
         assert completed.d2_result_status == "degraded"
-        assert store.read(key).state.clarify_task.operation.request_id == first_task["request_id"]
+        assert store.read(key).state.clarify_task.request_id == first_task["request_id"]
         notice = completed.d2_part_deferred_blocks[0].display_text
         assert notice in first["answer"]
     assert _body(send(client, q="Вопрос о восстановлении, улыбке и адресе в указанном порядке."), transport) == first
     assert len(fake.inputs) == 1
-    hidden = later["choices"][0]
+    hidden = later["clarification"]["choices"][0]
     failed = send(client, request_id="hidden", q="", ref="service:" + hidden, ui_revision=first["revision"])
     if transport == "json":
         assert failed.status_code == 400
@@ -161,7 +159,7 @@ def test_multiple_clarifications_answer_clear_part_keep_only_first_task(http_env
         fake.raw = json.dumps({"explanations": [{"request_id": "r2", "content_text": "Пояснение выбранных виниров."}]})
     else:
         fake.generate = forbidden
-    chosen = first_task["choices"][0]
+    chosen = first_task["clarification"]["choices"][0]
     args = dict(request_id="click", q="", ref="service:" + chosen, ui_revision=first["revision"])
     clicked = _body(send(client, **args), transport)
     assert "Пояснение выбранных виниров." in clicked["answer"] if information_first else "76 200" in clicked["answer"].replace("\u00a0", " ")
@@ -187,7 +185,7 @@ def test_authored_availability_keeps_clear_answer_without_invented_task_menu(htt
     with D2DialogueStore(db) as store:
         completed = store.read_latest_completion(key).response.resolved
         assert next(p for p in completed.d2_request_parts if p.request_id == "r2").status == "answered"
-        assert store.read(key).state.clarify_task.operation.request_id == "r1"
+        assert store.read(key).state.clarify_task.request_id == "r1"
     fake.generate = forbidden
     clicked = post(client, request_id="click", q="", ref=sorted(replies)[0], ui_revision=first["revision"])
     assert clicked.status_code == 200, clicked.get_json()
@@ -214,7 +212,7 @@ def test_first_price_deferral_cannot_publish_price_or_precede_active_clarificati
     with D2DialogueStore(db) as store:
         price_block = store.read_latest_completion(SessionKey(client_id="demo", sid="price-evidence")).response.resolved.d2_price_block
     later = clarify()
-    later["request_id"] = later["operation"]["request_id"] = "r2"
+    later["request_id"] = "r2"
     fake.raw = raw(clarify("content"), later)
     assert post(client, q="Информационный и ценовой вопросы требуют уточнения.").status_code == 200
     with D2DialogueStore(db) as store:
@@ -235,34 +233,42 @@ def test_first_price_deferral_cannot_publish_price_or_precede_active_clarificati
 def test_hidden_foreign_clarification_choices_are_still_rejected(http_env):
     client, _, use, _ = http_env
     later = clarify("content")
-    later.update(request_id="r2", choices=["veneers", "foreign"])
-    later["operation"]["request_id"] = "r2"
+    later.update(request_id="r2")
+    later["clarification"]["choices"] = ["veneers", "foreign"]
     use(FakeProvider(raw(clarify(), later, {"kind": "contact", "request_id": "r3", "contact_fields": ["contact_address"]})))
     assert post(client, q="Несколько вопросов.").status_code == 400
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
-@pytest.mark.parametrize("active_lead", [False, True])
-def test_old_schema_session_fails_without_reset_or_lead_loss(http_env, transport, active_lead):
-    from session import capture_lead_session_row, session_client_scope
+@pytest.mark.parametrize("lead_phase", ["none", "active", "submitted"])
+def test_old_schema_session_fails_without_reset_or_lead_loss(http_env, transport, lead_phase):
+    from session import capture_lead_session_row, mem_get, session_client_scope
+    active_lead = lead_phase != "none"
     client, db, use, _ = http_env
     fake = use(FakeProvider(raw({"kind": "booking", "request_id": "r1",
-        "subject": {"subject_id": "s1", "relation": "self", "age_group": "adult"}})
+        "age_group": "adult"})
         if active_lead else raw(explanation())))
-    sid = "old-active-lead" if active_lead else "old-ordinary"
+    sid = "old-" + lead_phase
     assert post(client, sid=sid, request_id="seed", q="Хочу записаться" if active_lead else "Расскажите о клинике").status_code == 200
     if active_lead:
         assert post(client, sid=sid, request_id="name", q="Анна").status_code == 200
+    if lead_phase == "submitted":
+        submitted = post(client, sid=sid, request_id="phone", q="+7 999 123 45 67")
+        assert submitted.status_code == 200
+        assert submitted.get_json()["lead_effect"]["status"] == "demo_stub"
     with D2DialogueStore(db) as store:
         row = store._connection.execute("SELECT payload FROM d2_dialogue WHERE client_id=? AND sid=?", ("demo", sid)).fetchone()[0]
         old = json.loads(row)
-        old["state"]["schema_version"] = 1
+        old["state"]["schema_version"] = 3
         legacy_payload = json.dumps(old, ensure_ascii=False)
         with store._connection:
             store._connection.execute("UPDATE d2_dialogue SET payload=? WHERE client_id=? AND sid=?", (legacy_payload, "demo", sid))
         requests_before = store._connection.execute("SELECT request_id,status,payload FROM d2_turn_request WHERE sid=? ORDER BY rowid", (sid,)).fetchall()
     with session_client_scope("demo"):
         lead_before = capture_lead_session_row(sid)
+        if lead_phase == "active":
+            assert json.loads(lead_before[0])["profile"]["name"] == "Анна"
+            assert json.loads(lead_before[0])["lead_intent"] == "collecting_phone"
     fake.generate = forbidden
     send = post if transport == "json" else post_sse
     failed = send(client, sid=sid, request_id="old-next", q="А что дальше?")
@@ -273,6 +279,10 @@ def test_old_schema_session_fails_without_reset_or_lead_loss(http_env, transport
         assert events["error"]["error"] == "d2_invalid_turn"
         assert "ui" not in events
     assert len(fake.inputs) == 1
+    if lead_phase == "submitted":
+        replay = _body(send(client, sid=sid, request_id="phone", q="+7 999 123 45 67"), transport)
+        assert replay == submitted.get_json()
+        assert replay["lead_effect"]["status"] == "demo_stub"
     with session_client_scope("demo"):
         assert capture_lead_session_row(sid) == lead_before
     with D2DialogueStore(db) as store:
@@ -282,6 +292,11 @@ def test_old_schema_session_fails_without_reset_or_lead_loss(http_env, transport
     fake.generate = FakeProvider.generate.__get__(fake)
     fake.raw = raw(explanation())
     assert post(client, sid=sid + "-new", request_id="new", q="Расскажите о клинике").status_code == 200
+    with session_client_scope("demo"):
+        assert capture_lead_session_row(sid) == lead_before
+        fresh = mem_get(sid + "-new")
+        assert not fresh["profile"].get("name")
+        assert not fresh["profile"].get("phone")
 
 
 @pytest.mark.parametrize("expired", [False, True])
@@ -315,7 +330,7 @@ def test_lead_interruption_preserves_slot_privacy_and_replay(http_env, transport
     from session import mem_get, session_client_scope
     client, db, use, _ = http_env
     fake = use(FakeProvider(raw({"kind": "booking", "request_id": "r1",
-        "subject": {"subject_id": "s1", "relation": "self", "age_group": "adult"}})))
+        "age_group": "adult"})))
     send = post if transport == "json" else post_sse
     def call(**args):
         response = send(client, **args)
@@ -366,10 +381,10 @@ def test_authored_reference_preserves_independent_address(http_env, reverse, ref
 def test_service_click_preserves_explicit_report_from_original_question(http_env):
     client, db, use, _ = http_env
     pending = clarify()
-    pending["operation"].update(
-        subject={"subject_id": "s1", "relation": "self", "age_group": "adult"},
-        situation={"scope_commitment": "reported", "extent": "few_teeth", "tooth_count": 3,
-                   "jaw": "lower", "continuity": "new"},
+    pending.update(
+        age_group="adult",
+        volume={"extent": "few_teeth", "tooth_count": 3,
+                   "jaw": "lower", },
     )
     fake = use(FakeProvider(raw(pending)))
     first = post(client, q="У меня нет трёх зубов снизу. Сколько восстановить?").get_json()
@@ -377,7 +392,7 @@ def test_service_click_preserves_explicit_report_from_original_question(http_env
     clicked = post(client, request_id="click", q="", ref="service:classic", ui_revision=first["revision"])
     assert clicked.status_code == 200, clicked.get_json()
     with D2DialogueStore(db) as store:
-        situation = store.read(SessionKey(client_id="demo", sid="cp6a")).state.situation_state
+        situation = discussion_scope(store.read_latest_completion(SessionKey(client_id="demo", sid="cp6a")).response.resolved).volume
         assert situation.extent == "few_teeth" and situation.tooth_count == 3
         assert situation.jaw == "lower"
 
@@ -393,10 +408,10 @@ def test_deferred_second_service_prevents_false_single_focus(http_env):
         assert result.response_scope == "mixed"
         assert result.d2_request_parts[1].status == "deferred"
         assert result.d2_request_parts[1].service_id == "veneers"
-        assert store.read(key).state.active_service is None
+        assert store.read(key).state.discussion_request_id is None
     fake.raw = raw(clarify())
     assert post(client, request_id="next", q="А сколько?").status_code == 200
-    assert fake.inputs[-1].context.ordinary.active_service is None
+    assert fake.inputs[-1].context.ordinary.discussion_scope is None
 
 
 @pytest.mark.parametrize("target", [{"type": "service", "id": "veneers"}, {"type": "topic", "id": "prosthetics"}])
@@ -450,7 +465,7 @@ def test_price_clarify_keeps_independent_answer_then_executes_saved_task(http_en
     assert {q["reply_id"] for q in first["ui"]["quick_replies"]} == {"service:classic", "service:all_on_4"}
     with D2DialogueStore(db) as store:
         task = store.read(SessionKey(client_id="demo", sid="sim2")).state.clarify_task
-        assert task.operation.kind == "price"
+        assert task.kind == "price"
         assert not hasattr(task, "request_kinds")
     fake.generate = forbidden
     args = dict(sid="sim2", request_id="click", q="", ref="service:classic", ui_revision=first["revision"])
@@ -463,7 +478,7 @@ def test_price_clarify_keeps_independent_answer_then_executes_saved_task(http_en
         completion = store.read_latest_completion(key)
         assert all(r.service_id == "classic" for r in completion.response.resolved.d2_price_block.rows)
         assert store.read(key).state.clarify_task is None
-        assert store.read(key).state.situation_state is None
+        assert "situation_state" not in store.read(key).state.model_dump()
 
 
 @pytest.mark.parametrize("extent", ["one_tooth", "full_arch", "unknown"])
@@ -479,7 +494,7 @@ def test_volume_no_provider_and_followup_context(http_env, extent):
     fake.generate = original
     fake.raw = raw(explanation("Сроки зависят от этапов заживления."))
     assert post(client, sid="volume", request_id="next", q="А сколько займёт?").status_code == 200
-    assert fake.inputs[-1].context.ordinary.discussion_scope.extent == extent
+    assert fake.inputs[-1].context.ordinary.discussion_scope.volume.extent == extent
 
 
 @pytest.mark.parametrize("reverse", [False, True])
@@ -517,20 +532,19 @@ def test_reported_information_then_correction_without_price(http_env):
     def answer(jaw, commitment):
         return raw(explanation("Порядок восстановления обсуждается с врачом.",
             target={"type": "topic", "id": "implantation"},
-            subject={"subject_id": "s1", "relation": "self", "age_group": "adult"},
-            situation={"scope_commitment": commitment, "extent": "full_arch", "jaw": jaw,
-                       "continuity": "new" if commitment == "reported" else "same"}))
+            volume={"extent": "full_arch", "jaw": jaw,
+                       }))
     fake = use(FakeProvider(answer("lower", "reported")))
     assert post(client, q="У меня нет зубов снизу. Как проходит восстановление?").status_code == 200
     key = SessionKey(client_id="demo", sid="cp6a")
     with D2DialogueStore(db) as store:
-        before = store.read(key).state.situation_state
+        before = discussion_scope(store.read_latest_completion(key).response.resolved).volume
         assert before.jaw == "lower"
     fake.raw = answer("upper", "correction")
     assert post(client, request_id="correct", q="Ошибся, сверху.").status_code == 200
     with D2DialogueStore(db) as store:
-        after = store.read(key).state.situation_state
-        assert after.jaw == "upper" and after.situation_owner_id == before.situation_owner_id
+        after = discussion_scope(store.read_latest_completion(key).response.resolved).volume
+        assert after.jaw == "upper" and before.jaw == "lower"
 
 
 def test_admin_does_not_publish_ordinary_prose(http_env):
@@ -573,19 +587,38 @@ def test_code_owned_parts_do_not_hide_address(http_env, first, reverse):
     assert address in response.get_json()["answer"]
 
 
-def test_information_clarification_is_not_converted_to_price(http_env):
+@pytest.mark.parametrize("reverse", [False, True])
+def test_information_clarification_is_not_converted_to_price(http_env, reverse):
     client, db, use, _ = http_env
-    fake = use(FakeProvider(raw(clarify("content"))))
+    blocks = [clarify("content"), explanation("Независимый ответ об уходе.", request_id="r2")]
+    if reverse:
+        blocks.reverse()
+    fake = use(FakeProvider(raw(*blocks)))
     first = post(client, q="Как проходит процедура?")
     assert first.status_code == 200, first.get_json()
+    assert "Независимый ответ об уходе." in first.get_json()["answer"]
+    with D2DialogueStore(db) as store:
+        pending = store.read(SessionKey(client_id="demo", sid="cp6a")).state.clarify_task
+        assert pending.pending_question == blocks[1 if reverse else 0]["pending_question"]
+        assert not hasattr(pending, "content_text")
     fake.raw = json.dumps({"explanations": [{"request_id": "r1", "content_text": "Этапы выбранной процедуры."}]})
     clicked = post(client, request_id="click", q="", ref="service:classic", ui_revision=first.get_json()["revision"])
     assert clicked.status_code == 200, clicked.get_json()
     assert "Этапы выбранной процедуры" in clicked.get_json()["answer"]
     assert fake.inputs[-1].known_task.blocks[0].target.id == "classic"
+    known = fake.inputs[-1].known_task.blocks[0]
+    assert known.request_id == pending.request_id
+    assert known.pending_question == pending.pending_question
+    assert known.clarification is None and not hasattr(known, "content_text")
+    assert len(fake.inputs) == 2
+    assert "Независимый ответ об уходе." not in clicked.get_json()["answer"]
     with D2DialogueStore(db) as store:
         saved = store.read_latest_completion(SessionKey(client_id="demo", sid="cp6a"))
         assert saved.response.resolved.d2_price_block is None
+        assert store.read(SessionKey(client_id="demo", sid="cp6a")).state.clarify_task is None
+    fake.raw = raw(explanation("Ответ на следующий вопрос."))
+    assert post(client, request_id="next", q="А уход?").status_code == 200
+    assert fake.inputs[-1].context.ordinary.clarify_task is None
 
 
 def test_price_details_known_action_no_provider(http_env):
@@ -597,6 +630,35 @@ def test_price_details_known_action_no_provider(http_env):
     clicked = post(client, request_id="details", q="", ref=ref, ui_revision=first["revision"])
     assert clicked.status_code == 200, clicked.get_json()
     assert "входит" in clicked.get_json()["answer"].lower()
+
+
+@pytest.mark.parametrize("transport", ["json", "sse"])
+def test_detail_service_clarification_executes_same_aspect_without_provider(http_env, transport):
+    client, db, use, _ = http_env
+    pending = {
+        "kind": "price_detail", "request_id": "r1", "price_detail_aspect": "includes",
+        "clarification": {"missing": "service", "choices": ["classic", "all_on_4"]},
+    }
+    fake = use(FakeProvider(raw(pending)))
+    send = post if transport == "json" else post_sse
+    first = _body(send(client, q="Что входит в выбранную процедуру?"), transport)
+    key = SessionKey(client_id="demo", sid="cp6a")
+    with D2DialogueStore(db) as store:
+        task = store.read(key).state.clarify_task
+        assert task.kind == "price_detail" and task.price_detail_aspect == "includes"
+        assert task.request_id == "r1" and not hasattr(task, "operation")
+    fake.generate = forbidden
+    args = dict(request_id="detail-click", q="", ref="service:classic", ui_revision=first["revision"])
+    clicked = _body(send(client, **args), transport)
+    assert _body(send(client, **args), transport) == clicked
+    assert len(fake.inputs) == 1
+    with D2DialogueStore(db) as store:
+        result = store.read_latest_completion(key).response.resolved
+        detail = result.d2_price_detail_block
+        assert detail.aspect == "includes"
+        assert all(row.service_id == "classic" for row in detail.rows)
+        assert result.d2_price_block is None
+        assert store.read(key).state.clarify_task is None
 
 
 def test_service_authenticity_before_provider(http_env):
@@ -615,7 +677,7 @@ def test_service_authenticity_before_provider(http_env):
 def test_booking_stays_with_existing_lead_owner(http_env):
     client, _, use, _ = http_env
     fake = use(FakeProvider(raw({"kind": "booking", "request_id": "r1",
-        "subject": {"subject_id": "s1", "relation": "self", "age_group": "adult"}})))
+        "age_group": "adult"})))
     response = post(client, q="Хочу записаться.")
     assert response.status_code == 200, response.get_json()
     assert "Как к вам обращаться?" in response.get_json()["answer"]
@@ -625,7 +687,7 @@ def test_booking_stays_with_existing_lead_owner(http_env):
 
 def test_child_price_cannot_bypass_clinic_policy(http_env):
     client, db, use, _ = http_env
-    use(FakeProvider(raw(price(subject={"subject_id": "s1", "relation": "other", "age_group": "child"}))))
+    use(FakeProvider(raw(price(age_group="child"))))
     response = post(client, q="Сколько стоит ребёнку?")
     assert response.status_code == 200, response.get_json()
     assert "дет" in response.get_json()["answer"].lower()
@@ -640,7 +702,7 @@ def test_http_does_not_reconstruct_legacy_envelope(http_env, monkeypatch):
     client, _, use, _ = http_env
     monkeypatch.setattr(OneCallEnvelope, "model_validate", forbidden)
     monkeypatch.setattr(RequestUnderstanding, "model_validate", forbidden)
-    monkeypatch.setattr(materializer, "resolve_d2_envelope_response", forbidden)
+    assert not hasattr(materializer, "resolve_d2_envelope_response")
     use(FakeProvider(raw(price(), explanation("Независимое объяснение.", request_id="r2"))))
     assert post(client, q="Цена и пояснение").status_code == 200
 
@@ -663,7 +725,7 @@ def test_prompt_example_dialogue_and_continuation(http_env, transport, index):
             decision = store.read_latest_completion(key).response.resolved.d2_price_scope_decision
             assert decision.topic_id == "implantation"
         else:
-            assert state.clarify_task.operation.kind == ("price" if index == 1 else "content")
+            assert state.clarify_task.kind == ("price" if index == 1 else "content")
     if index == 0:
         assert "Какой объём вас интересует: один зуб, вся челюсть или пока не знаете?" in first["answer"]
     if index == 0:
@@ -798,14 +860,13 @@ def test_price_owner_finishes_missing_offer_without_model_clarification(http_env
 @pytest.mark.parametrize("kind", ["content", "price_detail"])
 def test_nonprice_parameter_clarification_is_preserved(http_env, kind):
     client, db, use, _ = http_env
-    op = explanation("Как проходит выбранная процедура?") if kind == "content" else {
+    op = {"kind": "content", "request_id": "r1", "pending_question": "Как проходит выбранная процедура?"} if kind == "content" else {
         "kind": "price_detail", "request_id": "r1", "price_detail_aspect": "includes"}
-    fake = use(FakeProvider(raw({"kind": "clarification", "request_id": "r1",
-        "missing": "stage", "operation": op, "choices": []})))
+    fake = use(FakeProvider(raw({**op, "clarification": {"missing": "stage", "choices": []}})))
     first = post(client, q="Информационный вопрос без необходимого этапа").get_json()
     assert "этапе лечения" in first["answer"]
     with D2DialogueStore(db) as store:
-        assert store.read(SessionKey(client_id="demo", sid="cp6a")).state.clarify_task.operation.kind == kind
+        assert store.read(SessionKey(client_id="demo", sid="cp6a")).state.clarify_task.kind == kind
     fake.raw = raw(explanation("Ответ с учётом уточнённого этапа.")) if kind == "content" else raw({
         **op, "target": {"type": "service", "id": "classic"}})
     response = post(client, request_id="continue", q="Уточняю этап процедуры")

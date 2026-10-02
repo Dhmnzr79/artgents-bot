@@ -24,7 +24,7 @@ from contracts.response_plan_post_composer import PostComposerMaterialAuthority
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
 from core.one_call_envelope_protocol import parse_production_envelope_json, production_envelope_template
-from core.response_plan_materialization import resolve_d2_envelope_response
+from core.response_plan_materialization import resolve_d2_operations
 from core.d2_published_offer_terms import build_d2_published_offer_terms
 from core.response_text_renderer import render_response_text
 from core.response_ui_projection import project_response_ui
@@ -32,58 +32,21 @@ from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from tests.test_target_offer_projection import _bundle
 
 
-def _parsed_envelope(*, requests: list[dict[str, object]], commercial_intent: str) -> object:
-    payload = production_envelope_template(
-        patient_text="Служебный текст D1R.",
-        commercial_intent=commercial_intent,
-        request_understanding={"subjects": [], "requests": requests},
-        primary_price_request_id="r1" if commercial_intent == "price" else None,
-    )
-    return parse_production_envelope_json(
-        json.dumps(payload, ensure_ascii=False),
-        active_service_catalog=ActiveServiceCatalogSnapshot(canonical_json="{}"),
-        service_reference_catalog=ServiceReferenceCatalogSnapshot(canonical_json="{}"),
-        commercial_fact_catalog=CommercialFactCatalogSnapshot(canonical_json="{}"),
-    )
+def _parsed_envelope(*, requests, commercial_intent):
+    from contracts.d2_dialogue_result import D2DialogueResult
+    return D2DialogueResult.model_validate({"outcome":"dialogue","blocks":requests})
 
 
-def _price_request(
-    *, service_id: str | None, topic_id: str | None, request_id: str = "r1"
-) -> dict[str, object]:
-    return {
-        "request_id": request_id,
-        "kind": "price",
-        "subject_id": None,
-        "context": "general_information",
-        "policy_ids": [],
-        "payment_scheme": "unspecified",
-        "payment_scheme_intent": "not_requested",
-        "contact_fields": [],
-        "content_text": None,
-        "service_id": service_id,
-        "topic_id": topic_id,
-        "statement_mode": "question",
-    }
+def _price_request(*, service_id, topic_id, request_id="r1"):
+    target = {"type":"service","id":service_id} if service_id else ({"type":"topic","id":topic_id} if topic_id else None)
+    return {"request_id":request_id,"kind":"price","target":target}
 
 
-def _content_request(
-    *, content_ref: str, service_id: str | None, topic_id: str | None, request_id: str = "r1"
-) -> dict[str, object]:
-    return {
-        "request_id": request_id,
-        "kind": "content",
-        "subject_id": None,
-        "context": "general_information",
-        "policy_ids": [],
-        "payment_scheme": "unspecified",
-        "payment_scheme_intent": "not_requested",
-        "contact_fields": [],
-        "content_text": "Смысловой текст модели не является источником ответа.",
-        "content_ref": content_ref,
-        "service_id": service_id,
-        "topic_id": topic_id,
-        "statement_mode": "question",
-    }
+def _content_request(*, content_ref, service_id, topic_id, request_id="r1"):
+    target = {"type":"service","id":service_id} if service_id else ({"type":"topic","id":topic_id} if topic_id else None)
+    return {"request_id":request_id,"kind":"content","target":target,
+        "content_ref":content_ref,"content_text":"Смысловой текст модели не является источником ответа.",
+        "content_realization":"model_prose"}
 
 
 def _sources(*, content: tuple[D2AuthoredContentAuthority, ...] = ()) -> ResponsePlanMaterializationSources:
@@ -152,7 +115,7 @@ def test_standalone_direction_price_freezes_rows_and_real_conditions() -> None:
         commercial_intent="price",
     )
 
-    outcome = resolve_d2_envelope_response(envelope, _sources(), as_of=date(2026, 9, 18))
+    outcome = resolve_d2_operations((envelope).blocks, _sources(), as_of=date(2026, 9, 18))
 
     assert outcome.resolved.d2_price_block is not None
     assert outcome.resolved.information_blocks == ()
@@ -170,7 +133,7 @@ def test_standalone_exact_service_price_uses_the_same_d1r_path() -> None:
         commercial_intent="price",
     )
 
-    outcome = resolve_d2_envelope_response(envelope, _sources(), as_of=date(2026, 9, 18))
+    outcome = resolve_d2_operations((envelope).blocks, _sources(), as_of=date(2026, 9, 18))
 
     assert outcome.resolved.response_scope == "service"
     assert outcome.resolved.session_delta.active_service_id == "service_two"
@@ -194,7 +157,7 @@ def test_standalone_price_ignores_legacy_unknown_condition_evidence() -> None:
         }
     )
 
-    outcome = resolve_d2_envelope_response(envelope, source, as_of=date(2026, 9, 18))
+    outcome = resolve_d2_operations((envelope).blocks, source, as_of=date(2026, 9, 18))
     assert outcome.resolved.d2_result_status == "complete"
     assert outcome.resolved.d2_request_parts[0].failure_reason is None
     assert outcome.resolved.d2_price_block is not None
@@ -215,7 +178,7 @@ def test_standalone_global_content_has_no_price_and_is_frozen() -> None:
         )
     )
 
-    outcome = resolve_d2_envelope_response(envelope, source, as_of=date(2026, 9, 18))
+    outcome = resolve_d2_operations((envelope).blocks, source, as_of=date(2026, 9, 18))
 
     assert outcome.resolved.d2_price_block is None
     assert outcome.resolved.price_block is None
@@ -232,7 +195,7 @@ def test_frozen_d2_plan_does_not_reread_mutated_source_snapshots() -> None:
         commercial_intent="price",
     )
     source = _sources()
-    outcome = resolve_d2_envelope_response(envelope, source, as_of=date(2026, 9, 18))
+    outcome = resolve_d2_operations((envelope).blocks, source, as_of=date(2026, 9, 18))
     rendered = outcome.rendered_text
     projection = outcome.ui_projection
 
@@ -249,7 +212,7 @@ def test_empty_final_answer_stays_invalid_while_standalone_price_is_valid() -> N
         requests=[_price_request(service_id="service_one", topic_id="implantation")],
         commercial_intent="price",
     )
-    outcome = resolve_d2_envelope_response(envelope, _sources(), as_of=date(2026, 9, 18))
+    outcome = resolve_d2_operations((envelope).blocks, _sources(), as_of=date(2026, 9, 18))
     assert outcome.resolved.d2_price_block is not None
 
     empty_payload = outcome.resolved.model_dump()
@@ -304,7 +267,7 @@ def test_restricted_content_without_a_service_or_topic_is_rejected() -> None:
     )
 
     with pytest.raises(MaterializationContractError, match="d2_content_scope_required"):
-        resolve_d2_envelope_response(envelope, source, as_of=date(2026, 9, 18))
+        resolve_d2_operations((envelope).blocks, source, as_of=date(2026, 9, 18))
 
 
 def test_direct_d2_path_does_not_call_the_legacy_materialization_entry(
@@ -321,8 +284,8 @@ def test_direct_d2_path_does_not_call_the_legacy_materialization_entry(
         raise AssertionError("legacy materialization entry must stay unreachable")
 
     monkeypatch.setattr(materialization, "resolve_materialized_response", _legacy_called)
-    outcome = materialization.resolve_d2_envelope_response(
-        envelope, _sources(), as_of=date(2026, 9, 18)
+    outcome = materialization.resolve_d2_operations(
+        envelope.blocks, _sources(), as_of=date(2026, 9, 18)
     )
 
     assert outcome.resolved.d2_price_block is not None

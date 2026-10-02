@@ -10,33 +10,21 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal, Self
 
+from contracts.d2_dialogue_result import ClarifiedOperation, DiscussionScope
+
 from pydantic import field_validator, model_validator
 
 from contracts.response_plan import NonBlankStr, ResponsePlanModel, SessionKey, TerminalState, D2ResolvedRequestPart
 from contracts.response_plan_session import (
-    D2ShownPriceOfferRef,
-    HistoricalPriceOffersSnapshot,
-    PersistedActiveService,
-    PersistedActiveTopic,
-    PersistedShownCommercialIds,
-    PersistedShownOptionsSnapshot,
-    PersistedSituationState,
-    PersistedClarifyTask,
-    ResponsePlanSessionSnapshot,
-    SessionDialoguePair,
-    D2SelectedUiRef,
+    D2ShownPriceOfferRef, PersistedShownCommercialIds, D2SelectedUiRef,
+    D2DialogueReceiptRef, require_exact_nonblank_id,
+    require_strict_non_negative_int, reject_non_strict_int_input,
 )
 
 DEFAULT_D2_SESSION_IDLE_TTL_SECONDS = 30 * 60
 DEFAULT_D2_HISTORY_PAIR_LIMIT = 3
 DEFAULT_D2_HISTORY_TEXT_MAX_CHARS = 1000
 D2SessionContextFreshness = Literal["fresh", "expired", "unknown"]
-D2SemanticContinuationOutcome = Literal[
-    "clear_continuation", "ambiguous_focus", "explicit_new_topic"
-]
-D2PlanFocusAction = Literal["resolve_topic", "clarify_focus"]
-
-
 class D2SessionContextError(ValueError):
     """An activity record or snapshot cannot safely be projected for D2."""
 
@@ -79,21 +67,13 @@ class D2SessionActivity(ResponsePlanModel):
         return self
 
 
-class D2DiscussionScope(ResponsePlanModel):
-    """Read-only scope of a completed discussion, never a medical fact."""
-    topic_id: NonBlankStr
-    service_id: NonBlankStr | None = None
-    brand_id: NonBlankStr | None = None
-    extent: Literal["one_tooth", "few_teeth", "full_arch", "unknown"]
-
-
 class D2ProjectedDialoguePair(ResponsePlanModel):
     patient_text: str | None = None
     selected_ui_ref: D2SelectedUiRef | None = None
     assistant_text: str = ""
     committed_at_turn: int
     parts: tuple[D2ResolvedRequestPart, ...] = ()
-    price_scope: D2DiscussionScope | None = None
+    price_scope: DiscussionScope | None = None
     offers: tuple[D2ShownPriceOfferRef, ...] = ()
     detail_aspect: str | None = None
     policy_ids: tuple[str, ...] = ()
@@ -103,16 +83,11 @@ class D2ProjectedDialoguePair(ResponsePlanModel):
 class D2OrdinarySessionContext(ResponsePlanModel):
     """Ordinary dialogue state made available by a fresh activity record only."""
 
-    dialogue_pairs: tuple[SessionDialoguePair | D2ProjectedDialoguePair, ...] = ()
-    discussion_scope: D2DiscussionScope | None = None
-    active_service: PersistedActiveService | None = None
-    active_topic: PersistedActiveTopic | None = None
-    situation_state: PersistedSituationState | None = None
-    shown_options_snapshot: PersistedShownOptionsSnapshot | None = None
-    historical_price_offers: HistoricalPriceOffersSnapshot | None = None
+    dialogue_pairs: tuple[D2ProjectedDialoguePair, ...] = ()
+    discussion_scope: DiscussionScope | None = None
     d2_shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...] = ()
     clarify_pending: bool = False
-    clarify_task: PersistedClarifyTask | None = None
+    clarify_task: ClarifiedOperation | None = None
 
 
 class D2SessionContextProjection(ResponsePlanModel):
@@ -128,86 +103,59 @@ class D2SessionContextProjection(ResponsePlanModel):
     retained_shown_ids: PersistedShownCommercialIds
 
 
-class D2CrossTopicSituationCarry(ResponsePlanModel):
-    """Typed source facts eligible for a later explicit cross-topic transfer."""
+D2_SESSION_SCHEMA_VERSION = 5
 
-    situation_owner_id: str
-    source_situation: PersistedSituationState
-    destination_topic_id: str
+
+class D2SessionState(ResponsePlanModel):
+    """One receipt-based discussion context; no personal treatment record."""
+    schema_version: int
+    session_key: SessionKey
+    revision: int
+    last_committed_turn_index: int
+    dialogue_pairs: tuple[D2DialogueReceiptRef, ...] = ()
+    discussion_request_id: NonBlankStr | None = None
+    d2_shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...] = ()
+    accumulated_shown_ids: PersistedShownCommercialIds = PersistedShownCommercialIds()
+    terminal_state: TerminalState = "none"
+    clarify_pending: bool = False
+    clarify_task: ClarifiedOperation | None = None
+
+    @field_validator("schema_version", "revision", "last_committed_turn_index", mode="before")
+    @classmethod
+    def strict_counters(cls, value):
+        return reject_non_strict_int_input("session_counter", value)
 
     @model_validator(mode="after")
-    def _validate_shape(self) -> Self:
-        if self.situation_owner_id != self.source_situation.situation_owner_id:
-            raise ValueError("cross_topic_owner_mismatch")
-        if self.destination_topic_id == self.source_situation.topic_id:
-            raise ValueError("cross_topic_destination_not_new")
+    def validate_state(self):
+        for name in ("schema_version", "revision", "last_committed_turn_index"):
+            require_strict_non_negative_int(name, getattr(self, name))
+        if self.schema_version != D2_SESSION_SCHEMA_VERSION:
+            raise ValueError("session_schema_version_invalid")
+        require_exact_nonblank_id("session_client_id", self.session_key.client_id)
+        require_exact_nonblank_id("session_sid", self.session_key.sid)
+        refs = self.d2_shown_price_offer_refs
+        if len({r.offer_id for r in refs}) != len(refs):
+            raise ValueError("d2_shown_price_offer_id_duplicate")
+        if any(r.source_client_id != self.session_key.client_id for r in refs):
+            raise ValueError("d2_shown_price_offer_client_mismatch")
+        if any(p.committed_at_turn > self.last_committed_turn_index for p in self.dialogue_pairs):
+            raise ValueError("dialogue_pair_future_turn")
+        if self.clarify_task is not None and not self.clarify_pending:
+            raise ValueError("clarify_task_requires_pending")
         return self
 
 
-class D2EnvelopeSessionBinding(ResponsePlanModel):
-    """Typed result of binding one parsed D1R envelope to a C10 projection.
+class D2SessionSnapshot(ResponsePlanModel):
+    state: D2SessionState
+    exists_in_store: bool = False
 
-    This is intentionally a decision record, not a session mutation or a
-    resolver instruction.  ``carried_situation`` is present only when the
-    current D1R request explicitly declares the same typed situation.
-    """
-
-    source_session_key: SessionKey
-    source_revision: int
-    source_turn_index: int
-    outcome: D2SemanticContinuationOutcome
-    resolved_topic_id: str | None = None
-    carried_situation: PersistedSituationState | None = None
-    cross_topic_carry: D2CrossTopicSituationCarry | None = None
-
-    @model_validator(mode="after")
-    def _validate_carried_situation(self) -> Self:
-        if self.carried_situation is not None:
-            if self.outcome != "clear_continuation":
-                raise ValueError("carried_situation_requires_clear_continuation")
-            if self.resolved_topic_id != self.carried_situation.topic_id:
-                raise ValueError("carried_situation_topic_mismatch")
-        if self.cross_topic_carry is not None:
-            if self.outcome != "explicit_new_topic":
-                raise ValueError("cross_topic_carry_requires_explicit_new_topic")
-            if self.carried_situation is not None:
-                raise ValueError("cross_topic_carry_forbids_same_topic_carry")
-            if self.resolved_topic_id != self.cross_topic_carry.destination_topic_id:
-                raise ValueError("cross_topic_destination_mismatch")
-        return self
+    @property
+    def current_turn_index(self):
+        return self.state.last_committed_turn_index + 1
 
 
-class D2PlanFocusSeed(ResponsePlanModel):
-    """Minimal typed focus for a future isolated response-plan seam."""
-
-    source_session_key: SessionKey
-    source_revision: int
-    source_turn_index: int
-    action: D2PlanFocusAction
-    topic_id: str | None = None
-    carried_situation: PersistedSituationState | None = None
-    cross_topic_carry: D2CrossTopicSituationCarry | None = None
-
-    @model_validator(mode="after")
-    def _validate_shape(self) -> Self:
-        if self.action == "clarify_focus":
-            if (
-                self.topic_id is not None
-                or self.carried_situation is not None
-                or self.cross_topic_carry is not None
-            ):
-                raise ValueError("clarify_focus_forbids_topic_and_situation")
-            return self
-        if self.topic_id is None:
-            raise ValueError("resolve_topic_requires_topic")
-        if (
-            self.carried_situation is not None
-            and self.carried_situation.topic_id != self.topic_id
-        ):
-            raise ValueError("plan_focus_situation_topic_mismatch")
-        if (
-            self.cross_topic_carry is not None
-            and self.cross_topic_carry.destination_topic_id != self.topic_id
-        ):
-            raise ValueError("plan_focus_cross_topic_mismatch")
-        return self
+def empty_d2_session_snapshot(session_key):
+    return D2SessionSnapshot(state=D2SessionState(
+        schema_version=D2_SESSION_SCHEMA_VERSION, session_key=session_key,
+        revision=0, last_committed_turn_index=0,
+    ))

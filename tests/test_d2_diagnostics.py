@@ -122,7 +122,7 @@ def test_boundary_fault_does_not_leak_exception_or_lose_saved_result(observed, m
         raise RuntimeError(SECRET)
 
     target, name = {
-        "materialize": (dialogue, "resolve_d2_envelope_response"),
+        "materialize": (dialogue, "resolve_d2_operations"),
         "payload": (adapter, "_response_payload"),
         "transport": (app, "_sse_typing_line"),
     }[site]

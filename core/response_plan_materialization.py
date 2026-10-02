@@ -28,7 +28,6 @@ from contracts.response_plan import (
     D2PriceScopeDecision,
     D2PriceScopeChoice,
     D2ResolvedRequestPart,
-    D2TreatmentSituationDecision,
     FactRole,
     FrozenPriceOfferRow,
     InformationSourceBlock,
@@ -51,7 +50,7 @@ from contracts.response_plan import (
     all_allowed_route_mode_pairs,
 )
 from contracts.one_call_envelope import OneCallEnvelope
-from contracts.d2_session_context import D2PlanFocusSeed
+from contracts.d2_dialogue_result import DiscussionScope, ServiceTarget, TopicTarget
 from contracts.request_understanding import RequestUnderstanding, RequestUnderstandingRequest
 from contracts.response_plan_session import D2ShownPriceOfferRef
 from contracts.response_plan_composer import AdaptedComposerDecision
@@ -300,45 +299,9 @@ def resolve_materialized_response(
     )
 
 
-def resolve_d2_envelope_response(
-    envelope: OneCallEnvelope,
-    sources: ResponsePlanMaterializationSources,
-    *,
-    as_of: date,
-    d2_plan_focus_seed: D2PlanFocusSeed | None = None,
-    common_route_direct_service_only: bool = False,
-    common_route_content_lookup: bool = False,
-    exact_contact_blocks: tuple[D2ContactFactBlock, ...] = (),
-    exact_policy_blocks: tuple[D2PolicyFactBlock, ...] = (),
-    exact_contact_button: UiButtonCandidate | None = None,
-    exact_canonical_contact: CanonicalContactCandidate | None = None,
-    d2_request_order: tuple[str, ...] = (),
-    selected_document_action: D2SelectedDocumentAction | None = None,
-    shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...] = (),
-    selected_price_detail_action: D2PriceDetailUiAction | None = None,
-) -> MaterializedResponseOutcome:
-    """Historical caller adapter; the HTTP D2 path uses operations directly."""
-    if envelope.route != "ANSWER" or envelope.request_understanding is None:
-        raise MaterializationContractError("d2_envelope_route_unsupported")
-    if selected_document_action is not None:
-        envelope = _d2_validate_selected_document_binding(envelope, sources=sources, action=selected_document_action)
-    return resolve_d2_operations(
-        envelope.request_understanding.requests, envelope.request_understanding.subjects,
-        sources, as_of=as_of, d2_plan_focus_seed=d2_plan_focus_seed,
-        common_route_content_lookup=common_route_content_lookup,
-        exact_contact_blocks=exact_contact_blocks, exact_policy_blocks=exact_policy_blocks,
-        exact_contact_button=exact_contact_button, exact_canonical_contact=exact_canonical_contact,
-        d2_request_order=d2_request_order, shown_price_offer_refs=shown_price_offer_refs,
-        selected_price_detail_action=selected_price_detail_action,
-        promotion_scope=envelope.promotion_scope,
-        requested_fact_ids=envelope.references.direct_fact_ids if envelope.commercial_intent == "payment" else (),
-        legacy_patient_text=envelope.patient_text,
-    )
-
-
 def resolve_d2_operations(
-    operations, subjects, sources, *, as_of,
-    d2_plan_focus_seed=None, common_route_content_lookup=False,
+    operations, sources, *, as_of,
+    common_route_content_lookup=False,
     exact_contact_blocks=(), exact_policy_blocks=(),
     exact_contact_button=None, exact_canonical_contact=None,
     d2_request_order=(), shown_price_offer_refs=(), selected_price_detail_action=None,
@@ -401,8 +364,8 @@ def resolve_d2_operations(
     direct_promotion = promotion_scope != "none"
     direct_fact = bool(requested_fact_ids)
 
-    # The same multi-document presentation applies to comparisons and to
-    # independent questions. Neither borrows one document's secondary UI.
+    # Keep the existing marketing policy for multi-part answers. Source UI
+    # below uses verified documents, not the number of content operations.
     multiple_content_parts = len(content_parts) > 1
     ready_comparison = (
         len(content_parts) == 1
@@ -433,10 +396,6 @@ def resolve_d2_operations(
         raise MaterializationContractError("d2_price_or_content_part_required")
     if direct_promotion and promotion_scope not in {"general", "service", "shown"}:
         raise MaterializationContractError("d2_promotion_scope_invalid")
-
-    treatment_situation = _d2_treatment_situation(
-        operations, subjects=subjects, client_id=client_id, sources=sources
-    )
 
     # Resolve content first. Wrong/missing refs soft-fail as part gaps (D2-078);
     # foreign tenant material remains fatal and must not hide behind price recovery.
@@ -497,21 +456,7 @@ def resolve_d2_operations(
             )
             for part in price_parts[1:]
         )
-        applied_extent = _d2_applied_extent(price_part, treatment_situation, sources)
-        if applied_extent is None:
-            applied_extent = _d2_same_topic_applied_extent(
-                price_part,
-                price_parts=price_parts,
-                d2_plan_focus_seed=d2_plan_focus_seed,
-                sources=sources,
-            )
-        if applied_extent is None:
-            applied_extent = _d2_cross_topic_applied_extent(
-                price_part,
-                price_parts=price_parts,
-                d2_plan_focus_seed=d2_plan_focus_seed,
-                sources=sources,
-            )
+        applied_extent = price_part.volume.extent if price_part.volume is not None and price_part.volume.extent != "unknown" else None
         try:
             direct_service_only = price_part.service_id is not None
             direction_order = next(
@@ -669,7 +614,7 @@ def resolve_d2_operations(
     request_parts = [D2ResolvedRequestPart(
         request_id=p.request_id, kind="price", status="deferred",
         scope=price_scopes_by_id[p.request_id][1], service_id=p.service_id,
-        topic_id=price_scopes_by_id[p.request_id][2], subject_id=p.subject_id,
+        topic_id=price_scopes_by_id[p.request_id][2], discussion_scope=_discussion_descriptor(p),
     ) for p in deferred_price_parts]
     content_scopes_by_id = {part.request_id: scope for part, scope in zip(content_parts, content_part_scopes)}
     for part in operations:
@@ -684,7 +629,7 @@ def resolve_d2_operations(
                 failure_reason=(
                     price_failure_reason if part.request_id == price_part.request_id else None
                 ),
-                subject_id=part.subject_id,
+                discussion_scope=_discussion_descriptor(part),
                 scope=part_scope,
                 service_id=part.service_id,
                 topic_id=part_topic_id,
@@ -706,7 +651,7 @@ def resolve_d2_operations(
                 kind="content",
                 status=realization.outcome,
                 failure_reason=realization.reason,
-                subject_id=part.subject_id,
+                discussion_scope=_discussion_descriptor(part),
                 scope=scope,
                 service_id=part.service_id,
                 topic_id=topic,
@@ -728,7 +673,7 @@ def resolve_d2_operations(
                 request_id=part.request_id, kind="price_detail",
                 status="unavailable" if detail_failure_reason is not None else "answered",
                 failure_reason=detail_failure_reason,
-                subject_id=part.subject_id,
+                discussion_scope=_discussion_descriptor(part),
                 scope="service" if detail_service is not None else "mixed",
                 service_id=detail_service,
             ))
@@ -787,7 +732,13 @@ def resolve_d2_operations(
         )
     elif len(commercial_operations) == 1 and not multiple_content_parts:
         source_content_ref = _d2_direct_fact_source_ref(commercial_operations[0].fact_ids, sources)
-    if multiple_content_parts:
+    shared_content_source = source_content_ref is not None and all(
+        part.request_id in content_blocks_by_id
+        and content_blocks_by_id[part.request_id].content_ref == source_content_ref
+        for part in content_parts
+    )
+    suppress_multiple_source_ui = multiple_content_parts and not shared_content_source
+    if suppress_multiple_source_ui:
         # Preserve the ordered source marker, without borrowing one document's UI.
         source_ui, source_ui_diagnostics = UiPlanCandidates(source_content_ref=source_content_ref), ()
     else:
@@ -803,7 +754,7 @@ def resolve_d2_operations(
         suppress_secondary=(
             bool(price_parts or detail_parts)
             or direct_promotion
-            or multiple_content_parts
+            or suppress_multiple_source_ui
         ),
     )
     if volume_choices:
@@ -891,7 +842,6 @@ def resolve_d2_operations(
         price_plan=PricePlan(kind="none"),
         d2_price_block=price_block,
         d2_price_detail_block=detail_block,
-        d2_treatment_situation=treatment_situation,
         d2_price_scope_decision=scope_decision,
         d2_request_parts=tuple(request_parts),
         d2_part_failure_blocks=frozen_failure_blocks,
@@ -1104,153 +1054,11 @@ def _d2_price_detail_block(
     )
 
 
-def _d2_treatment_situation(
-    operations,
-    *,
-    subjects,
-    client_id: str,
-    sources: ResponsePlanMaterializationSources,
-) -> D2TreatmentSituationDecision | None:
-    owning_request = next((item for item in operations if getattr(item, "situation", None) is not None), None)
-    if owning_request is None:
+def _discussion_descriptor(part):
+    if not isinstance(part.target, (ServiceTarget, TopicTarget)):
         return None
-    situation = owning_request.situation
-    assert situation is not None
-
-    if owning_request.service_id is not None:
-        if owning_request.service_id not in sources.material_authority.bundle.services:
-            raise MaterializationOwnershipError("materialization_foreign_material")
-    if owning_request.topic_id is not None:
-        direction = next(
-            (
-                item
-                for item in sources.d2_directions
-                if item.topic_id == owning_request.topic_id and item.source_client_id == client_id
-            ),
-            None,
-        )
-        if direction is None:
-            raise MaterializationOwnershipError("materialization_foreign_material")
-        if owning_request.service_id is not None and owning_request.service_id not in direction.service_ids:
-            raise MaterializationContractError("d2_treatment_service_topic_mismatch")
-
-    subject = next(
-        (item for item in subjects if item.subject_id == owning_request.subject_id),
-        None,
-    )
-    return D2TreatmentSituationDecision(
-        source_request_id=owning_request.request_id,
-        subject_relation=subject.relation if subject is not None else None,
-        subject_age_group=subject.age_group if subject is not None else None,
-        service_id=owning_request.service_id,
-        topic_id=owning_request.topic_id,
-        scope_commitment=situation.scope_commitment,
-        extent=situation.extent,
-        tooth_count=situation.tooth_count,
-        jaw=situation.jaw,
-        continuity=situation.continuity,
-    )
-
-
-def _d2_applied_extent(
-    part: RequestUnderstandingRequest,
-    situation: D2TreatmentSituationDecision | None,
-    sources: ResponsePlanMaterializationSources,
-) -> str | None:
-    del sources
-    if (
-        situation is None
-        or situation.source_request_id != part.request_id
-        or situation.scope_commitment not in {"reported", "correction", "hypothetical"}
-        or situation.extent not in {"one_tooth", "few_teeth", "full_arch"}
-    ):
-        return None
-    return situation.extent
-
-
-def _d2_same_topic_applied_extent(
-    part: RequestUnderstandingRequest,
-    *,
-    price_parts: tuple[RequestUnderstandingRequest, ...],
-    d2_plan_focus_seed: D2PlanFocusSeed | None,
-    sources: ResponsePlanMaterializationSources,
-) -> str | None:
-    """Use only a fresh, typed same-topic situation from the D2 focus seed."""
-
-    if (
-        d2_plan_focus_seed is None
-        or d2_plan_focus_seed.action != "resolve_topic"
-        or d2_plan_focus_seed.source_session_key != sources.session_key
-        or d2_plan_focus_seed.topic_id is None
-    ):
-        return None
-    source = d2_plan_focus_seed.carried_situation
-    situation = part.situation
-    if (
-        source is None
-        or source.situation_owner_id is None
-        or source.session_key != sources.session_key
-        or part.service_id is not None
-        or part.topic_id is None
-        or part.topic_id != d2_plan_focus_seed.topic_id
-        or part.topic_id != source.topic_id
-        or {item.topic_id for item in price_parts} != {part.topic_id}
-        or situation is None
-        or situation.continuity != "same"
-        or situation.scope_commitment == "reset"
-        or source.extent not in {"one_tooth", "few_teeth", "full_arch"}
-    ):
-        return None
-    return source.extent
-
-
-def _d2_cross_topic_applied_extent(
-    part: RequestUnderstandingRequest,
-    *,
-    price_parts: tuple[RequestUnderstandingRequest, ...],
-    d2_plan_focus_seed: D2PlanFocusSeed | None,
-    sources: ResponsePlanMaterializationSources,
-) -> str | None:
-    """Return a C14 candidate's source extent only for its exact destination.
-
-    The seed is an already TTL-gated, typed C12/C14 projection.  This resolver
-    does not revisit that projection or infer any semantic relation from text.
-    A current request's own typed situation is handled first by
-    ``_d2_applied_extent`` and is never replaced here.
-    """
-
-    if (
-        d2_plan_focus_seed is None
-        or d2_plan_focus_seed.action != "resolve_topic"
-        or d2_plan_focus_seed.source_session_key != sources.session_key
-        or d2_plan_focus_seed.topic_id is None
-    ):
-        return None
-    carry = d2_plan_focus_seed.cross_topic_carry
-    if (
-        carry is None
-        or part.service_id is not None
-        or part.topic_id is None
-        or part.subject_id is None
-        or part.topic_id != d2_plan_focus_seed.topic_id
-        or part.topic_id != carry.destination_topic_id
-        or {item.topic_id for item in price_parts} != {part.topic_id}
-    ):
-        return None
-    source = carry.source_situation
-    situation = part.situation
-    if (
-        source.situation_owner_id is None
-        or carry.situation_owner_id != source.situation_owner_id
-        or source.session_key != sources.session_key
-        or carry.destination_topic_id == source.topic_id
-        or situation is None
-        or situation.continuity != "same"
-        or situation.scope_commitment == "reset"
-        or source.extent not in {"one_tooth", "few_teeth", "full_arch"}
-    ):
-        return None
-    return source.extent
+    return DiscussionScope(target=part.target, volume=part.volume,
+        brand_id=getattr(part, "brand_id", None))
 
 
 def _d2_price_scope_decision(
@@ -1272,10 +1080,9 @@ def _d2_price_scope_decision(
         return None, ()
     brand = sources.material_authority.bundle.brands.brands.get(part.brand_id) if part.brand_id else None
     choices: tuple[D2PriceScopeChoice, ...] = ()
-    situation = part.situation
     # Volume buttons come from clinic presentation (D2-028). Offer-set diversity
     # is not required: extents may share a price card and still need a choice.
-    can_offer_choices = situation is None
+    can_offer_choices = part.volume is None
     if applied_extent is None and can_offer_choices and presentation.volume_choices:
         choices = tuple(
             D2PriceScopeChoice(extent=item.extent, candidate=item.candidate)

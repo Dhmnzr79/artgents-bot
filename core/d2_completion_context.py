@@ -1,30 +1,19 @@
 """Safe read projection of the sole D2 store's completed results."""
 
-from contracts.d2_session_context import D2DiscussionScope, D2ProjectedDialoguePair
+from contracts.d2_session_context import D2ProjectedDialoguePair
 from contracts.response_plan_session import D2DialogueReceiptRef, D2ShownPriceOfferRef
 from core.user_text_privacy import mask_phones_in_text, mask_emails_in_text
 
 
 def discussion_scope(resolved):
-    decision = resolved.d2_price_scope_decision
-    if decision is None:
-        prices = [p for p in resolved.d2_request_parts if p.kind == "price" and p.status in {"answered", "unavailable"}]
-        if len(prices) != 1 or prices[0].topic_id is None:
-            return None
-        part = prices[0]
-        situation = resolved.d2_treatment_situation
-        extent = (situation.extent if situation is not None
-            and situation.source_request_id == part.request_id
-            and situation.scope_commitment in {"reported", "correction", "hypothetical"} else "unknown")
-        return D2DiscussionScope(topic_id=part.topic_id, service_id=part.service_id,
-            brand_id=part.brand_id, extent=extent)
-    if not any(p.request_id == decision.source_request_id and p.kind == "price"
-        and p.status in {"answered", "unavailable"}
-        and p.topic_id == decision.topic_id and p.service_id == decision.service_id
-        for p in resolved.d2_request_parts):
-        raise ValueError("d2_discussion_price_part_required")
-    return D2DiscussionScope(topic_id=decision.topic_id, service_id=decision.service_id,
-        brand_id=decision.brand_id, extent=decision.applied_extent or "unknown")
+    """Read the finalized task, never infer a patient or choose among alternatives."""
+    if resolved.response_scope == "mixed":
+        return None
+    scopes = [p.discussion_scope for p in resolved.d2_request_parts
+        if p.discussion_scope is not None]
+    if not scopes or not any(p.discussion_scope is not None and p.status in {"answered", "recovered", "unavailable"} for p in resolved.d2_request_parts) or any(scope != scopes[0] for scope in scopes[1:]):
+        return None
+    return scopes[0]
 
 
 def _receipt(store, key, request_id, revision, turn=None):
@@ -33,7 +22,7 @@ def _receipt(store, key, request_id, revision, turn=None):
         turn is not None and result.context.source_turn_index + 1 != turn
     ):
         raise ValueError("d2_history_receipt_invalid")
-    if result.focus.source_session_key != key:
+    if result.context.session_key != key:
         raise ValueError("d2_history_receipt_owner_mismatch")
     return result
 
@@ -84,35 +73,24 @@ def project_completed_dialogue(context, snapshot, store, policy):
             raise ValueError("d2_history_receipt_required")
         result = _receipt(store, key, ref.request_id, context.source_revision, ref.committed_at_turn)
         pairs.append(_project_pair(ref, result, policy.history_text_max_chars))
-    topic = snapshot.state.active_topic
     scope = None
-    if topic is not None and topic.discussion_request_id:
-        result = _receipt(store, key, topic.discussion_request_id, context.source_revision)
+    reference = snapshot.state.discussion_request_id
+    if reference is not None:
+        result = _receipt(store, key, reference, context.source_revision)
         scope = discussion_scope(result.response.resolved)
-        service = snapshot.state.active_service
-        if scope is None or scope.topic_id != topic.topic_id or (
-            service is not None and scope.service_id is not None and scope.service_id != service.service_id
-        ):
+        if scope is None:
             raise ValueError("d2_discussion_receipt_scope_mismatch")
-    ordinary = context.ordinary.model_copy(update={"dialogue_pairs": tuple(pairs), "discussion_scope": scope,
-        "active_topic": topic.model_copy(update={"discussion_request_id": None}) if topic else None})
+    ordinary = context.ordinary.model_copy(update={"dialogue_pairs": tuple(pairs), "discussion_scope": scope})
     return context.model_copy(update={"ordinary": ordinary})
 
 
 def retain_discussion_reference(state, previous, context, resolved, request_id):
-    """Follow the finalized active focus; no text parsing or price search."""
-    topic = state.active_topic
-    if topic is None:
-        return state
+    """Contacts retain context; scoped tasks replace it, ambiguity clears it."""
     scope = discussion_scope(resolved)
-    reference = None
-    if scope is not None and scope.topic_id == topic.topic_id:
+    if scope is not None:
         reference = request_id
-    elif context.freshness == "fresh" and previous.active_topic is not None:
-        old = previous.active_topic
-        old_scope = context.ordinary.discussion_scope
-        if old.topic_id == topic.topic_id and old_scope is not None and not (
-            state.active_service is not None and state.active_service.service_id != old_scope.service_id
-        ):
-            reference = old.discussion_request_id
-    return state.model_copy(update={"active_topic": topic.model_copy(update={"discussion_request_id": reference})})
+    elif resolved.response_scope != "clinic" or any(p.discussion_scope is not None for p in resolved.d2_request_parts):
+        reference = None
+    else:
+        reference = previous.discussion_request_id if context.freshness == "fresh" else None
+    return state.model_copy(update={"discussion_request_id": reference})

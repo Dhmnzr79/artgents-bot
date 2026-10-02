@@ -61,16 +61,13 @@ def _content_pain_raw() -> str:
         "content_fallback_section_ref": "a:korotko"}]}, ensure_ascii=False)
 
 
-def _price_raw(topic: str | None, situation: dict[str, object] | None = None, *,
+def _price_raw(topic: str | None, volume: dict[str, object] | None = None, *,
                service_id: str | None = None, subject_id: str | None = "s1") -> str:
-    operation = {"kind": "price", "request_id": "r1", "situation": situation}
+    operation = {"kind": "price", "request_id": "r1", "volume": volume}
     if service_id or topic:
         operation["target"] = {"type": "service", "id": service_id} if service_id else {"type": "topic", "id": topic}
-    if subject_id is not None:
-        operation["subject"] = {"subject_id": subject_id, "relation": "self", "age_group": "unknown"}
     if not service_id and not topic:
-        operation = {"kind": "clarification", "request_id": "r1", "missing": "service",
-                     "operation": operation, "choices": ["classic", "all_on_4"]}
+        operation["clarification"] = {"missing": "service", "choices": ["classic", "all_on_4"]}
     return json.dumps({"outcome": "dialogue", "blocks": [operation]}, ensure_ascii=False)
 
 
@@ -185,12 +182,10 @@ def test_default_price_cta_after_unknown_extent(tmp_path: Path) -> None:
         raw=_price_raw(
             "implantation",
             {
-                "scope_commitment": "unknown",
                 "extent": "unknown",
                 "tooth_count": None,
                 "jaw": "unknown",
-                "continuity": "same",
-            },
+                },
         ),
         key=key,
         request_id="b12-2b",
@@ -258,9 +253,9 @@ def test_pure_clarify_has_menu_but_no_lead_cta(tmp_path: Path) -> None:
     assert outcome.response.ui_projection.quick_replies
     assert _cta_buttons(outcome.response.ui_projection) == []
     assert saved is not None
-    assert saved.state.clarify_task.missing == "service"
-    assert saved.state.clarify_task.operation.kind == "price"
-    assert saved.state.shown_options_snapshot.service_ids == ("classic", "all_on_4")
+    assert saved.state.clarify_task.clarification.missing == "service"
+    assert saved.state.clarify_task.kind == "price"
+    assert saved.state.clarify_task.clarification.choices == ("classic", "all_on_4")
     assert saved.state.terminal_state == "none"
     assert len(provider.inputs) == 1
 
@@ -280,7 +275,7 @@ def test_clarification_cta_preserves_independent_parts(tmp_path: Path, tail_kind
         raw=json.dumps(raw, ensure_ascii=False),
         key=SessionKey(client_id="demo", sid=f"b12-mixed-{tail_kind}"), request_id="b12-mixed",
     )
-    assert saved.state.clarify_task.missing == "service"
+    assert saved.state.clarify_task.clarification.missing == "service"
     parts = outcome.response.resolved.d2_request_parts
     if tail_kind == "price":
         assert parts[1].status == "deferred"

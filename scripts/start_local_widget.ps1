@@ -44,6 +44,29 @@ Write-Host "Stop this bot with Ctrl+C."
 
 Push-Location -LiteralPath $repoRoot
 try {
+    $logCheck = @'
+from flask.cli import load_dotenv
+load_dotenv()
+from pathlib import Path
+from core.d2_full_audit import full_audit_enabled, full_audit_path, full_audit
+from logging_setup import LOG_FILE
+paths = [Path(LOG_FILE)]
+enabled = full_audit_enabled()
+if enabled:
+    paths.append(full_audit_path())
+for path in paths:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8"):
+        pass
+print(f"Application log: {Path(LOG_FILE).resolve()}", flush=True)
+print(f"Full dialogue audit: {'ON' if enabled else 'OFF'}; {full_audit_path().resolve()}", flush=True)
+if enabled:
+    full_audit("local_launcher_startup", trace_id="local-launcher")
+'@
+    $logCheck | & $python -
+    if ($LASTEXITCODE -ne 0) {
+        throw "Log write check failed. Bot was not started."
+    }
     & $python -m flask --app app run --host 127.0.0.1 --port 9001 --no-reload
 } finally {
     Pop-Location

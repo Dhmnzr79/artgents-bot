@@ -13,11 +13,11 @@ from contracts.response_plan_materialization import (
     MaterializationOwnershipError,
     OfferConditionEvidence,
 )
-from core.response_plan_materialization import resolve_d2_envelope_response
+from core.response_plan_materialization import resolve_d2_operations
 from core.response_text_renderer import render_response_text
 from core.response_ui_projection import project_response_ui
 from tests.test_d2_independent_request_parts import _envelope, _part, _sources_ab
-from tests.test_d2_price_scope_selection import _situation
+from tests.test_d2_price_scope_selection import _volume
 from tests.test_d2_multi_request import _sources
 from tests.test_target_offer_projection import _bundle
 
@@ -64,8 +64,8 @@ def _price_and_content(*, reverse: bool = False):
 
 @pytest.mark.parametrize("reverse", [False, True])
 def test_incomplete_price_degrades_without_losing_independent_content(reverse: bool) -> None:
-    outcome = resolve_d2_envelope_response(
-        _price_and_content(reverse=reverse),
+    outcome = resolve_d2_operations(
+        (_price_and_content(reverse=reverse)).blocks,
         _sources_with_incomplete_price_and_content(),
         as_of=_AS_OF,
     )
@@ -94,13 +94,13 @@ def test_incomplete_price_degrades_without_losing_independent_content(reverse: b
 def test_known_scope_failure_keeps_other_direction_content_without_substitution() -> None:
     price = {
         **_part("r1", "price", service_id=None, topic_id="implantation"),
-        "situation": _situation("few_teeth"),
+        "volume": _volume("few_teeth"),
     }
     content = _part(
         "r2", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"
     )
-    outcome = resolve_d2_envelope_response(
-        _envelope([price, content]),
+    outcome = resolve_d2_operations(
+        (_envelope([price, content])).blocks,
         _with_failure_authorities(_sources_ab(), _SCOPE),
         as_of=_AS_OF,
     )
@@ -122,8 +122,8 @@ def test_single_unavailable_price_is_failed_with_empty_ui() -> None:
     for offer in payload["material_authority"]["bundle"]["offers"]:
         offer["active"] = False
     sources = type(sources).model_validate(payload)
-    outcome = resolve_d2_envelope_response(
-        _envelope([_part("r1", "price", service_id="service_one", topic_id="implantation")]),
+    outcome = resolve_d2_operations(
+        (_envelope([_part("r1", "price", service_id="service_one", topic_id="implantation")])).blocks,
         sources,
         as_of=_AS_OF,
     )
@@ -140,8 +140,8 @@ def test_no_public_price_remains_complete_answered() -> None:
     payload = _bundle(no_public_active=True).model_dump()
     for offer in payload["offers"]:
         offer["active"] = offer["offer_id"] == "generic_no_public"
-    outcome = resolve_d2_envelope_response(
-        _envelope([_part("r1", "price", service_id="service_one", topic_id="implantation")]),
+    outcome = resolve_d2_operations(
+        (_envelope([_part("r1", "price", service_id="service_one", topic_id="implantation")])).blocks,
         _sources(_bundle().__class__.model_validate(payload)),
         as_of=_AS_OF,
     )
@@ -171,7 +171,7 @@ def test_degraded_price_request_suppresses_secondary_but_keeps_authorized_cta() 
         ).model_dump()
     ]
     sources = type(base).model_validate(payload)
-    outcome = resolve_d2_envelope_response(_price_and_content(), sources, as_of=_AS_OF)
+    outcome = resolve_d2_operations((_price_and_content()).blocks, sources, as_of=_AS_OF)
 
     assert outcome.resolved.d2_result_status == "degraded"
     assert outcome.ui_projection.quick_replies == ()
@@ -182,8 +182,8 @@ def test_degraded_price_request_suppresses_secondary_but_keeps_authorized_cta() 
 
 def test_missing_or_foreign_failure_authority_is_fatal_and_late_foreign_content_wins() -> None:
     with pytest.raises(MaterializationContractError, match="d2_part_failure_authority_missing"):
-        resolve_d2_envelope_response(
-            _price_and_content(), _sources_with_incomplete_price_and_content().model_copy(
+        resolve_d2_operations(
+            (_price_and_content()).blocks, _sources_with_incomplete_price_and_content().model_copy(
                 update={"d2_part_failures": ()}
             ), as_of=_AS_OF
         )
@@ -195,8 +195,8 @@ def test_missing_or_foreign_failure_authority_is_fatal_and_late_foreign_content_
         display_text="Чужой текст.",
     )
     with pytest.raises(MaterializationContractError, match="d2_part_failure_authority_missing"):
-        resolve_d2_envelope_response(
-            _price_and_content(), _sources_with_incomplete_price_and_content().model_copy(
+        resolve_d2_operations(
+            (_price_and_content()).blocks, _sources_with_incomplete_price_and_content().model_copy(
                 update={"d2_part_failures": (foreign_authority,)}
             ), as_of=_AS_OF
         )
@@ -205,8 +205,8 @@ def test_missing_or_foreign_failure_authority_is_fatal_and_late_foreign_content_
         "r2", "content", service_id="service_two", topic_id="therapy", content_ref="missing.md"
     )
     # Wrong/missing content_ref is a recoverable gap (D2-078), not foreign ownership.
-    outcome = resolve_d2_envelope_response(
-        _envelope([_part("r1", "price", service_id="service_one", topic_id="implantation"), foreign_content]),
+    outcome = resolve_d2_operations(
+        (_envelope([_part("r1", "price", service_id="service_one", topic_id="implantation"), foreign_content])).blocks,
         _sources_with_incomplete_price_and_content(),
         as_of=_AS_OF,
     )
@@ -223,14 +223,14 @@ def test_unexpected_price_error_is_fatal(monkeypatch: pytest.MonkeyPatch) -> Non
         lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("unexpected price failure")),
     )
     with pytest.raises(RuntimeError, match="unexpected price failure"):
-        resolve_d2_envelope_response(
-            _price_and_content(), _sources_with_incomplete_price_and_content(), as_of=_AS_OF
+        resolve_d2_operations(
+            (_price_and_content()).blocks, _sources_with_incomplete_price_and_content(), as_of=_AS_OF
         )
 
 
 def test_corrupted_failure_linkage_and_aggregate_are_rejected_and_frozen() -> None:
     sources = _sources_with_incomplete_price_and_content()
-    outcome = resolve_d2_envelope_response(_price_and_content(), sources, as_of=_AS_OF)
+    outcome = resolve_d2_operations((_price_and_content()).blocks, sources, as_of=_AS_OF)
     frozen_text, frozen_ui = outcome.rendered_text, outcome.ui_projection
     payload = outcome.resolved.model_dump()
     payload["d2_part_failure_blocks"] = []
@@ -254,8 +254,8 @@ def test_corrupted_failure_linkage_and_aggregate_are_rejected_and_frozen() -> No
     with pytest.raises(ValidationError, match="d2_request_part_price_linkage_invalid"):
         outcome.resolved.__class__.model_validate(payload)
 
-    successful = resolve_d2_envelope_response(
-        _envelope([_part("r1", "price", service_id="service_one", topic_id="implantation")]),
+    successful = resolve_d2_operations(
+        (_envelope([_part("r1", "price", service_id="service_one", topic_id="implantation")])).blocks,
         _sources(_bundle()),
         as_of=_AS_OF,
     )
@@ -311,7 +311,7 @@ def test_unavailable_d2_path_bypasses_legacy_semantic_composer_and_network(
     monkeypatch.setattr(target_live_backends, "chat_completions_create", forbidden)
     monkeypatch.setattr(socket, "create_connection", forbidden)
 
-    outcome = materialization.resolve_d2_envelope_response(
-        _price_and_content(), _sources_with_incomplete_price_and_content(), as_of=_AS_OF
+    outcome = materialization.resolve_d2_operations(
+        _price_and_content().blocks, _sources_with_incomplete_price_and_content(), as_of=_AS_OF
     )
     assert outcome.resolved.d2_result_status == "degraded"

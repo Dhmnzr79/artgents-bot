@@ -95,6 +95,33 @@ Stop if the folder, branch, baseline, or task do not match.
 - Compare failures with a clean baseline before labeling them regressions.
 - Live/provider tests require explicit owner approval and a hard call budget.
 
+## Audit change-map discipline
+
+- Follow the owner-approved change map and its current task, in sequence.
+  For D2 the canonical map is `docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md`,
+  section "Актуальный порядок после независимого аудита — 2026-10-02";
+  the nearest task is `docs/tasks/DEMO_D2_INTERFACE_TASK.md`.
+  Audit findings are proposals, not automatic implementation authority.
+- Do not independently change product behavior, architecture, agreed limits
+  or task scope. Routine technical choices within the approved boundaries
+  remain the implementer's responsibility.
+- Do not add fields, states, handlers, scenario branches, layers or model
+  calls absent from the approved map/task without separate owner agreement.
+  Updating the task yourself does not authorize such an addition.
+- A replacement must remove the old reachable structure. Do not retain
+  parallel mechanisms, transitional converters or a new-to-old contract
+  adapter without explicit agreement. Fix the general mechanism, never
+  conditions for a particular user phrase or question sequence.
+- Before deviating, explain the concrete cause, smallest alternative and
+  consequences in ordinary chat. Stop dependent changes until agreed;
+  continue independent work already authorized. No new approval document
+  or popup is required.
+- After each stage report what was removed, what was added and why, whether
+  behavior changed, evidence and remaining risks. Separate offline evidence
+  from live model/widget evidence. Simplification means fewer decisions,
+  duplicates and dependencies while preserving agreed quality/protections;
+  extra prompt instructions alone do not qualify.
+
 ## Completion report
 
 Report the branch, commit, changed files, tests, known baseline failures, provider calls,

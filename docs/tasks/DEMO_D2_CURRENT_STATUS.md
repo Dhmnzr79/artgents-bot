@@ -1,5 +1,97 @@
 # D2 — текущее состояние и куда смотреть
 
+## Точка передачи после аудита — 2026-10-02
+
+Дополнение: владелец разрешил commit/push SIM4/D2-116/prompt33 и документов.
+Checkpoint: `chore(d2): checkpoint sim4 and audit handoff`. После успешного
+push его SHA — база продолжения в этой же ветке (команда получения в карточке).
+Ниже незакоммиченное состояние — исторический preflight до публикации.
+Публикация не закрывает SIM4/REC5 и не разрешает новый runtime или live.
+
+Следующее чтение: [карточка интерфейса и handoff](DEMO_D2_INTERFACE_TASK.md).
+Разрешена подготовка документов; новый runtime и новые live calls не разрешены.
+Root C:\Cursor Projects\artgents-bot-active; branch codex/d2-stage1-contract;
+HEAD и origin branch e6756ee59df4f186e499c29ae41cda0e993d80fe;
+origin/main и merge-base 141ce91fb1731cd990fcf8391550150016c73e7f.
+SIM4/D2-116/prompt33 остаются незакоммиченным WIP; staging пуст, commit/push
+текущего checkpoint не выполнены. Передача по текущей рабочей папке, а не только
+по HEAD. Не создавать новую ветку из main поверх этого dirty checkout.
+
+Последующие ручные запросы владельца на prompt33: 7 попыток, 6 опубликованных
+ответов, 1 parse failure. Это не 6 полностью проверенных диалогов и не общий PASS.
+7ca91fe2: повторяющиеся kinds/situation, raw обрывается, output1024/max1024;
+finish_reason отсутствует. Провайдер ответил, таймаут не зафиксирован.
+Удаление трёх зубов: корректная операция, но существующие per-tooth offers
+отфильтрованы отсутствующей applicability; следующий общий вопрос показал цены.
+Новые вызовы агента: 0. Старые «widget не проверен» ниже — состояние ДО этих
+ручных попыток; устойчивость и полный UI gate всё ещё не закрыты.
+
+Независимый аудит подтвердил: нет разрешённой рекурсии; count не входит в
+длительный discussion_scope; часть опубликованных code answers отсутствует
+в следующем контексте; есть активные authored/fallback и price-carry ветки.
+Это не blanket отмена прежних PASS. План доведения — верх Roadmap.
+Foreign data/, docs/MARKETING_ANSWER_SCENARIOS.md, DEMO_D2_SIM0_TASK.md не трогать.
+
+## Текущее дополнение — prompt33, 2026-10-02
+
+GO на bug fix примера: известное направление + объём теперь показано прямой
+ценовой задачей, а не уточнением услуги. Runtime/schema/память прежние.
+Границы и проверки — [SIM4 Task](DEMO_D2_SIM4_TASK.md). Offline: 17 PASS;
+независимый Checker PASS (собственные 5 PASS). Устойчивость живой модели
+не подтверждена. Provider/live0; commit/push нет, Cursor gate остаётся.
+
+## Текущий checkpoint — D2-116, WIP, 2026-10-02
+
+GO владельца на три ценовых ответа: подходящая цена, разрешённый ориентир,
+известная услуга без цены. Общий restoration overview и prosthetics pool
+настроены в существующем механизме; prompt32. Правило — [D2-116](DEMO_D2_PRODUCT_DECISIONS.md),
+границы и exact allowlist — [SIM4 Task](DEMO_D2_SIM4_TASK.md). Этот checkpoint
+заменяет прежний few_teeth gap, не меняя исходный объём и медицинские факты.
+Новых model calls/памяти/семантических проверок нет. Основной offline: 92 PASS;
+соседний: 49 PASS и 3 старых FAIL; ещё 10 старых FAIL в availability/recovery.
+Все 13 failure IDs повторены на чистом HEAD e6756ee; полный CI не зелёный.
+Независимый Checker D2-116 PASS, собственный прогон 36 PASS /55.68s;
+прежние PASS ниже предшествуют D2-116. Это не закрытие SIM4; Cursor gate остаётся.
+Подробности — SIM4 Task. Live/commit/push0; widget пока не проверен.
+
+## Исправление параметров уточнения — 2026-10-02, WIP
+
+Владелец разрешил исправить инструкцию сохранения известного объёма внутри
+clarification.operation. Prompt31; runtime/schema/память не меняются.
+Known direction по-прежнему идёт напрямую к цене, не к выбору услуги.
+Тесты проверяют задачу, клик без модели, пробел цены и следующий контекст;
+omission модели сервер не исправляет. Exact allowlist и границы проверки —
+[SIM4 Task](DEMO_D2_SIM4_TASK.md). Independent Checker PASS для этого bug fix,
+собственный прогон 12 PASS / 26.09 s. Live-adherence не аттестована; Cursor
+gate остаётся. Provider/live0, commit/push нет.
+
+## Текущий checkpoint — SIM-4/D2-114–115, 2026-10-02
+
+Runtime SIM-4 разрешён делегацией владельца по демо-набору D2-115.
+Карточка: [SIM4 Task](DEMO_D2_SIM4_TASK.md). Implantation overview — один пример
+на методику из explicit pool, бренд/объём фильтруются до cap3. Конкретный демо-набор
+SIM-0 принят в рамках делегации; independent runtime Checker PASS,
+собственный reviewer прогон 44 PASS / 48.51 s; Cursor gate ещё впереди.
+Старые ниже statements о требуемом выборе владельцем — история до D2-115.
+
+Владелец принял остаточный финансовый риск свободной prose и приоритет
+спокойного связного разговора без новых смысловых проверяющих слоёв, обрезания
+или шаблонной замены. Кодовые цены/условия остаются из утверждённых данных.
+Решение: [D2-114](DEMO_D2_PRODUCT_DECISIONS.md); действующие T3/C03/Lock/Checker
+и SIM-4 Roadmap обновлены. Идея будущей очереди «Проверить» в админке сохранена
+в Roadmap, не реализуется сейчас. Старое строгое D2-108 всего ответа заменено.
+
+Baseline HEAD/origin branch e6756ee59df4f186e499c29ae41cda0e993d80fe,
+branch codex/d2-stage1-contract; main/merge-base 141ce91.
+Предыдущий DOC-only шаг D2-114 получил Checker PASS и 94 валидные ссылки.
+Теперь runtime подбор изменён по SIM4 Task; публикация prose прежняя.
+Прежний SIM4 Checker проверял prompt30; поздний prompt31 описан выше.
+Демо-набор по D2-115 и карточка удаления готовы. Targeted offline:
+126 соседних PASS + 43 новых PASS + focused 1 PASS. Independent runtime Checker
+PASS, Cursor gate ещё впереди; SIM-4 не закрыт. Ссылки: 98, diff check чистый.
+Live/provider/SMTP0, stage/commit/push/merge/deploy не выполнялись.
+Нижние состояния «SIM-4 не разрешён» — история до нынешнего решения.
+
 ## Текущий checkpoint — SIM-3 закрыт, 2026-10-02
 
 Владелец начал SIM-3 и принял сохранение обсуждаемой услуги/объёма через более

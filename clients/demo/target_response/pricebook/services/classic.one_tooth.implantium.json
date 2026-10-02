@@ -56,7 +56,8 @@
   ],
   "brand_id": "implantium",
   "applies_to_extents": [
-    "one_tooth"
+    "one_tooth",
+    "few_teeth"
   ],
   "required_conditions_metadata": {
     "completeness": "complete",

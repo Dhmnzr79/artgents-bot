@@ -93,22 +93,26 @@ def prompt_example(index):
     from core.d2_live_provider import build_d2_d1r_messages
     system, _ = build_d2_d1r_messages(_request())
     examples = re.findall(r"```json\s*(.*?)\s*```", system["content"], re.DOTALL)
-    assert len(examples) == 4
+    assert len(examples) == 5
     text = examples[index].replace("<topic_id>", "implantation")
     text = text.replace("<service_id>", "classic").replace("<other_service_id>", "all_on_4")
     return json.loads(text)
 
 
-@pytest.mark.parametrize("index,kind", [(0, "price"), (1, "price"), (2, "content"), (3, "content")])
+@pytest.mark.parametrize("index,kind", [(0, "price"), (1, "price"), (2, "content"), (3, "content"), (4, "price")])
 def test_sent_prompt_examples_conform_to_current_parser(index, kind):
     result = parse(prompt_example(index))
     block = result.blocks[0]
-    operation = block if index in (0, 3) else block.operation
+    operation = block if index in (0, 3, 4) else block.operation
     assert operation.kind == kind and operation.request_id == "r1"
-    if index in (0, 3):
+    if index in (0, 3, 4):
         assert operation.topic_id == "implantation" and operation.service_id is None
     else:
         assert block.request_id == operation.request_id
+    if index == 4:
+        assert operation.kind == "price"
+        assert operation.situation.extent == "few_teeth"
+        assert operation.situation.tooth_count == 3
 
 
 def test_target_in_place_of_pending_operation_is_not_repaired():

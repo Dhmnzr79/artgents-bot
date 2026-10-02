@@ -26,6 +26,26 @@ Checker must not edit, format, stage, commit, push, merge, deploy, or make provi
 
 ## Architecture evidence — applies to Checker and Cursor
 
+### Mandatory change-map check
+
+Apply AGENTS.md "Audit change-map discipline". For D2 compare the actual diff
+with the dated current map in DEMO_D2_DELIVERY_ROADMAP.md and its current task;
+read their paths under docs/tasks/. A finding or an executor's edit to the
+task is not owner approval. Check the agreed sequence and scope.
+
+REJECT an unapproved change to behavior, architecture or constraints; an
+unplanned field/state/handler/scenario branch/layer/model call; retained
+parallel mechanisms or a transitional new-to-old adapter; or a phrase-specific
+patch presented as the general solution. A documented owner-approved exception
+must name its scope; it does not authorize further departures.
+
+For each claimed replacement identify the deleted structure and verify that
+its decision is not reachable elsewhere. Require the stage report to list
+removals, additions with their agreed reason, behavior changes, checks and
+risks. Distinguish offline, live-model and widget evidence. A larger prompt,
+passing fixtures or fewer lines alone do not demonstrate simplification.
+Apply this check in the existing review, without adding another review round.
+
 Check the current Roadmap section and its approved product decisions, not
 historical GO/Draft text. Reject invented product behavior or phrase-specific
 fixes presented as general simplification. Verify the request class covered,
@@ -61,10 +81,15 @@ For SIM-2 reject mandatory splitting of ordinary connected explanations into
 separate operations or a larger replacement control envelope without agreement.
 For SIM-2/3 require a jointly specified completed-result/projection boundary,
 service-bound extent and explicit removed context transfers, not a new summary,
-fact extractor or parallel memory. For SIM-4 require the publication mechanism,
-handling of unsupported financial text, retained useful explanation, removed
-dependencies and added complexity. D2-108/C03 are already approved; they do not
-authorize a new verifier agent/call or whole-answer refusal. Each SIM must prove
+fact extractor or parallel memory. For SIM-4 apply the later owner decision
+D2-114/T3/C03: code-owned financial blocks use approved tenant data; unrestricted
+useful prose remains published with explicitly accepted residual financial risk.
+Do not require the superseded D2-108 all-answer guarantee or introduce a semantic
+verifier, sanitizer, second call, prose truncation/refusal or template replacement
+to obtain PASS. Verify real removals and the SIM-0-approved selection policy;
+changing a prompt or acceptance document alone is not runtime simplification.
+Existing review signals are observation only; detecting all mistakes is not promised.
+The future admin review queue is an idea, not authorized implementation. Each SIM must prove
 its affected dialogues and architectural claim before closure; REC-5 integrates
 those proofs, not postpones them.
 

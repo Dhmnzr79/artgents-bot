@@ -576,6 +576,7 @@
     "options": [
       {
         "option_id": "partial",
+        "active": true,
         "name": "Частичный съёмный протез",
         "aliases": [],
         "selection": {
@@ -586,6 +587,7 @@
       },
       {
         "option_id": "full",
+        "active": true,
         "name": "Полный съёмный протез",
         "aliases": [],
         "selection": {

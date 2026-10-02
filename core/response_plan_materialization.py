@@ -1458,17 +1458,6 @@ def _d2_price_scope(
         return (part.service_id,), "service", part.topic_id
     if part.topic_id is None:
         raise MaterializationContractError("d2_price_scope_required")
-    if part.brand_id is not None and part.topic_id == "implantation":
-        bundle = sources.material_authority.bundle
-        service_ids = tuple(dict.fromkeys(
-            offer.service_id for offer in bundle.offers
-            if offer.active and offer.brand_id == part.brand_id
-            and offer.service_id in bundle.services
-            and bundle.services[offer.service_id].active
-            and bundle.services[offer.service_id].family == "implantology"
-        ))
-        if service_ids:
-            return service_ids, "topic", part.topic_id
     for direction in sources.d2_directions:
         if direction.topic_id == part.topic_id and direction.source_client_id == client_id:
             return direction.service_ids, "topic", direction.topic_id
@@ -1526,10 +1515,11 @@ def _d2_price_block(
             # independent content parts alive instead of hard-failing the turn.
             raise MaterializationContractError("d2_no_price_candidates")
         offers.sort(key=_d2_direct_service_offer_sort_key)
-    elif ordered_offer_ids and brand_id is None:
-        # Broad direction overviews retain the tenant-authored representative
-        # offers and their order, independently of exact-service pricing.
+    else:
+        # Every direction uses its explicit tenant pool. No catalogue search,
+        # family expansion or separate brand policy may fill an empty result.
         by_id = {offer.offer_id: offer for offer in bundle.offers}
+        represented_services: set[str] = set()
         for offer_id in ordered_offer_ids:
             offer = by_id.get(offer_id)
             if offer is None or offer.service_id not in service_ids or not offer.active:
@@ -1541,82 +1531,12 @@ def _d2_price_block(
                 raise MaterializationOwnershipError("d2_direction_service_unavailable")
             if brand_id is not None and offer.brand_id != brand_id:
                 continue
-            if applied_extent is None or _d2_offer_applies(offer, service, applied_extent):
-                offers.append(offer)
-        if not offers and applied_extent is not None:
-            # Generic direction overviews may keep their existing typed-extent
-            # behaviour. Exact-service requests never enter this branch.
-            for offer in bundle.offers:
-                if not offer.active or offer.service_id not in service_ids:
-                    continue
-                service = bundle.services.get(offer.service_id)
-                if service is None or not service.active:
-                    continue
-                if offer.option_id is not None and not any(
-                    option.option_id == offer.option_id and option.active for option in service.options
-                ):
-                    continue
-                if _d2_offer_applies(offer, service, applied_extent):
-                    offers.append(offer)
-        offers = offers[:3]
-    elif brand_id is not None:
-        candidates: list[TargetOffer] = []
-        for service_id in service_ids:
-            service = bundle.services.get(service_id)
-            if service is None or not service.active:
+            if applied_extent is not None and not _d2_offer_applies(offer, service, applied_extent):
                 continue
-            active_options = {item.option_id for item in service.options if item.active}
-            candidates.extend(
-                offer for offer in bundle.offers
-                if offer.service_id == service_id and offer.brand_id == brand_id and offer.active
-                and (offer.option_id is None or offer.option_id in active_options)
-                and (applied_extent is None or _d2_offer_applies(offer, service, applied_extent))
-            )
-        authored_rank = {offer_id: index for index, offer_id in enumerate(ordered_offer_ids)}
-        service_rank = {
-            offer.service_id: min(
-                (authored_rank[item.offer_id] for item in bundle.offers
-                 if item.service_id == offer.service_id and item.offer_id in authored_rank),
-                default=len(authored_rank),
-            )
-            for offer in candidates
-        }
-        candidates.sort(key=lambda offer: service_rank[offer.service_id])
-        if applied_extent is None:
-            # Unknown volume: one published example per scale is enough.
-            seen_scales: set[str] = set()
-            for offer in candidates:
-                scale = next(iter(offer.applies_to_extents or ()), offer.service_id)
-                if scale not in seen_scales:
-                    offers.append(offer)
-                    seen_scales.add(scale)
-            offers = offers[:3]
-        else:
-            offers = candidates[:3]
-    for service_id in (() if ordered_offer_ids or direct_service_only or brand_id is not None else service_ids):
-        if service_id not in bundle.services:
-            raise MaterializationOwnershipError("materialization_foreign_material")
-        context = build_service_data_context(bundle, TargetDoctorCatalog(doctors={}), service_id)
-        candidate_context = context
-        if applied_extent is not None:
-            candidate_context = replace(
-                context,
-                offers=tuple(
-                    offer for offer in context.offers
-                    if _d2_offer_applies(offer, context.service, applied_extent)
-                ),
-            )
-        projection = project_target_service_offers(
-            candidate_context,
-            bundle.strategy,
-            TargetStrategyMatch(family=context.service.family),
-        )
-        for offer in projection.offers:
-            offers.append(offer)
-            if len(offers) >= 3:
-                break
-        if len(offers) >= 3:
-            break
+            if offer.service_id not in represented_services:
+                offers.append(offer)
+                represented_services.add(offer.service_id)
+        offers = offers[:3]
     if not offers:
         raise MaterializationContractError(
             "d2_no_scope_price_candidates" if applied_extent is not None else "d2_no_price_candidates"
@@ -1630,6 +1550,17 @@ def _d2_price_block(
         )
         for offer in offers
     )
+    # Applicability is authored by the clinic, never inferred from unit/count.
+    # Preserve a permitted per-tooth reference as such, not as a multi-tooth total.
+    if applied_extent == "few_teeth":
+        rows = tuple(
+            row.model_copy(update={"condition_texts": (*row.condition_texts,
+                "Это ориентир за один зуб, а не расчёт на несколько. "
+                "Итоговую стоимость по вашему запросу уточнят на консультации. "
+                "Хотите записаться?")})
+            if row.billing_unit in {"tooth", "tooth_package"} else row
+            for row in rows
+        )
     trace = MaterializationTrace(
         price_lookup_mode="catalog_reference",
         considered_offers=(),

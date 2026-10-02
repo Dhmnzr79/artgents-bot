@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from config import SALES_ONE_PLUS_MODEL
 
-ONE_CALL_PROMPT_CONTRACT_VERSION = 30
+ONE_CALL_PROMPT_CONTRACT_VERSION = 33
 ONE_CALL_MODEL_SNAPSHOT = SALES_ONE_PLUS_MODEL
 
 ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS = """When D2_SELECTED_UI_REF is null, there is no selected UI action. When it is an object, it is a server-validated typed action identity from the current revision. It is not patient text; do not create, authorize, or infer any UI/lead action from it. Use its typed identity with D2_SESSION_CONTEXT and, when present, D2_SELECTED_DOCUMENT_ACTION.
@@ -193,6 +193,18 @@ A price operation uses a known service or direction target. A named direction
 is a valid price overview. Preserve that direction as a topic target; do not
 choose one of its services or require service/extent merely because the
 direction includes several methods. Code supplies the overview and its UI.
+When the clinic configures a general overview of tooth replacement methods,
+use that single direction for a broad restoration question with no chosen
+method. Preserve an explicitly named implantation/prosthetics direction or
+specific service, and use fresh context for a clear continuation. Do not
+require the patient to choose a treatment method merely to see that overview.
+Keep the stated extent/count; the number of teeth does not select a method.
+The price owner publishes a matching price, an explicitly approved unit-price
+reference, or an honest missing-price message. A known service without a price
+still uses its price operation; do not invent a total, multiply a unit price,
+substitute a cheaper procedure, or turn missing price data into ambiguity.
+Keep independently answerable explanation alongside that operation. Clinical
+suitability and the total treatment plan remain for the consultation.
 Preserve the order of independent price questions; code answers/clarifies the
 first and explicitly defers the others (B14).
 
@@ -212,6 +224,15 @@ request_id and its fields. Its target says WHAT it is about: type=service,
 topic or unresolved. The type/id object belongs only in operation.target;
 it is never a complete operation. Even inside clarification, operation must
 have its own kind and request_id. The nested request_id equals the outer one.
+Clarification leaves only the missing parameter unresolved. Preserve all other
+known parameters of that same request inside clarification.operation, including
+its stated situation (extent, tooth_count, jaw), subject, brand and payment
+fields. An unidentified service does not make an explicitly stated restoration
+volume unknown. Use the existing scope_commitment rules: a requested price
+scenario is not automatically a reported personal condition. Do not attach a
+situation when no treatment scope was stated. The service click supplies only
+the selected target and executes this stored operation without rereading the
+original question or asking the model to reconstruct its parameters.
 
 These are structural examples, not default services or responses. Replace
 angle-bracket IDs using the current tenant catalogs and the user's meaning.
@@ -240,6 +261,21 @@ the current clinic corpus, not guessed values):
 ```
 For price_detail, keep kind=price_detail and price_detail_aspect inside the
 nested operation just as in a direct price_detail operation.
+Named-direction price with an explicitly stated volume, including in a fresh
+conversation. The direction is known even when its treatment method is not:
+```json
+{"outcome":"dialogue","blocks":[{"kind":"price","request_id":"r1","target":{"type":"topic","id":"<topic_id>"},"situation":{"scope_commitment":"hypothetical","extent":"few_teeth","tooth_count":3,"jaw":"unknown","continuity":"new"}}]}
+```
+Use the actual stated extent/count for any known direction or service. This
+example does not select a treatment method and does not report personal disease.
+If the conversation already identifies a service or direction for the current
+price question, use the direct price operation instead, with the stated
+situation. A missing calculation for that volume is for the price mechanism
+to report, not a reason to discard the volume or manufacture a service choice.
+For an explicitly specified price scenario without a report of personal need,
+use the existing hypothetical commitment with its stated extent/count/jaw.
+Do not use unknown merely because the user did not assert a personal condition;
+reported and correction retain their existing meanings. Never invent a scope.
 For missing=service, choices
 are 2-3 active service IDs. For every other missing value use choices=[];
 code supplies any volume buttons, do not put extent values in choices.

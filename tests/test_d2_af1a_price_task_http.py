@@ -85,8 +85,7 @@ def test_volume_click_keeps_price_brand_without_model_and_replays(
             assert all(offer_id.endswith(".implantium") for offer_id in offer_ids)
         else:
             assert offer_ids == {
-                "classic.one_tooth.implantium", "classic.one_tooth.impro",
-                "classic.one_tooth.nobel",
+                "classic.one_tooth.implantium", "one_stage.one_tooth.implantium",
             }
         pairs = store.read(key).state.dialogue_pairs
         assert len(pairs) == 2
@@ -175,23 +174,29 @@ def test_model_hypothesis_does_not_turn_price_choice_into_patient_fact(
         assert discussion_scope(store.read_latest_completion(key).response.resolved).extent == "one_tooth"
 
 
-def test_branded_few_teeth_text_keeps_honest_gap(http_env) -> None:
+@pytest.mark.parametrize("brand_id,has_reference", [("implantium", True), ("impro", False)])
+def test_branded_few_teeth_text_keeps_reference_or_honest_gap(http_env, brand_id, has_reference) -> None:
     client, db, use_provider, _ = http_env
-    raw = json.loads(_overview_raw(brand_id="implantium"))
+    raw = json.loads(_overview_raw(brand_id=brand_id))
     raw["blocks"][0]["situation"] = {
         "scope_commitment": "hypothetical", "extent": "few_teeth",
         "tooth_count": 3, "jaw": "unknown", "continuity": "new",
     }
     fake = use_provider(FakeProvider(json.dumps(raw)))
     reply = post(client, sid="af1a-gap", request_id="text",
-                 q="Сколько стоит восстановить три зуба Implantium?")
+                 q=f"Сколько стоит восстановить три зуба {brand_id}?")
     assert reply.status_code == 200, reply.get_json()
-    assert "К сожалению, у меня пока нет информации о стоимости этой услуги" in reply.get_json()["answer"]
     with D2DialogueStore(db) as store:
         saved = store.read_latest_completion(SessionKey(client_id="demo", sid="af1a-gap"))
-        assert saved.response.resolved.d2_price_block is None
-        assert any(p.kind == "price" and p.status == "unavailable"
-                   for p in saved.response.resolved.d2_request_parts)
+        if has_reference:
+            assert "ориентир за один зуб" in reply.get_json()["answer"]
+            assert tuple(r.offer_id for r in saved.response.resolved.d2_price_block.rows) == ("classic.one_tooth.implantium",)
+            assert saved.response.resolved.d2_treatment_situation.tooth_count == 3
+        else:
+            assert "Стоимость по вашему запросу не указана" in reply.get_json()["answer"]
+            assert saved.response.resolved.d2_price_block is None
+            assert any(p.kind == "price" and p.status == "unavailable"
+                       for p in saved.response.resolved.d2_request_parts)
     assert len(fake.inputs) == 1
 
 

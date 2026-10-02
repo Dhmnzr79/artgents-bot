@@ -27,7 +27,7 @@ from core.one_call_envelope_protocol import production_envelope_template
 
 NOW = datetime(2026, 9, 22, 18, tzinfo=timezone.utc)
 KEY = SessionKey(client_id="demo", sid="rec-recovery")
-PRICE_GAP = "К сожалению, у меня пока нет информации о стоимости этой услуги"
+PRICE_GAP = "Стоимость по вашему запросу не указана"
 INFO_GAP = "К сожалению, у меня пока недостаточно информации по этому вопросу"
 WARRANTY_LIVE = (
     "Да, гарантия есть: на работу врача — год, на Nobel и Impro — пожизненно, "

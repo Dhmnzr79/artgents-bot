@@ -741,9 +741,9 @@ def test_identified_price_has_one_execution_path(http_env, transport, after_fear
         assert resolved.d2_price_scope_decision.topic_id == "implantation"
         assert resolved.d2_price_scope_decision.service_id is None
         assert resolved.d2_price_scope_decision.reason == "overview"
-        # Preserve the existing SIM-0 list, not a newly selected set.
+        # D2-115 delegated demo overview: distinct methods, same prices/source.
         assert tuple(r.offer_id for r in resolved.d2_price_block.rows) == (
-            "classic.one_tooth.impro", "classic.one_tooth.implantium", "classic.one_tooth.nobel")
+            "classic.one_tooth.implantium", "all_on_4.jaw.implantium", "all_on_6.jaw.implantium")
     assert "76 200" in first["answer"].replace("\u00a0", " ")
     if mixed:
         assert "Независимое объяснение о восстановлении." in first["answer"]

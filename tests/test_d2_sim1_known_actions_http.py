@@ -48,11 +48,11 @@ def test_three_volume_actions_execute_without_provider_and_keep_context(http_env
         assert discussion_scope(saved.response.resolved).extent == extent
         assert store.read(key).state.situation_state is None
         assert saved.response.resolved.d2_price_block is not None
-        expected = (
-            ("all_on_4.jaw.impro", "all_on_4.jaw.implantium", "all_on_4.jaw.nobel")
-            if extent == "full_arch" else
-            ("classic.one_tooth.impro", "classic.one_tooth.implantium", "classic.one_tooth.nobel")
-        )
+        expected = {
+            "one_tooth": ("classic.one_tooth.implantium", "one_stage.one_tooth.implantium"),
+            "full_arch": ("all_on_4.jaw.implantium", "all_on_6.jaw.implantium"),
+            "unknown": ("classic.one_tooth.implantium", "all_on_4.jaw.implantium", "all_on_6.jaw.implantium"),
+        }[extent]
         assert tuple(r.offer_id for r in saved.response.resolved.d2_price_block.rows) == expected
         assert saved.response.resolved.d2_price_scope_decision.applied_extent == (
             None if extent == "unknown" else extent

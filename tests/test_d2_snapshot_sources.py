@@ -87,7 +87,7 @@ def test_unavailable_price_defaults_keep_content_and_cta() -> None:
 
     outcome = resolve_d2_envelope_response(envelope, unavailable_sources, as_of=_AS_OF)
     assert outcome.resolved.d2_result_status == "degraded"
-    assert "К сожалению, у меня пока нет информации о стоимости этой услуги" in outcome.rendered_text
+    assert "Стоимость по вашему запросу не указана" in outcome.rendered_text
     assert "Седация и наркоз" in outcome.rendered_text
     assert outcome.ui_projection.quick_replies == ()
     assert outcome.ui_projection.video is None

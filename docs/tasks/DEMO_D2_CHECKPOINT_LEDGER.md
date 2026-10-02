@@ -1,5 +1,114 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Разрешение checkpoint — 2026-10-02
+
+Владелец разрешил commit/push накопленного WIP и документов под именем
+`chore(d2): checkpoint sim4 and audit handoff`. SHA/успех push подтверждаются
+Git и отчётом публикации. Ниже DOC WIP описывает состояние до этого разрешения.
+Дополнение правил: независимый DOC Checker PASS по четырём файлам; замечание
+о разграничении DOC allowlist исправлено. Новый runtime/live не разрешён.
+
+## DOC WIP — подготовка передачи после аудита, 2026-10-02
+
+Владелец согласовал подготовку документов и исходного состояния перед новым
+чатом. Baseline e6756ee + существующий SIM4/D2-116/prompt33 WIP, ветка прежняя.
+Read-only аудит и ручные наблюдения не являются общим runtime PASS.
+Текущий факт ручного prompt33: 7 запросов, 1 malformed JSON, 6 ответов;
+finish_reason отсутствует, таймаутом ошибка не отмечена. Агент provider0.
+Документальный scope и handoff — [карточка](DEMO_D2_INTERFACE_TASK.md).
+Независимый DOC Checker PASS для семи документов: 110 локальных ссылок,
+git diff --check чист. Runtime WIP повторно не аттестован.
+Git checkpoint не создан/не опубликован;
+для commit/push требуется отдельное разрешение, передача пока не завершена.
+
+## WIP — prompt33, 2026-10-02
+
+Владелец разрешил исправление найденного примера. Известное направление с
+объёмом показано direct price; genuine unknown-service clarification сохранён.
+Baseline e6756ee + прежний WIP. Runtime и схема не меняются; гипотеза влияния
+примера на модель требует live-проверки с отдельно разрешённым бюджетом.
+Offline: 15 PASS /24.53s + 2 PASS /5.51s. Independent Checker PASS,
+его отдельный запуск: 5 PASS /3.51s. Provider/live/commit/push0, staging пуст.
+Подробности — [SIM4 Task](DEMO_D2_SIM4_TASK.md).
+
+## WIP — D2-116 три ценовых ответа, 2026-10-02
+
+Владелец согласовал общий механизм и дал GO реализации. [SIM4 Task](DEMO_D2_SIM4_TASK.md)
+содержит точный scope; [D2-116](DEMO_D2_PRODUCT_DECISIONS.md) заменяет прежний
+few_teeth gap и узкий prosthetics pool. Baseline e6756ee, ветка прежняя,
+staging пуст. Прежние SIM4/prompt31 PASS ниже не подтверждают этот новый diff.
+Provider/live/SMTP0; foreign WIP сохранён. Основной offline: 92 PASS /118.70s;
+соседний: 49 PASS, 3 FAIL /78.19s; availability/recovery: 10 FAIL /21.38s.
+Те же 13 failure IDs воспроизведены на чистом HEAD e6756ee: 13 FAIL, 1 PASS
+/24.30s. Полный CI не заявлен. Независимый Checker D2-116 PASS, собственный
+прогон 36 PASS /55.68s; widget ещё не проверен. Это не закрытие SIM4;
+Cursor gate остаётся. Подробности и ограничения — SIM4 Task.
+
+## WIP — сохранение объёма при уточнении услуги, 2026-10-02
+
+GO владельца после ручного диалога с потерей явно указанного объёма.
+Тип bug fix prompt31, не архитектурное упрощение; pending/click runtime прежний.
+Scope и allowlist — [SIM4 Task](DEMO_D2_SIM4_TASK.md). Astra read-only consult:
+поля уже сохраняются, причина в omission модели; новые поля/owner/retry не нужны.
+Offline проверяет корректно сформированную задачу и отдельно честно показывает
+предел adverse omission. Качество живой модели не подтверждено. Checker PASS;
+provider/live/SMTP0, staging пуст, commit/push нет. Foreign WIP сохранён.
+Targeted offline: scope HTTP + SIM2 contract + SIM1 known actions —
+70 PASS / 67.59 s, temporary DB/logs и socket block. Предыдущие fixture/setup
+ошибки и исправления записаны в карточке; runtime проверки не ослаблялись.
+Independent read-only Checker: 12 PASS / 26.09 s; traced pending → click →
+price → completion → next context. PASS только bug fix и границ ответственности,
+не live-model и не закрытие SIM4. Cursor остаётся следующим gate.
+
+## Checkpoint — SIM-4 explicit overview, 2026-10-02
+
+Owner делегировал выбор правдоподобного демо-набора из demo pricebook.
+D2-115 фиксирует фактические offers и порядок, D2-114 сохраняет свободную prose.
+Baseline HEAD/origin e6756ee, main/merge-base141ce91, branch codex/d2-stage1-contract.
+Root C:\Cursor Projects\artgents-bot-active; точный allowlist в SIM4 Task.
+Свой DOC WIP D2-114 включён; foreign data/, marketing и SIM0 Task сохранены.
+
+Заявленное упрощение: catalogue fallback + brand expansion/ranking/scales +
+implicit overview projection → explicit direction pool + общий brand/extent
+filter + one offer/service + cap3. Exact-service ветка, цены и applicability
+не меняются. Добавлено правило представителя методики, без новых управляющих
+полей/моделей/памяти/verifier. Astra консультация поддержала существующий формат.
+Targeted offline: 126 PASS соседних AF1a/SIM1/SIM2; новый исправленный набор
+43 PASS / 48.65 s + focused 1 PASS / 3.54 s (четвёртый exact-service offer),
+все 44 актуальных cases. Первый прогон имел 14 fixture failures, разобраны
+в SIM4 Task; проверки данных не ослаблялись. Independent Checker PASS:
+собственные 44 PASS / 48.51 s, оба endpoint и removal trace подтверждены.
+98 локальных ссылок разрешаются, diff --check чистый. Cursor gate ещё впереди;
+runtime checkpoint не закрыт, полный CI и widget/live не аттестованы.
+Provider/live/SMTP0; commit/push/merge/deploy не разрешены.
+
+## DOC checkpoint — SIM-4/D2-114, документальное решение, 2026-10-02
+
+Owner принял приоритет свободного разговора и риск финансовой ошибки prose;
+попросил записать решение и идею будущей админки. Astra read-only consultation
+подтвердила: произвольная prose без смыслового verifier не даёт строгой гарантии
+T3 для всего ответа. Новый owner decision D2-114 заменяет эту часть D2-108.
+Точность кодовых цен/условий и tenant/UI/medical/lead/privacy не ослаблены.
+
+Root C:\Cursor Projects\artgents-bot-active; branch codex/d2-stage1-contract;
+HEAD/origin branch e6756ee59df4f186e499c29ae41cda0e993d80fe;
+origin/main и merge-base 141ce91fb1731cd990fcf8391550150016c73e7f.
+Staging пуст; foreign data/, маркетинговый файл и SIM0 Task не открывались.
+Allowlist (только документация): Product Decisions, Target Contract, Acceptance,
+Delivery Roadmap, Current Status, Execution Lock, этот Ledger и
+../WORKFLOW_CHECKER.md. Runtime, prompt и тесты не меняются.
+
+Документы согласуют свободную публикацию prose с принятым риском, кодовые
+финансовые источники и запрет новых смысловых gates. В Roadmap сохранена
+будущая идея админки: сигналы/ручные отметки, выборка, сводка; без реализации
+и обещания полного обнаружения. SIM-4 runtime и SIM-0 подбор не закрываются;
+before/after/removal карточка реализации ещё требуется.
+Independent Checker: PASS только для документов; все восемь файлов согласованы,
+не заявлено runtime упрощение или закрытие SIM-4. 94 локальные Markdown-ссылки
+разрешаются, git diff --check exit0. Остаточная старая формулировка SIM-2
+в Roadmap исправлена и focused перечитана Checker; блокеров нет.
+Provider/live/SMTP0, pytest не запускался; Git-публикация не разрешена.
+
 ## Closure — SIM-3, 2026-10-02
 
 Владелец «Делаем» согласовал запись результатов Cursor и закрытие проверенного

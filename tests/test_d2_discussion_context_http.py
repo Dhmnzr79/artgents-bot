@@ -165,20 +165,19 @@ def test_clinic_age_rules_do_not_require_patient_identity(kind,age,context,block
 
 
 @pytest.mark.parametrize("transport", ["json","sse"])
-def test_recovered_source_click_keeps_frozen_scope_through_next_input(http_env,transport):
+def test_prose_source_click_keeps_frozen_scope_through_next_input(http_env,transport):
     client,db,use,_=http_env
     v={"extent":"few_teeth","tooth_count":3,"jaw":"lower"}
     ref="implantation__faq__pain.md"
-    fake=use(FakeProvider(raw(explanation(" ",target={"type":"service","id":"classic"},
+    fake=use(FakeProvider(raw(explanation("Живое объяснение обезболивания.",target={"type":"service","id":"classic"},
         volume=v,brand_id="implantium",content_ref=ref,
-        content_section_refs=["a:kakuyu-anesteziyu-ispolzuyut"],
-        content_fallback_section_ref="a:kakuyu-anesteziyu-ispolzuyut"))))
+        content_section_refs=["a:kakuyu-anesteziyu-ispolzuyut"]))))
     send=post if transport == "json" else post_sse
     first=_body(send(client,request_id="source",q="Больно ли восстановить три нижних зуба?"),transport)
     key=SessionKey(client_id="demo",sid="cp6a")
     with D2DialogueStore(db) as store:
         saved=store.read_latest_completion(key)
-        assert saved.response.resolved.d2_request_parts[0].status == "recovered"
+        assert saved.response.resolved.d2_request_parts[0].status == "answered"
         descriptor=discussion_scope(saved.response.resolved)
     reply=first["ui"]["quick_replies"][0]["reply_id"]
     fake.raw=json.dumps({"explanations":[{"request_id":"r1","content_text":"Пояснение по выбранному материалу."}]})

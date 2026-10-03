@@ -1,5 +1,69 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## UI отмены записи и подготовка публикации — 2026-10-03
+
+Interface Task §12: отмена только при телефоне, включая его паузу; оба пути
+запроса имени без отмены. Independent Checker PASS, новые 6 offline cases PASS.
+Старый phone-pause тест: 1 PASS / 1 FAIL на случайном 999 в timestamp,
+не на утечке телефона; точные результаты в §12. Live/widget не аттестованы.
+
+Владелец разрешил commit/push совокупного checkpoint D2-119/120/§12.
+Текущие заголовки документов сверены с результатами; нижние DOC/implementation
+отчёты сохраняют исторические HEAD и состояние Git на момент проверки.
+Публикация не означает merge/deploy или завершение SIM-4/SIM-5/REC-5.
+
+## Runtime D2-120 — medical continuation / error display, 2026-10-03
+
+Owner GO, baseline и exact 16-file allowlist — Interface Task §11.
+Bug fixes: medical завершает ход, не весь SID; прежняя history получает
+medical вопрос/ответ для следующего модельного вызова. Medical current-turn
+защиты и spam_closed сохранены. Widget/JSON client показывают нейтральную
+фразу при сбое, серверные ошибки/логи/lead receipts не превращаются в успех.
+Новых classifier/state/model calls/retries/recovery нет. Prompt v38.
+
+Executor: 33 offline PASS (16 новых + 15 D2-119 + 2 lead pause), node client
+fault tests PASS. Browser harness не проверил DOM: CDP Runtime.enable timeout
+одинаков на текущем коде и snapshot baseline. Live/widget/full CI не аттестованы.
+Проверена post-commit demo_stub заявка: ошибка выдачи ответа не стирает её,
+same-ID replay возвращает прежний receipt без нового эффекта. Pre-commit сбой
+логируется без успешного completion. Точные артефакты — Task §11.1.
+Independent Checker: 18 уникальных HTTP PASS и node error-copy PASS.
+1615 файлов вне allowlist неизменны.
+В первом review найден P1: medical→одно spam warning→medical блокировал
+правильный admin. Guard исправлен; spam_closed сохранён. Executor focused
+4 PASS, включая две новые проверки: теперь 35 уникальных HTTP cases,
+без суммирования повторов. Independent focused recheck 4 PASS, P1 закрыта;
+полный review повторно не запускался. Окончательный вердикт: **PASS D2-120**,
+P0/P1 нет. Это PASS bug fixes, не аттестация упрощения всей архитектуры.
+HEAD `36105d7`, branch `codex/d2-stage1-contract`, staging пуст; commit/push/
+PR/merge/deploy нет; provider/live/SMTP 0. Foreign data/SIM0 сохранены.
+
+## Runtime D2-119 — 2026-10-03
+
+Текущий runtime результат и точные проверки: Interface Task §10.6–10.7.
+Baseline/HEAD `36105d784dc672228a693e30ee3948c95bc43dcc`, branch
+`codex/d2-stage1-contract`; main/merge-base `141ce91fb1731cd990fcf8391550150016c73e7f`.
+Ordinary authored/fallback удалены из active input, known parser, realizer
+и publication contracts. Unknown публикует согласованную фразу/CTA без модели
+и прайса, сохраняет topic/volume в completion. Price buttons скрывают нажатое
+по услуге в existing memory; source follow-ups продолжают скрывать показанное.
+Prompt v37 уточняет medical/admin и точные policy IDs в прежнем вызове.
+
+Executor: 178/183 PASS в первом наборе; исправлены test expectations и
+адресно перепроверены. С дополнительными old-authored/lead probes — 185
+уникальных cases с успешным последним результатом; это не один полный rerun.
+Независимый Checker: **PASS**, P0/P1 нет; 48 уникальных cases с успешной
+последней проверкой, без суммирования reruns. Active schema/AST проверены,
+diff --check чист, 1615 tracked файлов вне allowlist неизменны.
+Live качество выбора admin/policy и
+source refs требует пользовательского widget; provider/live/SMTP агентом: 0.
+Не закрыты общая архитектура, strict provider, SIM-4/SIM-5/REC-5 и полный CI.
+Старые несовместимые receipts/pending отклоняются без recovery; сохранность
+lead/state/request rows проверена, подробная граница и replay в Task §10.7.
+14 файлов exact allowlist, staging пуст; новый commit/push/PR/merge/deploy нет.
+Foreign `data/`, `docs/tasks/DEMO_D2_SIM0_TASK.md` не читались и не менялись.
+Ниже сохранена история предыдущих checkpoint, включая прежний DOC-only статус.
+
 ## D2-119 — согласование правил и плана, 2026-10-02 (DOC)
 
 Действующие правила — Product Decisions D2-119, план — Interface Task §10.

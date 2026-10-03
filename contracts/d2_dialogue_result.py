@@ -104,10 +104,8 @@ class ExplanationFields(ScopedOperation):
     # Keep the domain spelling 'content'; it is a single connected explanation,
     # not a mandatory classification of each sentence/question.
     kind: Literal["content"]
-    content_realization: Literal["model_prose", "authored"] = "model_prose"
     content_ref: str | None = None
     content_section_refs: tuple[str, ...] = ()
-    content_fallback_section_ref: str | None = None
     brand_id: str | None = None
 
     @model_validator(mode="after")
@@ -121,11 +119,6 @@ class ExplanationFields(ScopedOperation):
             raise ValueError("content_section_refs_forbidden")
         if len(set(self.content_section_refs)) != len(self.content_section_refs):
             raise ValueError("content_section_refs_duplicate")
-        if self.content_fallback_section_ref is not None and (
-            self.content_realization != "model_prose"
-            or self.content_fallback_section_ref not in self.content_section_refs
-        ):
-            raise ValueError("content_fallback_not_grounded")
         return self
 
 
@@ -275,7 +268,7 @@ def validate_d2_payload(payload: dict, *, active_service_ids: frozenset[str], kn
             raise ValueError("known_task_explanations_required")
         replacements = {}
         for original, item in zip(expected, items):
-            if not isinstance(item, dict) or set(item) - {"request_id", "content_text", "content_realization"} or item.get("request_id") != original.request_id:
+            if not isinstance(item, dict) or set(item) - {"request_id", "content_text"} or item.get("request_id") != original.request_id:
                 raise ValueError("known_task_explanation_invalid")
             if not isinstance(item.get("content_text"), str) or not item["content_text"].strip():
                 raise ValueError("known_task_explanation_text_required")
@@ -283,9 +276,6 @@ def validate_d2_payload(payload: dict, *, active_service_ids: frozenset[str], kn
             values.pop("pending_question")
             values.pop("clarification")
             values.update(item)
-            values.setdefault("content_realization", "model_prose")
-            if "content_realization" not in item:
-                values["content_realization"] = "model_prose"
             replacements[original.request_id] = ExplanationOperation.model_validate(values)
         result = D2DialogueResult.model_validate({
             "outcome": known_task.outcome,

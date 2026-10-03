@@ -490,7 +490,10 @@ def test_volume_no_provider_and_followup_context(http_env, extent):
     fake.generate = forbidden
     clicked = post(client, sid="volume", request_id="click", q="", ref=f"volume:implantation:{extent}", ui_revision=first["revision"])
     assert clicked.status_code == 200, clicked.get_json()
-    assert "₽" in clicked.get_json()["answer"]
+    if extent == "unknown":
+        assert clicked.get_json()["answer"] == "Ничего страшного. На консультации врач поможет разобраться с объёмом лечения."
+    else:
+        assert "₽" in clicked.get_json()["answer"]
     fake.generate = original
     fake.raw = raw(explanation("Сроки зависят от этапов заживления."))
     assert post(client, sid="volume", request_id="next", q="А сколько займёт?").status_code == 200

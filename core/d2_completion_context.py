@@ -11,7 +11,7 @@ def discussion_scope(resolved):
         return None
     scopes = [p.discussion_scope for p in resolved.d2_request_parts
         if p.discussion_scope is not None]
-    if not scopes or not any(p.discussion_scope is not None and p.status in {"answered", "recovered", "unavailable"} for p in resolved.d2_request_parts) or any(scope != scopes[0] for scope in scopes[1:]):
+    if not scopes or not any(p.discussion_scope is not None and p.status in {"answered", "unavailable"} for p in resolved.d2_request_parts) or any(scope != scopes[0] for scope in scopes[1:]):
         return None
     return scopes[0]
 
@@ -43,6 +43,8 @@ def _project_pair(ref, result, limit):
             text.append(by_request[part.request_id])
     if not resolved.d2_request_parts and resolved.patient_text:
         text.append(safe_prose(resolved.patient_text))
+    if resolved.route == "ADMIN" and resolved.mode == "medical_terminal" and resolved.terminal_text:
+        text.append(safe_prose(resolved.terminal_text))
     safe_text = "\n\n".join(dict.fromkeys(text))[:limit].strip()
     price = resolved.d2_price_block or resolved.d2_price_detail_block
     offers = tuple(D2ShownPriceOfferRef(source_client_id=row.source_client_id,

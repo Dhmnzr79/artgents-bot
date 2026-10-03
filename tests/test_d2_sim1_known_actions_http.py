@@ -40,23 +40,27 @@ def test_three_volume_actions_execute_without_provider_and_keep_context(http_env
     args = dict(sid="sim1-volume", request_id="click", q="",
                 ref=f"volume:implantation:{extent}", ui_revision=first["revision"])
     clicked = _body(send(client, **args), transport)
-    assert clicked["answer"] and "₽" in clicked["answer"]
+    assert clicked["answer"]
+    assert ("₽" in clicked["answer"]) == (extent != "unknown")
     assert _body(send(client, **args), transport) == clicked
     with D2DialogueStore(db) as store:
         key = SessionKey(client_id="demo", sid="sim1-volume")
         saved = store.read_latest_completion(key)
         assert discussion_scope(saved.response.resolved).volume.extent == extent
         assert "situation_state" not in store.read(key).state.model_dump()
-        assert saved.response.resolved.d2_price_block is not None
+        if extent == "unknown":
+            assert saved.response.resolved.d2_price_block is None
+            assert saved.response.resolved.d2_price_scope_decision is None
+        else:
+            assert saved.response.resolved.d2_price_block is not None
         expected = {
             "one_tooth": ("classic.one_tooth.implantium", "one_stage.one_tooth.implantium"),
             "full_arch": ("all_on_4.jaw.implantium", "all_on_6.jaw.implantium"),
             "unknown": ("classic.one_tooth.implantium", "all_on_4.jaw.implantium", "all_on_6.jaw.implantium"),
         }[extent]
-        assert tuple(r.offer_id for r in saved.response.resolved.d2_price_block.rows) == expected
-        assert saved.response.resolved.d2_price_scope_decision.applied_extent == (
-            None if extent == "unknown" else extent
-        )
+        if extent != "unknown":
+            assert tuple(r.offer_id for r in saved.response.resolved.d2_price_block.rows) == expected
+            assert saved.response.resolved.d2_price_scope_decision.applied_extent == extent
     fake.generate = original_generate
     fake.raw = _raw("Сроки зависят от этапов лечения и заживления.")
     followup = _body(send(client, sid="sim1-volume", request_id="next", q="А сколько это займёт?"), transport)
@@ -65,16 +69,13 @@ def test_three_volume_actions_execute_without_provider_and_keep_context(http_env
     assert len(fake.inputs) == 2
 
 
-@pytest.mark.parametrize("mode", ["omitted", "model_prose", "authored"])
-def test_document_realization_preserves_frozen_section(http_env, mode):
+def test_document_realization_preserves_frozen_section(http_env):
     client, db, use_provider, _ = http_env
     doc = "implantation__faq__pain.md"
     fake = use_provider(PromptProvider(_raw("Об обезболивании", ref=doc)))
     first = post(client, sid="sim1-doc", request_id="first", q="Больно ли?").get_json()
     ref = f"{doc}#kakuyu-anesteziyu-ispolzuyut"
     item = {"request_id": "r1", "content_text": "Пояснение выбранного раздела."}
-    if mode != "omitted":
-        item["content_realization"] = mode
     fake.raw = json.dumps({"explanations": [item]})
     clicked = post(client, sid="sim1-doc", request_id="click", q="", ref=ref, ui_revision=first["revision"])
     assert clicked.status_code == 200, clicked.get_json()
@@ -86,11 +87,8 @@ def test_document_realization_preserves_frozen_section(http_env, mode):
         block = saved.response.resolved.information_blocks[0]
         assert block.content_ref == doc
         assert block.source_section_refs == ("a:kakuyu-anesteziyu-ispolzuyut",)
-        assert block.publication == ("authored" if mode == "authored" else "model_prose")
-        if mode != "authored":
-            assert clicked.get_json()["answer"] == item["content_text"]
-        else:
-            assert clicked.get_json()["answer"] != item["content_text"]
+        assert block.publication == "model_prose"
+        assert clicked.get_json()["answer"] == item["content_text"]
     assert "TYPED_ENVELOPE_INSTRUCTIONS" not in fake.messages[-1][0]["content"]
 
 
@@ -104,6 +102,8 @@ def test_document_realization_preserves_frozen_section(http_env, mode):
     {"explanations": [{"request_id": "r2", "content_text": "Другой ID"}]},
     {"explanations": [{"request_id": "r1", "content_text": "Текст", "content_realization": None}]},
     {"explanations": [{"request_id": "r1", "content_text": "Текст", "content_realization": "bad"}]},
+    {"explanations": [{"request_id": "r1", "content_text": "Текст", "content_realization": "authored"}]},
+    {"explanations": [{"request_id": "r1", "content_text": "Текст", "content_realization": "model_prose"}]},
     {"explanations": [{"request_id": "r1", "content_text": ""}]},
     {"explanations": []},
 ])

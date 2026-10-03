@@ -107,7 +107,8 @@ def _turn_from_completion(completion: D2CompletedTurn, *, idempotent_replay: boo
 def _shown_secondary_ref_ids(response) -> tuple[str, ...]:
     ui = response.ui_projection
     shown = [ui.video.video_id] if ui.video is not None else []
-    shown.extend(item.reply_id for item in ui.quick_replies)
+    price_refs = {item.reply_id for item in response.resolved.ui_plan.price_detail_actions}
+    shown.extend(item.reply_id for item in ui.quick_replies if item.reply_id not in price_refs)
     return tuple(shown)
 
 
@@ -370,7 +371,7 @@ def run_d2_dialogue_turn(
                 lead_ui_ref=lead_ui_ref,
                 situation_action=situation_action,
             )
-        # D2-040: one authored chance, then hard-stop. Lead/medical terminals stay owners.
+        # D2-040: one authored chance, then hard-stop. Medical ends one turn only.
         if (
             selected_ui_ref is None
             and not (lead_ui_ref or "").startswith("lead:")
@@ -380,6 +381,7 @@ def run_d2_dialogue_turn(
             "none",
             "clarify",
             "spam_warn",
+            "medical_terminal",
             }
         ):
             kind = (
@@ -607,7 +609,8 @@ def _commit_non_price_d2_turn(
         state = prepared_state
     if ttl_policy is not None:
         refs = snapshot.state.dialogue_pairs if context.freshness == "fresh" else ()
-        if response.resolved.route in {"ANSWER", "CLARIFY"} and (selected_ui_ref is not None or safe_user_message):
+        if (response.resolved.route in {"ANSWER", "CLARIFY"}
+            or (response.resolved.route == "ADMIN" and response.resolved.mode == "medical_terminal")) and (selected_ui_ref is not None or safe_user_message):
             ref = D2DialogueReceiptRef(request_id=request_id,
                 patient_text=_bounded_d2_text(safe_user_message, limit=ttl_policy.history_text_max_chars) if selected_ui_ref is None else None,
                 selected_ui_ref=selected_ui_ref, committed_at_turn=turn)
@@ -712,7 +715,7 @@ def _run_reserved_d2_dialogue_turn(
     if known_task is not None and (selected_document_action is not None or selected_price_detail_action is not None):
         shown = store.read_latest_completion(session_key)
         source_parts = [p for p in shown.response.resolved.d2_request_parts
-            if p.status in {"answered", "recovered"} and (
+            if p.status == "answered" and (
                 (selected_document_action is not None and p.kind == "content"
                  and p.content_ref == selected_document_action.content_ref)
                 or (selected_price_detail_action is not None and p.kind in {"price", "price_detail"}))]
@@ -754,11 +757,11 @@ def _run_reserved_d2_dialogue_turn(
         selected_ui_ref=selected_ui_ref, ttl_policy=ttl_policy,
     )
     if result.outcome == "admin":
-        if context.retained_terminal_state not in {"none", "clarify", "admin", "medical_terminal"}:
+        if context.retained_terminal_state not in {"none", "clarify", "admin", "medical_terminal", "spam_warn"}:
             raise ValueError("d2_experiment_terminal_session_unsupported")
         response = build_d2_manual_contact_terminal_response(tenant, session_key=session_key)
         return _commit_non_price_d2_turn(response=response, **commit_args)
-    if context.retained_terminal_state not in {"none", "clarify", "spam_warn"}:
+    if context.retained_terminal_state not in {"none", "clarify", "spam_warn", "medical_terminal"}:
         raise ValueError("d2_experiment_terminal_session_unsupported")
     if lead_bridge:
         if not d2_lead_session_client_matches(session_key):
@@ -888,6 +891,16 @@ def _run_reserved_d2_dialogue_turn(
             continue
         if isinstance(block, PriceOperation) and block.target is None:
             raise ValueError("d2_price_target_required")
+        if isinstance(block, PriceOperation) and selected_volume_price_task is not None and selected_volume_price_task.extent == "unknown":
+            exact_text.append(D2ExactTextBlock(request_id=block.request_id,
+                source_client_id=session_key.client_id,
+                display_text="Ничего страшного. На консультации врач поможет разобраться с объёмом лечения."))
+            exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
+                kind="reference", status="answered",
+                scope="service" if isinstance(block.target, ServiceTarget) else "topic",
+                service_id=block.service_id, topic_id=block.topic_id, brand_id=block.brand_id,
+                discussion_scope=DiscussionScope(target=block.target, volume=block.volume, brand_id=block.brand_id)))
+            continue
         operations.append(block)
     sources = build_d2_snapshot_sources(
         tenant, model_view=view, operations=tuple(operations), session_key=session_key,
@@ -941,7 +954,11 @@ def _run_reserved_d2_dialogue_turn(
         "requested_fact_ids": tuple(dict.fromkeys((*context.retained_shown_ids.requested_fact_ids, *delta.shown_requested_fact_ids))),
         "promo_fact_ids": tuple(dict.fromkeys((*context.retained_shown_ids.promo_fact_ids, *delta.shown_promo_ids))),
         "price_offer_ids": tuple(dict.fromkeys((*context.retained_shown_ids.price_offer_ids, *(r.offer_id for r in price.rows)))) if price else context.retained_shown_ids.price_offer_ids,
-        "secondary_ref_ids": tuple(dict.fromkeys((*context.retained_shown_ids.secondary_ref_ids, *_shown_secondary_ref_ids(response)))),
+        "secondary_ref_ids": tuple(dict.fromkeys((
+            *context.retained_shown_ids.secondary_ref_ids, *_shown_secondary_ref_ids(response),
+            *((f"price_detail_clicked:{selected_price_detail_action.service_id}:{selected_price_detail_action.aspect}",)
+              if selected_price_detail_action is not None else ()),
+        ))),
     })
     state = D2SessionState(
         schema_version=D2_SESSION_SCHEMA_VERSION, session_key=session_key,

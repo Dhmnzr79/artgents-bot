@@ -1,3 +1,10 @@
+export const TECHNICAL_ERROR_MESSAGE = "Не получилось показать ответ. Понимаю, что это неудобно";
+
+// Presentation only: never publish exception details or claim a lead outcome.
+export function friendlyErrorMessage(error) {
+  return error ? TECHNICAL_ERROR_MESSAGE : "";
+}
+
 /**
  * Слой HTTP к /ask (без UI).
  * @param {string} apiBase — пустая строка = тот же origin
@@ -9,20 +16,24 @@ export async function postAsk(apiBase, body) {
   // PERF-0: local-only timing (no PII, no network report) — see PERF-0 seam
   // audit "Client (widget) has zero timing instrumentation" finding.
   const perfT0 = performance.now();
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error(TECHNICAL_ERROR_MESSAGE);
+  }
   let data = {};
   try {
     data = await res.json();
   } catch {
-    data = {};
+    throw new Error(TECHNICAL_ERROR_MESSAGE);
   }
   if (!res.ok) {
-    const err = typeof data.error === "string" ? data.error : res.statusText;
-    throw new Error(err || "request_failed");
+    throw new Error(TECHNICAL_ERROR_MESSAGE);
   }
   if (typeof console !== "undefined" && console.debug) {
     console.debug("[perf] ask_client_ms", {

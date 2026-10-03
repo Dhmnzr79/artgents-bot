@@ -155,7 +155,7 @@ def build_d2_document_task(snapshot, action):
         request_id="r1", kind="content",
         target=TopicTarget(type="topic", id=topic) if topic else None,
         pending_question=action.section_title, content_ref=action.content_ref,
-        content_section_refs=(action.section_ref,), content_realization="authored",
+        content_section_refs=(action.section_ref,),
     ),))
 
 
@@ -515,7 +515,7 @@ def _manual_contact_text(snapshot: D2TenantSnapshot) -> tuple[str, str | None]:
     facts = parse_clinic_contact_facts_from_policies_raw(raw)
     phone_suffix = format_manual_contact_phone_suffix(facts)
     if template and "{phone_suffix}" in template:
-        text = template.format(phone_suffix=phone_suffix, urgent_suffix=urgent)
+        text = template.format(phone_suffix=phone_suffix, urgent_suffix=f" {urgent}" if urgent else "")
     elif template:
         text = template
     else:

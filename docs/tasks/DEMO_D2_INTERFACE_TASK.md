@@ -1,9 +1,10 @@
 # D2 — интерфейс модели, контекст обсуждения и source UI
 
-Дата: 2026-10-02. Текущий шаг — DOC-план §8 по решениям D2-117/118.
-§1–7 сохраняют историю предыдущей замены уточнения и её узкие PASS.
-Её runtime GO на §3.1–3.3 уже исполнен и не разрешает новую замену §8.
-Новый runtime/live/commit/push не выполняется. Восстановление сессии не вводится.
+Актуально: 2026-10-03. D2-119/120 и UI отмены на этапе телефона реализованы;
+scoped offline проверки и независимые review — §10.6–12. Полного live/widget
+PASS нет. Текущий шаг — сверка документов и разрешённые владельцем commit/push.
+§1–10.5 сохраняют историю прежних этапов и действовавших тогда разрешений.
+Новый runtime, live, merge/deploy и восстановление сессии в этот шаг не входят.
 Единственный план работ — верх [Roadmap](DEMO_D2_DELIVERY_ROADMAP.md).
 Правила: [AGENTS](../../AGENTS.md), [Checker](../WORKFLOW_CHECKER.md),
 [контракт §3](DEMO_D2_TARGET_CONTRACT.md), [Acceptance](DEMO_D2_ACCEPTANCE.md).
@@ -11,8 +12,9 @@
 Обязательный контроль: [Audit change-map discipline](../../AGENTS.md#audit-change-map-discipline)
 и [Mandatory change-map check](../WORKFLOW_CHECKER.md#mandatory-change-map-check).
 Переход к следующему этапу, новая ветка поведения или преобразователь к старой
-структуре не разрешаются этой карточкой автоматически. Runtime GO ограничен
-описанной владельцем заменой §3.1–3.3. В финальном отчёте отдельно перечислить удаления, добавления и их
+структуре не разрешаются этой карточкой автоматически. Выполненные runtime GO
+и их точные границы записаны в соответствующих разделах. В финальном отчёте
+отдельно перечислить удаления, добавления и их
 основание, изменения поведения, offline/live/widget проверки и остаточные риски.
 
 ## 1. Baseline и сохранение работы
@@ -1059,7 +1061,10 @@ Exact DOC allowlist: `docs/MARKETING_ANSWER_SCENARIOS.md` и
 runtime/tests вне allowlist сохраняются. Staging пуст; публикация не входит.
 Ответственность — только Target Contract §3, таблица не копируется и не меняется.
 
-### 10.2. Что действительно показал пользовательский widget
+### 10.2. Исторические находки до D2-119
+
+Статусы «Открыто» ниже относятся к исходному разбору. Последующие исправления
+и границы доказательств — §10.7–12; это не список текущих runtime TODO.
 
 Прочитан существующий локальный журнал из `%TEMP%/d2-widget-20261002-192344`.
 В анализируемом отрезке 2026-10-02 20:45–21:17 UTC: 44 запроса, 37 записанных
@@ -1126,6 +1131,317 @@ Cursor — review того же целостного результата, не 
 
 ### 10.5. Результат DOC checkpoint
 
-Правила согласованы, документы обновлены; код D2-119 **не реализован**.
+На момент этого исторического DOC checkpoint код D2-119 ещё не был реализован.
+Последующая реализация и проверки — §10.6–10.8.
 Проверки ссылок/внеallowlist/независимого DOC review фиксируются в Ledger.
 Новые runtime tests/provider/live/SMTP: 0; commit/push/merge/deploy: нет.
+
+### 10.6. Runtime D2-119 — preflight 2026-10-03
+
+Owner GO: «Ок. Тогда идем дальше». Repository/Git top:
+`C:\Cursor Projects\artgents-bot-active`, branch `codex/d2-stage1-contract`,
+HEAD `36105d784dc672228a693e30ee3948c95bc43dcc`; origin/main и merge-base
+`141ce91fb1731cd990fcf8391550150016c73e7f`. Tracked checkout/staging чисты.
+Foreign `data/`, `docs/tasks/DEMO_D2_SIM0_TASK.md` не читать/не менять.
+Baseline: `%TEMP%/d2-119-baseline-36105d7.zip` (git archive HEAD).
+
+Exact runtime allowlist: `contracts/d2_dialogue_result.py`,
+`contracts/response_plan.py`, `core/d2_dialogue.py`,
+`core/d2_snapshot_sources.py`, `core/d2_content_realization.py`,
+`core/d2_completion_context.py`, `core/response_plan_materialization.py`,
+`core/one_call_prompt_contract.py`, `tests/test_d2_119_http.py`,
+`tests/test_d2_sim1_known_actions_http.py`,
+`tests/test_d2_sim2_dialogues.py` (обновление старого ожидания цены после unknown),
+`tests/test_d2_discussion_context_http.py`,
+`docs/tasks/DEMO_D2_INTERFACE_TASK.md`, `docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md`.
+
+Классификация/владельцы — §10.3 и Target Contract §3. Архитектурное удаление:
+ordinary input mode/fallback → только content_text с optional provenance →
+удаляются поля, known-parser mode, document-task authored default,
+realizer authored/recovery и ordinary publication alternatives. Объясняет
+модель прежним вызовом; сервер больше не выбирает заменяющий текст документа.
+Medical/policy, unknown click и clicked price UI — bug fixes, не новые слои.
+Astra read-only консультация подтверждает existing exact-result для unknown
+и namespaced service/aspect в existing secondary_ref_ids для verified clicks.
+Проверки/результат пока впереди; live/commit/push не входят в этот шаг.
+
+### 10.7. Реализация D2-119, 2026-10-03
+
+Статус §10.5 относится к предыдущему DOC checkpoint. Runtime теперь изменён
+в пределах §10.6. Новых calls, классификаторов, patient memory, адаптеров,
+авторского policy текста или восстановления старого SID не добавлено.
+
+- **Удаление зависимости:** `ExplanationFields.content_realization` и
+  `content_fallback_section_ref`; known parser принимает только ID/text;
+  document task больше не задаёт authored. `_exact_authored_text`,
+  `_recovery_section_refs`, `_is_korotko_section` и ветви их публикации удалены.
+  Realizer больше не получает authority/текст документа. Ordinary publication
+  допускает только model_prose; recovered/fallback удалены из результата.
+  Provenance ref/sections остаётся для grounding и проверенного source UI.
+- **Medical/policy bug fix:** prompt v37 явно разделяет текущую личную проблему
+  и страх будущего лечения, требует существующий admin даже вместе с ценой;
+  policy IDs — точные строковые ключи tenant, не номера. Исполняются прежние
+  code-owned clinic/admin/price/age guards. Это инструкция прежнему вызову,
+  не доказательство живого выбора и не новый медицинский классификатор.
+- **Unknown bug fix:** verified volume unknown после прежних policy/reference
+  guards становится existing exact reference result с согласованной фразой,
+  topic/service/brand и unknown volume. Прайс и модель не вызываются; общий CTA,
+  commit и completion pointer сохраняют тему. Автозаявки нет.
+- **Price UI bug fix:** builder одновременно исключает текущий verified click
+  и прошлые `price_detail_clicked:<service>:<aspect>` в existing secondary IDs.
+  Эти ключи сохраняются только вместе с успешным commit. Показ ценовых кнопок
+  больше не считается их нажатием; другая услуга имеет отдельный набор при
+  наличии её конфигурации и данных. Source follow-up/video скрывают показанное.
+
+Путь: `/ask` и `/ask/stream` → `run_d2_ask_json` →
+`run_d2_dialogue_turn` → `validate_d2_payload` / existing known action →
+`resolve_d2_operations` → common commit → `project_completed_dialogue`.
+Модель владеет prose и свободным смыслом; сервер исполняет verified action;
+price owner выбирает утверждённые данные. §3 не изменён.
+Оставшиеся legacy input mode-поля в старом request_understanding и legacy
+parser не используются active `d2_contract=True`; shared realizer даже для
+них больше не имеет механизма подстановки MD. Их общая уборка вне этого шага.
+
+**Offline executor:** isolated runner отключает dotenv/network, использует
+временные SQLite/логи. Первый coherent набор: 178 PASS / 5 FAIL, 291.95 с,
+`%TEMP%/d2-interface-offline-fb3j_9_g/results.xml`. Пять исправленных test
+expectations: typed not_requested receipt вместо None; настроенные price
+buttons новой услуги; SSE error event вместо HTTP400; прежняя цена после unknown.
+Адресный проход: 17 PASS / 1 FAIL (SSE assertion), 36.01 с, `...h9yysaez`;
+после исправления оба price-chain cases PASS, 19.80 с, `...qggb7fff`.
+Дополнительные два old-authored/lead probes сначала ошибочно ожидали отказ
+на lead-only pause; он не читает ordinary history. Корректный probe переходит
+к обсуждению через verified pending-answer click: **2 PASS**, 7.51 с,
+`%TEMP%/d2-interface-offline-_88aedke/results.xml`.
+Итого покрыты 185 уникальных cases с успешной последней проверкой каждого;
+повторные прогоны не суммируются. Это не полный CI и не live PASS.
+
+Основной набор: `test_d2_119_http`, `test_d2_sim1_known_actions_http`,
+`test_d2_discussion_context_http`, `test_d2_source_followup_http`,
+`test_d2_sim2_dialogues`. Проверены JSON/SSE, prose/source-click и adverse
+старые поля без retry, unknown/replay/next-context, includes→stages и другая
+услуга, неповтор после выхода за историю трёх ходов, stale clicks, age guards,
+admin exact phone/urgent copy, lead pause/privacy и старые SID.
+Новые fixtures не проверяют, что live модель выберет правильный admin/policy.
+Исторические legacy-fixture/menu-copy failures общего набора здесь не
+перепроверялись и не объявляются устранёнными. Новых baseline failures в
+выбранном наборе не заявляем.
+
+**Старая сессия и заявка:** state schema остаётся 5. Предыдущие model_prose
+результаты совместимы. Старые authored/fallback/recovered completions и pending
+с удалёнными input-полями несовместимы при чтении; обычный ход отклоняется
+`d2_invalid_turn`, без migration/reset/recovery. Lead-only путь может работать
+без чтения ordinary receipt. Probe старого authored через переход из паузы
+к обсуждению сохраняет байты заявки с именем, state и request rows; модель
+не вызывается. Старые schema3 tests также подтверждают сохранение заявки и
+replay завершённого demo_stub receipt. Это не обещание replay любого старого
+authored ответа: он сам больше не соответствует контракту.
+
+Independent Checker: **PASS**, P0/P1 нет. Независимо 48 уникальных cases
+с успешным последним результатом (initial 35/36, focused 12/14, fresh old
+receipt 2/2; повторяющиеся cases не суммировать). Артефакты
+`%TEMP%/d2-interface-offline-{mkzzhjwq,9iggmxzw,ro2qtrml}/results.xml`.
+Подтверждены 185 executor cases по XML, active schema и AST 12 Python-файлов.
+Сверены 1615 tracked файлов вне allowlist с archive baseline (CRLF normalized):
+изменений нет. `git diff --check` чист. PASS только текущего checkpoint;
+живой выбор модели, widget, полный CI и архитектура всего бота не аттестованы.
+Provider/live/SMTP: 0. Staging пуст; HEAD 36105d7, commit/push/PR/merge/deploy
+этого шага не выполнялись. Foreign paths из §10.6 сохранены.
+
+### 10.8. Следующая проверка Cursor и widget
+
+Промпт для Cursor (review, не новая реализация):
+
+```text
+Независимый read-only review D2-119 в C:\Cursor Projects\artgents-bot-active.
+Ветка codex/d2-stage1-contract; baseline/HEAD 36105d784dc672228a693e30ee3948c95bc43dcc.
+Проверь текущий diff и новый tests/test_d2_119_http.py по AGENTS.md,
+WORKFLOW_CHECKER.md, Target Contract §3, Product Decisions D2-119,
+Interface Task §10.3 и §10.6–10.7. Exact allowlist — §10.6.
+Сначала прочитай изменённые тесты, затем проследи реальные JSON/SSE пути.
+Проверь удаление ordinary authored/fallback, сохранение source UI/контекста,
+unknown без цен/модели/автозаявки, price buttons hide-clicked per service,
+medical/age instructions при прежних code-owned guards, replay и lead/privacy.
+Проверь adverse output и старые несовместимые receipts без migration/reset.
+Не исправляй код и не расширяй задачу. Foreign data/ и DEMO_D2_SIM0_TASK.md
+не читать. Никаких live/provider/SMTP, commit/push/merge/deploy.
+Только соразмерные offline тесты с изоляцией dotenv/network/SQLite как в §10.7.
+Дай PASS/REJECT с P0/P1, отдельными P2 и точной границей доказательств.
+Не выдавай offline prompt/payload тесты за живое понимание модели.
+```
+
+После review — перезапуск локального бота прежним `scripts/start_local_widget.ps1`
+и пользовательский проход из **новых бесед**, без удаления старых данных:
+
+1. «Я боюсь боли при имплантации» → живое объяснение и разрешённые source
+   продолжения. Клик → ответ на выбранный вопрос без заголовка `{#...}`;
+   ранее показанные content/video не повторяются.
+2. «Сколько стоит имплантация?» → «Пока не знаю» → ровно согласованная фраза
+   и CTA, без прайса/повторного уточнения → «А сколько займёт лечение?».
+3. «Сколько стоит классическая имплантация?» → «Что входит» → остаются только
+   «Этапы оплаты» → клик → ценовых кнопок больше нет. Новая услуга получает
+   кнопки только при наличии configured profile и данных; у текущего demo
+   All-on-4 price_detail profile отсутствует, автоматически его не добавляли.
+4. Новые беседы для «После операции сильно болит и опухло», «Кровь не
+   останавливается», «После лечения больно, сколько будет стоить помощь?» →
+   утверждённый admin/телефон, без объяснения лечения и рекламных продолжений.
+5. «Можно записать ребёнка 12 лет?» → clinic policy без ошибки. Отдельно:
+   «В детстве лечил зубы, сейчас мне 35» → не применять детское ограничение.
+6. «Цена восстановления трёх зубов классической имплантацией?» → «А сроки?» →
+   тема/объём сохраняются, subject не требуется. Затем разрешённая CTA →
+   вымышленное имя → адрес → продолжение/отмена заявки; телефон не отправлять.
+
+Фиксировать request_id и фактический BOT_LOG_DIR launcher. Неправильный выбор
+admin/policy/source моделью — открытый дефект live, не оправдание офлайн PASS.
+Агентский live не запускается без отдельного согласованного бюджета.
+
+## 11. D2-120 — продолжение после medical и сообщение при сбое
+
+Owner GO 2026-10-03: «Давай». Классификация: **bug fixes**, не завершение
+архитектурного этапа. Target Contract §3 сохраняется. Root/Git top:
+`C:\Cursor Projects\artgents-bot-active`, branch `codex/d2-stage1-contract`,
+HEAD `36105d784dc672228a693e30ee3948c95bc43dcc`, main/merge-base
+`141ce91fb1731cd990fcf8391550150016c73e7f`. Staging пуст.
+Baseline — предыдущий 14-file D2-119 WIP, snapshot
+`%TEMP%/d2-120-baseline-36105d7-wip.zip`.
+Foreign `data/` и `docs/tasks/DEMO_D2_SIM0_TASK.md` не читать/не менять.
+
+Exact allowlist: `core/d2_dialogue.py`, `core/d2_snapshot_sources.py`,
+`core/d2_completion_context.py`, `core/one_call_prompt_contract.py`,
+`static/widget/api.js`, `static/widget/widget.js`,
+`tests/test_d2_120_http.py`, `tests/js/d2_error_copy.mjs`,
+`tests/js/d2_widget_harness.mjs`, `docs/MARKETING_ANSWER_SCENARIOS.md`,
+`docs/tasks/DEMO_D2_PRODUCT_DECISIONS.md`, `docs/tasks/DEMO_D2_ACCEPTANCE.md`,
+`docs/tasks/DEMO_D2_TARGET_CONTRACT.md`, `docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md`,
+`docs/tasks/DEMO_D2_INTERFACE_TASK.md`, `docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md`.
+
+До: medical marker запрещает следующий ordinary ответ, medical ход не входит
+в history. После: медицинский ответ завершает только текущий вопрос, следующий
+смысл решает модель в прежнем вызове с existing receipt history. Маркер остаётся
+в exact response contract, перестаёт быть D2 session lock; spam_closed не меняется.
+Жалоба → лекарства/лечение этой жалобы остаётся admin; жалоба → детский приём
+или адрес может получить обычный policy/contact. Не вводить classifier/reset.
+Astra read-only консультация: использовать existing receipts/projection,
+сохранить terminal/current-turn запреты UI и прежний spam guard.
+
+Ошибки: existing error display, не успешный bot answer. Нейтральная фраза
+«Не получилось показать ответ. Понимаю, что это неудобно». Не утверждает, что
+заявка отправлена/не отправлена, не просит повторять контакты. Server error codes,
+HTTP/SSE error, diagnostics/audit и rollback/receipt semantics сохраняются.
+Новых retries нет; существующий transport replay с тем же ID не удаляется.
+Исправляется пробел между admin phone и urgent sentence. Offline проверки:
+medical→medical/policy/contact, history/age/spam; ошибка до/после commit,
+lead preservation/replay; mocked JSON/SSE/network display. Затем Checker.
+Live/provider/SMTP/commit/push/merge/deploy не входят в этот шаг.
+
+### 11.1. Результат реализации и проверки
+
+Реализовано: предыдущий medical marker больше не отклоняет новый dialogue;
+medical receipt с вопросом и masked/bounded terminal_text входит в прежнюю
+историю. Текущий admin сохраняет exact copy/no UI; spam_closed остаётся hard
+stop, обычный spam guard действует и после medical. Prompt v38 объясняет
+разницу независимого вопроса и медицинского продолжения в том же вызове.
+Shared resolver/terminal schema, price и lead owner не менялись. Исправлен
+пробел перед urgent copy. Старый medical marker обрабатывается без reset;
+прошлые не записанные в history реплики не восстанавливаются задним числом.
+
+Widget `setError` и JSON `postAsk` отображают общий нейтральный текст; SSE
+сохраняет error code до слоя отображения. Не добавлен новый успешный answer,
+completion или журнал. Сервер по-прежнему логирует exception/trace/diagnostic,
+JSON сохраняет error status, SSE — event:error. Прежний transport replay с
+тем же request ID сохраняется, новых повторов/модельных вызовов нет.
+Ошибка после commit не доказывает неотправку заявки: поэтому текст не зовёт
+повторно отправить контакты. Сам error display не меняет receipt/lead/state.
+
+Executor offline: **33 PASS**, 62.76 с — `test_d2_120_http.py` (16),
+`test_d2_119_http.py` (15), две lead pause/privacy проверки SIM2.
+Артефакт `%TEMP%/d2-interface-offline-bi86g41a/results.xml`.
+`node tests/js/d2_error_copy.mjs` — **PASS**: JSON/SSE/network failures,
+неразглашение технического текста, same-ID transport replay, сохранение
+уже полученного UI при поздней ошибке. Socket/provider изолированы; контакты
+в тестах вымышленные, отправка только demo_stub, SMTP не вызывался.
+
+Real browser harness — **не прошёл**: `CDP timeout: Runtime.enable` до
+проверки DOM, `%TEMP%/d2-interface-offline-50rnps9m/results.xml`. Чистые harness
+и static baseline из snapshot в `d2-120-baseline-check-cz5ce222` с теми же
+payloads дают ту же ошибку Runtime.enable. Это воспроизведённый baseline
+сбой браузерного подключения; browser/widget PASS не заявлен. Общий CI не
+запускался. Живое понимание медицинских продолжений проверяет пользователь.
+
+16 файлов нового allowlist; 1615 файлов вне него побайтно совпали с baseline,
+включая предыдущие D2-119 изменения вне нового шага. Foreign WIP не читался.
+Staging пуст, branch/HEAD прежние; commit/push/PR/merge/deploy нет.
+Provider/live/SMTP агента: 0. Independent Checker: **PASS D2-120**,
+18 уникальных HTTP PASS и node error-copy PASS; P0/P1 нет. Проверены bug fixes,
+не архитектура всего бота. Финальный вердикт записан в Ledger.
+
+Checker обнаружил P1 в новом достижимом переходе medical→spam_warn→medical:
+правильный admin блокировался прежним guard. Исправлено в том же guard:
+spam_warn допускает admin; ранний spam_closed hard stop неизменён.
+Добавлены две JSON/SSE проверки этой цепочки. Адресно новая цепочка и
+spam_closed: **4 PASS**, 8.00 с, `...d2-interface-offline-4v1yyaqz/results.xml`.
+Итого executor 35 уникальных HTTP cases с успешным последним результатом;
+33 + 4 не суммируются, две hard-stop проверки повторные. Independent focused
+recheck: **4 PASS**, 7.79 с, `...d2-interface-offline-kxvbtu60/results.xml`;
+P1 закрыта. Initial independent 16 PASS, 30.64 с, `...h7iml0wg/results.xml`.
+18 уникальных HTTP cases, 20 executions; полный review не повторялся.
+
+После перезапуска widget проверить в **одной** беседе: «Болит имплант после
+установки» → «Можно записать ребёнка 12 лет?»; в другой: жалоба → «Что выпить?»
+→ «Какой адрес клиники?». Первое/последнее должны получить policy/contact,
+медицинское продолжение — утверждённый телефон, без медицинского совета.
+Искусственно ломать живой provider для проверки заглушки не требуется:
+offline fault injection проверяет ошибки до commit и после demo_stub заявки.
+
+## 12. Кнопка отмены только на этапе телефона — 2026-10-03
+
+Тип: UI bug fix по прямому указанию владельца; не архитектурное упрощение.
+База: HEAD 36105d784dc672228a693e30ee3948c95bc43dcc плюс существующий
+незакоммиченный D2-119/120. Снимок затрагиваемых старых файлов:
+`%TEMP%/d2-name-cancel-baseline`. Allowlist: `core/d2_lead_bridge.py`,
+`tests/test_d2_lead_cancel_ui.py`, эта карточка.
+
+На запросе имени (включая повтор и возврат из паузы) кнопки отмены нет.
+В паузе до имени остаётся «Продолжить запись». На этапе телефона, включая
+паузу этого этапа, «Отменить запись» сохраняется. Текстовый отказ не запрещаем.
+Владелец UI — существующий lead bridge; используем существующий этап lead owner.
+Новых состояний, полей, вызовов модели и классификаторов нет. Reconcile паузы
+узнаёт её по существующей кнопке продолжения, независимо от наличия отмены;
+проверки владельца и revision в lead owner остаются.
+
+Проверки: адресные offline JSON/SSE имя → пауза → возврат → телефон → отмена,
+replay и сохранение этапа; существующая phone-pause/privacy проверка.
+Foreign WIP: все остальные текущие изменения, включая пользовательский файл
+врача, `data/`, `DEMO_D2_SIM0_TASK.md`; не включаются в эту правку.
+Live/provider/SMTP, commit/push/merge/deploy не разрешены этой задачей.
+
+Результат §12: изменены только указанные три файла. Удалён показ отмены
+из обоих путей запроса имени; добавлена проверка существующего этапа при
+публикации pause UI. Заявка, её состояния и текстовый отказ не заменялись.
+Executor: новые 6 cases PASS (4 в k8lzhjzp, 2 в k4piymse); старый phone-pause
+SSE PASS, JSON FAIL: проверка ищет «999» во всём JSON и нашла их в timestamp
+23:41:49.499958Z. Independent: новые 6 PASS, старый phone-pause JSON PASS,
+SSE FAIL на той же проверке, timestamp 23:43:41.999984Z; 7 PASS / 1 FAIL,
+25.16 с, `%TEMP%/d2-interface-offline-zz5ol93s/results.xml`.
+Это ограничение неизменённого теста; полный зелёный прогон не заявляется.
+Проверка реального виджета/live не проводилась. `git diff --check` чист.
+HEAD/ветка прежние, staging пуст, commit/push/PR/merge/deploy нет.
+Independent Checker: PASS UI §12, P0/P1 нет. Подтверждено: единственное
+вхождение «999» в упавшей SSE проверке — activity.last_user_turn_at;
+новые 6 cases PASS. Это UI bug-fix PASS, не аттестация live/widget.
+
+## 13. Сверка документов и публикация checkpoint — 2026-10-03
+
+Владелец разрешил commit/push после сверки. Baseline HEAD 36105d7 плюс
+проверенный WIP §10.6–12. DOC baseline: `%TEMP%/d2-publish-doc-baseline-pjbvxo_h`.
+Allowlist сверки: Marketing, Acceptance, Checkpoint Ledger, Delivery Roadmap,
+Interface Task, Product Decisions, Target Contract. Изменены только текущие
+статусы и согласованное правило отмены; runtime не менялся. Старые результаты
+проверок не заменяются обещанием общего PASS. Foreign data/ и SIM0 не включать.
+Независимый DOC review нашёл stale header этой карточки; исправлен, направлен
+на focused recheck. Commit включает 26 файлов D2-119/120/§12 и документации;
+файл врача после отмены пользовательского эксперимента чистый и не включён.
+Independent DOC focused recheck: PASS; stale header исправлен, P0/P1 нет.
+109 локальных ссылок существуют; Target §3 не изменён; diff --check чист.
+Runtime/provider проверки повторно не запускались, ранее записанные ограничения
+и результаты §10.7–12 сохраняются. Публикация остаётся scoped checkpoint.

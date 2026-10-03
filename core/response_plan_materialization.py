@@ -773,6 +773,7 @@ def resolve_d2_operations(
     elif detail_block is not None:
         detail_replies, detail_actions = _d2_price_detail_ui(
             sources=sources, offer_ids=tuple(row.offer_id for row in detail_block.rows),
+            selected_action=selected_price_detail_action,
         )
         ui_candidates = ui_candidates.model_copy(update={
             "quick_replies": detail_replies,
@@ -789,7 +790,7 @@ def resolve_d2_operations(
     unavailable_count = sum(part.status == "unavailable" for part in request_parts)
     deferred_count = sum(part.status == "deferred" for part in request_parts)
     result_status = (
-        "complete" if not unavailable_count and not deferred_count and not any(part.status == "recovered" for part in request_parts)
+        "complete" if not unavailable_count and not deferred_count
         else "failed" if unavailable_count == len(request_parts)
         else "degraded"
     )
@@ -920,6 +921,7 @@ def _d2_price_detail_has_data(offer: TargetOffer, aspect: str) -> bool:
 
 def _d2_price_detail_ui(
     *, sources: ResponsePlanMaterializationSources, offer_ids: tuple[str, ...],
+    selected_action: D2PriceDetailUiAction | None = None,
 ) -> tuple[tuple[UiQuickReplyCandidate, ...], tuple[D2PriceDetailUiAction, ...]]:
     if not offer_ids or sources.d2_commercial is None:
         return (), ()
@@ -941,6 +943,12 @@ def _d2_price_detail_ui(
     replies: list[UiQuickReplyCandidate] = []
     actions: list[D2PriceDetailUiAction] = []
     for aspect in profile.price_detail_ids:
+        if (
+            f"price_detail_clicked:{service_id}:{aspect}" in sources.shown_d2_secondary_ref_ids
+            or (selected_action is not None and selected_action.service_id == service_id
+                and selected_action.aspect == aspect)
+        ):
+            continue
         if not all(_d2_price_detail_available(offer, aspect) for offer in offers if offer is not None):
             continue
         reply_id = f"price_detail:{aspect}"
@@ -1248,11 +1256,8 @@ def _d2_content_scope(
             return (), "topic", part.topic_id
         if not authority.allowed_service_ids and not sources.d2_content_topics_by_ref:
             return (), "topic", part.topic_id
-    if not authority.allowed_service_ids or part.content_realization == "model_prose":
-        # An owned source can support clinic-level model prose and source UI
-        # without inventing a service focus. Explicit authored stays strict.
-        return (), "clinic", None
-    raise MaterializationContractError("d2_content_scope_required")
+    # Provenance supports prose/UI without inventing a service focus.
+    return (), "clinic", None
 
 
 def _d2_price_scope(
@@ -1611,7 +1616,7 @@ def _d2_information_blocks(
 
     def unverified_source(part: RequestUnderstandingRequest) -> None:
         """Keep FullContext prose but grant no source citation or UI authority."""
-        if part.content_realization == "model_prose" and (part.content_text or "").strip():
+        if (part.content_text or "").strip():
             realization = realize_d2_unattributed_content(part)
             realizations[part.request_id] = realization
             assert realization.display_text is not None
@@ -1640,7 +1645,7 @@ def _d2_information_blocks(
                     display_text=None,
                     section_refs=(),
                 )
-            elif part.content_realization != "model_prose" or not (part.content_text or "").strip():
+            elif not (part.content_text or "").strip():
                 # No prose and no optional provenance is still a real gap.
                 realizations[part.request_id] = D2ContentRealization(
                     outcome="unavailable",
@@ -1730,7 +1735,7 @@ def _d2_information_blocks(
                 reason="d2_content_source_missing",
             )
             continue
-        realization = realize_d2_content(part, authority)
+        realization = realize_d2_content(part)
         realizations[part.request_id] = realization
         if realization.outcome == "unavailable":
             continue

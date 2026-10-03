@@ -1,5 +1,6 @@
 ﻿import { streamAsk } from "./api.js";
 import { setBotAnswerBody } from "./answer_format.js";
+import { friendlyErrorMessage } from "./api.js";
 
 const STORAGE_SID = "clinic_widget_sid";
 const STORAGE_LAUNCHER_TEASER = "clinic_widget_launcher_teaser_shown";
@@ -1590,9 +1591,7 @@ export function mountWidget(root, config) {
   }
 
   function setError(msg) {
-    const displayMessage = msg === "d2_invalid_turn"
-      ? "Не удалось подготовить ответ. Попробуйте задать вопрос ещё раз."
-      : msg;
+    const displayMessage = friendlyErrorMessage(msg);
     state.errorLine = displayMessage || "";
     if (msg) {
       errBox.textContent = displayMessage;

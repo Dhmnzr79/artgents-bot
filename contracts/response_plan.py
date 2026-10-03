@@ -384,7 +384,7 @@ D2PartFailureReason = Literal[
     "d2_price_detail_context_ambiguous",
 ]
 D2ResultStatus = Literal["complete", "degraded", "failed"]
-D2ContentPublication = Literal["authored", "model_prose", "fallback"]
+D2ContentPublication = Literal["model_prose"]
 D2_PRICE_DEFERRAL_TEXT = "Стоимость следующей услуги можно спросить следующим сообщением"
 D2_CLARIFICATION_DEFERRAL_TEXT = "Этот вопрос пока отложим. Его можно задать следующим сообщением."
 
@@ -506,7 +506,7 @@ class D2FrozenPriceDetailBlock(ResponsePlanModel):
 
 
 class InformationSourceBlock(ResponsePlanModel):
-    """Verified authored content selected by one D1R request part."""
+    """Model prose with optional verified document provenance."""
 
     request_id: NonBlankStr
     source_client_id: NonBlankStr
@@ -515,18 +515,13 @@ class InformationSourceBlock(ResponsePlanModel):
     content_ref: NonBlankStr | None
     display_text: NonBlankStr
     source_section_refs: tuple[NonBlankStr, ...] = ()
-    publication: D2ContentPublication = "authored"
+    publication: D2ContentPublication = "model_prose"
     snapshot_fingerprint: NonBlankStr = "fixture"
     replacement_reason: D2PartFailureReason | None = None
 
     @model_validator(mode="after")
     def _validate_publication(self) -> Self:
-        if self.publication == "fallback":
-            if self.replacement_reason not in {
-                "d2_model_prose_empty", "d2_model_prose_money", "d2_model_prose_link",
-            }:
-                raise ValueError("d2_fallback_reason_required")
-        elif self.replacement_reason is not None:
+        if self.replacement_reason is not None:
             raise ValueError("d2_content_replacement_reason_forbidden")
         return self
 
@@ -864,7 +859,7 @@ class D2PriceScopeChoice(ResponsePlanModel):
 class D2ResolvedRequestPart(ResponsePlanModel):
     request_id: NonBlankStr
     kind: Literal["price", "price_detail", "content", "contact", "clinic_policy", "clarification", "reference", "commercial_fact", "price_clarification", "price_reference"]
-    status: Literal["answered", "recovered", "unavailable", "deferred"]
+    status: Literal["answered", "unavailable", "deferred"]
     failure_reason: D2PartFailureReason | None = None
     discussion_scope: DiscussionScope | None = None
     scope: ResponseScope
@@ -899,8 +894,6 @@ class D2ResolvedRequestPart(ResponsePlanModel):
                 raise ValueError("d2_deferred_part_kind_invalid")
             if self.failure_reason is not None:
                 raise ValueError("d2_deferred_part_failure_reason_forbidden")
-        if self.kind == "price" and self.status == "recovered":
-            raise ValueError("d2_price_part_recovery_forbidden")
         if self.kind == "price" and self.status == "unavailable" and self.failure_reason not in {
             "d2_no_price_candidates", "d2_no_scope_price_candidates",
         }:
@@ -909,15 +902,8 @@ class D2ResolvedRequestPart(ResponsePlanModel):
             if self.status == "answered" and self.content_ref is None:
                 if self.content_publication != "model_prose":
                     raise ValueError("d2_content_part_publication_required")
-            elif self.status == "answered" and self.content_publication not in {"authored", "model_prose"}:
+            elif self.status == "answered" and self.content_publication != "model_prose":
                 raise ValueError("d2_content_part_publication_required")
-            if self.status == "recovered" and (
-                self.content_publication != "fallback"
-                or self.failure_reason not in {
-                    "d2_model_prose_empty", "d2_model_prose_money", "d2_model_prose_link",
-                }
-            ):
-                raise ValueError("d2_content_part_recovery_invalid")
             if self.status == "unavailable" and self.content_publication is not None:
                 raise ValueError("d2_content_part_unavailable_publication_forbidden")
             if self.status == "unavailable" and self.failure_reason not in {
@@ -1028,7 +1014,7 @@ def _validate_d2_part_result_shape(
     elif d2_price_detail_block is not None:
         raise ValueError("d2_price_detail_part_linkage_invalid")
     expected_status: D2ResultStatus
-    if not unavailable_parts and not deferred_parts and not any(part.status == "recovered" for part in parts):
+    if not unavailable_parts and not deferred_parts:
         expected_status = "complete"
     elif len(unavailable_parts) == len(parts):
         expected_status = "failed"
@@ -1516,7 +1502,7 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
     policy_by_request = {block.request_id: block for block in plan.d2_policy_blocks}
     published_content_parts = [
         part for part in parts
-        if part.kind == "content" and part.status in {"answered", "recovered"}
+        if part.kind == "content" and part.status == "answered"
     ]
     if len(published_content_parts) != len(content_by_request):
         raise ValueError("d2_request_part_content_linkage_invalid")

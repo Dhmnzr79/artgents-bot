@@ -119,13 +119,18 @@ def d2_paused_lead_profile_name(session_key: SessionKey) -> str:
 
 def apply_d2_lead_pause_ui(response: MaterializedResponseOutcome) -> MaterializedResponseOutcome:
     """Freeze resume/cancel in the resolved plan before D2 publishes its result."""
-    client_id = response.resolved.session_delta.session_key.client_id
+    session_key = response.resolved.session_delta.session_key
+    if not d2_lead_session_client_matches(session_key):
+        raise ValueError("d2_lead_session_client_required")
+    client_id = session_key.client_id
+    state = mem_get(session_key.sid)
+    step = state.get("lead_resume_step") if is_lead_paused(state) else state.get("lead_intent")
     replies = (
         UiQuickReplyCandidate(source_client_id=client_id, reply_id=LEAD_RESUME_REF,
                               label="Продолжить запись"),
-        UiQuickReplyCandidate(source_client_id=client_id, reply_id=LEAD_CANCEL_REF,
-                              label="Отменить запись"),
     )
+    if step == "collecting_phone":
+        replies += _lead_slot_quick_replies(client_id)
     ui = response.resolved.ui_plan.model_copy(update={
         "quick_replies": replies, "buttons": (), "widget": None,
         "video": None, "contact": None,
@@ -154,7 +159,7 @@ def reconcile_d2_lead_pause(session_key: SessionKey, completion) -> None:
     if response.resolved.session_delta.session_key != session_key:
         raise ValueError("d2_lead_completion_owner_mismatch")
     refs = {item.reply_id for item in response.ui_projection.quick_replies}
-    if not {LEAD_RESUME_REF, LEAD_CANCEL_REF}.issubset(refs):
+    if LEAD_RESUME_REF not in refs:
         return
     if not d2_lead_session_client_matches(session_key):
         raise ValueError("d2_lead_session_client_required")
@@ -330,7 +335,7 @@ def resolve_d2_lead_pre_provider(
                 snapshot,
                 session_key=session_key,
                 text=text,
-                quick=_lead_slot_quick_replies(snapshot.client_id),
+                quick=(),
             ),
         )
 
@@ -493,7 +498,7 @@ def _name_prompt_response(
         snapshot,
         session_key=session_key,
         text=text,
-        quick=_lead_slot_quick_replies(snapshot.client_id),
+        quick=(),
     )
 
 

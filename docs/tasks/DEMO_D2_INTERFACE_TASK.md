@@ -1768,3 +1768,246 @@ data/ и SIM0 исключены. Дополнительный allowlist док�
 Merge/deploy, исправление widget defects и live experiment не разрешены этим GO.
 Обсуждён следующий отдельный тест готовых frozen structured facts моделью;
 скрипт/модель/call budget ещё не выбраны и тест не запускался.
+
+## 18. Явные дубли в demo price data перед экспериментом — 2026-10-06
+
+Owner GO: убрать очевидные повторные формулировки из структурированных
+данных перед отдельным model test. Data bug fix, не simplification/schema
+change. Runtime, подбор, model/UI/lead и финансовые значения не менять.
+Root C:/Cursor Projects/artgents-bot-active, codex/d2-stage1-contract,
+HEAD e19fd5ebac42c1d6846adf8072e7124a597d1ebc, main/mergebase
+141ce91fb1731cd990fcf8391550150016c73e7f. Staging пуст; foreign data/ и SIM0
+сохранить. Цена остаётся у прежнего owner Target §3.
+
+Exact allowlist: следующие файлы под clients/demo/target_response/pricebook/services/:
+- all_on_4.jaw.implantium.json
+- all_on_4.jaw.impro.json
+- all_on_4.jaw.nobel.json
+- all_on_6.jaw.implantium.json
+- all_on_6.jaw.impro.json
+- all_on_6.jaw.nobel.json
+- classic.one_tooth.implantium.json
+- classic.one_tooth.impro.json
+- classic.one_tooth.nobel.json
+- removable_dentures.jaw.full.json
+- removable_dentures.jaw.partial.json
+- sinus_lift.one_site.closed.json
+- sinus_lift.one_site.open.json
+- implant_supported_prosthetics.default.json
+И docs/tasks/DEMO_D2_INTERFACE_TASK.md, DEMO_D2_DELIVERY_ROADMAP.md,
+DEMO_D2_CHECKPOINT_LEDGER.md, DEMO_D2_CURRENT_STATUS.md.
+
+Из package.label удаляется только повторное условие, уже полностью
+представленное в required_conditions_metadata. Для implant-supported цена
+за постоянную коронку на установленном импланте сохраняется, полное условие
+с хирургической установкой И КТ остаётся. Никакой runtime нормализации/regex.
+Includes/excludes остаются структурированными деталями состава, это намеренные
+представления для разных задач, не удалять их как повторы price caveat.
+One_stage: фразы о «по показаниям» не полностью эквивалентны; не унифицировать
+их под видом чистки. Суммы/modes/units/IDs/conditions/стадии/сроки/рассрочки
+не меняются. Schema та же, новый эксперимент ещё не создаётся/не запускается.
+
+Verification: сравнить все поля 33 demo offers с HEAD, разрешить только
+14 label-изменений, проверить сохранность удалённых условий в mandatory
+metadata и загрузку bundle/snapshot. Адресные existing price guidance,
+JSON/SSE details/replay и независимый scoped Checker. Live/provider/SMTP0.
+Commit/push этой новой правки не входят в текущий GO; прошлый checkpoint pushed.
+
+Executor §18: 52 PASS/63.28s, h5zp3brp/results.xml, offline runner с
+блокировкой сети и временными tenant/SQLite/logs. Price guidance36 +price copy16
+проверили условия/units/бренды/объёмы, JSON/SSE click/replay и frozen metadata.
+Сравнение всех 33 JSON с HEAD и загрузка snapshot/bundle/model_view: PASS;
+вне 14 package.label отличий нет. Runtime/tests не редактировались.
+diff --check чист; provider/live/SMTP0, staging пуст, commit/push нет.
+Independent Checker: PASS, P0/P1 нет; известный widget line-break остаётся открытым.
+Независимые 16 price-copy cases: PASS/8.71s kaokna0z. Checker сверил все 33
+JSON и фактический _d2_brief_price_conditions/model_view: caveats сохранены.
+Изменение файлов меняет tenant fingerprint. Новый ход прежнего SID может
+получить существующий d2_experiment_tenant_changed; replay старого receipt
+возвращает сохранённое. Lead rows не удаляются. Для проверки обновлённых данных
+использовать «Новую беседу»; migration/recovery не добавлять.
+
+## §19. Изолированный эксперимент модельного ценового текста — owner GO 2026-10-06
+
+Классификация: эксперимент, не упрощение и не замена runtime. Владелец разрешил
+до 8 живых попыток на текущей модели бота; ошибки входят в лимит, повторов нет.
+Baseline e19fd5e плюс сохранённый §18 WIP. Allowlist этого эксперимента:
+scripts/experiment_d2_price_prose.py и этот документ. Артефакты — отдельная
+временная папка; HTTP, widget, lead и данные клиники не редактируются.
+Foreign data/ и DEMO_D2_SIM0_TASK.md сохраняются.
+
+Восемь вопросов: обзоры implantation/prosthetics/restoration, All-on-4 Nobel,
+его состав и этапы оплаты текстовыми продолжениями, рассрочка, три зуба classic.
+Понимание задаётся fixture; подбор предложений, frozen plan и контекст создаются
+существующим run_d2_dialogue_turn в отдельном SQLite. FullContext и план одной
+клиники; предыдущие ответы в истории кодовые. Финансовую реализацию в этом
+эксперименте пишет модель по выбранным данным: это явное отличие от §3/T3.
+Никакой смены владельца в действующем runtime эксперимент не разрешает.
+Та же config.DEFAULT_LLM_MODEL, llm.chat_completions_create, temperature0,
+max_completion_tokens1024, штатный timeout/Qwen thinking policy, SDK retries0.
+Prompt экспериментальный prose-only, не обычный контракт v39.
+Полные ответы без редакции сравниваются с renderer; входы и usage сохраняются.
+Нет исправления текста, второго verifier, fallback или новых transport retries.
+Офлайн подготовка 8/8 прошла; live результаты и независимый review ниже.
+
+Live: 8 попыток, 8 ответов, errors0, retries0, все observed_model=qwen3.8-flash,
+finish_reason=stop. Всего 309406 токенов (FullContext отправлялся каждый раз).
+Артефакты: %TEMP%/d2-price-prose-wphqopp8/comparison.html, comparison.md,
+records.json. Исходные ответы модели не редактировались; runtime не изменён.
+В прочитанных примерах выбранные offers/бренды, суммы и базовые оговорки сохранены;
+три зуба не превращены в расчёт 3×unit. Это ручное наблюдение восьми примеров,
+не гарантия финансовой корректности всех возможных ответов.
+Ограничения: модель копирует часть готовых вводных из frozen plan, в обзоре
+restoration остаётся смысловой повтор про стоимость; этапы оплаты звучат длиннее
+и официальнее. All-on-4 дополнен консультацией из базы, рассрочка — известными
+ограничениями из FullContext (кариес/удаление); это не выдуманные цены, но выход
+за краткую кодовую формулировку. Модельный CTA обратного звонка не проверяет UI.
+Для принятия будущего решения нужно обсудить границу полезных дополнений и
+подачу выбранных данных; новую архитектуру/вызовы тест не внедряет.
+В stages модель заменяет «обычно через 3–6 месяцев» на «в среднем 3–6 месяцев»
+и добавляет «по факту выполнения»: суммы совпадают, но точная оговорка времени
+не воспроизведена дословно. Это наблюдаемый риск свободного изложения условий,
+не повод корректировать сохранённый ответ или объявлять финансовую гарантию.
+Независимый Checker: PASS для метода и изоляции, P0/P1 нет. Live-артефакты
+независимо не прочитаны из-за ограничений доступа к elevated Temp; показатели
+8 ответов и наблюдения о тексте — executor evidence. Финансовую корректность
+свободных ответов этот PASS не подтверждает. Commit/push/merge/deploy нет.
+
+## §20. Живые контекстные диалоги — owner GO 2026-10-06
+
+Классификация: тестовый эксперимент, не правка архитектуры. Owner разрешил
+20 дополнительных живых попыток без повторения первых 8 prose cases.
+Baseline e19fd5e + сохранённый §18/19 WIP. Allowlist: этот документ,
+scripts/experiment_d2_context_live.py; отчёт/сырой output/SQLite в отдельной
+временной папке. Foreign data/ и SIM0 не трогать. Runtime/tenant не изменять.
+
+20 вопросов в пяти диалогах: classic (процесс/боль, срок, гарантия, врачи,
+цена Impro); All-on-6 (отличие All-on-4, неприживление, верхняя челюсть/сроки,
+врачи); whitening (процесс+цена, сохранность результата, чувствительность,
+врачи); policy (12 лет+чистка+ОМС, взрослый38+чистка+цена, ОМС взрослому,
+адрес+суббота); medical (страх лечения кариеса, текущая сильная боль/отёк/кровь,
+возврат к будущему обезболиванию). Новые вопросы, no fixtures for meaning.
+
+Обычный D2HttpProvider/build_d2_d1r_messages v39 → strict parser → materializer
+→ renderer/store; модель самостоятельно понимает каждый вопрос. Память создаёт
+существующая D2 completion projection, в пяти отдельных SID одного temporary
+SQLite. Это действующий путь понимания/ответа, не §19 prose-only: финансовые,
+policy и doctors блоки сохраняют кодовых владельцев §3. В отчёте отдельно raw
+model JSON и окончательный ответ/UI. HTTP/SSE/DOM/lead delivery не аттестуются.
+lead_bridge=False, session binding отсутствует, lead/contact хранилища не пишутся.
+
+Глобальный предел20 reserve-before-provider; SDK retries0, штатный timeout,
+thinking/model/transport/settings. Ошибки входят в лимит. Никакого retry,
+подмены ответа, auto-reset или переписывания результата. Дальнейший вопрос
+после ошибки получает последний действительно завершённый контекст.
+Состояние вызовов сохраняется; повторный запуск начатой папки отвергается.
+Report содержит весь опубликованный текст и raw model без редакции.
+
+Executor results: 20 попыток и 20 raw model replies, 19 опубликованных ответов,
+1 OneCallEnvelopeProtocolError. Все observed_model=qwen3.8-flash; provider
+повторов нет, дополнительного prose/verifier вызова нет. Usage894917 tokens.
+Артефакты %TEMP%/d2-context-live-yxxrc2y8/: answers.md (читаемый отчёт),
+dialogues.md/html (все вопросы/ответы/raw/UI), records.json, state.json,
+dialogue.sqlite. FullContext/context/финальный текст не редактировались.
+
+Явные findings: №15 professional cleaning → professional_whitening/18000₽,
+неверная услуга выбрана моделью; отдельного cleaning service в текущем каталоге
+нет, но gap не оправдывает чужую цену. №16 policy_ids=[0] вместо string ID,
+strict parser отверг, retry нет; №17 продолжил с завершённым контекстом №15.
+Качество: №11 расплывчатое «надолго» и повтор про чувствительность; в материале
+нет точного срока эффекта. №2 расширяет срок приживления3–6мес до полного цикла
+от первого приёма; слишком широкое изложение. Никаких исправлений этих findings
+в runtime/data/prompt по итогам теста не выполнялось.
+
+Наблюдения: classic срок/гарантия/doctors/Impro связаны с предыдущей темой;
+All-on-6 и whitening followups поняты; compound №10/13 разрешены несколькими
+operations. №14 дети+ОМС без CTA; №15 взрослому CTA возвращён, но услуга неверна.
+№19 текущая боль/отёк/кровь → admin с телефоном; №20 future caries → dialogue.
+Это конкретные live примеры, не полная widget/medical/архитектурная приёмка.
+
+Independent method review выявил guard P1: offline --output мог обнулить started
+state. Исправлено общей проверкой existing state независимо от --live.
+Focused offline probe: offline/live оба отвергают calls1/startedTrue и сохраняют
+state побайтово, provider0. Live вопросы не повторялись; финальный counter20.
+Staging пуст, diff --check чист, commit/push/merge/deploy нет. Foreign сохранён.
+Независимый focused финал: PASS метода/изоляции, guard P1 закрыт. Live
+observations и чтение всех 20 ответов — executor evidence; качество ответов,
+архитектура и widget этим method PASS не аттестуются. Checker provider0.
+
+## §21. Две свежие пробы ОМС/брекеты — owner GO 2026-10-06
+
+Классификация: диагностический тест, не bug fix runtime и не упрощение.
+Owner дополнительно разрешил ровно2 provider attempts: вопрос №16 дословно
+без истории и новый вопрос о наличии/цене брекетов, каждый отдельный новый SID.
+Allowlist: scripts/experiment_d2_oms_braces_probe.py и этот документ;
+артефакты/SQLite/logs в отдельной Temp папке. Baseline e19fd5e + WIP§18–20,
+foreign data/ и SIM0 сохранены. Commit/push/live runtime edits не разрешены.
+Обычный D2HttpProvider v39, пустота history/source_revision0 проверяется до
+вызова. Hard cap2 reserve-before-transport, SDK retries0, ошибки входят в лимит.
+Нет автоматического повторного запуска, преобразования0→no_oms или fallback.
+Offline отдельно проверяется Pydantic тип policy_ids: [0] не string ID.
+Новые результаты не доказывают причинность history: модельный sampling/output
+может отличаться; внутреннюю причину токена0 нельзя восстановить по двум пробам.
+Read-only консультация GPT-6 Astra: провайдерные вызовы бота не выполняет.
+
+Executor live: 2/2 attempts, 2 raw replies, обе observed_model=qwen3.8-flash,
+finish_reason=stop, 88372 tokens. Оба результата отклонены strict parser,
+transport ошибок нет; retries0, lead/SMTP0. Артефакты
+%TEMP%/d2-oms-braces-probe-qpkb_wt7/answers.md, records.json, state.json,
+isolated.sqlite. У обоих inputs history0 и source_revision0 проверены.
+
+ОМС: вновь clinic_policy policy_ids=[0]. История не обязательна для воспроизведения
+№16. ID no_oms есть в каталоге, prompt явно запрещает numeric positions; причина
+генерации именно0 не установлена. Ошибка возникает до применения policy owner.
+Обычный provider запрашивает json_object; схема результата дана в prompt,
+не как отдельное принудительное ограничение всего output на стороне transport.
+
+Брекеты: price clarification missing=service choices=[] при уже указанном target
+braces, плюс content pending term. Pydantic подтверждает min2 violation в price
+choices; target уже известной услуги противоречит этому запросу clarification.
+Неактивность известного catalogID сама по себе не делает его неизвестной услугой.
+Нельзя объяснять оба случая утратой памяти; они подтверждают нарушения разных
+полей D2 контракта. Astra подтвердил read-only вывод; provider0/edits0.
+
+Offline: №16 payload [0] отвергается типом string_type; гипотетическая замена
+единственного поля на [no_oms] проходит. Это только диагностическая проба,
+конвертера в runtime нет. Новые реальные payloads подтверждены offline:
+OMS string_type, braces too_short(min2); дополнительные API calls0.
+Независимый Checker: PASS метода/изоляции, P0/P1 нет, provider0. Live-артефакты
+независимо не читались; live findings executor evidence, не quality acceptance.
+Staging пуст, diff --check чист; commit/push/merge/deploy/runtime fixes нет.
+
+## §22. Read-only аудит формирования ответов — 2026-10-06
+
+Классификация: аудит/документация, не runtime bug fix и не упрощение.
+Owner запросил комплексную проверку GPT-6 Astra и уточнил полезность при
+нынешней кодовой финансовой презентации. Три read-only проверки: prompt/
+contract, runtime/state/owners, demo sources. Baseline e19fd5e + WIP§18–21.
+Allowlist: этот раздел и Temp report d2-full-answer-audit-20261006.md.
+Runtime/prompt/данные не менялись; foreign data/ и SIM0 не читались.
+
+Новые подтверждённые P2: multiple ready price_detail accepted→whole-turn
+reject; off_topic получает default dental CTA вопреки D2-040; booking
+needs_clarification ошибочно превращается в pediatric refusal; booking
+early return теряет sibling operations; completion теряет inferred policy
+IDs; ordinal true coerces→1. Первые пять — traced static paths, ordinal и
+приём двух details — малые offline contract probes. Новый live/DOM не был.
+Commercial absent-fact whole-turn отказ требует отдельного разграничения
+valid gap и malformed/unauthorized input перед классификацией исправления.
+
+Generated pending content/schema boundary — ранее согласованная §3.1,
+не новая регрессия. Direct price без target проходит parser и падает позже;
+предложение согласовать validation не является полномочием менять контракт.
+OMS numeric0 и braces empty choices — model contract violations, strict
+rejection корректен. Cleaning→whitening — wrong semantic service selection.
+Уточнение №2: classic MD сам неоднозначно говорит «полное восстановление
+3–6 месяцев»; прежнее объяснение только модельной выдумкой неполно.
+
+Ordinary prompt содержит RAW MD/catalogs/policies, не полный published_terms/
+offers. §19 prose experiment получает frozen plan; он проверяет изложение
+выбранных фактов, не ordinary semantic selection. Общий quality PASS нет.
+Provider/live/SMTP0; один малый network-blocked contracts-only offline probe
+у Astra, root — read-only trace. Новых classifier/retry/adapter/memory/calls
+нет. Предложения требуют согласования в существующей карте до реализации.
+Report: %TEMP%/d2-full-answer-audit-20261006.md. Staging пуст; commit/push/
+merge/deploy нет; прежний WIP сохранён.

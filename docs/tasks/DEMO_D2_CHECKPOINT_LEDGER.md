@@ -1,5 +1,23 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Явные дубли demo price data — 2026-10-06
+
+Interface §18 owner GO, baseline e19fd5e, codex/d2-stage1-contract.
+В 14 offer JSON удалён повторный caveat из package.label; единица/состав
+объекта цены и обязательные условия сохранены. Implant-supported полный
+caveat с КТ остаётся; sinus-lift условие объёма костного материала и доступа
+сохранено. 3 one_stage не унифицировались: различаются «по показаниям».
+Проверка всех полей 33 offers against HEAD: PASS, только 14 labels отличаются.
+Загрузка snapshot/bundle/model_view: PASS,33 offers. Runtime/schema unchanged;
+provider/live/SMTP0. Дополнительный offline/review выполняются; widget
+line-break defect не исправлен. Model experiment не создавался/не запускался.
+Executor:52PASS/63.28s h5zp3brp/results.xml, network-blocked runner,
+guidance36+copy16. Independent Checker: PASS, P0/P1 нет. diff --check чист.
+Независимые16PASS/8.71s kaokna0z; all33JSON и сохранность caveats подтверждены.
+Новый tenant fingerprint несовместим с новым ходом старого SID по прежнему
+валидатору; stored replay/lead rows сохранены. Нового recovery/migration нет.
+Staging пуст, commit/push нет; foreign data/SIM0 сохранены.
+
 ## Owner widget findings / checkpoint publication — 2026-10-06
 
 После offline/Checker §17 owner выявил неудовлетворительную текстовую подачу:

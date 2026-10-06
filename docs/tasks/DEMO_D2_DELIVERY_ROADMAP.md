@@ -2,6 +2,12 @@
 
 ## Актуальный порядок после независимого аудита — 2026-10-02
 
+Owner GO 2026-10-06, Interface §18: перед отдельным экспериментом убрать явные
+дубли price caveats из 14 demo package.label, сохранив полные mandatory
+conditions и все финансовые поля. Только data bug fix; не изменение схемы,
+подбора или речи моделью. Widget line-break findings §17 остаются открытыми;
+эксперимент ещё не реализован/не запущен, call budget не согласован.
+
 Owner GO 2026-10-06 на commit/push накопленного SIM4/Interface §14–17.
 Widget §17 НЕ принят: разорванные price list continuation, дубли authored
 условий и тяжёлая подача остаются открытыми. Offline/Checker PASS не закрывает

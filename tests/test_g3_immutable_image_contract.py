@@ -458,7 +458,7 @@ def test_no_g4_deploy_wiring_started() -> None:
 
 def test_ci_workflow_pip_cache_uses_ci_lock() -> None:
     ci = _ci_text()
-    assert ci.count("cache-dependency-path: requirements-ci.lock") == 3
+    assert ci.count("cache-dependency-path: requirements-ci.lock") == 4
 
 
 def test_publish_verify_pip_cache_uses_ci_lock() -> None:

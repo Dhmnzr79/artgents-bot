@@ -69,7 +69,7 @@ def prepare(output):
                 context = provider.request.context.model_dump(mode="json")
             else:
                 context = before.context.model_dump(mode="json")
-            assert plan.get("d2_price_block") or plan.get("d2_price_detail_block") or plan.get("requested_fact_blocks") or plan.get("d2_exact_text_blocks"), (name, turn.response.rendered_text)
+            assert plan.get("d2_price_block") or plan.get("d2_price_detail_blocks") or plan.get("requested_fact_blocks") or plan.get("d2_exact_text_blocks"), (name, turn.response.rendered_text)
             records.append({"index": index, "name": name, "question": question,
                 "scripted_task": task, "verified_click": click, "context": context,
                 "fullcontext": corpus, "frozen_plan": {k: v for k, v in plan.items() if v not in (None, [], {}, "")},

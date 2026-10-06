@@ -46,14 +46,17 @@ def _project_pair(ref, result, limit):
     if resolved.route == "ADMIN" and resolved.mode == "medical_terminal" and resolved.terminal_text:
         text.append(safe_prose(resolved.terminal_text))
     safe_text = "\n\n".join(dict.fromkeys(text))[:limit].strip()
-    price = resolved.d2_price_block or resolved.d2_price_detail_block
-    offers = tuple(D2ShownPriceOfferRef(source_client_id=row.source_client_id,
-        offer_id=row.offer_id, service_id=row.service_id) for row in price.rows) if price else ()
+    price_blocks = (*((resolved.d2_price_block,) if resolved.d2_price_block else ()),
+        *resolved.d2_price_detail_blocks)
+    offers = tuple({(row.source_client_id, row.offer_id, row.service_id):
+        D2ShownPriceOfferRef(source_client_id=row.source_client_id,
+            offer_id=row.offer_id, service_id=row.service_id)
+        for block in price_blocks for row in block.rows}.values())
     return D2ProjectedDialoguePair(
         patient_text=ref.patient_text, selected_ui_ref=ref.selected_ui_ref,
         committed_at_turn=ref.committed_at_turn, assistant_text=safe_text,
         parts=resolved.d2_request_parts, price_scope=discussion_scope(resolved), offers=offers,
-        detail_aspect=resolved.d2_price_detail_block.aspect if resolved.d2_price_detail_block else None,
+        detail_aspects=tuple(block.aspect for block in resolved.d2_price_detail_blocks),
         policy_ids=tuple(dict.fromkeys(i for b in (*resolved.d2_policy_blocks, *resolved.d2_exact_text_blocks) for i in b.policy_ids)),
         fact_ids=tuple(dict.fromkeys((
             *resolved.finalized_commercial_ids.requested_fact_ids,

@@ -657,7 +657,7 @@ def test_detail_service_clarification_executes_same_aspect_without_provider(http
     assert len(fake.inputs) == 1
     with D2DialogueStore(db) as store:
         result = store.read_latest_completion(key).response.resolved
-        detail = result.d2_price_detail_block
+        detail = result.d2_price_detail_blocks[0]
         assert detail.aspect == "includes"
         assert all(row.service_id == "classic" for row in detail.rows)
         assert result.d2_price_block is None

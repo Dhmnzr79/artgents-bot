@@ -77,7 +77,7 @@ def test_explicit_brand_details_override_previous_set_and_keep_next_context(http
         fake.raw = raw(detail('nobel_biocare'))
     args = dict(request_id='details', q='Какие этапы оплаты All-on-4 Nobel?')
     body = _body(send(client, **args), transport)
-    rows = saved(db).response.resolved.d2_price_detail_block.rows
+    rows = saved(db).response.resolved.d2_price_detail_blocks[0].rows
     assert [r.offer_id for r in rows] == ['all_on_4.jaw.nobel']
     assert '256' in body['answer'] and '171' in body['answer']
     assert 'Implantium' not in body['answer'] and 'Impro' not in body['answer']
@@ -100,13 +100,13 @@ def test_unfiltered_details_and_verified_click_keep_all_displayed_offers(http_en
     send = post if transport == 'json' else post_sse
     _body(send(client, request_id='direct', q='Этапы оплаты All-on-4?'), transport)
     expected = {'all_on_4.jaw.impro','all_on_4.jaw.implantium','all_on_4.jaw.nobel'}
-    assert {r.offer_id for r in saved(db).response.resolved.d2_price_detail_block.rows} == expected
+    assert {r.offer_id for r in saved(db).response.resolved.d2_price_detail_blocks[0].rows} == expected
     fake.raw = raw(price('all_on_4', 'service'))
     priced = _body(send(client, sid='click-sid', request_id='price', q='Сколько стоит All-on-4?'), transport)
     calls = len(fake.inputs)
     args = dict(sid='click-sid', request_id='click', q='', ref='price_detail:stages', ui_revision=priced['revision'])
     clicked = _body(send(client, **args), transport)
-    assert {r.offer_id for r in saved(db, 'click-sid').response.resolved.d2_price_detail_block.rows} == expected
+    assert {r.offer_id for r in saved(db, 'click-sid').response.resolved.d2_price_detail_blocks[0].rows} == expected
     assert len(fake.inputs) == calls
     assert _body(send(client, **args), transport) == clicked
     assert 'Этапы оплаты' not in [q['label'] for q in clicked['ui']['quick_replies']]
@@ -127,7 +127,7 @@ def test_missing_brand_offers_publish_gap_not_other_brands(http_env, transport):
     use(FakeProvider(raw(detail('nobel_biocare'))))
     body = _body((post if transport == 'json' else post_sse)(client, q='Этапы оплаты All-on-4 Nobel?'), transport)
     assert 'детали не указаны' in body['answer']
-    assert saved(db).response.resolved.d2_price_detail_block is None
+    assert saved(db).response.resolved.d2_price_detail_blocks == ()
 
 
 @pytest.mark.parametrize('transport', ['json', 'sse'])
@@ -147,8 +147,9 @@ def test_detail_uses_same_extent_applicability_as_price(http_env, extent):
     client, db, use, _ = http_env
     use(FakeProvider(raw(detail('nobel_biocare', volume={'extent':extent}))))
     body = _body(post(client, q='Этапы оплаты выбранного объёма Nobel?'), 'json')
-    block = saved(db).response.resolved.d2_price_detail_block
+    blocks = saved(db).response.resolved.d2_price_detail_blocks
     if extent == 'full_arch':
-        assert [r.offer_id for r in block.rows] == ['all_on_4.jaw.nobel']
+        assert len(blocks) == 1
+        assert [r.offer_id for r in blocks[0].rows] == ['all_on_4.jaw.nobel']
     else:
-        assert block is None and 'детали не указаны' in body['answer']
+        assert blocks == () and 'детали не указаны' in body['answer']

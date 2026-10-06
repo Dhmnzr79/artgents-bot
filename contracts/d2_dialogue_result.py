@@ -132,7 +132,7 @@ class DetailOperation(ScopedOperation):
     kind: Literal["price_detail"]
     price_detail_aspect: Literal["includes", "stages"]
     price_detail_offer_id: str | None = None
-    price_detail_offer_ordinal: int | None = Field(default=None, ge=1)
+    price_detail_offer_ordinal: int | None = Field(default=None, ge=1, strict=True)
 
     @model_validator(mode="after")
     def selector(self):

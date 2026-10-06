@@ -2011,3 +2011,124 @@ Provider/live/SMTP0; один малый network-blocked contracts-only offline 
 нет. Предложения требуют согласования в существующей карте до реализации.
 Report: %TEMP%/d2-full-answer-audit-20261006.md. Staging пуст; commit/push/
 merge/deploy нет; прежний WIP сохранён.
+
+## §23. Кодовые ответы и исправления исполнения — owner GO 2026-10-06
+
+Классификация: bug fixes и presentation, не архитектурное упрощение.
+Baseline checkpoint 9179cbb, branch codex/d2-stage1-contract; origin/main и
+merge-base 141ce91. Root C:/Cursor Projects/artgents-bot-active. Staging пуст.
+Foreign data/ и DEMO_D2_SIM0_TASK.md не читать/не изменять.
+Allowlist: core/response_text_renderer.py, core/response_plan_materialization.py,
+core/d2_dialogue.py, core/d2_snapshot_sources.py, core/d2_lead_bridge.py,
+contracts/d2_dialogue_result.py, tests/test_d2_price_copy.py,
+tests/test_d2_code_answer_fixes.py, этот документ, DEMO_D2_CURRENT_STATUS.md,
+DEMO_D2_DELIVERY_ROADMAP.md, DEMO_D2_CHECKPOINT_LEDGER.md в docs/tasks/.
+
+Owner: сохранить кодовые цены, улучшить компоновку/повторы и исправить
+выявленные runtime defects существующими owners §3. Model prose не фильтровать;
+новых полей/состояний/вызовов/классификаторов/адаптеров не добавлять.
+Суммы, единицы, условия, medical/tenant/UI authenticity/lead privacy сохраняются.
+Порядок booking+sibling относительно начала заявки не согласован: dependent
+изменение раннего return не делать до отдельного решения. Multi-detail
+ограничение обсудить с Astra: существующий single frozen block не даёт права
+переименовать финансовую операцию в reference или завести второй owner.
+
+Acceptance: компактные цена+единица без forced line breaks; facts/conditions
+сохранены; pure off_topic без CTA; ordinal отвергает bool; completion отражает
+effective policy IDs, не private text; booking clarification не публикует
+несуществующий pediatric запрет. Точные tests JSON/SSE, replay и следующий
+provider context с fake provider, socket block/isolated DB через runner.
+Один coherent checkpoint → independent Checker; live/provider/SMTP0.
+
+Executor: локальный checkpoint9179cbb сохранён до runtime edits (21files
+§18–22), push не делался. Действительный diff: пять runtime/contract файлов,
+два tests (один новый), четыре docs. d2_snapshot_sources.py не менялся.
+Компоновка: frozen scope_text получает уже authored первый package clause,
+остальные clauses и mandatory conditions сохранены; цена/единица вместе,
+нет list continuation lines; дополнительный textual CTA при visible booking
+button не печатается. Model prose не обрезается/не дедуплицируется.
+Off_topic сохраняет запрет CTA текущего хода через existing suppression,
+дальнейшая dental CTA возвращается. Effective policy_ids берутся из уже
+готового policy resolution, price-blocked сохраняет actual blocked keys.
+Lead bridge больше не придумывает pediatric key при no active booking;
+existing unclear outcome просит уточнение, не начинает lead collection.
+Новых fields/states/schema version/model calls/owners нет; ordinal strict.
+
+Целевой прогон49PASS/53.93s: new tests18+copy16+HTTP+cancel.
+Guidance36PASS/55.29s: темы/объёмы/единицы/продолжения. Последняя малая
+punctuation правка покрывается independent final new+copy прогоном.
+Старый test_d2_lead_scenarios.py 7FAIL воспроизводится на чистом9179cbb
+(7FAIL/2PASS/17.40s): legacy envelope не принимается текущим D2 parser.
+Multi details и booking+sibling НЕ исправлены: Astra подтвердил, что
+доступные детали нельзя silently convert→reference (теряется финансовая
+lineage) или объявить unavailable. Требуются решения о замене single frozen
+detail несколькими и о порядке ответа/начала lead; dependent edits остановлены.
+Артефакты0vh_6gg3/813k4cts/k6e6prxm в Temp; provider/live/SMTP0.
+
+Независимый Checker: PASS bug fixes/presentation; P0/P1 нет. Final new+copy
+34PASS/31.59s 0up1l3nv, latest punctuation проверена. Рекомендация расширить
+booking evidence закрыта четырьмя child/OMS JSON/SSE/replay/no-lead fixtures:
+executor4PASS/5.50s 2fi43peu и focused Checker4PASS/5.11s 709rnsug.
+Прогон не аттестует живое понимание модели/DOM или architecture whole-bot.
+Итоговый diff11files (five runtime/contract, two tests, four docs); staging
+пуст; implementation commit/push/merge/deploy0; baseline checkpoint9179cbb
+локально. Foreign сохранён. Dependent два пункта открыты.
+
+## §24. Несколько деталей и ответ перед записью — owner GO 2026-10-06
+
+Owner явно согласовал оба оставшихся пункта §23: final plan хранит несколько
+price_detail вместо одного и отвечает на каждую; booking+информация сначала
+публикует ответ, затем existing lead owner спрашивает имя. Классификация:
+bug fixes/contract replacement, не SIM simplification. Baseline9179cbb +
+проверенный WIP§23; staging пуст. Foreign data/SIM0 сохранить/не читать.
+Allowlist (включая WIP§23): contracts/response_plan.py,
+contracts/d2_session_context.py, contracts/d2_dialogue_result.py;
+core/response_plan_materialization.py, core/response_plan_resolver.py,
+core/response_text_renderer.py, core/d2_dialogue.py,
+core/d2_completion_context.py, core/d2_lead_bridge.py;
+scripts/experiment_d2_price_prose.py (потребитель renamed frozen field);
+tests/test_d2_price_copy.py, tests/test_d2_code_answer_fixes.py,
+tests/test_d2_compound_answers.py, tests/test_d2_price_details_http.py,
+tests/test_d2_demo_audit_fixes.py, tests/test_d2_source_followup_http.py,
+tests/test_d2_sim2_dialogues.py, tests/test_d2_sim3_completion_context.py;
+четыре текущих docs/task status/roadmap/ledger/interface.
+
+§3 owners сохраняются: model operations, price owner selection/freeze,
+existing lead owner state/privacy, renderer display, completion memory.
+Удаляются singular frozen slot и multiple_unsupported, не появляются
+reference adapters для финансовых details. Scalar detail_aspect в projection
+заменяется ordered aspects. Mixed booking early return удаляется; lead owner
+вызывается после materialization, его prompt/result добавляется в конец.
+Один provider call, verified detail clicks остаются без модели.
+
+Acceptance: JSON/SSE compound includes+stages и price+details, per-part missing
+данные сохраняют siblings; бренды/offer selectors/tenant ownership строги;
+replay прежнего request без повторной модели; следующий input содержит все
+показанные refs/aspects, mixed service не создаёт произвольный focus/UI.
+Info+booking (оба исходных порядка), blocked child/OMS, failure до lead
+mutation, следующий name/phone intake — existing owner. Offline isolated DB,
+socket block, provider/live/SMTP0. Astra consultation read-only подтвердил
+схему; не Checker PASS. Strict frozen rename может отвергнуть old local
+receipt; DB/lead rows не удалять, recovery/migration/adapter не добавлять.
+
+Executor §24: singular d2_price_detail_block и detail_aspect удалены, plural
+collection проходит все frozen consumers; multiple_unsupported удалён. Каждый
+part materialized отдельно, recoverable missing data сохраняют остальные.
+Offer refs union/dedup в completion; разные наборы не получают произвольных
+detail actions. Mixed booking materializes siblings до lead mutation, existing
+lead result последний; rollback при failed completion проверяется.
+Executor90PASS/123.66s (_yjedewx). Старые price_details_http18FAIL/3PASS
+воспроизведены на clean9179cbb/21.47s (owiluild), legacy envelope baseline.
+Independent Checker19PASS/27.39s, REJECT P1: addons после name prompt.
+Исправлено: closing clinic reference/clarification после всех answer addons;
+JSON/SSE price+booking с nonempty promo/packages добавлены. Focused recheck
+PASS10/12.88s xcv1ucp7: исходный P1 закрыт. Финальный executor
+48PASS/75.92s uxsljsme (compound21 + source_followup27). Provider/live/SMTP0;
+no commit/push/merge/deploy, staging пуст.
+Old receipt strict rejection и неизменность raw payload/state проверены;
+никакого migration/reset/recovery. Lead/privacy rows не удаляются.
+
+Owner widget smoke §24 — 2026-10-06: после предложенных сценариев владелец
+сообщил «Вроде ок» и разрешил commit/push §23–24. Это owner smoke, не
+полная REC-5/live quality аттестация. Далее — внешний вид виджета без
+изменения архитектуры ответов. Foreign data/SIM0 в checkpoint не включать.

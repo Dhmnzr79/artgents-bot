@@ -788,20 +788,25 @@ def _validate_price_detail_ui_actions(
     *, actions: tuple[D2PriceDetailUiAction, ...],
     replies: tuple[UiQuickReplyCandidate, ...],
     price: D2FrozenPriceBlock | None,
-    detail: D2FrozenPriceDetailBlock | None,
+    details: tuple[D2FrozenPriceDetailBlock, ...],
 ) -> None:
     if not actions:
         return
-    if price is None and detail is None:
+    if price is None and not details:
         raise ValueError("d2_price_detail_action_without_offer_source")
     expected_ids = (
         tuple(row.offer_id for row in price.rows) if price is not None
-        else tuple(row.offer_id for row in detail.rows)
+        else tuple(row.offer_id for row in details[0].rows)
     )
     expected_services = (
         {row.service_id for row in price.rows} if price is not None
-        else {row.service_id for row in detail.rows}
+        else {row.service_id for row in details[0].rows}
     )
+    if price is None and any(
+        tuple(row.offer_id for row in block.rows) != expected_ids
+        for block in details
+    ):
+        raise ValueError("d2_price_detail_action_ambiguous_offer_source")
     if len(expected_services) != 1:
         raise ValueError("d2_price_detail_action_mixed_service")
     action_ids = [action.reply_id for action in actions]
@@ -945,7 +950,7 @@ def _validate_d2_part_result_shape(
     deferred_blocks: tuple[D2PartDeferredBlock, ...],
     result_status: D2ResultStatus | None,
     d2_price_block: D2FrozenPriceBlock | None,
-    d2_price_detail_block: D2FrozenPriceDetailBlock | None,
+    d2_price_detail_blocks: tuple[D2FrozenPriceDetailBlock, ...],
 ) -> None:
     if not parts:
         if failure_blocks or deferred_blocks or result_status is not None:
@@ -1002,19 +1007,12 @@ def _validate_d2_part_result_shape(
     elif d2_price_block is not None:
         raise ValueError("d2_request_part_price_linkage_invalid")
     detail_parts = [part for part in parts if part.kind == "price_detail"]
-    if detail_parts:
-        if len(detail_parts) != 1:
-            raise ValueError("d2_price_detail_part_linkage_invalid")
-        detail_part = detail_parts[0]
-        if detail_part.status == "answered" and (
-            d2_price_detail_block is None or detail_part.request_id != d2_price_detail_block.request_id
-        ):
-            raise ValueError("d2_price_detail_part_linkage_invalid")
-        if detail_part.status == "unavailable" and d2_price_detail_block is not None:
-            raise ValueError("d2_price_detail_part_linkage_invalid")
-        if detail_part.status not in {"answered", "unavailable"}:
-            raise ValueError("d2_price_detail_part_linkage_invalid")
-    elif d2_price_detail_block is not None:
+    detail_by_id = {block.request_id: block for block in d2_price_detail_blocks}
+    if len(detail_by_id) != len(d2_price_detail_blocks) or list(detail_by_id) != [
+        part.request_id for part in detail_parts if part.status == "answered"
+    ]:
+        raise ValueError("d2_price_detail_part_linkage_invalid")
+    if any(part.status not in {"answered", "unavailable"} for part in detail_parts):
         raise ValueError("d2_price_detail_part_linkage_invalid")
     expected_status: D2ResultStatus
     if not unavailable_parts and not deferred_parts:
@@ -1038,7 +1036,7 @@ class PreComposerPlan(ResponsePlanModel):
     history_turn_count: int = Field(default=0, ge=0)
     price_plan: PricePlan
     d2_price_block: D2FrozenPriceBlock | None = None
-    d2_price_detail_block: D2FrozenPriceDetailBlock | None = None
+    d2_price_detail_blocks: tuple[D2FrozenPriceDetailBlock, ...] = ()
     d2_price_scope_decision: D2PriceScopeDecision | None = None
     d2_request_parts: tuple[D2ResolvedRequestPart, ...] = ()
     d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()
@@ -1127,12 +1125,12 @@ class PreComposerPlan(ResponsePlanModel):
             self.d2_part_deferred_blocks,
             self.d2_result_status,
             self.d2_price_block,
-            self.d2_price_detail_block,
+            self.d2_price_detail_blocks,
         )
         _validate_price_detail_ui_actions(
             actions=self.ui_candidates.price_detail_actions,
             replies=self.ui_candidates.quick_replies,
-            price=self.d2_price_block, detail=self.d2_price_detail_block,
+            price=self.d2_price_block, details=self.d2_price_detail_blocks,
         )
         return self
 
@@ -1313,8 +1311,8 @@ def _assert_no_commerce(plan: ResolvedResponsePlan) -> None:
         raise ValueError("terminal_plan_forbids_price_block")
     if plan.d2_price_block is not None:
         raise ValueError("terminal_plan_forbids_d2_price_block")
-    if plan.d2_price_detail_block is not None:
-        raise ValueError("terminal_plan_forbids_d2_price_detail_block")
+    if bool(plan.d2_price_detail_blocks):
+        raise ValueError("terminal_plan_forbids_d2_price_detail_blocks")
     if plan.information_blocks:
         raise ValueError("terminal_plan_forbids_information_blocks")
     if plan.required_offer_conditions:
@@ -1473,10 +1471,10 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
         plan.d2_part_deferred_blocks,
         plan.d2_result_status,
         plan.d2_price_block,
-        plan.d2_price_detail_block,
+        plan.d2_price_detail_blocks,
     )
     if not parts:
-        if plan.d2_price_block is not None or plan.d2_price_detail_block is not None or plan.information_blocks:
+        if plan.d2_price_block is not None or bool(plan.d2_price_detail_blocks) or plan.information_blocks:
             raise ValueError("d2_request_parts_required")
         return
     block_ids = [block.request_id for block in plan.information_blocks]
@@ -1588,9 +1586,9 @@ def _validate_resolved_client_ownership(plan: ResolvedResponsePlan) -> None:
         _check(plan.d2_price_block)
         for row in plan.d2_price_block.rows:
             _check(row)
-    if plan.d2_price_detail_block is not None:
-        _check(plan.d2_price_detail_block)
-        for row in plan.d2_price_detail_block.rows:
+    for detail in plan.d2_price_detail_blocks:
+        _check(detail)
+        for row in detail.rows:
             _check(row)
     for block in plan.d2_part_failure_blocks:
         _check(block)
@@ -1653,7 +1651,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
     terminal_text: str | None = None
     price_block: ResolvedPriceBlock | None = None
     d2_price_block: D2FrozenPriceBlock | None = None
-    d2_price_detail_block: D2FrozenPriceDetailBlock | None = None
+    d2_price_detail_blocks: tuple[D2FrozenPriceDetailBlock, ...] = ()
     d2_price_scope_decision: D2PriceScopeDecision | None = None
     d2_request_parts: tuple[D2ResolvedRequestPart, ...] = ()
     d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()
@@ -1695,7 +1693,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
                 not (self.patient_text and self.patient_text.strip())
                 and not self.information_blocks
                 and not self.is_price_answer
-                and self.d2_price_detail_block is None
+                and not self.d2_price_detail_blocks
                 and not self.d2_part_failure_blocks
                 and not self.d2_part_deferred_blocks
                 and not self.promo_blocks
@@ -1757,7 +1755,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
         _validate_price_detail_ui_actions(
             actions=self.ui_plan.price_detail_actions,
             replies=self.ui_plan.quick_replies,
-            price=self.d2_price_block, detail=self.d2_price_detail_block,
+            price=self.d2_price_block, details=self.d2_price_detail_blocks,
         )
         return self
 

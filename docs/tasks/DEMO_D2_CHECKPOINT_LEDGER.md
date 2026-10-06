@@ -1,5 +1,42 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Составные ответы §24 — 2026-10-06
+
+Owner GO: ordered details вместо singular field; полный ответ перед existing
+lead result. Baseline9179cbb + WIP§23; bug fixes/contract replacement.
+Financial ownership/UI authenticity/medical/lead privacy сохранены.
+Executor90PASS/123.66s _yjedewx; Independent Checker19PASS/27.39s, REJECT
+единственный P1: коммерческие addons после name prompt. Исправлено renderer
+порядком существующих exact clinic tail parts, новые JSON/SSE price+booking
+fixtures; focused Checker PASS10/12.88s xcv1ucp7.
+Финальный executor48PASS/75.92s uxsljsme (compound21 + source_followup27). Provider/live/SMTP0, isolated DB/socket block.
+Baseline legacy price_details_http18FAIL/3PASS/21.47s owiluild на clean9179cbb.
+Old receipts несовместимы без изменения DB/заявок; migration/reset/adapter0.
+Staging пуст; implementation commit/push/merge/deploy0; foreign data/SIM0
+сохранён. SIM4/5/REC5 и live/widget не аттестованы. Числа прогонов не суммировать.
+
+## Кодовые ответы §23 — 2026-10-06
+
+Checkpoint до правок:9179cbb, локальный commit21files с §18–22; push0.
+Runtime bug fixes/presentation, не simplification: compact price/unit rows,
+no extra CTA footer при bookingbutton, off_topic UI, effective policy IDs
+в существующей completion, booking unclear без pediatric fallback,
+strict ordinal. Нет новых model calls/fields/states/schema version/adapters.
+Executor49PASS/53.93s 0vh_6gg3 + guidance36PASS/55.29s 813k4cts;
+после первого прогона добавлена только punctuation кодовых условий;
+финальный независимый copy/new-path34PASS/31.59s 0up1l3nv. Socket blocked, isolated
+DB; provider/live/SMTP0. Legacy lead scenarios7FAIL подтверждены на чистом
+9179cbb:7FAIL/2PASS/17.40s k6e6prxm, старый envelope format, не регрессия.
+Multiple details и booking+sibling НЕ закрыты: отдельные owner decisions
+о frozen representation и порядке lead intake. Widget/live не аттестованы.
+Foreign data/SIM0 на месте; staging пуст, новых runtime commits/push нет.
+
+Independent Checker PASS bug fixes/presentation, P0/P1 нет. P2 недостаток
+booking prohibition coverage закрыт четырьмя child/OMS JSON/SSE fixtures:
+executor4PASS/5.50s 2fi43peu; focused Checker4PASS/5.11s 709rnsug.
+Проверены authored policy, отсутствие false pediatric/lead mutation и replay.
+Числа отдельных прогонов не являются уникальным общим числом tests.
+
 ## Явные дубли demo price data — 2026-10-06
 
 Interface §18 owner GO, baseline e19fd5e, codex/d2-stage1-contract.
@@ -1582,3 +1619,8 @@ Checker/Cursor verdict будет указан после проверки diff.
   internal route. HTTP/SSE integration, реальный lead UI/transport и общий runtime
   **не начаты**. Live-проверка ограниченно доказана только для CP3 A08, не для
   общего runtime.
+
+Owner widget smoke §24 — 2026-10-06: после предложенных сценариев владелец
+сообщил «Вроде ок» и разрешил commit/push §23–24. Это owner smoke, не
+полная REC-5/live quality аттестация. Далее — внешний вид виджета без
+изменения архитектуры ответов. Foreign data/SIM0 в checkpoint не включать.

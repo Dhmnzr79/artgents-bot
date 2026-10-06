@@ -360,8 +360,6 @@ def resolve_d2_operations(
     price_parts = tuple(item for item in operations if item.kind == "price")
     content_parts = tuple(item for item in operations if item.kind == "content")
     detail_parts = tuple(item for item in operations if item.kind == "price_detail")
-    if len(detail_parts) > 1:
-        raise MaterializationContractError("d2_price_detail_multiple_unsupported")
     direct_promotion = promotion_scope != "none"
     direct_fact = bool(requested_fact_ids)
 
@@ -535,9 +533,9 @@ def resolve_d2_operations(
         )
         scope_decision = None
         volume_choices = ()
-    detail_block: D2FrozenPriceDetailBlock | None = None
-    detail_failure_reason: str | None = None
-    if detail_parts:
+    detail_blocks: list[D2FrozenPriceDetailBlock] = []
+    detail_failures: dict[str, str] = {}
+    for detail_part in detail_parts:
         effective_refs = (
             tuple(D2ShownPriceOfferRef(
                 source_client_id=row.source_client_id, offer_id=row.offer_id,
@@ -545,8 +543,6 @@ def resolve_d2_operations(
             ) for row in price_block.rows)
             if price_block is not None else shown_price_offer_refs
         )
-        # A separately named service in this same turn supersedes the older
-        # displayed offer set before the detail part is resolved.
         named_content_services = {
             part.service_id for part in content_parts if part.service_id is not None
         }
@@ -555,35 +551,36 @@ def resolve_d2_operations(
                 len(named_content_services) != 1
                 or any(ref.service_id not in named_content_services for ref in effective_refs)
             ))
-            or (detail_parts[0].service_id is not None and any(
-                ref.service_id != detail_parts[0].service_id for ref in effective_refs
+            or (detail_part.service_id is not None and any(
+                ref.service_id != detail_part.service_id for ref in effective_refs
             ))
         ):
             effective_refs = ()
         try:
-            detail_block = _d2_price_detail_block(
-                detail_parts[0], sources=sources,
+            detail_blocks.append(_d2_price_detail_block(
+                detail_part, sources=sources,
                 shown_price_offer_refs=effective_refs, selected_action=selected_price_detail_action,
-            )
+            ))
         except MaterializationContractError as error:
             if str(error) not in {"d2_price_detail_context_ambiguous", "d2_no_price_candidates", "d2_no_scope_price_candidates"}:
                 raise
-            detail_failure_reason = str(error)
-            ambiguous = detail_failure_reason == "d2_price_detail_context_ambiguous"
+            reason = str(error)
+            detail_failures[detail_part.request_id] = reason
+            ambiguous = reason == "d2_price_detail_context_ambiguous"
             failure_blocks.append(D2PartFailureBlock(
-                request_id=detail_parts[0].request_id,
-                source_client_id=client_id,
+                request_id=detail_part.request_id, source_client_id=client_id,
                 message_id="d2-price-detail-clarify" if ambiguous else "d2-price-detail-unavailable",
-                reason=detail_failure_reason,
+                reason=reason,
                 display_text=("Уточните, для какой услуги или варианта показать детали." if ambiguous
                     else "Для этого варианта детали не указаны."),
             ))
-        if detail_block is not None and not price_parts and not content_parts:
-            detail_services = {row.service_id for row in detail_block.rows}
-            if len(detail_services) == 1:
-                service_ids, response_scope = (next(iter(detail_services)),), "service"
-            else:
-                response_scope = "mixed"
+    details_by_id = {block.request_id: block for block in detail_blocks}
+    if detail_blocks and not price_parts and not content_parts:
+        detail_services = {row.service_id for block in detail_blocks for row in block.rows}
+        if len(detail_services) == 1:
+            service_ids, response_scope = (next(iter(detail_services)),), "service"
+        else:
+            response_scope = "mixed"
     part_identities = []
     def _scope_identity(scope: str, service_id: str | None, topic_id: str | None) -> tuple[str, str | None]:
         if service_id is not None:
@@ -600,7 +597,7 @@ def resolve_d2_operations(
             for item in (*price_parts, *deferred_price_parts)
         )
     part_identities.extend(_scope_identity(scope, part.service_id, topic) for part, (_, scope, topic) in zip(content_parts, content_part_scopes))
-    if detail_block is not None:
+    for detail_block in detail_blocks:
         detail_services = {row.service_id for row in detail_block.rows}
         detail_service = next(iter(detail_services)) if len(detail_services) == 1 else None
         part_identities.append(_scope_identity(
@@ -670,6 +667,8 @@ def resolve_d2_operations(
                 ),
             ))
         elif part.kind == "price_detail":
+            detail_block = details_by_id.get(part.request_id)
+            detail_failure_reason = detail_failures.get(part.request_id)
             detail_services = {row.service_id for row in detail_block.rows} if detail_block is not None else set()
             detail_service = next(iter(detail_services)) if len(detail_services) == 1 else None
             request_parts.append(D2ResolvedRequestPart(
@@ -774,9 +773,12 @@ def resolve_d2_operations(
                 "quick_replies": detail_replies,
                 "price_detail_actions": detail_actions,
             })
-    elif detail_block is not None:
+    elif detail_blocks and all(
+        tuple(row.offer_id for row in block.rows) == tuple(row.offer_id for row in detail_blocks[0].rows)
+        for block in detail_blocks
+    ):
         detail_replies, detail_actions = _d2_price_detail_ui(
-            sources=sources, offer_ids=tuple(row.offer_id for row in detail_block.rows),
+            sources=sources, offer_ids=tuple(row.offer_id for row in detail_blocks[0].rows),
             selected_action=selected_price_detail_action,
         )
         ui_candidates = ui_candidates.model_copy(update={
@@ -846,7 +848,7 @@ def resolve_d2_operations(
         selected_topic_id=selected_topic_id if plan_scope != "mixed" else None,
         price_plan=PricePlan(kind="none"),
         d2_price_block=price_block,
-        d2_price_detail_block=detail_block,
+        d2_price_detail_blocks=tuple(detail_blocks),
         d2_price_scope_decision=scope_decision,
         d2_request_parts=tuple(request_parts),
         d2_part_failure_blocks=frozen_failure_blocks,
@@ -892,7 +894,7 @@ def resolve_d2_operations(
         code_owned_answer=(
             (direct_promotion and bool(commercial.promo_blocks))
             or (direct_fact and bool(requested_fact_ids))
-            or detail_block is not None
+            or bool(detail_blocks)
             or bool(exact_contact_blocks or exact_policy_blocks or exact_text_blocks)
         ),
     )
@@ -1498,16 +1500,17 @@ def _d2_frozen_price_row(
     else:  # pragma: no cover - TargetPrice is a discriminated union.
         raise MaterializationContractError("d2_price_mode_invalid")
     package_scope = terms.package_label.strip()
+    scope_text = package_scope.split(";", 1)[0].strip() if package_scope else unit
     return D2FrozenPriceRow(
         source_client_id=client_id,
         offer_id=offer.offer_id,
         service_id=offer.service_id,
         mode=mode,
-        display_text=f"{service_name} — {body}{'' if package_scope else f' {unit}'}",
+        display_text=f"{service_name} — {body} {scope_text}".strip(),
         service_name=service.name,
         variant_label=variant,
         price_display_text=body,
-        scope_text=unit if not package_scope else None,
+        scope_text=scope_text or None,
         amount=price.amount if isinstance(price, TargetFixedPrice) else None,
         min_amount=(
             price.min_amount
@@ -1518,7 +1521,7 @@ def _d2_frozen_price_row(
         currency=price.currency,
         billing_unit=price.billing_unit,
         condition_texts=_d2_brief_price_conditions(
-            offer, package_label=package_scope, already_shown=unit if not package_scope else "",
+            offer, package_label=package_scope, already_shown=scope_text,
         ),
     )
 

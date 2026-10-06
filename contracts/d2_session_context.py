@@ -75,7 +75,7 @@ class D2ProjectedDialoguePair(ResponsePlanModel):
     parts: tuple[D2ResolvedRequestPart, ...] = ()
     price_scope: DiscussionScope | None = None
     offers: tuple[D2ShownPriceOfferRef, ...] = ()
-    detail_aspect: str | None = None
+    detail_aspects: tuple[str, ...] = ()
     policy_ids: tuple[str, ...] = ()
     fact_ids: tuple[str, ...] = ()
 

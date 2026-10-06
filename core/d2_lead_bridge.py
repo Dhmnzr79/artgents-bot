@@ -232,22 +232,29 @@ def resolve_d2_booking_lead_entry(
     policy = (resolve_clinic_policies(client_id=session_key.client_id, understanding=understanding)
         if understanding is not None else resolve_clinic_policy_operations(
             client_id=session_key.client_id, operations=operations))
-    if policy.suppress_forbidden_booking_cta or not policy.active_booking_request_id:
-        blocked_key = next(
-            (
-                d.policy_key
-                for d in policy.decisions
-                if d.outcome == "blocked" and d.policy_key
-            ),
-            "no_pediatric_dentistry",
+    blocked_keys = tuple(dict.fromkeys(
+        d.policy_key for d in policy.decisions if d.policy_key and (
+            d.outcome == "blocked" or (
+                policy.suppress_forbidden_booking_cta
+                and d.policy_key == "no_pediatric_dentistry"
+                and d.outcome == "allowed_by_known_rules"
+            )
         )
-        text = _authored_policy_answer(snapshot, blocked_key) or (
-            "К сожалению, детский приём в этой клинике не оказываем. "
-            "Если вопрос по взрослому пациенту — напишите, пожалуйста."
-        )
+    ))
+    if blocked_keys:
+        text = "\n\n".join(filter(None, (
+            _authored_policy_answer(snapshot, key) for key in blocked_keys
+        ))) or "У меня пока недостаточно информации об условиях такой записи."
         return D2LeadBridgeResult(
             kind="booking_blocked",
             response=_plain_answer(snapshot, session_key=session_key, text=text, quick=()),
+        )
+    if not policy.active_booking_request_id or policy.suppress_forbidden_booking_cta:
+        return D2LeadBridgeResult(
+            kind="unclear",
+            response=_plain_answer(snapshot, session_key=session_key,
+                text="Уточните, пожалуйста, условия записи. Пока я не могу подтвердить её по указанным данным.",
+                quick=()),
         )
     sid = session_key.sid
     st = mem_get(sid)

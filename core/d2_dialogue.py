@@ -763,14 +763,14 @@ def _run_reserved_d2_dialogue_turn(
         return _commit_non_price_d2_turn(response=response, **commit_args)
     if context.retained_terminal_state not in {"none", "clarify", "spam_warn", "medical_terminal"}:
         raise ValueError("d2_experiment_terminal_session_unsupported")
+    booking_blocks = tuple(block for block in result.blocks if block.kind == "booking")
     if lead_bridge:
         if not d2_lead_session_client_matches(session_key):
             raise ValueError("d2_lead_session_client_required")
-        booking = resolve_d2_booking_lead_entry(
-            snapshot=tenant, session_key=session_key,
-            operations=tuple(p for p in result.requests if p.kind in {"booking", "price", "clinic_policy"}),
-        )
-        if booking is not None:
+        if booking_blocks and len(booking_blocks) == len(result.blocks):
+            booking = resolve_d2_booking_lead_entry(
+                snapshot=tenant, session_key=session_key, operations=booking_blocks,
+            )
             return _commit_non_price_d2_turn(response=booking.response, **commit_args)
 
     operations, contact_blocks, policy_blocks = [], [], []
@@ -783,6 +783,8 @@ def _run_reserved_d2_dialogue_turn(
     directory_cta = None
     suppress_forbidden_booking_cta = False
     for block in result.blocks:
+        if block.kind == "booking":
+            continue
         is_price = isinstance(block, PriceOperation)
         if is_price and first_price_seen:
             deferred.append(block)
@@ -853,7 +855,9 @@ def _run_reserved_d2_dialogue_turn(
             # Rules have already been applied to this local operation. The final
             # renderer receives code-owned text, not a second route decision.
             exact_text.append(D2ExactTextBlock(request_id=block.request_id,
-                source_client_id=session_key.client_id, display_text=answer.rendered_text, policy_ids=block.policy_ids))
+                source_client_id=session_key.client_id, display_text=answer.rendered_text,
+                policy_ids=tuple(dict.fromkeys(d.policy_key for d in policy.decisions
+                    if d.outcome == "allowed_by_known_rules" and d.policy_key))))
             exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
                 kind="reference", status="answered", scope="clinic"))
             continue
@@ -871,7 +875,8 @@ def _run_reserved_d2_dialogue_turn(
                 answer = build_d2_clinic_policy_response(tenant, session_key=session_key,
                     request=rule)
                 exact_text.append(D2ExactTextBlock(request_id=block.request_id,
-                    source_client_id=session_key.client_id, display_text=answer.rendered_text))
+                    source_client_id=session_key.client_id, display_text=answer.rendered_text,
+                    policy_ids=blocked))
                 exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
                     kind="price_reference", status="answered", scope="clinic"))
                 continue
@@ -912,7 +917,7 @@ def _run_reserved_d2_dialogue_turn(
         shown_promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
         shown_secondary_ref_ids=context.retained_shown_ids.secondary_ref_ids,
     )
-    render_order = tuple(b.request_id for b in result.blocks)
+    render_order = tuple(b.request_id for b in result.blocks if b.kind != "booking")
     response = resolve_d2_operations(
         tuple(operations), sources, as_of=now.date(),
         common_route_content_lookup=bool(operations) and all(isinstance(p, ExplanationOperation) for p in operations),
@@ -926,8 +931,34 @@ def _run_reserved_d2_dialogue_turn(
         selected_price_detail_action=selected_price_detail_action,
         commercial_operations=tuple(commercial_operations),
         directory_cta=directory_cta,
-        suppress_forbidden_booking_cta=suppress_forbidden_booking_cta,
+        suppress_forbidden_booking_cta=(suppress_forbidden_booking_cta
+            or all(isinstance(block, OffTopicOperation) for block in result.blocks)),
     )
+    if lead_bridge and booking_blocks:
+        # Resolve siblings before the existing lead owner mutates intake state.
+        booking = resolve_d2_booking_lead_entry(
+            snapshot=tenant, session_key=session_key,
+            operations=tuple(p for p in result.blocks if p.kind in {"booking", "price", "clinic_policy"}),
+        )
+        booking_part = D2ResolvedRequestPart(request_id=booking_blocks[0].request_id,
+            kind="clarification" if booking.kind == "unclear" else "reference",
+            status="answered", scope="clinic")
+        values = response.resolved.model_dump()
+        values.update(
+            d2_request_parts=(*response.resolved.d2_request_parts, booking_part),
+            d2_exact_text_blocks=(*response.resolved.d2_exact_text_blocks,
+                D2ExactTextBlock(request_id=booking_part.request_id,
+                    source_client_id=session_key.client_id, display_text=booking.response.rendered_text)),
+            ui_plan=booking.response.resolved.ui_plan,
+            textual_cta_block=None,
+            d2_result_status=("degraded" if any(part.status != "answered"
+                for part in response.resolved.d2_request_parts) else "complete"),
+        )
+        resolved = type(response.resolved).model_validate(values)
+        from core.response_text_renderer import render_response_text
+        from core.response_ui_projection import project_response_ui
+        response = replace(response, resolved=resolved,
+            rendered_text=render_response_text(resolved), ui_projection=project_response_ui(resolved))
     if not response.rendered_text.strip():
         raise ValueError("d2_empty_completed_answer")
     if lead_pause_response:
@@ -948,12 +979,14 @@ def _run_reserved_d2_dialogue_turn(
     scope = response.resolved.response_scope
     current_discussion = discussion_scope(response.resolved)
     refs = _next_d2_shown_price_offer_refs(snapshot=snapshot, price=price, context=context)
-    if response.resolved.d2_price_detail_block is not None:
-        refs = tuple(D2ShownPriceOfferRef(source_client_id=r.source_client_id, offer_id=r.offer_id, service_id=r.service_id)
-                     for r in response.resolved.d2_price_detail_block.rows)
+    if response.resolved.d2_price_detail_blocks:
+        refs = tuple({(r.source_client_id, r.offer_id, r.service_id):
+            D2ShownPriceOfferRef(source_client_id=r.source_client_id, offer_id=r.offer_id, service_id=r.service_id)
+            for block in (*((price,) if price else ()), *response.resolved.d2_price_detail_blocks)
+            for r in block.rows}.values())
     if pending is not None or scope == "mixed":
         refs = ()
-    elif price is None and response.resolved.d2_price_detail_block is None:
+    elif price is None and not response.resolved.d2_price_detail_blocks:
         if current_discussion is not None and current_discussion != context.ordinary.discussion_scope:
             refs = ()
     accumulated = context.retained_shown_ids.model_copy(update={

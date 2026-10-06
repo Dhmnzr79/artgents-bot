@@ -2,6 +2,21 @@
 
 ## Актуальный порядок после независимого аудита — 2026-10-02
 
+Текущее дополнение owner GO 2026-10-06 — Interface §23: безопасные bug fixes
+кодовой подачи и исполнения перед дальнейшим model-price experiment.
+Baseline9179cbb; цены остаются у price owner, свободное понимание у модели.
+Выполнены compact rows/CTA/provenance/booking unclear/strict ordinal;
+offline49+36PASS, Independent Checker PASS34+focused4. Widget acceptance открыта.
+Owner согласовал §24: ordered multi-detail collection вместо singular slot,
+mixed booking после полного ответа. Реализация готова; executor90PASS,
+Checker19PASS с одной P1 ordering находкой; исправлена, focused PASS10.
+Финальный executor48PASS (compound/source-followup).
+Financial reference adapter не добавлен. Local old frozen receipts strict
+reject без изменения DB/заявок; новая беседа для widget. SIM4/5/REC5 не закрывать.
+§19–21 эксперименты завершены8+20+2
+attempts ранее; в §23 provider0. Строки ниже про незапущенный эксперимент —
+исторические стадии подготовки, не текущая блокировка.
+
 Owner GO 2026-10-06, Interface §18: перед отдельным экспериментом убрать явные
 дубли price caveats из 14 demo package.label, сохранив полные mandatory
 conditions и все финансовые поля. Только data bug fix; не изменение схемы,

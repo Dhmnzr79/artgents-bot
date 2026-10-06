@@ -92,8 +92,8 @@ def test_classic_price_clicks_freeze_all_shown_offers_without_provider(http_env,
     assert len(fake.inputs) == 1
     with D2DialogueStore(db) as store:
         saved = store.read_latest_completion(SessionKey(client_id="demo", sid=sid))
-        assert saved.response.resolved.d2_price_detail_block.aspect == "stages"
-        assert len(saved.response.resolved.d2_price_detail_block.rows) == 3
+        assert saved.response.resolved.d2_price_detail_blocks[0].aspect == "stages"
+        assert len(saved.response.resolved.d2_price_detail_blocks[0].rows) == 3
 
 
 def test_direct_detail_uses_shown_order_even_when_buttons_disabled(http_env):
@@ -405,7 +405,7 @@ def test_expired_shown_set_is_not_used_for_short_detail(http_env):
             now=at + timedelta(minutes=30), request_id="detail",
         )
         assert detail.response.resolved.route == "CLARIFY"
-        assert detail.response.resolved.d2_price_detail_block is None
+        assert detail.response.resolved.d2_price_detail_blocks == ()
     assert len(fake.inputs) == 2
 
 

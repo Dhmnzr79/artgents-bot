@@ -120,7 +120,7 @@ def test_price_detail_is_remembered_without_old_money_and_contact_prose_is_publi
     fake.raw = raw(explanation("Ответ о сроках."))
     assert post(client, request_id="next", q="А сроки?").status_code == 200
     pairs = fake.inputs[-1].context.ordinary.dialogue_pairs
-    assert pairs[-1].detail_aspect == "includes"
+    assert pairs[-1].detail_aspects == ("includes",)
     assert pairs[-1].offers
     serialized = json.dumps([p.model_dump(mode="json") for p in pairs], ensure_ascii=False)
     for money in ("76 200", "85 200", "101 200", "₽", "amount_rub", "rendered_text"):

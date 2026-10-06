@@ -149,6 +149,9 @@ def _collect_owned_candidates(plan: PreComposerPlan) -> list[object]:
     if plan.d2_price_block is not None:
         items.append(plan.d2_price_block)
         items.extend(plan.d2_price_block.rows)
+    for detail in plan.d2_price_detail_blocks:
+        items.append(detail)
+        items.extend(detail.rows)
     items.extend(plan.d2_part_failure_blocks)
     items.extend(plan.d2_part_deferred_blocks)
     items.extend(plan.d2_contact_blocks)
@@ -402,7 +405,7 @@ def _resolve_composer_answer(
         d2_result_status=plan.d2_result_status,
         price_block=price_block,
         d2_price_block=d2_price_block,
-        d2_price_detail_block=plan.d2_price_detail_block,
+        d2_price_detail_blocks=plan.d2_price_detail_blocks,
         information_blocks=composer.information_blocks,
         required_offer_conditions=required_conditions,
         requested_fact_blocks=tuple(requested_blocks),

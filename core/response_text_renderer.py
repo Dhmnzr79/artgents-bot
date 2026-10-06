@@ -33,7 +33,16 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
             block.request_id: block for block in plan.d2_part_deferred_blocks
         }
         exact_by_request = {b.request_id: b for b in plan.d2_exact_text_blocks}
-        for part in plan.d2_request_parts:
+        # Closing clinic references/clarifications follow the whole answer,
+        # including price-owned conditions and commercial additions.
+        body_end = len(plan.d2_request_parts)
+        while body_end and (
+            plan.d2_request_parts[body_end - 1].status == "answered"
+            and plan.d2_request_parts[body_end - 1].kind in {"reference", "clarification"}
+            and plan.d2_request_parts[body_end - 1].scope == "clinic"
+        ):
+            body_end -= 1
+        for part in plan.d2_request_parts[:body_end]:
             if part.status == "unavailable":
                 parts.append(failures_by_request[part.request_id].display_text.strip())
             elif part.status == "deferred":
@@ -45,7 +54,8 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
                     parts.append(plan.patient_text.strip())
                 _render_d2_price_parts(plan, parts)
             elif part.kind == "price_detail":
-                _render_d2_price_detail(plan, parts)
+                _render_d2_price_detail(next(block for block in plan.d2_price_detail_blocks
+                    if block.request_id == part.request_id), parts)
             elif part.kind == "contact":
                 parts.append(contacts_by_request[part.request_id].display_text.strip())
             elif part.kind == "clinic_policy":
@@ -62,6 +72,8 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
         parts.extend(_render_d2_commercial_packages(plan))
         parts.extend(_render_amplifier_list(plan))
         parts.extend(_render_textual_cta(plan))
+        parts.extend(exact_by_request[part.request_id].display_text.strip()
+                     for part in plan.d2_request_parts[body_end:])
         return _join_parts(parts)
 
     if plan.is_price_answer:
@@ -130,10 +142,7 @@ def _render_d2_price_parts(plan: ResolvedResponsePlan, parts: list[str]) -> None
         start = end
 
 
-def _render_d2_price_detail(plan: ResolvedResponsePlan, parts: list[str]) -> None:
-    detail = plan.d2_price_detail_block
-    if detail is None:
-        return
+def _render_d2_price_detail(detail, parts: list[str]) -> None:
     rows = detail.rows
     if len(rows) == 1:
         parts.append(f"**{rows[0].label}**")
@@ -221,8 +230,10 @@ def _render_compact_price_group(
         if row.variant_label:
             name += f" — {row.variant_label}"
         scope = f" {row.scope_text}" if row.scope_text else ""
-        parts.append(f"{name}\n\n{price_text(row)}{scope}")
-        parts.extend(text for text in common if text != row.scope_text)
+        parts.append(f"{name} — {price_text(row)}{scope}")
+        conditions = tuple(text for text in common if text != row.scope_text)
+        if conditions:
+            parts.append(" ".join(text if text.endswith((".", "!", "?")) else text + "." for text in conditions))
         return
 
     if not show_service_in_each_row:
@@ -233,13 +244,15 @@ def _render_compact_price_group(
         label = (
             f"{row.service_name} — {row.variant_label}" if row.variant_label else row.service_name
         ) if show_service_in_each_row else row.variant_label
-        local = tuple(text for text in item if text not in common)
+        local = tuple(text for text in item if text != row.scope_text and text not in common)
         prefix = f"{label} — " if label else ""
-        suffix = "\n  " + "\n  ".join(local) if local else ""
-        lines.append(f"- {prefix}{price_text(row)}{suffix}")
+        scope = f" {row.scope_text}" if row.scope_text else ""
+        suffix = " · " + " ".join(text if text.endswith((".", "!", "?")) else text + "." for text in local) if local else ""
+        lines.append(f"- {prefix}{price_text(row)}{scope}{suffix}")
     parts.append("\n".join(lines))
-    if common:
-        parts.extend(common)
+    conditions = tuple(text for text in common if not all(text == row.scope_text for row in rows))
+    if conditions:
+        parts.append(" ".join(text if text.endswith((".", "!", "?")) else text + "." for text in conditions))
 
 
 def _render_authored_service_alternative(plan: ResolvedResponsePlan) -> list[str]:
@@ -299,6 +312,12 @@ def _render_amplifier_list(plan: ResolvedResponsePlan) -> list[str]:
 
 def _render_textual_cta(plan: ResolvedResponsePlan) -> list[str]:
     if plan.textual_cta_block is None:
+        return []
+    if plan.d2_price_block is not None and any(
+        button.action_kind == "cta" for button in plan.ui_plan.buttons
+    ):
+        # The visible booking button already invites the visitor. Preserve
+        # model prose and mandatory price caveats without adding another footer.
         return []
     return [plan.textual_cta_block.text.strip()]
 

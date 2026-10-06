@@ -20,7 +20,7 @@ def render(aspect, *rows):
     block = D2FrozenPriceDetailBlock(source_client_id="demo", request_id="r1", aspect=aspect, rows=rows)
     before = block.model_dump()
     parts = []
-    _render_d2_price_detail(SimpleNamespace(d2_price_detail_block=block), parts)
+    _render_d2_price_detail(block, parts)
     assert block.model_dump() == before
     return "\n\n".join(parts)
 
@@ -95,7 +95,7 @@ def test_single_price_preserves_mode_unit_and_every_condition(mode, text, metada
     _render_compact_price_group((item,), parts, show_service_in_each_row=False)
     answer = "\n\n".join(parts)
     assert item.model_dump() == before
-    assert answer.startswith("**Услуга** — Вариант\n\n")
+    assert answer.startswith(f"**Услуга** — Вариант — {text if mode == 'no_public_price' else f'**{text}**'}")
     assert answer.count(text) == 1
     assert answer.count("Диагностика по показаниям — отдельно") == 1
     if mode != "no_public_price":
@@ -114,7 +114,7 @@ def test_verified_detail_click_keeps_frozen_facts_and_replay_without_model(http_
     assert len(fake.inputs) == 1
     with D2DialogueStore(db) as store:
         completion = store.read_latest_completion(SessionKey(client_id="demo", sid="cp6a"))
-        block = completion.response.resolved.d2_price_detail_block
+        block = completion.response.resolved.d2_price_detail_blocks[0]
         assert block.aspect == aspect and len(block.rows) == 3
         assert completion.response.rendered_text == body["answer"]
         for item in block.rows:

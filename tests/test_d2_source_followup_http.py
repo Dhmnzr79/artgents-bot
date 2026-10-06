@@ -159,8 +159,8 @@ def test_price_detail_chain_keeps_shown_offers_and_scope_without_provider(http_e
         assert len(fake.inputs) == 1
         with D2DialogueStore(db) as store:
             saved = store.read_latest_completion(key)
-            assert saved.response.resolved.d2_price_detail_block.aspect == aspect
-            assert [r.offer_id for r in saved.response.resolved.d2_price_detail_block.rows] == offer_ids
+            assert saved.response.resolved.d2_price_detail_blocks[0].aspect == aspect
+            assert [r.offer_id for r in saved.response.resolved.d2_price_detail_blocks[0].rows] == offer_ids
             assert saved.response.resolved.d2_request_parts[0].discussion_scope == descriptor, aspect
     fake.raw = raw(content(DURATION))
     _body(send(client, request_id="duration", q="А по времени лечения?"), transport)

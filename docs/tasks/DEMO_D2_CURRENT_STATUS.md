@@ -1,5 +1,34 @@
 # D2 — текущее состояние и куда смотреть
 
+## Кодовые ответы: bug-fix checkpoint — 2026-10-06
+
+Точка возврата перед правками: 9179cbb (cleanup + три экспериментальных
+скрипта и результаты §18–22 сохранены локальным commit, push не выполнялся).
+Interface §23: цена/единица на одной строке, условия рядом; кодовый CTA footer
+не дублирует видимую booking button; pure off_topic без dental CTA; effective
+policy IDs проходят в completion; booking unclear не превращается в ложный
+детский отказ; ordinal strict. Обычные финансовые ответы остаются кодовыми.
+Provider/live/SMTP0. Executor49PASS + guidance36PASS; legacy lead scenarios
+7FAIL повторены на чистом 9179cbb (7FAIL/2PASS). Independent Checker PASS:
+34PASS latest new+copy, focused booking child/OMS4PASS; provider0.
+Widget ещё не аттестован; SIM4/5/REC5 не закрыты.
+
+Owner GO §24: оба dependent пункта реализованы. Single frozen detail заменён
+ordered collection через materializer/resolver/renderer/completion; отдельные
+financial parts сохраняют ownership, refs и aspects. Mixed booking early return
+удалён: сначала полный sibling answer, затем existing lead result. Новых
+model calls/classifiers/memory/adapters нет. Executor90PASS; независимый
+Checker19PASS нашёл P1: коммерческие дополнения печатались после name prompt.
+Порядок исправлен, добавлены JSON/SSE price+booking проверки; focused recheck
+PASS:10/12.88s xcv1ucp7. Финальный executor48PASS/75.92s uxsljsme
+(compound21 + source_followup27). Это bug fixes/contract replacement, не SIM simplification.
+Old local frozen receipts несовместимы: strict rejection без переписывания
+DB/lead rows, migration/reset/recovery не добавлены. Owner widget smoke §24: «Вроде ок», commit/push разрешён 2026-10-06.
+Полная приёмка REC-5 не закрыта. Для widget нужна новая беседа. SIM4/5/REC5 и live/widget acceptance остаются открытыми.
+Ошибки live модели OMS/braces/
+cleaning остаются отдельной задачей. Ниже исторические записи §18/раньше;
+утверждения «эксперимент не запущен» относятся к моменту подготовки.
+
 ## Подготовка данных к отдельному model test — 2026-10-06
 
 После checkpoint e19fd5e owner разрешил убрать явные дубли условий.

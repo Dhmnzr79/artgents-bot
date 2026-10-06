@@ -9,6 +9,13 @@ from session import clear_session_client_binding, clear_session_store_cache
 
 
 @pytest.fixture(autouse=True)
+def _isolate_d2_dialogue_and_demo_quota(monkeypatch, tmp_path):
+    """Fresh durable D2 state and quota per test; do not disable admission."""
+    monkeypatch.setenv("D2_DIALOGUE_DB_PATH", str(tmp_path / "d2-ci.sqlite"))
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _reset_ip_rate_limit_buckets() -> None:
     """Isolate HTTP harness tests from module-global per-IP rate limit state."""
 

@@ -179,7 +179,6 @@ def run_d2_dialogue_turn(
     lead_effect_dispatcher: D2LeadEffectDispatcher | None = None,
     lead_ui_ref: str | None = None,
     ui_revision: int | None = None,
-    situation_action: str | None = None,
     lead_bridge: bool = False,
 ) -> D2DialogueTurn:
     """Complete one D2 turn with one state/result owner.
@@ -198,7 +197,7 @@ def run_d2_dialogue_turn(
     full_audit(
         "turn_input", session_key=session_key, request_id=effective_request_id,
         user_message=user_message, lead_ui_ref=lead_ui_ref,
-        ui_revision=ui_revision, situation_action=situation_action,
+        ui_revision=ui_revision,
     )
     if (lead_effect_id is None) != (lead_effect_dispatcher is None):
         raise ValueError("d2_lead_effect_pair_required")
@@ -209,7 +208,7 @@ def run_d2_dialogue_turn(
                 user_message,
                 (lead_ui_ref or "").strip(),
                 str(ui_revision or ""),
-                (situation_action or "").strip(),
+                "",  # Preserve the fingerprint shape of ordinary existing requests.
             )
         ),
     )
@@ -349,12 +348,10 @@ def run_d2_dialogue_turn(
         lead_gate = bool(
             lead_bridge
             or session_matched
-            or (situation_action or "").strip()
             or (lead_ui_ref or "").strip()
         )
         if pending_answer is None and lead_gate and d2_lead_needs_pre_provider(
             session_key=session_key,
-            situation_action=situation_action,
             lead_ui_ref=lead_ui_ref,
         ):
             return _run_lead_pre_provider_turn(
@@ -369,7 +366,6 @@ def run_d2_dialogue_turn(
                 lead_effect_id=lead_effect_id,
                 lead_effect_dispatcher=lead_effect_dispatcher,
                 lead_ui_ref=lead_ui_ref,
-                situation_action=situation_action,
             )
         # D2-040: one authored chance, then hard-stop. Medical ends one turn only.
         if (
@@ -508,9 +504,8 @@ def _run_lead_pre_provider_turn(
     lead_effect_id: str | None,
     lead_effect_dispatcher: D2LeadEffectDispatcher | None,
     lead_ui_ref: str | None,
-    situation_action: str | None,
 ) -> D2DialogueTurn:
-    """Situation intake / active lead slots: no provider, existing privacy owners."""
+    """Active lead slots: no provider, existing privacy owners."""
     if not d2_lead_session_client_matches(session_key):
         raise ValueError("d2_lead_session_client_required")
     diagnostics.stage("snapshot")
@@ -532,7 +527,6 @@ def _run_lead_pre_provider_turn(
         snapshot=tenant,
         session_key=session_key,
         user_message=user_message,
-        situation_action=situation_action,
         lead_ui_ref=lead_ui_ref,
         published_revision=snapshot.state.revision + 1,
     )

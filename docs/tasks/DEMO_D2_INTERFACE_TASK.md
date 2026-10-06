@@ -762,8 +762,9 @@ PersistedSituationState и общий legacy state в `contracts/response_plan_s
 legacy materialization/policy entry остаются для не-D2 потребителей. D2 не
 создаёт эти типы и не передаёт им ordinary semantic result. В общем policy
 resolver прежняя ветка получает request_ages из legacy registry; D2 использует
-age_group операции напрямую. `situation_action` во входе lead/transport —
-существующий lead-контракт, не patient carry. Исторический reason
+age_group операции напрямую. `situation_action` во входе lead/transport был
+сохранён как lead-контракт, не patient carry; решение владельца 2026-10-07
+(§30) отключает его в текущем D2. Исторический reason
 `known_situation` в price trace — метка, не отдельный путь решения.
 Не объявляем всю legacy-архитектуру репозитория удалённой.
 
@@ -2242,3 +2243,124 @@ offline test files. data/ and docs/tasks/DEMO_D2_SIM0_TASK.md remain excluded.
 Prior independent PASS for §25–28 and targeted offline evidence apply; minor
 greeting/color edits do not require another bot test run. External deployment
 and public embed smoke remain pending. No merge/deploy authorization.
+
+## §30. Situation intake dormant — owner GO 2026-10-07
+
+Architecture simplification within explicitly approved removal; §3 unchanged.
+Root C:/Cursor Projects/artgents-bot-active, codex/d2-stage1-contract,
+baseline 8dccb3b, fetched origin/main and merge-base 141ce91. Foreign data/
+and DEMO_D2_SIM0_TASK.md untouched. Allowlist: core/d2_http_adapter.py,
+core/d2_dialogue.py, core/d2_lead_bridge.py, static/widget/widget.js,
+tests/test_d2_no_legacy_path.py, tests/test_d2_lead_scenarios.py,
+tests/test_d2_lead_cancel_ui.py, tests/test_demo_d1r_http_offline.py,
+tests/test_d2_situation_disabled.py, this card, DEMO_D2_TARGET_CONTRACT.md,
+DEMO_D2_DELIVERY_ROADMAP.md. Astra consulted before edits.
+Before: action/start/back or old pending flag -> pre-provider situation branch
+-> note-length check -> name collection. After: unsupported action rejected
+before store/provider; historical flag ignored; ordinary Q&A or existing active
+lead owner handles input. Removed decision dependency: situation action/flag
+cannot select a D2 route or start a lead. Sole active lead owner remains bridge;
+ordinary meaning stays with existing model call. No new fields/states/calls,
+fallback, migration or recovery. Fingerprint keeps its old empty fourth slot
+only as encoding for ordinary replay, without situation decisions.
+Removed bridge branches/types, transport/function arguments, dormant widget
+listeners and obsolete executable situation scenarios. Legacy storage/helpers
+remain outside D2; no migration or bulk deletion of historical data. Established
+PII cleanup on ordinary lead completion/cancel remains, including old notes.
+Future idea: optional voluntary description before booking; no present UI or
+server producer. Reintroduction requires explicit product/UI/privacy agreement.
+Acceptance: JSON/SSE reject start/back without mutation/model; stale flag alone
+does not trigger intake, active slots still work, CTA authenticity/replay hold.
+Executor evidence: coherent offline run 42 PASS / 4 FAIL, 81.18s,
+%TEMP%/d2-interface-offline-hslq5aay. Four failures were new-test assertions:
+dataclass serialization and expecting an old note to survive normal PII cleanup.
+Corrected without runtime changes; focused suite 18 PASS / 24.75s,
+%TEMP%/d2-interface-offline-8wv8zse7, including JSON/SSE lead pause/resume.
+The other 30 targeted tests passed in the initial run. Node syntax and diffcheck
+PASS; isolated runner blocks network, provider/live/SMTP calls 0.
+Independent Checker §30 PASS, P0/P1 none: 18 PASS / 25.95s,
+%TEMP%/d2-interface-offline-ddgkvlfg; node syntax/diffcheck PASS. Traced removal
+adapter -> dialogue -> bridge/widget; ordinary leads and privacy retained.
+Full CI and live widget smoke not attested. Other stale CI groups
+are outside this removal; this checkpoint does not certify entire PR CI.
+No commit/push/live/deploy in this checkpoint.
+
+## §31. PR CI migration — owner GO 2026-10-07
+
+Test/CI migration, not runtime architecture simplification. Baseline 8dccb3b,
+codex/d2-stage1-contract, root C:/Cursor Projects/artgents-bot-active,
+origin/main and merge-base 141ce91. Existing §30 is included unchanged.
+Foreign data/ and docs/tasks/DEMO_D2_SIM0_TASK.md excluded; staging empty.
+Additional exact allowlist: tests/conftest.py, tests/d2_ci_http.py,
+tests/test_one_call_tenant_isolation_offline.py,
+tests/test_tenant_ingress_prod_boundary_offline.py,
+tests/test_session_tenant_binding_hardening_offline.py,
+tests/test_tenant_lead_pending_question_offline.py,
+tests/test_d2_lead_interrupt_http.py, tests/test_d2_sim2_contract.py,
+tests/test_d2_ci_clinic_policy.py, tests/test_g2_pr_ci_contract.py,
+.github/workflows/ci.yml, this card. Astra consulted; §3 owners unchanged.
+No legacy API/envelope adapter, patient memory, worker or provider call added.
+
+Protection mapping for retired D1 clinic suites:
+- request_understanding_schema -> D2 sim2 strict contract and actual prompt.
+- D1 HTTP/authority -> D2 demo audit fixes and CI clinic policy: authored clinic
+  rule, child prohibition, adult/paid booking, no foreign policy, next-turn IDs.
+- composition -> D2 compound answers: both details, partial failure, booking
+  plus information, adverse booking outputs, transactional state protection.
+- route budget -> D2 no-legacy-path + demo limits: replay/free click, no extra
+  model, quota exhaustion before transport, same-SID/shared-IP/daily limits.
+- patient volume scope -> D2 discussion context: service/volume without subject,
+  update/current scope, unrelated topic and contacts, persisted next-turn input.
+- tenant/pending HTTP -> migrated original modules: tenant corpus/contacts/prices,
+  same-SID/replay, host-bound JSON/SSE, forged/stale UI, provider PII exclusion,
+  pending clearing, name/phone resume and request binding/teardown.
+Retired D1 modules remain historical files outside explicit CI commands;
+no blanket skip/deselection. Unit/privacy/ingress/PG tests remain in CI.
+Per-test D2 DB isolates completion and quota without disabling limits;
+HTTP fixture also isolates tenant session DBs and forbids network/provider.
+Baseline CI evidence supplied/reviewed: 31 failed/610 passed and second
+136 failed/103 passed.
+Executor full Offline unit and contracts module list: 670 PASS / 5 SKIP,
+120.52s, %TEMP%/d2-interface-offline-mszg_2m3. Skips are unchanged Windows
+symlink prerequisites in G4/G7; Linux execution is not certified locally.
+Initial full migrated policy list: 253 PASS / 3 FAIL, 261.42s,
+%TEMP%/d2-interface-offline-nshj2gd3. Failures were new-test no_braces YAML
+assumption (2) and old shown_options_snapshot assertion (1), not runtime bugs.
+Both corrected: real no_dms policy plus distinct braces service alternative;
+hidden volume verified against durable UI and rejected forged click.
+Independent Checker §30–31 PASS: initial 129 PASS / 2 fixture FAIL, 81.46s,
+%TEMP%/d2-interface-offline-k77vy_qt; focused policy/workflow recheck
+30 PASS / 16.95s, ofpu1pc2; additional hidden-volume recheck 1 PASS / 3.80s,
+axrmsm8b. No new runtime change beyond §30.
+Final-order policy run exposed one flaky privacy assertion: substring 999
+matched timestamp microseconds, not a phone. Changed both migrated persisted
+privacy assertions to reject the full canonical phone after digit normalization;
+name/provider/context assertions retained. Independent focused recheck:
+5 PASS / 16.54s, %TEMP%/d2-interface-offline-glk78vbv; diffcheck PASS.
+Final full Offline unit and contracts list: 671 PASS / 5 unchanged Windows
+symlink SKIP, 116.02s, %TEMP%/d2-interface-offline-h97ts24k.
+Final full Demo D1 clinic policy regression module list: 258 PASS / 0 FAIL,
+255.39s, %TEMP%/d2-interface-offline-hef2svuo. Counts are separate overlapping
+workflow jobs, not summed. Both requested module lists pass locally; actual
+GitHub/Linux checks have not rerun because no push was authorized.
+Node syntax/diffcheck PASS; provider/live/SMTP calls 0; network blocked.
+No push/merge/deploy/live authorized. Commit not requested for this checkpoint.
+
+Final checkpoint inventory (23 files, exact; §30 + §31):
+- Runtime/UI: core/d2_http_adapter.py, core/d2_dialogue.py,
+  core/d2_lead_bridge.py, static/widget/widget.js.
+- Docs: docs/tasks/DEMO_D2_INTERFACE_TASK.md,
+  docs/tasks/DEMO_D2_TARGET_CONTRACT.md, docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md.
+- CI: .github/workflows/ci.yml.
+- Tests: tests/conftest.py, tests/d2_ci_http.py,
+  tests/test_d2_ci_clinic_policy.py, tests/test_d2_situation_disabled.py,
+  tests/test_d2_lead_cancel_ui.py, tests/test_d2_lead_interrupt_http.py,
+  tests/test_d2_lead_scenarios.py, tests/test_d2_no_legacy_path.py,
+  tests/test_d2_sim2_contract.py, tests/test_demo_d1r_http_offline.py,
+  tests/test_g2_pr_ci_contract.py, tests/test_one_call_tenant_isolation_offline.py,
+  tests/test_session_tenant_binding_hardening_offline.py,
+  tests/test_tenant_ingress_prod_boundary_offline.py,
+  tests/test_tenant_lead_pending_question_offline.py.
+Staging remains empty, HEAD 8dccb3b; no commit/push/merge/deploy. Foreign data/
+and docs/tasks/DEMO_D2_SIM0_TASK.md unchanged and excluded. Historical suites
+outside the requested CI jobs are not certified green by this checkpoint.

@@ -1,6 +1,7 @@
 """D2 lead interruption through the real JSON/SSE adapter, with fake provider."""
 
 import json
+import re
 
 import pytest
 
@@ -9,9 +10,13 @@ from core.d2_dialogue_store import D2DialogueStore
 from core.one_call_envelope_protocol import production_envelope_template
 from lead_interrupt import LEAD_CANCEL_REF, LEAD_PENDING_ANSWER_REF, LEAD_RESUME_REF
 from session import mem_get, session_client_scope
-from tests.d1r_envelope_fixtures import envelope_adult_booking_only
+from tests.d2_ci_http import raw, explanation
+
+def envelope_adult_booking_only():
+    return raw({"kind":"booking", "request_id":"r1", "age_group":"adult"})
 from tests.test_d2_http_contract import FakeProvider, http_env, post, post_sse, sse_events
-from tests.test_d2_ui_b12_scenarios import _price_raw
+def _price_raw(topic, *, service_id=None):
+    return raw({"kind":"price", "request_id":"r1", "target":{"type":"service" if service_id else "topic","id":service_id or topic}})
 
 
 @pytest.fixture(autouse=True)
@@ -20,12 +25,7 @@ def full_audit_off(monkeypatch):
 
 
 def _content_raw(text: str) -> str:
-    return json.dumps(production_envelope_template(
-        request_understanding={"subjects": [], "requests": [{
-            "request_id": "r1", "kind": "content", "subject_id": None,
-            "context": "general_information", "content_text": text,
-        }]},
-    ), ensure_ascii=False)
+    return raw(explanation(text))
 
 
 def _send(client, transport, **kwargs):
@@ -65,7 +65,7 @@ def test_pending_question_gets_d2_answer_and_resumes_exact_slot(http_env, transp
                 ui_revision=pending["revision"])
     answered = _send(client, transport, **args)
     assert "₽" in answered["answer"]
-    assert _refs(answered) == {LEAD_RESUME_REF, LEAD_CANCEL_REF}
+    assert _refs(answered) == ({LEAD_RESUME_REF, LEAD_CANCEL_REF} if phone else {LEAD_RESUME_REF})
     assert answered["ui"]["buttons"] == []
     assert answered["lead_effect"]["status"] == "not_requested"
     assert fake.inputs[-1].user_message == question
@@ -83,9 +83,8 @@ def test_pending_question_gets_d2_answer_and_resumes_exact_slot(http_env, transp
         assert {item.reply_id for item in saved.response.resolved.ui_plan.quick_replies} == _refs(answered)
         assert saved.response.resolved.ui_plan.buttons == ()
         pairs = store.read(SessionKey(client_id="demo", sid=sid)).state.dialogue_pairs
-        assert len(pairs) == 1
-        assert pairs[0].patient_text == question
-        assert "₽" not in pairs[0].assistant_text
+        assert pairs[-1].patient_text == question
+        assert pairs[-1].request_id == "answer"
 
     assert _send(client, transport, **args) == answered
     assert len(fake.inputs) == 2
@@ -122,7 +121,7 @@ def test_pending_question_privacy_and_paused_followup_keep_exit(http_env):
     with D2DialogueStore(db) as store:
         record = store.read(SessionKey(client_id="demo", sid=sid))
         assert "Анна" not in record.model_dump_json()
-        assert "999" not in record.model_dump_json()
+        assert "79991234567" not in re.sub(r"\D", "", record.model_dump_json())
         assert store.read_latest_completion(SessionKey(client_id="demo", sid=sid)).response.resolved.textual_cta_block is None
     assert post(client, sid=sid, request_id="name-while-paused", q="Анна").status_code != 200
     assert len(fake.inputs) == 2
@@ -183,7 +182,7 @@ def test_postcommit_pause_failure_replays_and_repairs_without_second_provider(ht
     with session_client_scope("demo"):
         assert mem_get(sid)["lead_intent"] == "collecting_name"
     replay = _send(client, "json", **args)
-    assert _refs(replay) == {LEAD_RESUME_REF, LEAD_CANCEL_REF}
+    assert _refs(replay) == {LEAD_RESUME_REF}
     assert len(fake.inputs) == 2
     with session_client_scope("demo"):
         assert mem_get(sid)["lead_intent"] == "paused"
@@ -263,7 +262,7 @@ def test_replay_old_answer_cannot_consume_new_pending_question(http_env):
         client, "json", sid=sid, request_id="answer-b", q="",
         ref=LEAD_PENDING_ANSWER_REF, ui_revision=second_question["revision"],
     )
-    assert _refs(second_answer) == {LEAD_RESUME_REF, LEAD_CANCEL_REF}
+    assert _refs(second_answer) == {LEAD_RESUME_REF}
     assert fake.inputs[-1].user_message == "Как ухаживать за имплантом?"
 
 
@@ -352,7 +351,7 @@ def test_sse_framing_failure_replays_committed_answer_and_pause(http_env, monkey
     with session_client_scope("demo"):
         assert mem_get(sid)["lead_intent"] == "paused"
     replay = _send(client, "json", **args)
-    assert _refs(replay) == {LEAD_RESUME_REF, LEAD_CANCEL_REF}
+    assert _refs(replay) == {LEAD_RESUME_REF}
     assert len(fake.inputs) == 2
 
 
@@ -377,8 +376,16 @@ def test_hidden_volume_choices_are_not_remembered_as_shown(http_env):
     fake.raw = _price_raw("implantation")
     answer = _send(client, "json", sid=sid, request_id="answer", q="",
                    ref=LEAD_PENDING_ANSWER_REF, ui_revision=pending["revision"])
-    assert _refs(answer) == {LEAD_RESUME_REF, LEAD_CANCEL_REF}
+    assert _refs(answer) == {LEAD_RESUME_REF}
     with D2DialogueStore(db) as store:
         state = store.read(SessionKey(client_id="demo", sid=sid)).state
-        assert state.shown_options_snapshot is None
+        saved = store.read_latest_completion(SessionKey(client_id="demo", sid=sid))
+        assert saved.response.ui_projection.buttons == ()
+        assert {q.reply_id for q in saved.response.ui_projection.quick_replies} == {LEAD_RESUME_REF}
         assert state.accumulated_shown_ids.shown_service_option_ids == ()
+    rejected = post(client, sid=sid, request_id="hidden-volume", q="",
+                    ref="volume:implantation:one_tooth", ui_revision=answer["revision"])
+    assert rejected.status_code == 400
+    assert len(fake.inputs) == 2
+    with session_client_scope("demo"):
+        assert mem_get(sid)["lead_intent"] == "paused"

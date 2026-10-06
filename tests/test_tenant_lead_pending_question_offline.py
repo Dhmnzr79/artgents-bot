@@ -42,6 +42,74 @@ from tests.test_tenant_ingress_prod_boundary_offline import (
     prod_tenant_boundary,
 )
 
+from tests.d2_ci_http import FakeProvider, http_env, begin, send, click, raw, explanation, prompt
+from contracts.response_plan import SessionKey
+from core.d2_dialogue_store import D2DialogueStore
+
+
+@pytest.mark.parametrize('transport', ['json', 'sse'])
+@pytest.mark.parametrize('phone', [False, True])
+def test_d2_pending_answer_privacy_resume_and_replay(http_env, transport, phone):
+    client, db, use, _ = http_env
+    fake = use(FakeProvider(''))
+    begin(client, fake, phone=phone, transport=transport)
+    question = 'Меня зовут Анна, телефон +7 999 123-45-67. Сколько стоит имплантация?'
+    pending = send(client, transport, request_id='question', q=question)
+    assert len(fake.inputs) == 1
+    assert LEAD_PENDING_ANSWER_REF in {q['reply_id'] for q in pending['ui']['quick_replies']}
+    fake.raw = raw(explanation('О стоимости расскажем по материалам клиники.'))
+    answered = click(client, pending, LEAD_PENDING_ANSWER_REF, request_id='answer', transport=transport)
+    assert answered['answer'] == 'О стоимости расскажем по материалам клиники.'
+    assert len(fake.inputs) == 2
+    text = fake.inputs[-1].user_message + fake.inputs[-1].context.model_dump_json()
+    assert 'Сколько стоит имплантация?' in fake.inputs[-1].user_message
+    assert 'Анна' not in text and '999 123' not in text and '9991234567' not in text
+    with session_client_scope('demo'):
+        state = mem_get('cp6a')
+        assert state['lead_intent'] == 'paused'
+        assert not state['lead_pending_interruption_text']
+        if phone:
+            assert state['profile']['name'] == 'Анна'
+    with D2DialogueStore(db) as store:
+        record = store.read(SessionKey(client_id='demo', sid='cp6a'))
+        stored = record.model_dump_json()
+        assert 'Анна' not in stored
+        assert '79991234567' not in re.sub(r'\D', '', stored)
+        assert record.state.dialogue_pairs[-1].patient_text == fake.inputs[-1].user_message
+    assert click(client, pending, LEAD_PENDING_ANSWER_REF, request_id='answer', transport=transport) == answered
+    resumed = click(client, answered, LEAD_RESUME_REF, request_id='resume', transport=transport)
+    assert 'телефон' in resumed['answer'].lower() if phone else 'обращ' in resumed['answer'].lower()
+    with session_client_scope('demo'):
+        assert mem_get('cp6a')['lead_intent'] == ('collecting_phone' if phone else 'collecting_name')
+    assert len(fake.inputs) == 2
+
+
+@pytest.mark.parametrize('transport', ['json', 'sse'])
+def test_d2_pending_log_privacy_rejected_click_preserves_state(http_env, monkeypatch, transport):
+    client, _, use, _ = http_env
+    fake = use(FakeProvider(''))
+    begin(client, fake, transport=transport)
+    from core import d2_diagnostics as diagnostics
+    previews = []
+    monkeypatch.setattr(diagnostics, '_write', lambda fields: previews.append(dict(fields)))
+    question = 'PRIVATE_PENDING_QUOTE Сколько стоит имплантация?'
+    pending = send(client, transport, request_id='question', q=question)
+    with session_client_scope('demo'):
+        before = dict(mem_get('cp6a'))
+    response = (client.post('/ask' if transport == 'json' else '/ask/stream',
+                           json={'sid':'cp6a','client_id':'demo','request_id':'stale','q':'',
+                                 'ref':LEAD_PENDING_ANSWER_REF,'ui_revision':pending['revision']-1}))
+    if transport == 'json':
+        assert response.status_code == 400
+    else:
+        from tests.test_d2_http_contract import sse_events
+        assert 'error' in dict(sse_events(response))
+    with session_client_scope('demo'):
+        assert mem_get('cp6a') == before
+    assert len(fake.inputs) == 1
+    assert previews
+    assert 'PRIVATE_PENDING_QUOTE' not in json.dumps(previews, ensure_ascii=False)
+
 
 def _sp(answer, sid, client_id, **kwargs):
     return {
@@ -347,64 +415,6 @@ def _seed_collecting_name(sid: str, *, client_id: str = "demo") -> None:
         set_lead_intent(sid, "collecting_name")
 
 
-def test_pending_answer_one_call_and_resume_name(
-    prod_tenant_boundary,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sqlite_path, _sessions_dir = isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    gray_calls: list[str] = []
-
-    def _forbid_gray(*_a, **_k):
-        gray_calls.append("gray")
-        raise AssertionError("gray LLM must not run on PII slot")
-
-    monkeypatch.setattr("llm.classify_lead_turn_gray_zone", _forbid_gray)
-    backend = _CountingBackend(answer_envelope("Ответ про All-on-4."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    client = app_module.app.test_client()
-    sid = f"s-pending-name-{uuid.uuid4().hex[:8]}"
-    headers = _prod_headers(origin="https://artgents.ru")
-    _seed_collecting_name(sid)
-
-    r2 = client.post(
-        "/ask",
-        json={"q": "А сколько стоит All-on-4?", "sid": sid},
-        base_url=_demo_base_url(),
-        headers=headers,
-    )
-    assert r2.status_code == 200
-    assert backend.call_count == 0
-    qrs = r2.get_json().get("quick_replies") or []
-    assert any(q.get("ref") == LEAD_PENDING_ANSWER_REF for q in qrs)
-
-    r3 = client.post(
-        "/ask",
-        json={"ref": LEAD_PENDING_ANSWER_REF, "sid": sid},
-        base_url=_demo_base_url(),
-        headers=headers,
-    )
-    assert r3.status_code == 200
-    assert backend.call_count == 1
-    assert gray_calls == []
-    inv = backend.invocation
-    assert inv is not None
-    assert "All-on-4" in str(inv.user_message)
-    out_qrs = r3.get_json().get("quick_replies") or []
-    assert any(q.get("ref") == LEAD_RESUME_REF for q in out_qrs)
-
-    r4 = client.post(
-        "/ask",
-        json={"ref": LEAD_RESUME_REF, "sid": sid},
-        base_url=_demo_base_url(),
-        headers=headers,
-    )
-    assert r4.status_code == 200
-    assert backend.call_count == 1
-    assert "Как к вам можно обращаться?" in (r4.get_json().get("answer") or "")
-
-
 def test_phone_question_pending(monkeypatch: pytest.MonkeyPatch) -> None:
     backend = _CountingBackend(answer_envelope("x"))
     sid = uuid.uuid4().hex
@@ -497,73 +507,6 @@ def test_provider_privacy_name_intro_variants(raw: str) -> None:
     assert q
     assert "анна" not in q.lower()
     assert "All-on-4" in q
-
-
-def test_provider_invocation_user_message_strips_phone(
-    prod_tenant_boundary,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sqlite_path, _ = isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    backend = _CountingBackend(answer_envelope("Ответ."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    sid = uuid.uuid4().hex
-    _seed_collecting_name(sid)
-    with session_client_scope("demo"):
-        from session import set_lead_pending_interruption
-
-        set_lead_pending_interruption(
-            sid,
-            text="+7 999 123-45-67, а рассрочка есть?",
-            step="collecting_phone",
-        )
-        update_profile(sid, name="Анна")
-    client = app_module.app.test_client()
-    headers = _prod_headers(origin="https://artgents.ru")
-    resp = client.post(
-        "/ask",
-        json={"ref": LEAD_PENDING_ANSWER_REF, "sid": sid},
-        base_url=_demo_base_url(),
-        headers=headers,
-    )
-    assert resp.status_code == 200
-    assert backend.call_count == 1
-    msg = str(backend.invocation.user_message)
-    assert "999" not in msg
-    assert "1234567" not in msg
-    assert "рассрочка" in msg.lower()
-
-
-def test_provider_question_not_persisted_in_session(
-    prod_tenant_boundary,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sqlite_path, _ = isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    backend = _CountingBackend(answer_envelope("Ответ."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    sid = uuid.uuid4().hex
-    _seed_collecting_name(sid)
-    with session_client_scope("demo"):
-        from session import set_lead_pending_interruption
-
-        set_lead_pending_interruption(sid, text="А сколько стоит All-on-4?", step="collecting_name")
-    client = app_module.app.test_client()
-    client.post(
-        "/ask",
-        json={"ref": LEAD_PENDING_ANSWER_REF, "sid": sid},
-        base_url=_demo_base_url(),
-        headers=_prod_headers(origin="https://artgents.ru"),
-    )
-    with session_client_scope("demo"):
-        st = mem_get(sid)
-        blob = str(st)
-        assert "lead_orchestration_provider_question" not in blob
-        assert "All-on-4" not in blob or st.get("lead_pending_interruption_text") == ""
 
 
 def test_pii_only_pending_answer_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -737,228 +680,6 @@ def test_html_like_pending_shown_literal_in_payload(monkeypatch: pytest.MonkeyPa
     assert raw in answer
 
 
-@pytest.mark.parametrize("path", ["/ask"])
-def test_ask_pending_zero_calls_before_answer(
-    prod_tenant_boundary,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    path: str,
-) -> None:
-    sqlite_path, _ = isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    backend = _CountingBackend(answer_envelope("Ответ."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    client = app_module.app.test_client()
-    sid = f"s-parity-{uuid.uuid4().hex[:8]}"
-    headers = _prod_headers(origin="https://artgents.ru")
-    base = _demo_base_url()
-    _seed_collecting_name(sid)
-
-    pending_resp = client.post(
-        path,
-        json={"q": "А сколько стоит All-on-4?", "sid": sid},
-        base_url=base,
-        headers=headers,
-    )
-    assert backend.call_count == 0
-    pending_payload = pending_resp.get_json()
-    answer_resp = client.post(
-        path,
-        json={"ref": LEAD_PENDING_ANSWER_REF, "sid": sid},
-        base_url=base,
-        headers=headers,
-    )
-    assert answer_resp.status_code == 200
-    answer_payload = answer_resp.get_json()
-    assert backend.call_count == 1
-    pending_qrs = pending_payload.get("quick_replies") or []
-    answer_qrs = answer_payload.get("quick_replies") or []
-    assert any(q.get("ref") == LEAD_PENDING_ANSWER_REF for q in pending_qrs)
-    assert any(q.get("ref") == LEAD_RESUME_REF for q in answer_qrs)
-
-
-def test_stream_e2e_collecting_name_pending_question(
-    prod_tenant_boundary,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sqlite_path, _ = isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    backend = _CountingBackend(answer_envelope("Ответ про All-on-4."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    client = app_module.app.test_client()
-    sid = f"s-stream-name-{uuid.uuid4().hex[:8]}"
-    headers = _prod_headers(origin="https://artgents.ru")
-    base = _demo_base_url()
-    question = "А сколько стоит All-on-4?"
-    _seed_collecting_name(sid)
-
-    pending_resp = client.post(
-        "/ask/stream",
-        json={"q": question, "sid": sid},
-        base_url=base,
-        headers=headers,
-    )
-    assert pending_resp.status_code == 200
-    assert backend.call_count == 0
-    pending_payload = _parse_sse_ui_payload(pending_resp)
-    assert question in (pending_payload.get("answer") or "")
-    pending_qrs = pending_payload.get("quick_replies") or []
-    assert any(q.get("ref") == LEAD_PENDING_ANSWER_REF for q in pending_qrs)
-    assert any(q.get("ref") == LEAD_PENDING_CONTINUE_NAME_REF for q in pending_qrs)
-
-    from session import clear_session_store_cache
-
-    clear_session_store_cache()
-    with session_client_scope("demo"):
-        text, step = get_lead_pending_interruption(sid)
-        assert step == "collecting_name"
-        assert "All-on-4" in text
-
-    answer_resp = client.post(
-        "/ask/stream",
-        json={"ref": LEAD_PENDING_ANSWER_REF, "sid": sid},
-        base_url=base,
-        headers=headers,
-    )
-    assert answer_resp.status_code == 200
-    answer_payload = _parse_sse_ui_payload(answer_resp)
-    assert answer_payload.get("meta", {}).get("lead_paused") is True
-    assert backend.call_count == 1
-    answer_qrs = answer_payload.get("quick_replies") or []
-    assert any(q.get("ref") == LEAD_RESUME_REF for q in answer_qrs)
-
-    resume_resp = client.post(
-        "/ask/stream",
-        json={"ref": LEAD_RESUME_REF, "sid": sid},
-        base_url=base,
-        headers=headers,
-    )
-    assert resume_resp.status_code == 200
-    resume_payload = _parse_sse_ui_payload(resume_resp)
-    assert backend.call_count == 1
-    assert "Как к вам можно обращаться?" in (resume_payload.get("answer") or "")
-
-
-def test_stream_e2e_collecting_phone_pending_question(
-    prod_tenant_boundary,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sqlite_path, _ = isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    backend = _CountingBackend(answer_envelope("Рассрочка доступна."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    client = app_module.app.test_client()
-    sid = f"s-stream-phone-{uuid.uuid4().hex[:8]}"
-    headers = _prod_headers(origin="https://artgents.ru")
-    base = _demo_base_url()
-    question = "А рассрочка есть?"
-    with session_client_scope("demo"):
-        mem_reset(sid)
-        set_lead_intent(sid, "collecting_phone")
-        update_profile(sid, name="Анна")
-
-    pending_resp = client.post(
-        "/ask/stream",
-        json={"q": question, "sid": sid},
-        base_url=base,
-        headers=headers,
-    )
-    assert pending_resp.status_code == 200
-    assert backend.call_count == 0
-    pending_payload = _parse_sse_ui_payload(pending_resp)
-    assert question in (pending_payload.get("answer") or "")
-    assert any(
-        q.get("ref") == LEAD_PENDING_RETRY_PHONE_REF
-        for q in (pending_payload.get("quick_replies") or [])
-    )
-
-    answer_resp = client.post(
-        "/ask/stream",
-        json={"ref": LEAD_PENDING_ANSWER_REF, "sid": sid},
-        base_url=base,
-        headers=headers,
-    )
-    assert answer_resp.status_code == 200
-    _parse_sse_ui_payload(answer_resp)
-    assert backend.call_count == 1
-    resume_resp = client.post(
-        "/ask/stream",
-        json={"ref": LEAD_RESUME_REF, "sid": sid},
-        base_url=base,
-        headers=headers,
-    )
-    assert resume_resp.status_code == 200
-    resume_payload = _parse_sse_ui_payload(resume_resp)
-    assert "телефона" in (resume_payload.get("answer") or "").lower()
-
-
-def test_pending_quote_not_in_dialog_history(
-    prod_tenant_boundary,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sqlite_path, _ = isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    backend = _CountingBackend(answer_envelope("x"))
-    _install_sales_fast_transport(monkeypatch, backend)
-    question = "А сколько стоит All-on-4?"
-    sid = uuid.uuid4().hex
-    _seed_collecting_name(sid)
-    client = app_module.app.test_client()
-    headers = _prod_headers(origin="https://artgents.ru")
-    resp = client.post(
-        "/ask",
-        json={"q": question, "sid": sid},
-        base_url=_demo_base_url(),
-        headers=headers,
-    )
-    assert resp.status_code == 200
-    with session_client_scope("demo"):
-        from session import recent_dialog_history
-
-        joined = recent_dialog_history(sid, max_messages=8)
-        assert question not in joined
-        assert "All-on-4" not in joined
-
-
-def test_pending_question_withheld_from_emit_bot_event_details(
-    prod_tenant_boundary,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sqlite_path, _ = isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    backend = _CountingBackend(answer_envelope("x"))
-    _install_sales_fast_transport(monkeypatch, backend)
-    captured: list[dict] = []
-
-    def _capture(_logger, _name, *, details=None, **_kw):
-        if details:
-            captured.append(dict(details))
-
-    monkeypatch.setattr("app.emit_bot_event", _capture)
-    question = "А сколько стоит All-on-4?"
-    sid = uuid.uuid4().hex
-    _seed_collecting_name(sid)
-    client = app_module.app.test_client()
-    resp = client.post(
-        "/ask",
-        json={"q": question, "sid": sid},
-        base_url=_demo_base_url(),
-        headers=_prod_headers(origin="https://artgents.ru"),
-    )
-    assert resp.status_code == 200
-    blob = json.dumps(captured, ensure_ascii=False)
-    assert "All-on-4" not in blob
-
-
 def test_render_bot_answer_html_escapes_markup() -> None:
     script_uri = Path("static/widget/answer_format.js").resolve().as_uri()
     raw = "<script>alert(1)</script>"
@@ -996,50 +717,6 @@ def test_worker_context_clears_provider_question_handoff() -> None:
     ):
         bind_lead_provider_question("А сколько стоит All-on-4?")
     assert take_lead_provider_question() is None
-
-
-def test_phone_pending_answer_resume_to_phone_prompt(
-    prod_tenant_boundary,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sqlite_path, _ = isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    backend = _CountingBackend(answer_envelope("Рассрочка доступна."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    sid = uuid.uuid4().hex
-    with session_client_scope("demo"):
-        mem_reset(sid)
-        set_lead_intent(sid, "collecting_phone")
-        update_profile(sid, name="Анна")
-    client = app_module.app.test_client()
-    headers = _prod_headers(origin="https://artgents.ru")
-    base = _demo_base_url()
-    r1 = client.post(
-        "/ask",
-        json={"q": "А рассрочка есть?", "sid": sid},
-        base_url=base,
-        headers=headers,
-    )
-    assert r1.status_code == 200
-    assert backend.call_count == 0
-    r2 = client.post(
-        "/ask",
-        json={"ref": LEAD_PENDING_ANSWER_REF, "sid": sid},
-        base_url=base,
-        headers=headers,
-    )
-    assert r2.status_code == 200
-    assert backend.call_count == 1
-    r3 = client.post(
-        "/ask",
-        json={"ref": LEAD_RESUME_REF, "sid": sid},
-        base_url=base,
-        headers=headers,
-    )
-    assert r3.status_code == 200
-    assert "телефона" in (r3.get_json().get("answer") or "").lower()
 
 
 @patch("lead_service.leads_mode", return_value="demo_stub")

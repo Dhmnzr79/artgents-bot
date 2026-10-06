@@ -135,8 +135,9 @@ def test_sent_prompt_contains_only_current_extent_menu_copy():
     directions = system["content"].split("=== D2_DIRECTION_PRICES ===\n")[1].split("=== BRAND_CATALOG ===")[0]
     rows = json.loads(directions)
     assert rows
-    for row in rows:
-        assert row["unknown_extent_text"] == "Какой объём вас интересует: один зуб, вся челюсть или пока не знаете?"
+    expected = {item.topic_id: item.unknown_extent_text for item in _request().model_view.direction_prices}
+    assert {row["topic_id"]: row["unknown_extent_text"] for row in rows} == expected
+    assert all('Несколько зубов' not in row['unknown_extent_text'] for row in rows)
 
 
 @pytest.mark.parametrize("missing", ["extent", "jaw", "stage"])

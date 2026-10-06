@@ -140,7 +140,6 @@ def _turn(
     provider: RawFakeProvider | None = None,
     request_id: str,
     lead_ui_ref: str | None = None,
-    situation_action: str | None = None,
     lead_effect_id: str | None = None,
     dispatcher: CountingDispatcher | None = None,
     store: D2DialogueStore | None = None,
@@ -158,7 +157,6 @@ def _turn(
         now=NOW,
         request_id=request_id,
         lead_ui_ref=lead_ui_ref,
-        situation_action=situation_action,
         lead_effect_id=lead_effect_id,
         lead_effect_dispatcher=dispatcher,
         lead_bridge=True,
@@ -279,41 +277,6 @@ def test_d2_031_old_consent_does_not_auto_reenter(tmp_path):
         assert mem_get(sid).get("lead_intent") == "none"
         assert not is_active_lead_flow(mem_get(sid))
         assert "обращать" not in outcome.response.rendered_text.lower()
-
-
-def test_d2_022_situation_note_to_name_not_answered(tmp_path):
-    sid = "lead-sit"
-    with session_client_scope("demo"):
-        mem_reset(sid, client_id="demo")
-        with observed_common_route():
-            start, fake0, store, _k0 = _turn(
-                tmp_path=tmp_path,
-                sid=sid,
-                message="",
-                provider=RawFakeProvider("MUST_NOT_CALL"),
-                request_id="req-sit-0",
-                situation_action="start",
-            )
-            assert fake0.inputs == []
-            assert mem_get(sid).get("situation_pending") is True
-            assert "ситуац" in start.response.rendered_text.lower()
-
-            note = "Нужна консультация по имплантации одного зуба"
-            moved, fake1, _s1, _k1 = _turn(
-                tmp_path=tmp_path,
-                sid=sid,
-                message=note,
-                provider=RawFakeProvider("MUST_NOT_CALL"),
-                request_id="req-sit-1",
-                store=store,
-            )
-        assert fake1.inputs == []
-        assert mem_get(sid).get("situation_pending") is False
-        assert mem_get(sid).get("situation_note") == note
-        assert mem_get(sid).get("lead_intent") == "collecting_name"
-        # Note is clinic comment, not a medical/marketing answer.
-        assert "имплант" not in moved.response.rendered_text.lower() or "обращать" in moved.response.rendered_text.lower()
-        assert "обращать" in moved.response.rendered_text.lower()
 
 
 def test_a12_name_phone_submit_one_effect(tmp_path):

@@ -50,17 +50,3 @@ def test_cancel_only_at_phone(http_env, transport, pause):
     with session_client_scope('demo'):
         assert mem_get('cp6a')['lead_intent'] not in {'collecting_name', 'collecting_phone', 'paused'}
     assert len(fake.inputs) == (2 if pause else 1)
-
-@pytest.mark.parametrize('transport', ['json', 'sse'])
-def test_situation_intake_name_has_no_cancel(http_env, transport):
-    client, _, use, _ = http_env
-    fake = use(FakeProvider(raw({'kind': 'booking', 'request_id': 'r1', 'age_group': 'adult'})))
-    send = post if transport == 'json' else post_sse
-    _body(send(client, request_id='start', q='', situation_action='start'), transport)
-    name = _body(send(client, request_id='description', q='Хочу обсудить восстановление зуба'), transport)
-    assert name['ui']['quick_replies'] == []
-    with session_client_scope('demo'):
-        assert mem_get('cp6a')['lead_intent'] == 'collecting_name'
-    phone = _body(send(client, request_id='name', q='Анна'), transport)
-    assert {q['reply_id'] for q in phone['ui']['quick_replies']} == {LEAD_CANCEL_REF}
-    assert len(fake.inputs) == 0

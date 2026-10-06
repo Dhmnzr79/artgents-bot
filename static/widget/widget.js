@@ -1679,33 +1679,6 @@ export function mountWidget(root, config) {
     const trail = document.createElement("div");
     trail.className = "clinic-turn__trail";
 
-    const sit = m.situation;
-    if (sit && sit.show && sit.mode === "normal") {
-      const sb = document.createElement("button");
-      sb.type = "button";
-      sb.className = "clinic-turn__btn clinic-turn__btn--cta-secondary";
-      sb.textContent = "Рассказать о ситуации";
-      sb.addEventListener("click", () => {
-        dismissTrailingsAll(state.messages);
-        dismissLinksAll(state.messages);
-        void sendAsk({ action: "situation", q: "", userEcho: "Рассказать о ситуации" });
-      });
-      trail.appendChild(sb);
-    }
-
-    if (sit && sit.show && sit.mode === "pending") {
-      const back = document.createElement("button");
-      back.type = "button";
-      back.className = "clinic-turn__btn clinic-turn__btn--ghost-wide";
-      back.textContent = "Назад к диалогу";
-      back.addEventListener("click", () => {
-        dismissTrailingsAll(state.messages);
-        dismissLinksAll(state.messages);
-        void sendAsk({ situation_action: "back", q: "", userEcho: "Назад к диалогу" });
-      });
-      trail.appendChild(back);
-    }
-
     if (m.cta && m.cta.text && m.revision === state.lastPayload?.revision) {
       const c = document.createElement("button");
       c.type = "button";

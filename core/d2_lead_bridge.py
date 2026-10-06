@@ -56,8 +56,6 @@ from session import (
     resume_lead_from_pause,
     set_lead_intent,
     set_lead_pending_interruption,
-    set_situation_note,
-    set_situation_pending,
     update_profile,
 )
 
@@ -65,8 +63,6 @@ D2LeadKind = Literal[
     "collecting_name",
     "collecting_phone",
     "cancelled",
-    "situation_pending",
-    "situation_to_name",
     "pending_interrupt",
     "booking_blocked",
     "submitted",
@@ -183,19 +179,15 @@ def d2_lead_session_client_matches(session_key: SessionKey) -> bool:
 def d2_lead_needs_pre_provider(
     *,
     session_key: SessionKey,
-    situation_action: str | None,
     lead_ui_ref: str | None,
 ) -> bool:
     """True when the turn must short-circuit before the D1R provider.
 
     Ordinary D2 turns may probe the client binding but never read session mem.
-    Active-lead / situation-pending short-circuit runs only when the bound
+    Active-lead short-circuit runs only when the bound
     session client exactly matches ``session_key.client_id``.
     A mismatched binding fails closed.
     """
-    action = (situation_action or "").strip()
-    if action in {"start", "back"}:
-        return True
     ref = (lead_ui_ref or "").strip()
     if ref == "d2:booking_cta":
         return True
@@ -210,10 +202,10 @@ def d2_lead_needs_pre_provider(
     if not d2_lead_session_client_matches(session_key):
         return False
     try:
-        situation_pending, active_lead = peek_lead_activity(session_key.sid)
+        _, active_lead = peek_lead_activity(session_key.sid)
     except SessionClientNotBoundError:
         return False
-    return situation_pending or active_lead
+    return active_lead
 
 
 def resolve_d2_booking_lead_entry(
@@ -287,15 +279,13 @@ def resolve_d2_lead_pre_provider(
     snapshot: D2TenantSnapshot,
     session_key: SessionKey,
     user_message: str,
-    situation_action: str | None = None,
     lead_ui_ref: str | None = None,
     published_revision: int | None = None,
 ) -> D2LeadBridgeResult:
-    """Handle situation intake and active lead slots without a provider call."""
+    """Handle active lead slots without a provider call."""
     sid = session_key.sid
     client_id = session_key.client_id
     txt = tone_to_txt_dict(client_id)
-    action = (situation_action or "").strip()
     ref = (lead_ui_ref or "").strip()
     q = (user_message or "").strip()
     st = mem_get(sid)
@@ -306,44 +296,6 @@ def resolve_d2_lead_pre_provider(
         return D2LeadBridgeResult(
             kind="collecting_name",
             response=_name_prompt_response(snapshot, session_key=session_key),
-        )
-
-    if action == "back":
-        set_situation_pending(sid, False)
-        text = txt.get("situation_back_fallback") or "Хорошо, вернулись к обычному диалогу."
-        return D2LeadBridgeResult(
-            kind="cancelled",
-            response=_plain_answer(snapshot, session_key=session_key, text=text, quick=()),
-        )
-
-    if action == "start":
-        set_situation_pending(sid, True)
-        text = txt.get("situation_prompt") or "Опишите коротко ситуацию."
-        return D2LeadBridgeResult(
-            kind="situation_pending",
-            response=_plain_answer(snapshot, session_key=session_key, text=text, quick=()),
-        )
-
-    if st.get("situation_pending"):
-        if len(q) < 8:
-            text = txt.get("situation_retry_short") or "Напишите чуть подробнее."
-            return D2LeadBridgeResult(
-                kind="situation_pending",
-                response=_plain_answer(snapshot, session_key=session_key, text=text, quick=()),
-            )
-        set_situation_note(sid, q)
-        set_situation_pending(sid, False)
-        mark_booking_intent_ever(sid)
-        set_lead_intent(sid, "collecting_name")
-        text = txt.get("situation_to_lead_name") or resolve_lead_name_prompt(client_id, txt=txt)
-        return D2LeadBridgeResult(
-            kind="situation_to_name",
-            response=_plain_answer(
-                snapshot,
-                session_key=session_key,
-                text=text,
-                quick=(),
-            ),
         )
 
     # Pending-choice refs: the answer action enters the ordinary D2 route.

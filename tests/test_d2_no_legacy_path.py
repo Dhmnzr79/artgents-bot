@@ -60,11 +60,11 @@ def test_success_error_and_typed_lead_action_never_call_legacy(http_env):
         assert post(client, sid="error", request_id="error").status_code != 200
 
     with no_legacy_calls(ordinary=False) as calls:
-        response = post(client, sid="action", request_id="action", q="",
-                        situation_action="start")
+        fake.raw = '{"outcome":"dialogue","blocks":[{"kind":"booking","request_id":"r1","age_group":"adult"}]}'
+        response = post(client, sid="action", request_id="action", q="Хочу записаться")
     assert response.status_code == 200
     assert ("core.d2_dialogue", "run_d2_dialogue_turn") in calls
-    assert len(fake.inputs) == 2
+    assert len(fake.inputs) == 3
 
 
 def test_json_route_dependency_is_direct_d2_adapter():
@@ -86,8 +86,9 @@ def test_sse_success_error_and_lead_action_never_call_legacy(http_env):
     with no_legacy_calls(ordinary=True):
         assert sse_events(post_sse(client, sid="sse-error", request_id="error"))[-1][0] == "error"
     with no_legacy_calls(ordinary=False) as calls:
+        fake.raw = '{"outcome":"dialogue","blocks":[{"kind":"booking","request_id":"r1","age_group":"adult"}]}'
         assert sse_events(post_sse(client, sid="sse-action", request_id="action",
-                                   q="", situation_action="start"))[-1][0] == "done"
+                                   q="Хочу записаться"))[-1][0] == "done"
     assert ("core.d2_dialogue", "run_d2_dialogue_turn") in calls
 
 

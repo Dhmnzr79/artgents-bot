@@ -66,10 +66,10 @@ def _audit_lead_after(sid: str, *, phase: str) -> None:
 
 def run_d2_ask_json(data: dict, *, client_id: str, peer_ip: str | None = None) -> dict:
     diagnostics.stage("request")
-    supported = {"client_id", "sid", "request_id", "q", "ref", "ui_revision", "situation_action"}
+    supported = {"client_id", "sid", "request_id", "q", "ref", "ui_revision"}
     if set(data) - supported:
         raise ValueError("d2_unsupported_request_fields")
-    for name in ("sid", "ref", "situation_action"):
+    for name in ("sid", "ref"):
         if name in data and data[name] is not None and not isinstance(data[name], str):
             raise ValueError("d2_request_field_invalid")
     if data.get("ref") is not None and not data["ref"].strip():
@@ -81,8 +81,6 @@ def run_d2_ask_json(data: dict, *, client_id: str, peer_ip: str | None = None) -
             raise ValueError("d2_ui_action_requires_empty_question")
     elif "ui_revision" in data:
         raise ValueError("d2_ui_revision_without_action")
-    if data.get("situation_action") and data["situation_action"] not in {"start", "back"}:
-        raise ValueError("d2_situation_action_invalid")
     sid = sid_from_body(data)
     request_id = data.get("request_id")
     if request_id is None:
@@ -97,7 +95,6 @@ def run_d2_ask_json(data: dict, *, client_id: str, peer_ip: str | None = None) -
         "validated_request", client_id=client_id, sid=sid,
         request_id=request_id, user_message=user_message,
         selected_ref=data.get("ref"), ui_revision=data.get("ui_revision"),
-        situation_action=data.get("situation_action"),
     )
     bind_session_client(client_id)
     path = _store_path(client_id)
@@ -119,7 +116,6 @@ def run_d2_ask_json(data: dict, *, client_id: str, peer_ip: str | None = None) -
                 request_id=request_id,
                 lead_ui_ref=data.get("ref"),
                 ui_revision=data.get("ui_revision"),
-                situation_action=data.get("situation_action"),
                 lead_bridge=True,
             )
         except (D2RequestIdConflict, D2RequestInProgress) as exc:

@@ -920,3 +920,12 @@ Cursor PASS документационного аудита следующий �
 не делает provider calls и не объявляет A02/A11/B08 собранными. Следующий шаг
 определяется этой таблицей и Ledger, а не новой услугой или комбинацией
 маркетинговых блоков.
+## Owner clarification — 2026-10-07: dormant situation intake
+
+Owner paused use of «Рассказать о ситуации» in the current bot. The idea is
+retained for later discussion, but situation_action/start/back, the old pending
+flag's D2 routing and note-to-lead transition are removed from the active path
+and current acceptance. This supersedes earlier statements preserving that
+particular intake; ordinary lead/privacy and all §3 protections remain required.
+No UI or model mechanism is added. Historical storage/legacy helpers remain
+untouched; reintroduction needs explicit approval. See INTERFACE_TASK §30.

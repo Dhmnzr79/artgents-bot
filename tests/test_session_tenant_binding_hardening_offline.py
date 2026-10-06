@@ -27,6 +27,38 @@ from session import (
 from tests.test_sales_fast_widget_integration import _CountingBackend, _install_sales_fast_transport
 from tests.test_sales_one_plus_turn import answer_envelope
 
+from tests.d2_ci_http import FakeProvider, http_env, raw
+from tests.test_d2_http_contract import sse_events
+
+
+@pytest.mark.parametrize('path', ['/ask', '/ask/stream'])
+@pytest.mark.parametrize('explicit', [False, True])
+def test_d2_request_binds_lead_session_and_clears_after_response(http_env, monkeypatch, path, explicit):
+    client, _, use, tmp = http_env
+    fake = use(FakeProvider(raw({'kind':'booking','request_id':'r1','age_group':'adult'})))
+    observed = []
+    import core.d2_lead_bridge as bridge
+    real = bridge.mem_get
+    def read(sid):
+        observed.append(current_session_client_id())
+        return real(sid)
+    monkeypatch.setattr(bridge, 'mem_get', read)
+    data = {'sid':'binding','request_id':'r1','q':'Хочу записаться'}
+    tenant = 'nikadent' if explicit else 'demo'
+    if explicit:
+        data['client_id'] = tenant
+    response = client.post(path, json=data)
+    assert response.status_code == 200
+    body = response.get_json() if path == '/ask' else dict(sse_events(response))['ui']
+    assert body['client_id'] == tenant
+    assert observed and set(observed) == {tenant}
+    assert current_session_client_id() is None
+    with session_client_scope(tenant):
+        assert mem_get('binding')['lead_intent'] == 'collecting_name'
+    other = 'demo' if tenant == 'nikadent' else 'nikadent'
+    assert not (tmp/'sessions'/f'{other}.sqlite').exists()
+    assert len(fake.inputs) == 1
+
 
 def _isolated_sqlite_paths(tmp_path: Path):
     sessions_dir = tmp_path / "sessions"
@@ -71,28 +103,6 @@ def test_unbound_session_operation_is_fail_closed_without_demo_db(
 
     assert not (sessions_dir / "demo.db").exists()
     assert _table_count(sessions_dir / "demo.db") == 0
-
-
-def test_http_missing_client_id_uses_ingress_default_demo(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sqlite_path, sessions_dir = _isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    backend = _CountingBackend(answer_envelope("Ответ demo."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    sid = f"s-default-{uuid.uuid4().hex[:8]}"
-
-    resp = app_module.app.test_client().post("/ask", json={"q": "Расскажите о клинике", "sid": sid})
-    assert resp.status_code == 200
-    payload = resp.get_json()
-    assert payload["meta"]["client_id"] == config.DEFAULT_CLIENT_ID
-    assert backend.call_count == 1
-    assert _table_count(sessions_dir / "demo.db") >= 1
-
-    with session_client_scope(config.DEFAULT_CLIENT_ID):
-        assert mem_get(sid).get("hist")
 
 
 @pytest.mark.parametrize("client_id", ["demo", "nikadent"])
@@ -180,51 +190,6 @@ def test_nested_scope_restores_outer_client() -> None:
             assert current_session_client_id() == "nikadent"
         assert current_session_client_id() == "demo"
     assert current_session_client_id() is None
-
-
-def test_ask_binds_before_session_write_and_clears_after_request(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sqlite_path, sessions_dir = _isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    backend = _CountingBackend(answer_envelope("Ответ."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    sid = f"s-ask-bind-{uuid.uuid4().hex[:8]}"
-    clear_session_client_binding()
-
-    resp = app_module.app.test_client().post(
-        "/ask",
-        json={"q": "Расскажите о клинике", "sid": sid, "client_id": "demo"},
-    )
-    assert resp.status_code == 200
-    assert resp.get_json()["meta"]["client_id"] == "demo"
-    assert current_session_client_id() is None
-    assert _table_count(sessions_dir / "demo.db") >= 1
-
-
-def test_ask_stream_worker_binds_and_clears_after_done(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sqlite_path, sessions_dir = _isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    backend = _CountingBackend(answer_envelope("Stream ответ."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    sid = f"s-stream-bind-{uuid.uuid4().hex[:8]}"
-    clear_session_client_binding()
-
-    resp = app_module.app.test_client().post(
-        "/ask/stream",
-        json={"q": "Расскажите о клинике", "sid": sid, "client_id": "demo"},
-    )
-    assert resp.status_code == 200
-    payload = _parse_sse_ui_payload(resp)
-    assert payload["meta"]["client_id"] == "demo"
-    assert current_session_client_id() is None
-    assert _table_count(sessions_dir / "demo.db") >= 1
 
 
 def test_unknown_client_rejected_without_demo_session_mutation(

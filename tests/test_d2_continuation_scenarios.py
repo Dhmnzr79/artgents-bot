@@ -1,0 +1,486 @@
+"""CP5-C2a/C2b: continuation — overview/volume, A07, TTL, A10, B11 person-change."""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import socket
+import sqlite3
+import sys
+from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import pytest
+
+from contracts.response_plan import SessionKey
+from core.d2_dialogue import run_d2_dialogue_turn
+from core.d2_dialogue_store import D2DialogueStore
+from core.d2_completion_context import project_completed_dialogue, discussion_scope
+from core.d2_session_context import project_d2_session_context
+from contracts.d2_session_context import D2SessionTtlPolicy
+from contracts.d2_session_context import D2SessionSnapshot
+
+
+def projected_history(store, key):
+    record = store.read(key)
+    snapshot = D2SessionSnapshot(state=record.state, exists_in_store=True)
+    policy = D2SessionTtlPolicy()
+    context = project_d2_session_context(snapshot, expected_session_key=key,
+        activity=record.activity, policy=policy, now=record.activity.last_user_turn_at)
+    return project_completed_dialogue(context, snapshot, store, policy).ordinary.dialogue_pairs
+
+
+NOW = datetime(2026, 9, 22, 15, tzinfo=timezone.utc)
+VOLUME = ("one_tooth", "full_arch", "unknown")
+CLASSIC_THREE = (
+    "classic.one_tooth.impro",
+    "classic.one_tooth.implantium",
+    "classic.one_tooth.nobel",
+)
+WHITENING_OFFER = "professional_whitening.default"
+CLARIFY_TEXT = "Могу подсказать по услугам, ценам, врачам или записи. Что вас интересует?"
+
+
+def _volume(*, extent="one_tooth", tooth_count=1, jaw="unknown"):
+    return {"extent": extent, "tooth_count": tooth_count, "jaw": jaw}
+
+
+def _raw(topic, volume=None, *, service_id=None):
+    operation = {"kind": "price", "request_id": "r1", "volume": volume}
+    if service_id or topic:
+        operation["target"] = {"type": "service", "id": service_id} if service_id else {"type": "topic", "id": topic}
+    else:
+        operation["clarification"] = {"missing": "service", "choices": ["classic", "all_on_4"]}
+    return json.dumps({"outcome": "dialogue", "blocks": [operation]}, ensure_ascii=False)
+
+
+def _content(*, text: str) -> str:
+    return json.dumps({"outcome": "dialogue", "blocks": [
+        {"kind": "content", "request_id": "r1", "content_text": text},
+    ]}, ensure_ascii=False)
+
+
+class RawFakeProvider:
+    def __init__(self, raw: str) -> None:
+        self.raw = raw
+        self.inputs = []
+
+    def generate(self, request):
+        self.inputs.append(request)
+        return self.raw
+
+
+@pytest.fixture(autouse=True)
+def isolated_io(monkeypatch, tmp_path):
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    monkeypatch.setenv("BOT_LOG_DIR", str(log_dir))
+    os.environ["BOT_LOG_DIR"] = str(log_dir)
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("network forbidden in CP5-C2 continuation")
+
+    monkeypatch.setattr(socket.socket, "connect", forbidden)
+    monkeypatch.setattr(socket.socket, "connect_ex", forbidden)
+    monkeypatch.setattr(socket.socket, "sendto", forbidden)
+    monkeypatch.setattr(socket, "create_connection", forbidden)
+    monkeypatch.setattr(socket, "getaddrinfo", forbidden)
+    connect = sqlite3.connect
+
+    def isolated_connect(database, *args, **kwargs):
+        assert Path(database).resolve().is_relative_to(tmp_path.resolve()), "non-test DB forbidden"
+        return connect(database, *args, **kwargs)
+
+    monkeypatch.setattr(sqlite3, "connect", isolated_connect)
+
+
+@contextmanager
+def observed_common_route():
+    calls = []
+    previous = sys.getprofile()
+
+    def observe(frame, event, _arg):
+        if event != "call":
+            return
+        module = frame.f_globals.get("__name__", "")
+        calls.append((module, frame.f_code.co_name))
+        assert not module.startswith((
+            "core.sales_",
+            "core.target_composer",
+            "core.target_runtime_",
+            "core.response_plan_composer_executor",
+            "core.target_session_selection",
+            "core.one_call_runtime",
+            "core.one_call_presentation",
+            "core.response_plan_session",
+            "core.target_offer_projection",
+            "core.target_service_selection",
+            "core.response_strategy",
+        )), f"legacy runtime/selector called: {module}"
+        assert module != "core.target_marketing_selector", "legacy marketing selector called"
+        if module == "session":
+            assert frame.f_code.co_name == "current_session_client_id", (
+                f"unexpected session use on ordinary D2 route: {frame.f_code.co_name}"
+            )
+            return
+
+    sys.setprofile(observe)
+    try:
+        yield calls
+    finally:
+        sys.setprofile(previous)
+
+
+def _clients(tmp_path: Path) -> Path:
+    clients = tmp_path / "clients"
+    if not (clients / "demo").exists():
+        shutil.copytree(Path("clients") / "demo", clients / "demo")
+    return clients
+
+
+def _run(
+    tmp_path: Path,
+    raw: str,
+    *,
+    key: SessionKey,
+    message: str,
+    now: datetime = NOW,
+    clients: Path | None = None,
+    store_path: Path | None = None,
+):
+    clients = clients if clients is not None else _clients(tmp_path)
+    provider = RawFakeProvider(raw)
+    db = store_path or (tmp_path / "dialogue.sqlite")
+    with observed_common_route() as calls:
+        with D2DialogueStore(db) as store:
+            outcome = run_d2_dialogue_turn(
+                session_key=key,
+                user_message=message,
+                provider=provider,
+                clients_root=clients,
+                store=store,
+                now=now,
+            )
+            saved = store.read(key)
+    return outcome, saved, provider, calls, clients
+
+
+def _offer_ids(outcome) -> tuple[str, ...]:
+    block = outcome.response.resolved.d2_price_block
+    assert block is not None
+    return tuple(row.offer_id for row in block.rows)
+
+
+def test_a01_alternative_and_correction_both_replace_discussed_volume(tmp_path: Path) -> None:
+    key = SessionKey(client_id="demo", sid="c2a-a01")
+    overview, saved, _, calls, clients = _run(
+        tmp_path,
+        _raw("implantation"),
+        key=key,
+        message="Сколько стоит имплантация?",
+    )
+    decision = overview.response.resolved.d2_price_scope_decision
+    assert decision is not None
+    assert decision.reason == "overview"
+    assert decision.applied_extent is None
+    assert [item.extent for item in decision.volume_choices] == list(VOLUME)
+    assert [item.reply_id for item in overview.response.ui_projection.quick_replies] == [
+        f"volume:implantation:{extent}" for extent in VOLUME
+    ]
+    assert [item.label for item in overview.response.ui_projection.quick_replies] == [
+        "Один зуб", "Вся челюсть", "Пока не знаю",
+    ]
+    assert _offer_ids(overview) == CLASSIC_THREE
+    assert "Цена зависит от протокола и объёма лечения." in overview.response.rendered_text
+    assert "Какой объём вас интересует" in overview.response.rendered_text
+    assert "situation_state" not in saved.state.model_dump()
+    assert overview.response.resolved.terminal_text is None
+
+    one, saved, _, _, _ = _run(
+        tmp_path,
+        _raw("implantation", _volume()),
+        key=key,
+        message="Один зуб",
+        now=NOW.replace(minute=1),
+        clients=clients,
+    )
+    assert one.response.resolved.d2_price_scope_decision.applied_extent == "one_tooth"
+    assert _offer_ids(one) == CLASSIC_THREE
+    assert {q.reply_id for q in one.response.ui_projection.quick_replies} == {
+        "price_detail:includes", "price_detail:stages",
+    }
+    assert saved.state.discussion_request_id is not None
+    assert discussion_scope(one.response.resolved).volume.extent == "one_tooth"
+
+    hypo, saved, _, _, _ = _run(
+        tmp_path,
+        _raw(
+            "implantation",
+            _volume(extent="few_teeth", tooth_count=3, ),
+        ),
+        key=key,
+        message="А если три?",
+        now=NOW.replace(minute=2),
+        clients=clients,
+    )
+    assert hypo.response.resolved.d2_price_scope_decision.applied_extent == "few_teeth"
+    assert "classic.one_tooth.implantium" in _offer_ids(hypo)
+    assert saved.state.discussion_request_id is not None
+    assert discussion_scope(hypo.response.resolved).volume.tooth_count == 3
+
+    corr, saved, _, _, _ = _run(
+        tmp_path,
+        _raw(
+            "implantation",
+            _volume(extent="few_teeth", tooth_count=3, ),
+        ),
+        key=key,
+        message="Нет, всё-таки три",
+        now=NOW.replace(minute=3),
+        clients=clients,
+    )
+    assert corr.response.resolved.d2_price_scope_decision.applied_extent == "few_teeth"
+    assert saved.state.discussion_request_id is not None
+    assert discussion_scope(corr.response.resolved).volume.tooth_count == 3
+    assert sum(name == "select_target_marketing" for _, name in calls) == 0
+
+
+def test_a07_unknown_keeps_overview_without_repeating_volume_or_starting_lead(tmp_path: Path) -> None:
+    key = SessionKey(client_id="demo", sid="c2a-a07")
+    first, _, _, _, clients = _run(
+        tmp_path,
+        _raw("prosthetics"),
+        key=key,
+        message="Сколько стоит протезирование?",
+    )
+    assert [item.extent for item in first.response.resolved.d2_price_scope_decision.volume_choices] == list(VOLUME)
+    assert first.response.resolved.terminal_text is None
+
+    second, saved, _, _, _ = _run(
+        tmp_path,
+        _raw(
+            "prosthetics",
+            _volume(extent="unknown", tooth_count=None, ),
+        ),
+        key=key,
+        message="Не знаю",
+        now=NOW.replace(minute=1),
+        clients=clients,
+    )
+    decision = second.response.resolved.d2_price_scope_decision
+    assert decision is not None
+    assert decision.reason == "overview"
+    assert decision.applied_extent is None
+    assert decision.volume_choices == ()
+    assert decision.unknown_extent_text is None
+    assert second.response.ui_projection.quick_replies == ()
+    assert [b.button_id for b in second.response.ui_projection.buttons] == ["default_consult"]
+    assert second.response.ui_projection.buttons[0].label == "Записаться на консультацию"
+    assert second.response.ui_projection.buttons[0].action_kind == "cta"
+    assert second.response.resolved.terminal_text is None
+    assert saved.state.terminal_state == "none"
+    assert "situation_state" not in saved.state.model_dump()
+    assert "Подскажите" not in second.response.rendered_text
+    assert "ориентир" in second.response.rendered_text.lower()
+    assert second.response.resolved.d2_price_block is not None
+    assert second.response.resolved.d2_price_block.rows
+
+
+def test_ttl_expiry_drops_carried_volume_on_ambiguous_followup(tmp_path: Path) -> None:
+    key = SessionKey(client_id="demo", sid="c2a-ttl")
+    first, saved, _, _, clients = _run(
+        tmp_path,
+        _raw("implantation", _volume()),
+        key=key,
+        message="Нет одного зуба, сколько стоит?",
+    )
+    assert saved.state.discussion_request_id is not None
+    assert _offer_ids(first) == CLASSIC_THREE
+
+    second, saved, provider, _, _ = _run(
+        tmp_path,
+        _raw("implantation", _volume(extent="unknown", tooth_count=None, )),
+        key=key,
+        message="А сколько стоит?",
+        now=NOW + timedelta(minutes=30),
+        clients=clients,
+    )
+    assert provider.inputs[0].context.freshness == "expired"
+    assert second.response.resolved.d2_price_scope_decision.applied_extent is None
+    assert second.response.resolved.d2_price_scope_decision.reason == "overview"
+    assert "situation_state" not in saved.state.model_dump()
+
+
+def test_a10_empty_session_price_ask_clarifies_without_inventing_price(tmp_path: Path) -> None:
+    key = SessionKey(client_id="demo", sid="c2b-a10-empty")
+    outcome, saved, _, _, _ = _run(
+        tmp_path,
+        _raw(None),
+        key=key,
+        message="Сколько стоит?",
+    )
+    assert outcome.response.resolved.route == "ANSWER"
+    assert outcome.response.resolved.d2_price_block is None
+    assert saved.state.clarify_pending is True
+    assert saved.state.clarify_task is not None
+    assert saved.state.clarify_task.clarification.missing == "service"
+    assert saved.state.clarify_task.kind == "price"
+    assert saved.state.clarify_task.clarification.choices == ("classic", "all_on_4")
+    assert len(saved.state.dialogue_pairs) == 1
+    assert saved.state.dialogue_pairs[0].request_id == outcome.request_id
+    assert saved.state.terminal_state == "none"
+    assert "situation_state" not in saved.state.model_dump()
+    assert outcome.response.rendered_text == "Какую услугу вы имеете в виду?"
+    assert outcome.response.ui_projection.quick_replies
+
+
+def test_stage2_keeps_ordered_price_refs_without_price_text_for_second_option_followup(
+    tmp_path: Path,
+) -> None:
+    key = SessionKey(client_id="demo", sid="c2-stage2-second-option")
+    store_path = tmp_path / "shared-dialogue.sqlite"
+    first, saved, _, _, clients = _run(
+        tmp_path,
+        _raw("implantation", _volume()),
+        key=key,
+        message="Нет одного зуба, сколько стоит?",
+        store_path=store_path,
+    )
+    offer_ids = _offer_ids(first)
+    assert len(offer_ids) == 3
+    assert [item.offer_id for item in saved.state.d2_shown_price_offer_refs] == list(offer_ids)
+    assert len(saved.state.dialogue_pairs) == 1
+    assert saved.state.dialogue_pairs[0].request_id == first.request_id
+
+    _, saved, provider, _, _ = _run(
+        tmp_path,
+        _raw("implantation", _volume()),
+        key=key,
+        message="Что входит во второй?",
+        now=NOW + timedelta(minutes=1),
+        clients=clients,
+        store_path=store_path,
+    )
+    carried = provider.inputs[0].context.ordinary.d2_shown_price_offer_refs
+    assert [item.offer_id for item in carried] == list(offer_ids)
+    assert [item.service_id for item in carried] == [
+        row.service_id for row in first.response.resolved.d2_price_block.rows
+    ]
+    assert "historical_price_offers" not in provider.inputs[0].context.ordinary.model_dump()
+    assert all(not hasattr(item, "display_text") for item in carried)
+    assert [item.offer_id for item in saved.state.d2_shown_price_offer_refs] == list(offer_ids)
+
+
+def test_stage2_bounds_live_prose_pairs_and_expires_them_with_context(tmp_path: Path) -> None:
+    key = SessionKey(client_id="demo", sid="c2-stage2-history")
+    store_path = tmp_path / "history-dialogue.sqlite"
+    clients = None
+    saved = None
+    for index in range(4):
+        _, saved, _, _, clients = _run(
+            tmp_path,
+            _content(text=f"Проверенная модельная проза {index}."),
+            key=key,
+            message=(f"Запрос {index}: " + "Расскажите об этапах лечения и восстановлении. " * 30),
+            now=NOW + timedelta(minutes=index),
+            clients=clients,
+            store_path=store_path,
+        )
+    assert saved is not None
+    assert len(saved.state.dialogue_pairs) == 3
+    assert all(len(pair.patient_text or "") <= 1_000 for pair in saved.state.dialogue_pairs)
+    assert all(not hasattr(pair, "assistant_text") for pair in saved.state.dialogue_pairs)
+
+    _, saved, provider, _, _ = _run(
+        tmp_path,
+        _content(text="Проверенная модельная проза fresh follow-up."),
+        key=key,
+        message="Свежий follow-up.",
+        now=NOW + timedelta(minutes=4),
+        clients=clients,
+        store_path=store_path,
+    )
+    carried_pairs = provider.inputs[0].context.ordinary.dialogue_pairs
+    assert [pair.patient_text for pair in carried_pairs] == [
+        (f"Запрос {index}: " + "Расскажите об этапах лечения и восстановлении. " * 30)[:1_000]
+        for index in range(1, 4)
+    ]
+    assert [pair.assistant_text for pair in carried_pairs] == [
+        f"Проверенная модельная проза {index}."
+        for index in range(1, 4)
+    ]
+    assert all("Авторский" not in pair.assistant_text for pair in carried_pairs)
+    assert len(saved.state.dialogue_pairs) == 3
+
+    _, saved, provider, _, _ = _run(
+        tmp_path,
+        _content(text="Проверенная модельная проза после TTL."),
+        key=key,
+        message="Сколько стоит?",
+        now=NOW + timedelta(minutes=34),
+        clients=clients,
+        store_path=store_path,
+    )
+    assert provider.inputs[0].context.freshness == "expired"
+    assert provider.inputs[0].context.ordinary.dialogue_pairs == ()
+    assert len(saved.state.dialogue_pairs) == 1
+
+
+def test_a10_switch_to_whitening_does_not_carry_implant_prices(tmp_path: Path) -> None:
+    key = SessionKey(client_id="demo", sid="c2b-a10-switch")
+    first, saved, _, _, clients = _run(
+        tmp_path,
+        _raw("implantation", _volume()),
+        key=key,
+        message="Нет одного зуба, сколько стоит?",
+    )
+    assert _offer_ids(first) == CLASSIC_THREE
+
+    second, saved, _, _, _ = _run(
+        tmp_path,
+        _raw(
+            "whitening",
+            service_id="professional_whitening",
+
+        ),
+        key=key,
+        message="А отбеливание сколько?",
+        now=NOW.replace(minute=1),
+        clients=clients,
+    )
+    assert _offer_ids(second) == (WHITENING_OFFER,)
+    assert all(row.offer_id != CLASSIC_THREE[0] for row in second.response.resolved.d2_price_block.rows)
+    assert second.response.resolved.d2_price_scope_decision is None
+    assert "situation_state" not in saved.state.model_dump()
+    assert discussion_scope(second.response.resolved).service_id == "professional_whitening"
+    assert discussion_scope(second.response.resolved).volume is None
+
+
+def test_b11_other_person_does_not_inherit_prior_volume(tmp_path: Path) -> None:
+    key = SessionKey(client_id="demo", sid="c2b-b11-person")
+    first, saved, _, _, clients = _run(
+        tmp_path,
+        _raw("implantation", _volume()),
+        key=key,
+        message="Нет одного зуба, сколько стоит?",
+    )
+    assert _offer_ids(first) == CLASSIC_THREE
+
+    second, saved, _, _, _ = _run(
+        tmp_path,
+        _raw(
+            "implantation",
+            _volume(extent="one_tooth", tooth_count=1, ),
+        ),
+        key=key,
+        message="А жене тоже один зуб, сколько?",
+        now=NOW.replace(minute=1),
+        clients=clients,
+    )
+    assert second.response.resolved.d2_price_scope_decision.applied_extent == "one_tooth"
+    assert _offer_ids(second) == CLASSIC_THREE
+    assert saved.state.discussion_request_id is not None
+    assert discussion_scope(second.response.resolved).volume.tooth_count == 1
+    assert "situation_state" not in saved.state.model_dump()

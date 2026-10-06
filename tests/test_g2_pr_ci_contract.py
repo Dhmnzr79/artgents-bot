@@ -52,6 +52,11 @@ _MANDATORY_OFFLINE_MODULES = (
     "tests/test_turn_planner_wiring.py",
     "tests/test_tenant_resource_isolation_offline.py",
     "tests/test_one_call_tenant_isolation_offline.py",
+    "tests/test_d2_http_contract.py",
+    "tests/test_d2_demo_limits.py",
+    "tests/test_d2_situation_disabled.py",
+    "tests/test_d2_ci_clinic_policy.py",
+    "tests/test_d2_lead_interrupt_http.py",
     "tests/test_tenant_ingress_prod_boundary_offline.py",
     "tests/test_session_tenant_binding_hardening_offline.py",
     "tests/test_tenant_lead_routing_context_offline.py",
@@ -237,6 +242,20 @@ def test_g2_contract_runs_in_offline_unit_and_contracts_job() -> None:
     offline = _offline_pytest_block(text)
     assert "tests/test_g2_pr_ci_contract.py" in offline
     assert "postgres-qualification:" not in offline
+
+
+def test_clinic_policy_job_requires_current_d2_protection_suites():
+    block = _workflow_text().split('  demo-d1-clinic-policy-regression:', 1)[1].split('  postgres-qualification:', 1)[0]
+    for name in ('d2_sim2_contract', 'd2_demo_audit_fixes', 'd2_compound_answers',
+                 'd2_no_legacy_path', 'd2_ci_clinic_policy', 'd2_discussion_context_http',
+                 'd2_code_answer_fixes', 'd2_lead_interrupt_http', 'd2_situation_disabled',
+                 'tenant_lead_pending_question_offline', 'one_call_tenant_isolation_offline',
+                 'clinic_policy_resolver_offline', 'clinic_policies_loader'):
+        assert f'tests/test_{name}.py' in block
+    for retired in ('request_understanding_schema_offline', 'demo_d1r_http_offline',
+                    'demo_d1r_composition_offline', 'demo_d1r_route_budget_offline',
+                    'demo_clinic_policy_authority_offline', 'demo_implant_volume_scope_offline'):
+        assert f'tests/test_{retired}.py' not in block
 
 
 def test_g8_integration_not_in_offline_pytest_list() -> None:

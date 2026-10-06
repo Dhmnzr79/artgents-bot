@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from contracts.request_understanding import RequestUnderstanding
+from contracts.d2_dialogue_result import D2DialogueResult
 from contracts.one_call_envelope import (
     ENVELOPE_NORMALIZED_ANSWER_CLARIFY_FIELDS_CLEARED,
     ENVELOPE_NORMALIZED_DIRECT_FACT_ID_DEDUPED,
@@ -40,9 +41,18 @@ _ALLOWED_COMMERCIAL_INTENT = frozenset(
     {"none", "price", "payment", "payment_stages", "included", "promotion"}
 )
 _ALLOWED_PROMOTION_SCOPE = frozenset({"none", "general", "service", "shown"})
-_ALLOWED_CLARIFY_AXIS = frozenset({"service", "extent", "jaw", "stage"})
+_ALLOWED_CLARIFY_AXIS = frozenset({"service", "term", "extent", "jaw", "stage"})
 _ALLOWED_SERVICE_REFERENCE_STATUS = frozenset({"none", "resolved", "unresolved"})
 ENVELOPE_NORMALIZED_UNEXPECTED_PRICE_TEXT = "envelope_normalized_unexpected_price_text"
+ENVELOPE_NORMALIZED_NESTED_PRIMARY_PRICE_REQUEST_ID = (
+    "envelope_normalized_nested_primary_price_request_id"
+)
+ENVELOPE_NORMALIZED_DUPLICATE_PATIENT_TEXT = (
+    "envelope_normalized_duplicate_patient_text"
+)
+ENVELOPE_NORMALIZED_INVALID_CONTENT_PROVENANCE_DROPPED = (
+    "envelope_normalized_invalid_content_provenance_dropped"
+)
 
 
 class OneCallEnvelopeProtocolError(ValueError):
@@ -99,6 +109,132 @@ def _normalize_production_payload(
     codes: list[str] = []
     required = required_envelope_field_names()
     keys = set(payload.keys())
+    understanding = payload.get("request_understanding")
+    requests = understanding.get("requests") if isinstance(understanding, dict) else None
+    if isinstance(requests, list):
+        normalized_requests: list[object] = []
+        dropped_provenance = False
+        for request in requests:
+            if not isinstance(request, dict):
+                normalized_requests.append(request)
+                continue
+            content_text = request.get("content_text")
+            content_ref = request.get("content_ref")
+            model_prose = (
+                request.get("kind") == "content"
+                and (
+                    request.get("content_realization") is None
+                    or request.get("content_realization") == "model_prose"
+                )
+                and isinstance(content_text, str)
+                and bool(content_text.strip())
+            )
+            valid_content_ref = (
+                content_ref is None
+                or (
+                    isinstance(content_ref, str)
+                    and content_ref == content_ref.strip().replace("\\", "/")
+                    and content_ref.endswith(".md")
+                    and "/" not in content_ref
+                    and ".." not in content_ref
+                )
+            )
+            sections = request.get("content_section_refs", [])
+            fallback = request.get("content_fallback_section_ref")
+            valid_sections = (
+                isinstance(sections, (list, tuple))
+                and all(
+                    isinstance(ref, str) and bool(ref) and ref == ref.strip()
+                    for ref in sections
+                )
+                and len(sections) == len(set(sections))
+            )
+            valid_fallback = (
+                fallback is None
+                or (
+                    isinstance(fallback, str)
+                    and bool(fallback)
+                    and fallback == fallback.strip()
+                    and isinstance(sections, (list, tuple))
+                    and fallback in sections
+                )
+            )
+            if (
+                (
+                    request.get("kind") in {"content", "other"}
+                    and isinstance(content_text, str)
+                    and content_text.strip()
+                    and not valid_content_ref
+                )
+                or (
+                    model_prose
+                    and (
+                        not valid_sections
+                        or not valid_fallback
+                        or (content_ref is None and bool(sections))
+                    )
+                )
+            ):
+                # A malformed optional source cannot authorize source UI, but
+                # it must not discard useful FullContext prose. Preserve no
+                # unverified source fields for the later typed validation.
+                request = dict(request)
+                request["content_ref"] = None
+                request["content_section_refs"] = []
+                request["content_fallback_section_ref"] = None
+                dropped_provenance = True
+            normalized_requests.append(request)
+        if dropped_provenance:
+            payload = dict(payload)
+            understanding = dict(understanding)
+            understanding["requests"] = normalized_requests
+            payload["request_understanding"] = understanding
+            codes.append(ENVELOPE_NORMALIZED_INVALID_CONTENT_PROVENANCE_DROPPED)
+    if isinstance(understanding, dict) and "primary_price_request_id" in understanding:
+        nested_value = _optional_nonblank_string(
+            understanding["primary_price_request_id"],
+            code="primary_price_request_id_invalid",
+        )
+        payload = dict(payload)
+        if "primary_price_request_id" in keys:
+            top_level_value = _optional_nonblank_string(
+                payload["primary_price_request_id"],
+                code="primary_price_request_id_invalid",
+            )
+            if top_level_value != nested_value:
+                raise OneCallEnvelopeProtocolError(
+                    "primary_price_request_id_location_conflict"
+                )
+            payload["primary_price_request_id"] = top_level_value
+        else:
+            payload["primary_price_request_id"] = nested_value
+            keys.add("primary_price_request_id")
+        payload["request_understanding"] = {
+            key: value
+            for key, value in understanding.items()
+            if key != "primary_price_request_id"
+        }
+        codes.append(ENVELOPE_NORMALIZED_NESTED_PRIMARY_PRICE_REQUEST_ID)
+    patient_text = payload.get("patient_text")
+    requests = understanding.get("requests") if isinstance(understanding, dict) else None
+    if (
+        payload.get("route") == "ANSWER"
+        and isinstance(patient_text, str)
+        and patient_text.strip()
+        and isinstance(requests, list)
+        and any(
+            isinstance(request, dict)
+            and request.get("kind") in {"content", "other"}
+            and isinstance(request.get("content_text"), str)
+            and request["content_text"].strip() == patient_text.strip()
+            for request in requests
+        )
+    ):
+        # The ledger owns informational prose. Keep its one copy instead of
+        # rejecting an otherwise usable response for a duplicated text field.
+        payload = dict(payload)
+        payload["patient_text"] = None
+        codes.append(ENVELOPE_NORMALIZED_DUPLICATE_PATIENT_TEXT)
     if "price_text" not in keys:
         payload = dict(payload)
         payload["price_text"] = None
@@ -317,7 +453,10 @@ def _validate_structure(
         if not isinstance(patient_text_raw, str):
             raise OneCallEnvelopeProtocolError("patient_text_invalid")
         patient_text = patient_text_raw
-        if route in {"ANSWER", "CLARIFY"} and not patient_text.strip():
+        # Ordinary FullContext prose belongs to request_understanding.content_text.
+        # ``patient_text`` is therefore optional for ANSWER and must not make a
+        # usable typed response fail merely because the legacy duplicate is null.
+        if route == "CLARIFY" and not patient_text.strip():
             raise OneCallEnvelopeProtocolError("patient_text_required")
 
     price_text_raw = payload["price_text"]
@@ -371,6 +510,14 @@ def _validate_structure(
                 message if message else "request_understanding_invalid"
             ) from exc
 
+    tooth_count = request_understanding.tooth_count if request_understanding is not None else None
+    if tooth_count is not None:
+        count_extent = "one_tooth" if tooth_count == 1 else "few_teeth"
+        if extent is None:
+            extent = count_extent
+        elif extent in {"one_tooth", "few_teeth"} and extent != count_extent:
+            raise OneCallEnvelopeProtocolError("scope_count_extent_conflict")
+
     primary_price_request_id = _optional_nonblank_string(
         payload.get("primary_price_request_id"),
         code="primary_price_request_id_invalid",
@@ -393,6 +540,21 @@ def _validate_structure(
         )
         if not has_understanding:
             raise OneCallEnvelopeProtocolError("request_understanding_required")
+        has_fullcontext_prose = any(
+            request.kind in {"content", "other"}
+            and bool((request.content_text or "").strip())
+            for request in request_understanding.requests
+        )
+        has_code_owned_surface = any(
+            request.kind in {"clinic_policy", "booking", "price", "price_detail", "contact"}
+            for request in request_understanding.requests
+        )
+        if (
+            not (patient_text or "").strip()
+            and not has_fullcontext_prose
+            and not has_code_owned_surface
+        ):
+            raise OneCallEnvelopeProtocolError("patient_text_required")
         if clarify_axis is not None:
             raise OneCallEnvelopeProtocolError("clarify_axis_forbidden_for_answer")
         if clarify_service_options is not None:
@@ -434,6 +596,8 @@ def _validate_structure(
         )
     except ValueError as exc:
         message = str(exc)
+        if "Value error, " in message:
+            message = message.split("Value error, ", 1)[1].split(" [", 1)[0].strip()
         if message in {
             "patient_text_required",
             "patient_text_forbidden_for_admin",
@@ -446,6 +610,7 @@ def _validate_structure(
             "service_id_invalid",
             "stage_invalid",
             "clarify_service_options_invalid",
+            "primary_price_request_id_invalid",
             "promotion_scope_forbidden",
             "promotion_scope_invalid",
             "direct_fact_ids_forbidden_for_route",
@@ -472,6 +637,7 @@ def _validate_structure(
                     "service_id_invalid",
                     "stage_invalid",
                     "clarify_service_options_invalid",
+                    "primary_price_request_id_invalid",
                     "promotion_scope_forbidden",
                     "promotion_scope_invalid",
                     "service_reference_status_invalid",
@@ -561,8 +727,10 @@ def parse_production_envelope_json(
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
     commercial_fact_catalog: CommercialFactCatalogSnapshot,
-) -> OneCallEnvelope:
-    """Parse and validate a production v5 envelope from provider raw text."""
+    known_task: OneCallEnvelope | D2DialogueResult | None = None,
+    d2_contract: bool = False,
+) -> OneCallEnvelope | D2DialogueResult:
+    """One strict JSON decoder; validate the explicitly selected protocol."""
 
     _clear_envelope_input_normalizations()
 
@@ -574,6 +742,49 @@ def parse_production_envelope_json(
         raise OneCallEnvelopeProtocolError("envelope_oversized")
 
     payload = _loads_strict_json_object(raw)
+    if d2_contract:
+        from contracts.d2_dialogue_result import validate_d2_payload
+        try:
+            return validate_d2_payload(
+                payload, active_service_ids=active_service_catalog.active_service_ids,
+                known_task=known_task,
+            )
+        except ValueError as exc:
+            raise OneCallEnvelopeProtocolError(str(exc)) from exc
+    if known_task is not None:
+        # Same decoder and entry point, but no semantic model envelope is
+        # requested or interpreted for an already authorized task.
+        understanding = known_task.request_understanding
+        expected = tuple(p for p in understanding.requests if p.kind in {"content", "other"})
+        if set(payload) != {"explanations"} or not isinstance(payload["explanations"], list):
+            raise OneCallEnvelopeProtocolError("known_task_explanations_required")
+        items = payload["explanations"]
+        if len(items) != len(expected):
+            raise OneCallEnvelopeProtocolError("known_task_explanations_mismatch")
+        replacements = {}
+        for part, item in zip(expected, items):
+            if (
+                not isinstance(item, dict)
+                or set(item) - {"request_id", "content_text", "content_realization"}
+                or item.get("request_id") != part.request_id
+            ):
+                raise OneCallEnvelopeProtocolError("known_task_explanation_invalid")
+            if item.get("content_realization") != "authored" and (
+                not isinstance(item.get("content_text"), str) or not item["content_text"].strip()
+            ):
+                raise OneCallEnvelopeProtocolError("known_task_explanation_text_required")
+            values = part.model_dump(mode="json")
+            values.pop("content_realization", None)
+            values["content_text"] = item.get("content_text")
+            if "content_realization" in item:
+                values["content_realization"] = item["content_realization"]
+            replacements[part.request_id] = values
+        values = known_task.model_dump(mode="json")
+        values["request_understanding"]["requests"] = [
+            replacements.get(p.request_id, p.model_dump(mode="json"))
+            for p in understanding.requests
+        ]
+        return OneCallEnvelope.model_validate(values)
     payload, normalization_codes = _normalize_production_payload(payload)
     _record_envelope_input_normalizations(normalization_codes)
     envelope = _validate_structure(payload, commercial_fact_catalog=commercial_fact_catalog)

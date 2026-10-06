@@ -16,6 +16,7 @@ from core.user_text_privacy import (
     provider_safe_user_text,
     sanitize_dialog_history_for_provider,
 )
+from core.lead_provider_input_privacy import prepare_lead_pending_provider_question
 
 from orchestration.sales_one_plus_ask_turn import _apply_provider_safe_question
 
@@ -75,6 +76,15 @@ def test_apply_provider_safe_marks_contact_only_as_privacy_only() -> None:
     safe_email, privacy_email = _apply_provider_safe_question(_MARKER_EMAIL)
     assert privacy_email is True
     assert safe_email == ""
+
+
+def test_pending_lead_question_keeps_substance_without_legacy_name_gate() -> None:
+    raw = f"Меня зовут Анна, {_SUBSTANTIVE} {_MARKER_PHONE}"
+    safe = prepare_lead_pending_provider_question(raw)
+    assert safe is not None
+    assert _MARKER_NAME not in safe
+    assert _MARKER_PHONE not in safe
+    assert "имплантац" in safe.lower()
 
 
 @pytest.mark.parametrize(

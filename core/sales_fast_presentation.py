@@ -295,6 +295,103 @@ _DIALOGUE_PRICE_CLARIFY_GENERIC = (
 _DIALOGUE_PRICE_CLARIFY_ALL_ON_PAIR = (
     "Вас интересует стоимость All-on-4 или All-on-6?"
 )
+D2_SCOPE_UNKNOWN_REF = "d2:clarify_scope/unknown"
+D2_SCOPE_DESCRIBE_REF = "d2:clarify_scope/describe"
+D2_SCOPE_BOOK_REF = "d2:clarify_scope/book_consultation"
+
+
+def build_scope_clarify_quick_replies(
+    *,
+    axis: str,
+    client_id: str,
+) -> tuple[list[dict[str, str]], tuple[TargetRuntimeFollowupItem, ...]]:
+    choices = {
+        "extent": (
+            ("Один зуб", "one_tooth"),
+            ("Несколько зубов", "few_teeth"),
+            ("Вся челюсть", "full_arch"),
+        ),
+        "jaw": (
+            ("Верхняя", "upper"),
+            ("Нижняя", "lower"),
+            ("Обе", "both"),
+        ),
+    }.get(axis, ())
+    items = [
+        TargetRuntimeFollowupItem(
+            ref=f"d2:clarify_{axis}/{value}", label=label, client_id=client_id,
+        )
+        for label, value in choices
+    ]
+    if items:
+        items.append(TargetRuntimeFollowupItem(
+            ref=D2_SCOPE_UNKNOWN_REF, label="Не знаю", client_id=client_id,
+        ))
+    return ([{"label": item.label, "ref": item.ref} for item in items], tuple(items))
+
+
+def materialize_scope_unknown_payload(*, client_id: str, sid: str) -> TargetRuntimeTerminalPayload:
+    """Answer a session-bound 'Не знаю' without inventing or persisting scope."""
+    from core.pending_price_clarify import clear_pending_price_clarify
+    from core.target_runtime_session import (
+        clear_validated_understanding_snapshot,
+        write_target_runtime_clarify_followups,
+    )
+
+    clear_pending_price_clarify(sid)
+    clear_validated_understanding_snapshot(sid)
+    followups = (
+        TargetRuntimeFollowupItem(
+            ref=D2_SCOPE_DESCRIBE_REF, label="Описать ситуацию", client_id=client_id,
+        ),
+        TargetRuntimeFollowupItem(
+            ref=D2_SCOPE_BOOK_REF, label="Записаться на консультацию", client_id=client_id,
+        ),
+    )
+    write_target_runtime_clarify_followups(sid, followups=followups)
+    return TargetRuntimeTerminalPayload(
+        kind="terminal",
+        payload={
+            "answer": "Ничего страшного. Можете описать ситуацию своими словами или перейти к записи на консультацию.",
+            "quick_replies": [{"label": item.label, "ref": item.ref} for item in followups],
+            "cta": None,
+            "video": None,
+            "situation": {"show": False, "mode": "normal"},
+            "offer": None,
+            "meta": {
+                "client_id": client_id, "sid": sid, "intent": "content",
+                "answer_path": "sales_fast", "service_route": "d2_scope_unknown",
+                "ui_source_family": "guided_fallback", "attribution_kind": "plain",
+                "terminal_mode": "clarify",
+            },
+        },
+        terminal_mode="clarify",
+    )
+
+
+def materialize_scope_describe_payload(*, client_id: str, sid: str) -> TargetRuntimeTerminalPayload:
+    from core.target_runtime_session import (
+        clear_validated_understanding_snapshot,
+        write_target_runtime_clarify_followups,
+    )
+
+    clear_validated_understanding_snapshot(sid)
+    write_target_runtime_clarify_followups(sid, followups=())
+    return TargetRuntimeTerminalPayload(
+        kind="terminal",
+        payload={
+            "answer": "Опишите, пожалуйста, вашу ситуацию своими словами — что хотелось бы узнать?",
+            "quick_replies": [], "cta": None, "video": None,
+            "situation": {"show": False, "mode": "normal"}, "offer": None,
+            "meta": {
+                "client_id": client_id, "sid": sid, "intent": "content",
+                "answer_path": "sales_fast", "service_route": "d2_scope_describe",
+                "ui_source_family": "guided_fallback", "attribution_kind": "plain",
+                "terminal_mode": "clarify",
+            },
+        },
+        terminal_mode="clarify",
+    )
 
 
 def build_dialogue_service_clarify_quick_replies(
@@ -324,6 +421,7 @@ def build_dialogue_service_clarify_quick_replies(
 def resolve_dialogue_price_clarify_text(
     *,
     clarify_service_options: tuple[str, ...] | None,
+    clarify_axis: str | None = None,
 ) -> str:
     """Short price-scope clarify without parsing patient_text."""
 
@@ -331,6 +429,10 @@ def resolve_dialogue_price_clarify_text(
         options = tuple(str(item).strip() for item in clarify_service_options if str(item).strip())
         if set(options) == {"all_on_4", "all_on_6"}:
             return _DIALOGUE_PRICE_CLARIFY_ALL_ON_PAIR
+    if clarify_axis == "extent":
+        return "Сколько зубов нужно восстановить: один, несколько или всю челюсть?"
+    if clarify_axis == "jaw":
+        return "Какую челюсть нужно восстановить: верхнюю, нижнюю или обе?"
     return _DIALOGUE_PRICE_CLARIFY_GENERIC
 
 
@@ -339,6 +441,7 @@ def materialize_dialogue_price_clarify_payload(
     client_id: str,
     sid: str,
     clarify_service_options: tuple[str, ...] | None = None,
+    clarify_axis: str | None = None,
     bundle: ResponseSchemaBundle | None = None,
 ) -> TargetRuntimeTerminalPayload:
     quick_replies: list[dict[str, str]] = []
@@ -349,7 +452,11 @@ def materialize_dialogue_price_clarify_payload(
             client_id=client_id,
             clarify_service_options=clarify_service_options,
         )
-    if followups:
+    elif clarify_axis in {"extent", "jaw"}:
+        quick_replies, followups = build_scope_clarify_quick_replies(
+            axis=clarify_axis, client_id=client_id,
+        )
+    if followups and clarify_service_options:
         from core.pending_price_clarify import write_pending_price_clarify
         from session import mem_get
 
@@ -359,14 +466,15 @@ def materialize_dialogue_price_clarify_payload(
             allowed_service_ids=tuple(item.ref.split("/")[-1] for item in followups if item.ref),
             session_turn_count=session_turn_count,
         )
-        from core.target_runtime_session import write_target_runtime_clarify_followups
+    from core.target_runtime_session import write_target_runtime_clarify_followups
 
-        write_target_runtime_clarify_followups(sid, followups=followups)
+    write_target_runtime_clarify_followups(sid, followups=followups)
     return TargetRuntimeTerminalPayload(
         kind="terminal",
         payload={
             "answer": resolve_dialogue_price_clarify_text(
                 clarify_service_options=clarify_service_options,
+                clarify_axis=clarify_axis,
             ),
             "quick_replies": quick_replies,
             "cta": None,

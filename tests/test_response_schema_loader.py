@@ -16,6 +16,7 @@ from core.response_schema_loader import (
     ResponseSchemaLoadError,
     YamlMergeKeyError,
     load_response_schema_bundle,
+    load_response_schema_bundle_from_texts,
 )
 
 
@@ -159,6 +160,29 @@ def test_complete_pack_loads_exact_source_values_and_external_refs(tmp_path: Pat
         "kb:Service.md#Exact_Chunk",
         "doctor:doctor_one",
     ]
+
+
+def test_captured_text_loader_matches_path_loader(tmp_path: Path) -> None:
+    root = _write_pack(tmp_path / "pack")
+    expected = load_response_schema_bundle(root)
+    texts = {
+        item.relative_to(root).as_posix(): item.read_text(encoding="utf-8")
+        for item in root.rglob("*") if item.is_file()
+    }
+
+    actual = load_response_schema_bundle_from_texts(texts)
+
+    assert actual.model_dump() == expected.model_dump()
+    texts.pop("marketing.yaml")
+    with pytest.raises(ResponseSchemaLoadError, match="required_path_missing"):
+        load_response_schema_bundle_from_texts(texts)
+    texts = {
+        item.relative_to(root).as_posix(): item.read_text(encoding="utf-8")
+        for item in root.rglob("*") if item.is_file()
+    }
+    texts["service_catalog.json"] = '{"service_one": {}, "service_one": {}}'
+    with pytest.raises(ResponseSchemaLoadError, match="duplicate_key"):
+        load_response_schema_bundle_from_texts(texts)
 
 
 def test_offer_order_uses_filename_without_deriving_offer_id(tmp_path: Path) -> None:

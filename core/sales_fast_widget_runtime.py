@@ -9,6 +9,7 @@ from typing import Protocol
 import config
 from contracts.exact_sales_resolution import ExactSalesResolution
 from contracts.local_problem_gate import LocalProblemGateResult
+from contracts.patient_scope_projection import ProjectedPatientScope, ProjectedScopeAxis
 from contracts.precomposer_selected_offer import PrecomposerSelectedOfferResult
 from contracts.sales_one_plus_semantic import SalesOnePlusSemanticFrame
 from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundTerminalResponse
@@ -519,6 +520,44 @@ def _topic_for_effective_scope_merge(
     return None
 
 
+def _is_current_care_for_other_person(understanding: object | None) -> bool:
+    """Return true only for a current-care request explicitly owned by another person."""
+
+    if understanding is None:
+        return False
+    other_subject_ids = {
+        str(getattr(subject, "subject_id", "") or "").strip()
+        for subject in (getattr(understanding, "subjects", ()) or ())
+        if getattr(subject, "relation", None) == "other"
+    }
+    other_subject_ids.discard("")
+    if not other_subject_ids:
+        return False
+    return any(
+        str(getattr(request, "subject_id", "") or "").strip() in other_subject_ids
+        and getattr(request, "context", None) == "current_care"
+        and getattr(request, "kind", None) in {"booking", "content", "other", "price"}
+        for request in (getattr(understanding, "requests", ()) or ())
+    )
+
+
+def _session_state_for_other_person_scope(
+    session_state: object,
+    *,
+    understanding: object | None,
+) -> object:
+    """Do not let one patient's treatment scope or offer survive into another's turn."""
+
+    if not _is_current_care_for_other_person(understanding):
+        return session_state
+    return replace(
+        session_state,
+        patient_facts=None,
+        last_displayed_offer_ids=(),
+        last_selected_offer_id=None,
+    )
+
+
 def _authoritative_effective_scope_for_turn(
     *,
     session_state: object,
@@ -528,7 +567,7 @@ def _authoritative_effective_scope_for_turn(
     stage_action: UiStageAction | None,
     commercial_intent: str | None,
 ) -> object:
-    """Session + message scope for bound-package dispatch and patient_facts persist."""
+    """Session + validated model scope for dispatch; UI controls remain authoritative."""
 
     if scope_action is not None or stage_action is not None:
         return resolve_effective_scope(
@@ -544,13 +583,26 @@ def _authoritative_effective_scope_for_turn(
         session_state=session_state,
         commercial_intent=commercial_intent,
     )
+    patient_scope = turn_frame.patient_scope
+    def axis(value: str) -> ProjectedScopeAxis:
+        return ProjectedScopeAxis(
+            value=value if value != "unknown" else None,
+            provenance="one_call_envelope.patient_scope",
+            usable=value != "unknown",
+        )
+
     return resolve_effective_scope(
         current_ui_action=None,
         current_ui_stage_action=None,
         session_facts=session_state.patient_facts,  # type: ignore[attr-defined]
         current_topic=merge_topic,
         session_turn_count=int(session_state.session_turn_count),  # type: ignore[attr-defined]
-        projected_turn_scope=project_sales_fast_scope_from_message(user_message),
+        projected_turn_scope=ProjectedPatientScope(
+            extent=axis(patient_scope.extent),
+            jaw=axis(patient_scope.jaw),
+            stage=axis(patient_scope.stage),
+            reported_context=axis("unknown"),
+        ),
     )
 
 
@@ -572,9 +624,14 @@ def _rebuild_authoritative_context(
     ExactSalesResolution,
     object,
     object,
+    object,
 ]:
     if result.envelope is None:
         raise ValueError("authoritative_rebuild_requires_envelope")
+    session_state = _session_state_for_other_person_scope(
+        session_state,
+        understanding=result.envelope.request_understanding,
+    )
     governed_ui = governed_ui_authority_from_resolution(resolution)
     session_service_id = resolve_session_service_for_followup(
         turn_frame=build_effective_provisional_turn_frame(
@@ -690,7 +747,7 @@ def _rebuild_authoritative_context(
         shown_amplifier_refs=session_state.shown_amplifier_refs,  # type: ignore[attr-defined]
         shown_consultation_value_refs=session_state.shown_consultation_value_refs,  # type: ignore[attr-defined]
     )
-    return turn_frame, bound, effective_scope, commerce_resolution, strategy_context, semantic
+    return turn_frame, bound, effective_scope, commerce_resolution, strategy_context, semantic, session_state
 
 
 ONE_CALL_RUNTIME_ARCHITECTURE = "fullcontext_one_call"
@@ -1040,6 +1097,7 @@ def _compose_understanding_clarification(
         client_id=client_id, understanding=envelope.request_understanding,
         primary_price_request_id=envelope.primary_price_request_id,
         user_message=user_message,
+        suppress_missing_content_text=result.decision == "clarify",
     )
     # A full-route CLARIFY question comes from the validated envelope. A code
     # scope-defer uses the existing deterministic widget question instead.
@@ -1107,6 +1165,7 @@ def _materialize_result(
             commerce_resolution,
             strategy_context,
             semantic,
+            session_state,
         ) = _rebuild_authoritative_context(
             result=result,
             context=context,
@@ -1153,6 +1212,12 @@ def _materialize_result(
                 provider_calls=provider_calls,
             )
         raise
+    cadence = TargetPresentationCadenceState(
+        shown_video_ids=frozenset(session_state.shown_video_ids),  # type: ignore[attr-defined]
+        shown_content_followup_refs=frozenset(session_state.shown_content_followup_refs),  # type: ignore[attr-defined]
+        shown_price_followup_refs=frozenset(session_state.shown_price_followup_refs),  # type: ignore[attr-defined]
+        situation_offered=bool(session_state.situation_offered),  # type: ignore[attr-defined]
+    )
     precomposer_selected_offer = resolve_authoritative_selected_offer_for_turn(
         bundle=context.bundle,
         doctor_catalog=context.doctor_catalog,
@@ -1161,6 +1226,24 @@ def _materialize_result(
         session_state=session_state,  # type: ignore[arg-type]
         commercial_intent=semantic.commercial_intent,
     )
+    if (
+        result.decision == "clarify"
+        and result.envelope is not None
+        and result.envelope.commercial_intent == "price"
+        and semantic.clarify_axis == "service"
+    ):
+        return SalesFastWidgetOutcome(
+            widget=_compose_understanding_clarification(materialize_dialogue_price_clarify_payload(
+                client_id=client_id,
+                sid=sid,
+                clarify_service_options=semantic.clarify_service_options,
+                clarify_axis="service",
+                bundle=context.bundle,
+            ), result=result, client_id=client_id, sid=sid, user_message=user_message),
+            provider_calls=provider_calls,
+            model_route="clarify",
+            failure_kind=result.reason,
+        )
     if isinstance(bound, TargetTurnFrameBoundTerminalResponse):
         if (
             bound.dispatch.terminal_mode == "defer"
@@ -1172,6 +1255,7 @@ def _materialize_result(
                     client_id=client_id,
                     sid=sid,
                     clarify_service_options=semantic.clarify_service_options,
+                    clarify_axis=semantic.clarify_axis,
                     bundle=context.bundle,
                 ), result=result, client_id=client_id, sid=sid, user_message=user_message),
                 provider_calls=provider_calls,
@@ -1186,6 +1270,7 @@ def _materialize_result(
                     clarify_service_options=semantic.clarify_service_options
                     if semantic.clarify_axis == "service"
                     else None,
+                    clarify_axis=semantic.clarify_axis,
                     bundle=context.bundle,
                 ), result=result, client_id=client_id, sid=sid, user_message=user_message),
                 provider_calls=provider_calls,
@@ -1385,7 +1470,27 @@ def _materialize_result(
             prior=session_prior,  # type: ignore[arg-type]
             current_selection=selection,
             followups=_followups_from_widget(widget),
-            effective_scope=effective_scope,  # type: ignore[arg-type]
+            effective_scope=effective_scope if (
+                _current_ui_scope_action() is not None
+                or _current_ui_stage_action() is not None
+                or (
+                    semantic.request_understanding is not None
+                    and semantic.request_understanding.scope_commitment
+                    in {"reported", "correction"}
+                )
+            ) else None,  # type: ignore[arg-type]
+            clear_patient_facts=_is_current_care_for_other_person(
+                semantic.request_understanding,
+            ),
+            reported_tooth_count=(
+                semantic.request_understanding.tooth_count
+                if semantic.request_understanding is not None
+                else None
+            ),
+            replace_tooth_count=bool(
+                semantic.request_understanding is not None
+                and semantic.request_understanding.scope_commitment in {"reported", "correction"}
+            ),
             presentation_cadence_update=widget.presentation_cadence_update,
             availability_status=semantic.availability_status,
             displayed_offer_ids=displayed_offer_ids,

@@ -241,6 +241,12 @@ def _resolve_governed_typed_ui_ref(
     from contracts.ui_service_action import is_ui_service_ref
     from contracts.ui_stage_action import is_ui_stage_ref
     from core.target_runtime_followup_nav import build_target_unknown_ref_clarify_payload
+    from core.sales_fast_presentation import (
+        D2_SCOPE_DESCRIBE_REF,
+        D2_SCOPE_UNKNOWN_REF,
+        materialize_scope_describe_payload,
+        materialize_scope_unknown_payload,
+    )
     from core.target_runtime_session import (
         read_target_runtime_session,
         write_session_patient_facts_from_ui_action,
@@ -255,6 +261,25 @@ def _resolve_governed_typed_ui_ref(
         or is_ui_service_ref(ref_eff)
         or is_ui_stage_ref(ref_eff)
     )
+
+    if ref_eff in {D2_SCOPE_UNKNOWN_REF, D2_SCOPE_DESCRIBE_REF} and _is_governed_ref_label_only_click(
+        ref=ref_eff, q=q, sid=sid,
+    ):
+        if _session_bound_label_for_ref(ref=ref_eff, sid=sid) is None:
+            payload = build_target_unknown_ref_clarify_payload(client_id=client_id, sid=sid)
+            route = "sales_fast_followup_unknown"
+        else:
+            terminal = (
+                materialize_scope_unknown_payload(client_id=client_id, sid=sid)
+                if ref_eff == D2_SCOPE_UNKNOWN_REF
+                else materialize_scope_describe_payload(client_id=client_id, sid=sid)
+            )
+            payload = terminal.payload
+            route = str((payload.get("meta") or {}).get("service_route") or "d2_scope_clarify")
+        return AskOrchestrationResult(
+            kind="service_reply", q=q, sid=sid, client_id=client_id,
+            service_payload=payload, service_route=route,
+        )
 
     if q and not governed_typed_ref:
         from core.target_runtime_followup_nav import resolve_target_followup_navigation

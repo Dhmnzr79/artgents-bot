@@ -39,17 +39,12 @@
   --clinic-radius-lg: 10px;
   --clinic-radius-md: 12px;
   --clinic-radius-sm: 999px;
-  /* Палитра: brand (заливки) + action (интерактив на белом); clients/{id}/brand.yaml */
-  --clinic-brand: #6952e8;
-  --clinic-button-1: #7b4eff;
-  --clinic-button-2: #ff8db2;
-  --clinic-button-1-rgb: 123, 78, 255;
-  --clinic-button-2-rgb: 255, 141, 178;
-  --clinic-gradient-cta: linear-gradient(130deg, var(--clinic-button-1) 0%, var(--clinic-button-2) 100%);
-  --clinic-action: #4a3ba8;
-  --clinic-action-hover: #3f328f;
-  --clinic-brand-rgb: 105, 82, 232;
-  --clinic-action-rgb: 74, 59, 168;
+  /* Основной цвет клиента для кнопок и интерактивных обводок. */
+  --clinic-brand: #0C2FE0;
+  --clinic-action: var(--clinic-brand);
+  --clinic-action-hover: #0B2ACA;
+  --clinic-brand-rgb: 12, 47, 224;
+  --clinic-action-rgb: 12, 47, 224;
   --clinic-shadow: 0 8px 32px rgba(var(--clinic-brand-rgb), 0.14);
   --clinic-shadow-soft: 0 4px 16px rgba(var(--clinic-brand-rgb), 0.1);
   --clinic-bg: #ffffff;
@@ -60,15 +55,15 @@
   --clinic-text-soft: #6b6280;
   --clinic-text-muted: #9a92ad;
   --clinic-chip-bg: rgba(255, 255, 255, 0.72);
-  --clinic-chip-border: rgba(var(--clinic-brand-rgb), 0.14);
+  --clinic-chip-border: var(--clinic-brand);
   --clinic-focus: 0 0 0 2px rgba(255, 255, 255, 0.95), 0 0 0 4px rgba(var(--clinic-action-rgb), 0.32);
   --clinic-gradient-online: linear-gradient(135deg, #8af447 0%, #32d33d 48%, #10b83a 100%);
   --clinic-online: #32d33d;
-  --clinic-bubble-user: rgba(var(--clinic-brand-rgb), 0.12);
+  --clinic-bubble-user: #F3F4F6;
   --clinic-line: rgba(43, 30, 78, 0.09);
   --clinic-composer-bg: var(--clinic-bg-tint);
-  --clinic-composer-border: rgba(var(--clinic-brand-rgb), 0.18);
-  --clinic-composer-focus-border: rgba(var(--clinic-brand-rgb), 0.42);
+  --clinic-composer-border: var(--clinic-brand);
+  --clinic-composer-focus-border: var(--clinic-brand);
   --clinic-composer-focus-shadow: 0 10px 28px rgba(var(--clinic-brand-rgb), 0.12);
   --clinic-placeholder: #aaa0bb;
   --clinic-panel-w: 440px;
@@ -130,7 +125,7 @@
   box-shadow: var(--clinic-shadow), var(--clinic-focus);
 }
 
-/* Демо-CTA и send: градиент из brand.yaml (button_1 → button_2) */
+/* Однотонные кнопки в основном цвете клиента. */
 .clinic-shell__launcher.clinic-shell__launcher--demo {
   display: inline-block;
   width: auto;
@@ -139,11 +134,7 @@
   padding: 14px 26px;
   border: none;
   border-radius: 999px;
-  background-color: var(--clinic-button-1, #7b4eff);
-  background-image: var(
-    --clinic-gradient-cta,
-    linear-gradient(130deg, #7b4eff 0%, #ff8db2 100%)
-  );
+  background: var(--clinic-brand);
   color: #fff;
   font-family: inherit;
   font-size: 15px;
@@ -154,8 +145,8 @@
   white-space: nowrap;
   cursor: pointer;
   box-shadow:
-    0 10px 28px rgba(var(--clinic-button-1-rgb, 123, 78, 255), 0.38),
-    0 4px 12px rgba(var(--clinic-button-2-rgb, 255, 141, 178), 0.22);
+    0 10px 28px rgba(var(--clinic-brand-rgb), 0.38),
+    0 4px 12px rgba(var(--clinic-brand-rgb), 0.22);
   transition:
     transform 0.16s ease,
     box-shadow 0.16s ease,
@@ -170,8 +161,8 @@
   transform: translateY(-1px);
   filter: brightness(1.05);
   box-shadow:
-    0 14px 32px rgba(var(--clinic-button-1-rgb, 123, 78, 255), 0.44),
-    0 6px 16px rgba(var(--clinic-button-2-rgb, 255, 141, 178), 0.28);
+    0 14px 32px rgba(var(--clinic-brand-rgb), 0.44),
+    0 6px 16px rgba(var(--clinic-brand-rgb), 0.28);
 }
 
 .clinic-shell__launcher--demo:active {
@@ -182,8 +173,8 @@
 .clinic-shell__launcher--demo:focus-visible {
   outline: none;
   box-shadow:
-    0 10px 28px rgba(var(--clinic-button-1-rgb, 123, 78, 255), 0.38),
-    0 4px 12px rgba(var(--clinic-button-2-rgb, 255, 141, 178), 0.22),
+    0 10px 28px rgba(var(--clinic-brand-rgb), 0.38),
+    0 4px 12px rgba(var(--clinic-brand-rgb), 0.22),
     var(--clinic-focus);
 }
 
@@ -485,22 +476,13 @@
   flex-shrink: 0;
 }
 
-.clinic-shell__header--glass {
+.clinic-shell__header--sticky {
   position: sticky;
   top: 0;
   z-index: 3;
   margin: 0;
   border-bottom: none;
-  /* Лёгкая вуаль + blur контента под шапкой (не плотная белая плашка) */
-  background: rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(20px) saturate(1.1);
-  -webkit-backdrop-filter: blur(20px) saturate(1.1);
-}
-
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .clinic-shell__header--glass {
-    background: rgba(255, 255, 255, 0.72);
-  }
+  background: var(--clinic-bg);
 }
 
 .clinic-shell__header-main {
@@ -555,19 +537,6 @@
   color: var(--clinic-text-soft);
 }
 
-.clinic-shell__header-status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: #22c55e;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.2;
-  letter-spacing: 0.02em;
-}
-
 .clinic-shell__header-actions {
   display: flex;
   align-items: center;
@@ -592,7 +561,7 @@
   border: none;
   border-radius: 0;
   background: transparent;
-  color: var(--clinic-text);
+  color: var(--clinic-brand);
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
@@ -652,31 +621,6 @@
   overflow: visible;
 }
 
-.clinic-shell__welcome-logo-wrap {
-  position: relative;
-  width: fit-content;
-  max-width: 100%;
-  margin: 0 auto 20px;
-  flex-shrink: 0;
-  pointer-events: none;
-}
-
-.clinic-shell__welcome-logo {
-  display: block;
-  width: fit-content;
-  line-height: 0;
-}
-
-.clinic-shell__welcome-logo-img,
-.clinic-shell__welcome-logo svg {
-  display: block;
-  width: var(--clinic-logo-w, auto);
-  height: var(--clinic-logo-h, 32px);
-  max-width: 100%;
-  margin: 0 auto;
-  object-fit: contain;
-}
-
 .clinic-shell__welcome-lead {
   position: relative;
   z-index: 2;
@@ -685,7 +629,7 @@
 
 .clinic-shell__welcome-text {
   margin: 0;
-  text-align: center;
+  text-align: left;
   color: var(--clinic-text);
   font-size: 15px;
   line-height: 1.45;
@@ -758,17 +702,14 @@
 }
 
 .clinic-msg__attribution {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0 0 8px;
   font-size: 13px;
   line-height: 1.4;
   font-weight: 400;
   color: var(--clinic-text-muted);
-}
-
-.clinic-msg__attribution--lead {
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .clinic-msg__attribution-icon {
@@ -966,6 +907,41 @@
   height: 100%;
 }
 
+.clinic-msg__links--with-volume {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-top: 0;
+}
+
+.clinic-msg__volume-chip {
+  flex: 0 1 auto;
+  max-width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 9px 16px;
+  border: 1px solid var(--clinic-action);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--clinic-action);
+  font: inherit;
+  font-size: 14.5px;
+  line-height: 1.5;
+  text-align: center;
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.clinic-msg__volume-chip:hover {
+  color: var(--clinic-action-hover);
+  border-color: var(--clinic-action-hover);
+}
+
+.clinic-msg__volume-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--clinic-focus);
+}
+
 .clinic-turn {
   width: 100%;
   display: flex;
@@ -1066,7 +1042,7 @@
   line-height: 1;
   font-weight: 400;
   transition: background-color 0.16s ease;
-  background: var(--clinic-gradient-cta, var(--clinic-brand));
+  background: var(--clinic-brand);
   color: #fff;
   box-shadow: none;
   text-align: center;
@@ -1105,8 +1081,25 @@
 }
 
 .clinic-shell__typing-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.clinic-shell__typing-words {
   position: relative;
-  display: inline-block;
+}
+
+.clinic-shell__typing-icon {
+  display: flex;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.clinic-shell__typing-icon svg {
+  width: 100%;
+  height: 100%;
 }
 
 .clinic-shell__typing-label-base {
@@ -1218,7 +1211,7 @@
   margin-bottom: 1px;
   border-radius: 50%;
   border: none;
-  background: var(--clinic-gradient-cta, var(--clinic-brand));
+  background: var(--clinic-brand);
   color: #fff;
   cursor: pointer;
   display: grid;
@@ -1468,7 +1461,7 @@
     overflow: hidden;
   }
 
-  .clinic-shell.is-open.is-mobile-fullscreen .clinic-shell__header--glass {
+  .clinic-shell.is-open.is-mobile-fullscreen .clinic-shell__header--sticky {
     position: relative;
     top: auto;
     flex-shrink: 0;
@@ -1507,10 +1500,6 @@
   .clinic-shell__welcome-card {
     margin-top: 16px;
     padding: 0 0 20px;
-  }
-
-  .clinic-shell__welcome-logo-wrap {
-    margin-bottom: 12px;
   }
 
   .clinic-shell__welcome-text {
@@ -1554,22 +1543,22 @@
   100% {
     transform: scale(1);
     box-shadow:
-      0 10px 28px rgba(var(--clinic-button-1-rgb, 123, 78, 255), 0.38),
-      0 4px 12px rgba(var(--clinic-button-2-rgb, 255, 141, 178), 0.22);
+      0 10px 28px rgba(var(--clinic-brand-rgb), 0.38),
+      0 4px 12px rgba(var(--clinic-brand-rgb), 0.22);
   }
 
   88% {
     transform: scale(1.04);
     box-shadow:
-      0 16px 36px rgba(var(--clinic-button-1-rgb, 123, 78, 255), 0.52),
-      0 8px 20px rgba(var(--clinic-button-2-rgb, 255, 141, 178), 0.36);
+      0 16px 36px rgba(var(--clinic-brand-rgb), 0.52),
+      0 8px 20px rgba(var(--clinic-brand-rgb), 0.36);
   }
 
   94% {
     transform: scale(1);
     box-shadow:
-      0 10px 28px rgba(var(--clinic-button-1-rgb, 123, 78, 255), 0.38),
-      0 4px 12px rgba(var(--clinic-button-2-rgb, 255, 141, 178), 0.22);
+      0 10px 28px rgba(var(--clinic-brand-rgb), 0.38),
+      0 4px 12px rgba(var(--clinic-brand-rgb), 0.22);
   }
 }
 

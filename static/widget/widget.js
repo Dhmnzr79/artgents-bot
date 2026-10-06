@@ -1,6 +1,6 @@
-﻿import { postAsk, streamAsk } from "./api.js";
+﻿import { streamAsk } from "./api.js";
 import { setBotAnswerBody } from "./answer_format.js";
-import { mergeFollowupControls } from "./followup_controls.js";
+import { friendlyErrorMessage } from "./api.js";
 
 const STORAGE_SID = "clinic_widget_sid";
 const STORAGE_LAUNCHER_TEASER = "clinic_widget_launcher_teaser_shown";
@@ -43,19 +43,21 @@ const PLAIN_ATTRIBUTION_ROUTES = new Set([
   "target_fullcontext_verifier_blocked",
   "target_fullcontext_followup_unknown",
 ]);
-/** Синхронно с config.BOOKING_INTENT_RE — до ответа сервера не показываем «базу знаний». */
-const BOOKING_INTENT_RE =
-  /(?:запишите\s+меня|хочу\s+запис(?:аться|ать)\b|запись\s+на\s+(?:консультац|приём|прием)|остав(?:ить|лю)\s+заявку|(?<!\bкак\s)(?<!\bгде\s)(?<!\bкуда\s)\bзапис(?:аться|ать)\b(?:\s+на\s+(?:консультац|приём|прием))?)/iu;
-
 /** Скрытый сброс сессии: «::reset <token>» (только demoLauncher / dev-хост). */
 const SECRET_SESSION_RESET_RE = /^::reset\s+(\S+)\s*$/i;
 const SECRET_SESSION_RESET_TOKEN = "x7k9m2p4";
 
 const SEND_BTN_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-const LINK_CHEVRON_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const LINK_ARROW_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M4 12h16M14 6l6 6-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 const CTA_CALENDAR_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M8 3v4M16 3v4M3 10h18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`;
+
+const SOURCE_BOOK_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v15M12 5C8 2 4 3 2 4v15c4-2 7-1 10 1 3-2 6-3 10-1V4c-2-1-6-2-10 1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+const MESSAGE_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 15a3 3 0 0 1-3 3H8l-5 3V6a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+const SEARCH_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="6" stroke="currentColor" stroke-width="1.5"/><path d="m15 15 6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+const CHECK_DOCUMENT_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 2H5v20h14V7l-5-5Zm0 0v5h5M8 14l3 3 5-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const WRITE_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m15 4 5 5M3 21l2-7L17 2l5 5-12 12-7 2Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 /** @param {string} hex */
 function _hexToRgb(hex) {
@@ -94,7 +96,7 @@ function _darkenHex(hex, ratio = 0.1) {
 
 /**
  * Apply ``config.theme`` CSS variables on the widget shell (overrides widget.css defaults).
- * Palette: ``brand``, ``action``, ``button_1``/``button_2`` (градиент кнопок), и др. from brand.yaml.
+ * Primary color: ``brand`` from brand.yaml, shared by buttons and outlines.
  * @param {HTMLElement | null} shellEl
  * @param {Record<string, string> | undefined} theme
  */
@@ -102,29 +104,12 @@ function applyWidgetTheme(shellEl, theme) {
   if (!shellEl || !theme || typeof theme !== "object") return;
   const brand = String(theme.brand || "").trim();
   if (!brand) return;
-  const action = String(theme.action || "").trim() || _darkenHex(brand, 0.28);
+  const action = brand;
   const actionHover = _darkenHex(action, 0.1);
-
-  const button1 = String(theme.button_1 || "").trim() || brand;
-  const button2 = String(theme.button_2 || "").trim() || _darkenHex(brand, 0.12);
 
   shellEl.style.setProperty("--clinic-brand", brand);
   shellEl.style.setProperty("--clinic-action", action);
   shellEl.style.setProperty("--clinic-action-hover", actionHover);
-  shellEl.style.setProperty("--clinic-button-1", button1);
-  shellEl.style.setProperty("--clinic-button-2", button2);
-  const button1Rgb = _hexToRgb(button1);
-  const button2Rgb = _hexToRgb(button2);
-  if (button1Rgb) {
-    shellEl.style.setProperty("--clinic-button-1-rgb", _rgbCss(button1Rgb));
-  }
-  if (button2Rgb) {
-    shellEl.style.setProperty("--clinic-button-2-rgb", _rgbCss(button2Rgb));
-  }
-  shellEl.style.setProperty(
-    "--clinic-gradient-cta",
-    `linear-gradient(130deg, ${button1} 0%, ${button2} 100%)`
-  );
 
   const brandRgb = _hexToRgb(brand);
   const actionRgb = _hexToRgb(action);
@@ -132,14 +117,13 @@ function applyWidgetTheme(shellEl, theme) {
     const rgb = _rgbCss(brandRgb);
     shellEl.style.setProperty("--clinic-brand-rgb", rgb);
     shellEl.style.setProperty("--clinic-bg-subtle", `rgba(${rgb}, 0.06)`);
-    shellEl.style.setProperty("--clinic-chip-border", `rgba(${rgb}, 0.14)`);
-    shellEl.style.setProperty("--clinic-bubble-user", `rgba(${rgb}, 0.12)`);
+    shellEl.style.setProperty("--clinic-chip-border", brand);
     shellEl.style.setProperty("--clinic-shadow", `0 8px 32px rgba(${rgb}, 0.14)`);
     shellEl.style.setProperty("--clinic-shadow-soft", `0 4px 16px rgba(${rgb}, 0.1)`);
     shellEl.style.setProperty("--clinic-bg-tint", _mixHexWithWhite(brand, 0.96));
     shellEl.style.setProperty("--clinic-composer-bg", _mixHexWithWhite(brand, 0.97));
-    shellEl.style.setProperty("--clinic-composer-border", `rgba(${rgb}, 0.18)`);
-    shellEl.style.setProperty("--clinic-composer-focus-border", `rgba(${rgb}, 0.42)`);
+    shellEl.style.setProperty("--clinic-composer-border", brand);
+    shellEl.style.setProperty("--clinic-composer-focus-border", brand);
     shellEl.style.setProperty(
       "--clinic-composer-focus-shadow",
       `0 10px 28px rgba(${rgb}, 0.12)`
@@ -165,45 +149,14 @@ function resolvePackAssetUrl(apiBase, path) {
 }
 
 /**
- * @param {HTMLElement} logoWrap
- * @param {HTMLElement} logoEl
- * @param {WidgetConfig} config
- */
-function fillWelcomeLogo(logoWrap, logoEl, config) {
-  const url = resolvePackAssetUrl(config.apiBase, config.logoUrl);
-  const w = Number(config.logoWidth) || 0;
-  const h = Number(config.logoHeight) || 32;
-  logoEl.textContent = "";
-  if (url) {
-    const img = document.createElement("img");
-    img.className = "clinic-shell__welcome-logo-img";
-    img.src = url;
-    img.alt = "";
-    img.decoding = "async";
-    logoEl.appendChild(img);
-  } else {
-    logoEl.innerHTML = WELCOME_LOGO_SVG;
-  }
-  if (w > 0) logoWrap.style.setProperty("--clinic-logo-w", `${w}px`);
-  else logoWrap.style.removeProperty("--clinic-logo-w");
-  logoWrap.style.setProperty("--clinic-logo-h", `${h}px`);
-}
-
-/**
  * @param {HTMLElement} el
  * @param {WidgetConfig} config
  */
 function fillHeaderStatus(el, config) {
   const clinicName = String(config.clinicName || "").trim() || "клиники";
-  el.textContent = "";
-  el.appendChild(document.createTextNode(`ИИ-консультант ${clinicName} `));
-  const badge = document.createElement("span");
-  badge.className = "clinic-shell__header-status-badge";
-  badge.textContent = "24/7";
-  el.appendChild(badge);
+  el.textContent = `ИИ-консультант ${clinicName}`;
 }
 
-const WELCOME_LOGO_SVG = `<svg viewBox="0 0 101 26" preserveAspectRatio="xMidYMid meet" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M85.1918 4.41158H88.1628V7.95266H85.1918V14.1348C85.1918 14.755 85.3319 15.1951 85.612 15.4552C85.8921 15.7153 86.3322 15.8453 86.9324 15.8453C87.4725 15.8453 87.8827 15.8054 88.1628 15.7254V19.0265C87.5826 19.2666 86.8324 19.3866 85.9121 19.3866C84.4716 19.3866 83.3311 18.9865 82.4908 18.1862C81.6505 17.366 81.2304 16.2455 81.2304 14.8251V7.95266H78.5596V4.42005H81.5894V2.1355C81.5898 2.11402 81.5905 2.09243 81.5905 2.07071V0H85.1918V4.41158Z" fill="#51246B"/><path d="M88.7988 15.0837L92.22 14.3335C92.26 14.9737 92.5101 15.5139 92.9702 15.954C93.4504 16.3742 94.1006 16.5842 94.9209 16.5842C95.5411 16.5842 96.0213 16.4442 96.3614 16.1641C96.7015 15.884 96.8716 15.5339 96.8716 15.1137C96.8716 14.3735 96.3414 13.8933 95.281 13.6732L93.3304 13.2231C91.9499 12.923 90.9095 12.3828 90.2093 11.6026C89.5291 10.8223 89.189 9.89197 89.189 8.81161C89.189 7.47116 89.7091 6.33077 90.7495 5.39046C91.8098 4.45014 93.1303 3.97998 94.7108 3.97998C95.7112 3.97998 96.5915 4.13003 97.3517 4.43013C98.112 4.71023 98.7022 5.08035 99.1223 5.54051C99.5425 5.98066 99.8626 6.43081 100.083 6.89096C100.303 7.35112 100.443 7.80127 100.503 8.24142L97.1717 8.99167C97.0916 8.4715 96.8515 8.01134 96.4514 7.61121C96.0713 7.21107 95.5011 7.011 94.7408 7.011C94.2207 7.011 93.7705 7.15105 93.3904 7.43114C93.0303 7.71124 92.8502 8.06136 92.8502 8.4815C92.8502 9.20174 93.3003 9.64189 94.2007 9.80194L96.3014 10.2521C97.7218 10.5522 98.8022 11.1024 99.5425 11.9027C100.303 12.7029 100.683 13.6632 100.683 14.7836C100.683 16.1041 100.183 17.2445 99.1823 18.2048C98.182 19.1651 96.7715 19.6453 94.9509 19.6453C93.9106 19.6453 92.9802 19.4952 92.16 19.1951C91.3397 18.875 90.6995 18.4749 90.2393 17.9947C89.7992 17.4945 89.4591 17.0044 89.219 16.5242C88.9989 16.024 88.8588 15.5439 88.7988 15.0837Z" fill="#51246B"/><path d="M68.7843 10.7179V19.2108H64.793V4.4458H68.6643V6.27641C69.0844 5.55617 69.6846 5.00598 70.4649 4.62586C71.2451 4.24573 72.0654 4.05566 72.9257 4.05566C74.6663 4.05566 75.9867 4.60585 76.887 5.70622C77.8074 6.78658 78.2675 8.18706 78.2675 9.90764V19.2108H74.2762V10.5979C74.2762 9.71757 74.0461 9.00733 73.5859 8.46715C73.1458 7.92697 72.4656 7.65688 71.5452 7.65688C70.705 7.65688 70.0347 7.94698 69.5346 8.52717C69.0344 9.10737 68.7843 9.83761 68.7843 10.7179Z" fill="#51246B"/><path d="M0 15.1796C0 13.9192 0.410138 12.9088 1.23041 12.1486C2.05069 11.3883 3.11105 10.9082 4.41149 10.7081L8.04271 10.1679C8.78296 10.0679 9.15309 9.71777 9.15309 9.11757C9.15309 8.55738 8.93301 8.09723 8.49286 7.7371C8.07272 7.37698 7.46252 7.19692 6.66225 7.19692C5.82196 7.19692 5.15174 7.427 4.65157 7.88716C4.17141 8.34731 3.90132 8.9175 3.8413 9.59773L0.300101 8.84748C0.440148 7.56705 1.07036 6.43667 2.19074 5.45634C3.31112 4.47601 4.79162 3.98584 6.63224 3.98584C8.83298 3.98584 10.4535 4.51602 11.4939 5.57638C12.5342 6.61673 13.0544 7.95718 13.0544 9.59773V16.8602C13.0544 17.7405 13.1144 18.5207 13.2345 19.201H9.57323C9.47319 18.7608 9.42318 18.1706 9.42318 17.4304C8.48286 18.8909 7.03237 19.6211 5.07171 19.6211C3.5512 19.6211 2.32078 19.181 1.38047 18.3007C0.460155 17.4204 0 16.38 0 15.1796ZM5.91199 16.6501C6.85231 16.6501 7.62257 16.39 8.22277 15.8698C8.84298 15.3297 9.15309 14.4494 9.15309 13.229V12.5687L5.82196 13.0789C4.60155 13.259 3.99135 13.8792 3.99135 14.9395C3.99135 15.4197 4.1614 15.8298 4.50152 16.1699C4.84163 16.4901 5.31179 16.6501 5.91199 16.6501Z" fill="#BD35D8"/><path d="M22.8439 4.38619V8.40755C22.4437 8.32752 22.0436 8.28751 21.6435 8.28751C20.5031 8.28751 19.5828 8.61762 18.8825 9.27784C18.1823 9.91806 17.8322 10.9784 17.8322 12.4589V19.2112H13.8408V4.44621H17.7121V6.63695C18.4324 5.09643 19.8328 4.32617 21.9135 4.32617C22.1336 4.32617 22.4437 4.34618 22.8439 4.38619Z" fill="#BD35D8"/><path d="M33.3418 19.9782L36.943 19.0178C37.0831 19.8381 37.4632 20.5083 38.0834 21.0285C38.7036 21.5487 39.4739 21.8088 40.3942 21.8088C43.0151 21.8088 44.3255 20.4383 44.3255 17.6974V16.617C43.9854 17.1572 43.4652 17.6074 42.765 17.9675C42.0647 18.3276 41.2145 18.5077 40.2141 18.5077C38.2535 18.5077 36.6129 17.8274 35.2925 16.467C33.992 15.1065 33.3418 13.3959 33.3418 11.3352C33.3418 9.33457 33.992 7.63399 35.2925 6.23352C36.5929 4.83305 38.2334 4.13281 40.2141 4.13281C41.2945 4.13281 42.1948 4.33288 42.915 4.73302C43.6353 5.11314 44.1354 5.5833 44.4155 6.14349V4.4029H48.2568V17.5773C48.2568 19.7981 47.6166 21.6387 46.3362 23.0992C45.0557 24.5797 43.1151 25.32 40.5142 25.32C38.5736 25.32 36.943 24.7998 35.6226 23.7594C34.3221 22.7191 33.5619 21.4587 33.3418 19.9782ZM40.9043 15.0865C41.9247 15.0865 42.755 14.7464 43.3952 14.0662C44.0554 13.3859 44.3855 12.4756 44.3855 11.3352C44.3855 10.2149 44.0454 9.31456 43.3652 8.63433C42.705 7.9541 41.8847 7.61399 40.9043 7.61399C39.884 7.61399 39.0337 7.9541 38.3535 8.63433C37.6933 9.31456 37.3632 10.2149 37.3632 11.3352C37.3632 12.4756 37.6933 13.3859 38.3535 14.0662C39.0137 14.7464 39.864 15.0865 40.9043 15.0865Z" fill="#51246B"/><path d="M53.4286 10.0881H60.0308C59.9908 9.26783 59.6907 8.5776 59.1305 8.01741C58.5903 7.45722 57.7901 7.17713 56.7297 7.17713C55.7694 7.17713 54.9891 7.47723 54.3889 8.07743C53.7887 8.67763 53.4686 9.34786 53.4286 10.0881ZM60.4209 13.9294L63.7521 14.9197C63.3519 16.2802 62.5617 17.4006 61.3813 18.2809C60.2209 19.1612 58.7704 19.6013 57.0298 19.6013C54.9091 19.6013 53.1085 18.8911 51.628 17.4706C50.1475 16.0301 49.4072 14.1095 49.4072 11.7087C49.4072 9.42789 50.1275 7.56726 51.568 6.12677C53.0084 4.66628 54.709 3.93604 56.6697 3.93604C58.9504 3.93604 60.731 4.61626 62.0115 5.97672C63.3119 7.33718 63.9621 9.20781 63.9621 11.5886C63.9621 11.7487 63.9521 11.9287 63.9321 12.1288C63.9321 12.3289 63.9321 12.4889 63.9321 12.609L63.9021 12.819H53.3386C53.3786 13.7794 53.7587 14.5796 54.4789 15.2198C55.1992 15.8601 56.0595 16.1802 57.0598 16.1802C58.7604 16.1802 59.8808 15.4299 60.4209 13.9294Z" fill="#51246B"/><path d="M30.0834 4.41158H33.0544V7.95266H30.0834V14.1348C30.0834 14.755 30.2235 15.1951 30.5036 15.4552C30.7837 15.7153 31.2238 15.8453 31.824 15.8453C32.3641 15.8453 32.7743 15.8054 33.0544 15.7254V19.0265C32.4742 19.2666 31.724 19.3866 30.8037 19.3866C29.3632 19.3866 28.2227 18.9865 27.3824 18.1862C26.5421 17.366 26.122 16.2455 26.122 14.8251V7.95266H23.4512V4.42005H26.481V2.1355C26.4814 2.11402 26.4821 2.09243 26.4821 2.07071V0H30.0834V4.41158Z" fill="#BD35D8"/><rect x="33.0547" y="21.3281" width="3.99161" height="33.0546" transform="rotate(90 33.0547 21.3281)" fill="#BD35D8"/></svg>`;
 
 /** @param {unknown} meta */
 function leadMetaPhoneStep(meta) {
@@ -214,10 +167,8 @@ function leadMetaPhoneStep(meta) {
 
 /** @param {unknown} payload */
 function isActiveLeadFlowPayload(payload) {
-  const m = payload?.meta;
-  if (!m || typeof m !== "object" || !m.lead_flow) return false;
-  const step = String(m.lead_step || "");
-  return Boolean(step && step !== "done");
+  return Array.isArray(payload?.ui?.quick_replies) &&
+    payload.ui.quick_replies.some((item) => String(item?.reply_id || "").startsWith("lead:"));
 }
 
 /** 10 цифр после «7» (пользователь может ввести 9… или 8… или уже +7…) */
@@ -281,45 +232,37 @@ function ruPhoneToBackendE164(inputVal) {
  */
 
 /**
- * @param {import("./api.js").postAsk} _
- * @param {unknown} data
+ * @param {unknown} data D2 HTTP payload saved for this turn.
+ * @param {string} expectedClientId
  */
-function botTurnFromPayload(data) {
+function botTurnFromPayload(data, expectedClientId) {
   if (!data || typeof data !== "object") return null;
-  const meta = /** @type {Record<string, unknown>} */ (data.meta || {});
-  const followups = Array.isArray(meta.followups) ? meta.followups : [];
-  const quickReplies = Array.isArray(data.quick_replies) ? data.quick_replies : [];
-  const sit = data.situation && typeof data.situation === "object" ? data.situation : null;
-  const ctaRaw = data.cta;
-  const cta =
-    ctaRaw && typeof ctaRaw === "object" && ctaRaw.text
-      ? {
-          text: String(ctaRaw.text),
-          action: String(ctaRaw.action || "lead"),
-          key: ctaRaw.key ? String(ctaRaw.key) : "",
-        }
-      : null;
-  const vp = data.video && typeof data.video === "object" ? data.video : null;
-  const vk = vp?.key ? String(vp.key).trim() : "";
-  const vSrc = vp?.src ? String(vp.src).trim() : "";
-  const vTit = vp?.title ? String(vp.title).trim() : "";
-  const hasPlayableVideo = Boolean(vSrc);
+  if (data.client_id !== expectedClientId || !Number.isInteger(data.revision)) return null;
+  const ui = data.ui && typeof data.ui === "object" ? data.ui : {};
+  const quickReplies = (Array.isArray(ui.quick_replies) ? ui.quick_replies : [])
+    .filter((x) => x && x.source_client_id === expectedClientId && x.reply_id && x.label)
+    .map((x) => ({ ref: String(x.reply_id), label: String(x.label) }));
+  const ctaRaw = (Array.isArray(ui.buttons) ? ui.buttons : [])
+    .find((x) => x && x.source_client_id === expectedClientId && x.action_kind === "cta");
+  const cta = ctaRaw ? { text: String(ctaRaw.label), ref: `button:${ctaRaw.button_id}` } : null;
+  const vk = ui.video?.source_client_id === expectedClientId ? String(ui.video.video_id || "") : "";
 
   return {
     role: "bot",
     text: String(data.answer || "").trim(),
-    followups: followups.filter((x) => x && x.ref),
-    quickReplies: quickReplies.filter((x) => x && x.ref),
+    followups: [],
+    quickReplies,
+    revision: data.revision,
     linksDismissed: false,
-    videoKey: hasPlayableVideo ? vk : "",
-    videoSrc: hasPlayableVideo ? vSrc : "",
-    videoTitleText: hasPlayableVideo ? vTit : "",
+    videoKey: vk,
+    videoSrc: "",
+    videoTitleText: "",
     videoRevealed: false,
-    situation: sit ? { show: Boolean(sit.show), mode: sit.mode || "normal" } : null,
+    situation: null,
     cta,
     trailingDismissed: false,
-    attributionKind: resolveTurnAttributionKind(meta),
-    serviceRoute: String(meta.service_route || ""),
+    attributionKind: resolveTurnAttributionKind(data),
+    serviceRoute: "",
   };
 }
 
@@ -364,10 +307,9 @@ function botSourceAttributionLabel(botName) {
 
 /** @param {"searching"|"writing"} phase @param {string} [botName] */
 function typingStatusLabel(phase, botName) {
-  const name = displayBotName(botName);
   return phase === "writing"
-    ? `${name} печатает ответ`
-    : `${name} ищет в базе знаний`;
+    ? "Печатает ответ"
+    : phase === "checking" ? "Проверяет информацию" : "Ищет в базе клиники";
 }
 
 /** @param {unknown} meta */
@@ -382,9 +324,8 @@ function isLeadFlowBotMeta(meta) {
  * @param {unknown} lastPayload
  */
 function isLeadFlowAskBody(body, lastPayload) {
-  if (body?.cta_action === "lead") return true;
   const ref = String(body?.ref || "");
-  if (ref.startsWith("lead:")) return true;
+  if (ref.startsWith("lead:") || ref.startsWith("button:")) return true;
   return isActiveLeadFlowPayload(lastPayload);
 }
 
@@ -427,7 +368,7 @@ function resolveTurnAttributionKind(meta) {
     const route = String(meta.service_route || "");
     if (isPlainAttributionRoute(route)) return "plain";
   }
-  return "content";
+  return "plain";
 }
 
 /**
@@ -439,7 +380,7 @@ function predictLiveAttributionKind(body, lastPayload) {
   const ref = String(body?.ref || "").trim();
   if (ref === "lead:cancel") return "plain";
   if (isLeadFlowAskBody(body, lastPayload)) return "lead";
-  return "content";
+  return "plain";
 }
 
 /** @param {TurnAttributionKind} kind @param {string} [botName] @returns {HTMLElement} */
@@ -453,13 +394,13 @@ function createAttributionElForKind(kind, botName) {
 function createPlainAttributionEl(botName) {
   const el = document.createElement("div");
   el.className = "clinic-msg__attribution clinic-msg__attribution--plain";
-  el.textContent = displayBotName(botName);
+  appendAttributionContent(el, MESSAGE_SVG, displayBotName(botName));
   return el;
 }
 
 /** @param {string} [botName] @param {{ attributionKind?: TurnAttributionKind }} [m] @returns {HTMLElement} */
 function createTurnAttributionEl(botName, m) {
-  const kind = m?.attributionKind || "content";
+  const kind = m?.attributionKind || "plain";
   return createAttributionElForKind(kind, botName);
 }
 
@@ -467,8 +408,19 @@ function createTurnAttributionEl(botName, m) {
 function createBotAttributionEl(botName) {
   const el = document.createElement("div");
   el.className = "clinic-msg__attribution";
-  el.textContent = botSourceAttributionLabel(botName);
+  appendAttributionContent(el, SOURCE_BOOK_SVG, botSourceAttributionLabel(botName));
   return el;
+}
+
+function appendAttributionContent(el, svg, label) {
+  const icon = document.createElement("span");
+  icon.className = "clinic-msg__attribution-icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.innerHTML = svg;
+  const text = document.createElement("span");
+  text.className = "clinic-msg__attribution-text";
+  text.textContent = label;
+  el.append(icon, text);
 }
 
 /**
@@ -568,8 +520,8 @@ function scrollToLastTurnStart(feedEl) {
   }
   const main = feedEl.closest(".clinic-shell__main");
   const header =
-    scroller.querySelector(".clinic-shell__header--glass") ||
-    main?.querySelector(".clinic-shell__header--glass");
+    scroller.querySelector(".clinic-shell__header--sticky") ||
+    main?.querySelector(".clinic-shell__header--sticky");
   const headerH = header ? header.getBoundingClientRect().height : 0;
   const turnRect = last.getBoundingClientRect();
   const scrollerRect = scroller.getBoundingClientRect();
@@ -710,6 +662,12 @@ function renderWidgetConfigError(root) {
 }
 
 export function mountWidget(root, config) {
+  let waitingLabelTimers = [];
+
+  function clearWaitingLabelTimers() {
+    waitingLabelTimers.forEach(window.clearTimeout);
+    waitingLabelTimers = [];
+  }
   if (!isWidgetPresentationContractValid(config)) {
     renderWidgetConfigError(root);
     return { resetSession: () => {} };
@@ -726,6 +684,7 @@ export function mountWidget(root, config) {
     isOpen: false,
     messages: [],
     lastPayload: null,
+    retryBody: null,
     pending: false,
     /** @type {"searching"|"writing"} */
     typingPhase: "searching",
@@ -856,7 +815,7 @@ export function mountWidget(root, config) {
       ${launcherHtml}
       <div class="clinic-shell__panel" id="clinic-panel" role="dialog" aria-modal="true" aria-label="Чат" data-clinic-panel>
         <main class="clinic-shell__main" aria-label="Сообщения">
-          <header class="clinic-shell__header clinic-shell__header--glass">
+          <header class="clinic-shell__header clinic-shell__header--sticky">
             <div class="clinic-shell__header-main">
               <div class="clinic-shell__header-avatar">
                 <span class="clinic-shell__avatar-fallback clinic-shell__avatar-fallback--header" data-clinic-header-fb>
@@ -1044,7 +1003,7 @@ export function mountWidget(root, config) {
     const chev = document.createElement("span");
     chev.className = "clinic-msg__link-chevron";
     chev.setAttribute("aria-hidden", "true");
-    chev.innerHTML = LINK_CHEVRON_SVG;
+    chev.innerHTML = LINK_ARROW_SVG;
     btn.appendChild(lab);
     btn.appendChild(chev);
     btn.setAttribute("aria-label", VIDEO_REVEAL_LABEL);
@@ -1166,10 +1125,12 @@ export function mountWidget(root, config) {
   }
 
   function resetSession() {
+    clearWaitingLabelTimers();
     if (state.pending) return;
     clearStoredSid();
     state.messages = [];
     state.lastPayload = null;
+    state.retryBody = null;
     state.typingPhase = "searching";
     state.started = false;
     state.unread = false;
@@ -1182,17 +1143,9 @@ export function mountWidget(root, config) {
 
   async function runSecretSessionReset() {
     if (state.pending) return;
-    const sid = getSid();
     input.value = "";
     autoResizeTextarea(input);
     syncSendState();
-    if (sid) {
-      try {
-        await postAsk(apiBase, { client_id: clientId, sid, q: "/reset" });
-      } catch {
-        /* best-effort server cleanup */
-      }
-    }
     resetSession();
   }
 
@@ -1300,13 +1253,20 @@ export function mountWidget(root, config) {
   function createTypingLabelEl() {
     const wrap = document.createElement("span");
     wrap.className = "clinic-shell__typing-label";
+    const icon = document.createElement("span");
+    icon.className = "clinic-shell__typing-icon";
+    icon.setAttribute("aria-hidden", "true");
+    wrap.appendChild(icon);
+    const words = document.createElement("span");
+    words.className = "clinic-shell__typing-words";
     const base = document.createElement("span");
     base.className = "clinic-shell__typing-label-base";
     const shine = document.createElement("span");
     shine.className = "clinic-shell__typing-label-shine";
     shine.setAttribute("aria-hidden", "true");
-    wrap.appendChild(base);
-    wrap.appendChild(shine);
+    words.appendChild(base);
+    words.appendChild(shine);
+    wrap.appendChild(words);
     return wrap;
   }
 
@@ -1314,7 +1274,10 @@ export function mountWidget(root, config) {
     const bubble = feed.querySelector(".clinic-shell__typing");
     const labelWrap = feed.querySelector(".clinic-shell__typing-label");
     if (!bubble || !labelWrap) return;
-    fillTypingLabel(labelWrap, state.statusMessage || typingLabelForPhase(state.typingPhase));
+    fillTypingLabel(labelWrap, typingLabelForPhase(state.typingPhase));
+    const icon = labelWrap.querySelector(".clinic-shell__typing-icon");
+    if (icon) icon.innerHTML = state.typingPhase === "writing" ? WRITE_SVG
+      : state.typingPhase === "checking" ? CHECK_DOCUMENT_SVG : SEARCH_SVG;
     bubble.classList.toggle("clinic-shell__typing--shimmer", state.typingPhase === "searching");
   }
 
@@ -1328,37 +1291,41 @@ export function mountWidget(root, config) {
     updateTypingIndicatorText();
   }
 
-  /** @param {Record<string, unknown>} body */
-  function shouldShowKbSearchTyping(body) {
-    if (body.cta_action === "lead") return false;
-    const ref = String(body.ref || "");
-    if (ref.startsWith("lead:")) return false;
-    if (body.situation_action || body.action === "situation") return false;
-    if (isActiveLeadFlowPayload(state.lastPayload)) return false;
-    const q = String(body.q || "").trim();
-    if (q.length >= 2 && BOOKING_INTENT_RE.test(q)) return false;
-    return true;
-  }
-
-  /** @param {Record<string, unknown>} [body] */
-  function beginPendingRequest(body = {}) {
+  function beginPendingRequest(body) {
+    clearWaitingLabelTimers();
     state.pending = true;
-    state.typingPhase = shouldShowKbSearchTyping(body) ? "searching" : "writing";
+    const leadRequest = isLeadFlowAskBody(body, state.lastPayload)
+      || state.lastPayload?.attribution_kind === "lead";
+    state.typingPhase = leadRequest ? "writing" : "searching";
     state.perfPendingStartMs = performance.now();
     state.perfFirstLocalStatusLogged = false;
     state.statusMessage = null;
     renderFeed();
+    updateTypingIndicatorText();
+    if (!leadRequest) {
+      // Cosmetic waiting sequence, not backend stages or a second model check.
+      for (const [delay, phase] of [[1500, "checking"], [3500, "writing"]]) {
+        waitingLabelTimers.push(window.setTimeout(() => {
+          if (!state.pending) return;
+          state.typingPhase = phase;
+          updateTypingIndicatorText();
+        }, delay));
+      }
+    }
   }
 
   /** @param {"searching"|"writing"} phase */
   function setTypingPhase(phase) {
     const next = phase === "writing" ? "writing" : "searching";
+    if (next === "writing") clearWaitingLabelTimers();
+    if (next === "searching" && state.typingPhase !== "searching") return;
     if (state.typingPhase === next) return;
     state.typingPhase = next;
     updateTypingIndicatorText();
   }
 
   function endPendingRequest() {
+    clearWaitingLabelTimers();
     state.pending = false;
     state.typingPhase = "searching";
     state.statusMessage = null;
@@ -1400,7 +1367,7 @@ export function mountWidget(root, config) {
     let pseudoStreamTimer = 0;
     let turnFinalized = false;
     let streamAborted = false;
-    const liveAttributionKind = predictLiveAttributionKind(body, state.lastPayload);
+    let liveAttributionKind = predictLiveAttributionKind(body, state.lastPayload);
 
     const clearWritingRevealTimer = () => {
       if (writingRevealTimer) {
@@ -1455,12 +1422,13 @@ export function mountWidget(root, config) {
       clearStreamTimers();
       const streamedText = fullText.trim();
       if (uiData) {
-        if (uiData.meta && uiData.meta.sid) setSid(uiData.meta.sid);
-        const turn = botTurnFromPayload(uiData);
+        if (uiData.sid) setSid(uiData.sid);
+        const turn = botTurnFromPayload(uiData, clientId);
         if (turn) {
           state.messages.push(turn);
         }
         state.lastPayload = uiData;
+        state.retryBody = null;
         if (!state.isOpen) state.unread = true;
       } else if (streamedText) {
         state.messages.push({
@@ -1509,6 +1477,7 @@ export function mountWidget(root, config) {
       let index = 0;
       const prefix = fullText;
       state.typingPhase = "writing";
+      clearWaitingLabelTimers();
       updateTypingIndicatorText();
       const tick = () => {
         if (turnFinalized || streamAborted) return;
@@ -1536,7 +1505,7 @@ export function mountWidget(root, config) {
         commitFinalTurn();
         return;
       }
-      const turn = botTurnFromPayload(uiData);
+      const turn = botTurnFromPayload(uiData, clientId);
       const finalText = turn ? String(turn.text || "") : "";
       if (!finalText) {
         commitFinalTurn();
@@ -1585,9 +1554,8 @@ export function mountWidget(root, config) {
         fullText += chunk;
 
         if (!liveBubble) {
-          if (state.typingPhase === "searching") {
-            state.typingPhase = "writing";
-            updateTypingIndicatorText();
+          if (state.typingPhase !== "writing") {
+            setTypingPhase("writing");
             if (!writingRevealTimer) {
               writingRevealTimer = window.setTimeout(revealLiveBubble, TYPING_WRITING_MIN_MS);
             }
@@ -1606,14 +1574,20 @@ export function mountWidget(root, config) {
       onUi(data) {
         if (turnFinalized || uiData) return;
         uiData = data;
+        liveAttributionKind = resolveTurnAttributionKind(data);
+        if (liveBubble) {
+          liveBubble.querySelector(".clinic-msg__attribution")?.replaceWith(
+            createAttributionElForKind(liveAttributionKind, config.botName));
+        }
       },
       onDone() {
         finalizeTurn();
       },
-      onError(msg) {
+      onError(msg, retryable) {
         if (turnFinalized) return;
         streamAborted = true;
         clearStreamTimers();
+        state.retryBody = retryable ? body : null;
         setError(msg);
         endPendingRequest();
         renderFeed();
@@ -1623,10 +1597,31 @@ export function mountWidget(root, config) {
   }
 
   function setError(msg) {
-    state.errorLine = msg || "";
+    const displayMessage = friendlyErrorMessage(msg);
+    state.errorLine = displayMessage || "";
     if (msg) {
-      errBox.textContent = msg;
+      errBox.textContent = displayMessage;
+      if (state.retryBody) {
+        const retry = document.createElement("button");
+        retry.type = "button";
+        retry.textContent = "Повторить запрос";
+        retry.addEventListener("click", () => {
+          const body = state.retryBody;
+          if (!body || state.pending) return;
+          setError("");
+          beginPendingRequest(body);
+          void runStreamAsk(feed, apiBase, body);
+        });
+        errBox.appendChild(retry);
+      }
       errBox.hidden = false;
+      if (clientId === "demo") {
+        const fresh = document.createElement("button");
+        fresh.type = "button";
+        fresh.textContent = "Новая беседа";
+        fresh.addEventListener("click", resetSession);
+        errBox.appendChild(fresh);
+      }
     } else {
       errBox.textContent = "";
       errBox.hidden = true;
@@ -1639,31 +1634,35 @@ export function mountWidget(root, config) {
    * @param {number} msgIndex
    */
   function renderInlineLinks(bubble, m, msgIndex) {
-    if (m.linksDismissed) return;
-    const items = mergeFollowupControls(m.followups, m.quickReplies);
+    if (m.linksDismissed || m.revision !== state.lastPayload?.revision) return;
+    const items = m.quickReplies || [];
     if (!items.length) return;
 
     const box = getOrCreateLinksBox(bubble);
+    if (items.some((it) => String(it.ref || "").startsWith("volume:"))) {
+      box.classList.add("clinic-msg__links--with-volume");
+    }
     for (const it of items) {
       if (!it.ref) continue;
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "clinic-msg__link";
+      const isVolume = String(it.ref).startsWith("volume:");
+      btn.className = isVolume ? "clinic-msg__volume-chip" : "clinic-msg__link";
       const lab = document.createElement("span");
       lab.className = "clinic-msg__link-text";
       lab.textContent = it.label || it.ref;
       const chev = document.createElement("span");
       chev.className = "clinic-msg__link-chevron";
       chev.setAttribute("aria-hidden", "true");
-      chev.innerHTML = LINK_CHEVRON_SVG;
+      chev.innerHTML = LINK_ARROW_SVG;
       btn.appendChild(lab);
-      btn.appendChild(chev);
+      if (!isVolume) btn.appendChild(chev);
       btn.addEventListener("click", () => {
         const target = state.messages[msgIndex];
         if (target && target.role === "bot") target.linksDismissed = true;
         dismissTrailingsAll(state.messages);
         const echo = (it.label || it.ref || "").trim();
-        void sendAsk({ ref: it.ref, q: "", userEcho: echo, _linkOnly: true });
+        void sendAsk({ ref: it.ref, ui_revision: m.revision, q: "", userEcho: echo });
       });
       box.appendChild(btn);
     }
@@ -1680,34 +1679,7 @@ export function mountWidget(root, config) {
     const trail = document.createElement("div");
     trail.className = "clinic-turn__trail";
 
-    const sit = m.situation;
-    if (sit && sit.show && sit.mode === "normal") {
-      const sb = document.createElement("button");
-      sb.type = "button";
-      sb.className = "clinic-turn__btn clinic-turn__btn--cta-secondary";
-      sb.textContent = "Рассказать о ситуации";
-      sb.addEventListener("click", () => {
-        dismissTrailingsAll(state.messages);
-        dismissLinksAll(state.messages);
-        void sendAsk({ action: "situation", q: "", userEcho: "Рассказать о ситуации" });
-      });
-      trail.appendChild(sb);
-    }
-
-    if (sit && sit.show && sit.mode === "pending") {
-      const back = document.createElement("button");
-      back.type = "button";
-      back.className = "clinic-turn__btn clinic-turn__btn--ghost-wide";
-      back.textContent = "Назад к диалогу";
-      back.addEventListener("click", () => {
-        dismissTrailingsAll(state.messages);
-        dismissLinksAll(state.messages);
-        void sendAsk({ situation_action: "back", q: "", userEcho: "Назад к диалогу" });
-      });
-      trail.appendChild(back);
-    }
-
-    if (m.cta && m.cta.text) {
+    if (m.cta && m.cta.text && m.revision === state.lastPayload?.revision) {
       const c = document.createElement("button");
       c.type = "button";
       c.className = "clinic-turn__btn clinic-turn__btn--cta-primary";
@@ -1717,13 +1689,7 @@ export function mountWidget(root, config) {
         dismissTrailingsAll(state.messages);
         dismissLinksAll(state.messages);
         const echo = (m.cta.text || "Запись").trim();
-        void sendAsk({
-          cta_action: "lead",
-          cta_key: m.cta.key || "",
-          cta_label: ctaLabel,
-          q: "",
-          userEcho: echo,
-        });
+        void sendAsk({ ref: m.cta.ref, ui_revision: m.revision, q: "", userEcho: echo });
       });
       trail.appendChild(c);
     }
@@ -1759,15 +1725,6 @@ export function mountWidget(root, config) {
       const card = document.createElement("section");
       card.className = "clinic-shell__welcome-card";
 
-      const logoWrap = document.createElement("div");
-      logoWrap.className = "clinic-shell__welcome-logo-wrap";
-      logoWrap.setAttribute("aria-hidden", "true");
-
-      const logo = document.createElement("div");
-      logo.className = "clinic-shell__welcome-logo";
-      fillWelcomeLogo(logoWrap, logo, config);
-      logoWrap.appendChild(logo);
-
       const lead = document.createElement("div");
       lead.className = "clinic-shell__welcome-lead";
       const textP = document.createElement("p");
@@ -1779,7 +1736,6 @@ export function mountWidget(root, config) {
       textP.appendChild(textBody);
       lead.appendChild(textP);
 
-      card.appendChild(logoWrap);
       card.appendChild(lead);
 
       const actions = document.createElement("div");
@@ -1797,7 +1753,7 @@ export function mountWidget(root, config) {
         const chev = document.createElement("span");
         chev.className = "clinic-msg__link-chevron";
         chev.setAttribute("aria-hidden", "true");
-        chev.innerHTML = LINK_CHEVRON_SVG;
+        chev.innerHTML = LINK_ARROW_SVG;
         b.appendChild(lab);
         b.appendChild(chev);
         if (s.soon) {
@@ -1865,6 +1821,9 @@ export function mountWidget(root, config) {
     const typingWrap = document.createElement("div");
     typingWrap.className = "clinic-shell__typing-wrap";
     fillTypingLabel(typingLabel, typingLabelForPhase(state.typingPhase));
+    typingLabel.querySelector(".clinic-shell__typing-icon").innerHTML =
+      state.typingPhase === "writing" ? WRITE_SVG
+      : state.typingPhase === "checking" ? CHECK_DOCUMENT_SVG : SEARCH_SVG;
     typingWrap.appendChild(typing);
     typingWrap.classList.toggle("is-visible", state.pending);
     feed.appendChild(typingWrap);
@@ -1898,12 +1857,11 @@ export function mountWidget(root, config) {
   }
 
   async function sendAsk(extra = {}) {
+    if (state.pending || state.retryBody) return;
     const userEcho =
       typeof extra.userEcho === "string" ? extra.userEcho.trim() : "";
-    const linkOnly = Boolean(extra._linkOnly);
     const apiFields = { ...extra };
     delete apiFields.userEcho;
-    delete apiFields._linkOnly;
 
     if (userEcho) {
       const applyUserEcho = () => {
@@ -1932,6 +1890,7 @@ export function mountWidget(root, config) {
     const body = {
       client_id: clientId,
       sid,
+      request_id: crypto.randomUUID(),
       q: "",
       ...apiFields,
     };
@@ -1943,7 +1902,7 @@ export function mountWidget(root, config) {
   }
 
   async function sendFromComposer() {
-    if (state.pending) return;
+    if (state.pending || state.retryBody) return;
 
     const raw = input.value.trim();
     if (isSecretSessionResetCommand(raw, config)) {
@@ -1973,7 +1932,7 @@ export function mountWidget(root, config) {
       setError("");
 
       const sid = getSid();
-      const askBody = { client_id: clientId, sid, q };
+      const askBody = { client_id: clientId, sid, request_id: crypto.randomUUID(), q };
       beginPendingRequest(askBody);
       await runStreamAsk(feed, apiBase, askBody);
     };
@@ -2016,7 +1975,7 @@ export function mountWidget(root, config) {
   }
 
   function syncSendState() {
-    if (state.pending) {
+    if (state.pending || state.retryBody) {
       sendBtn.disabled = true;
       return;
     }

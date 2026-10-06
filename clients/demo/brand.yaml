@@ -6,7 +6,4 @@ logo_height: 28
 avatar_url: "/static/clients/demo/avatar.png"
 
 colors:
-  brand: "#6952e8"
-  action: "#4A3BA8"
-  button_1: "#7B4EFF"
-  button_2: "#FF8DB2"
+  brand: "#0C2FE0"

@@ -1,5 +1,14 @@
 # Архитектура маркетинговых сценариев
 
+> **D2 precedence notice (2026-09-20).** Этот документ остаётся историческим
+> контрактом Stage 5.1 и описанием текущего legacy runtime. Для целевого D2 его
+> правила `scenario_rules`, scenario-amplifiers, общий лимит 3/2 и несколько
+> marketing authority отменены D2-017–020, D2-044–046 и D2-085–090. Канон D2:
+> [`DEMO_D2_TARGET_CONTRACT.md`](tasks/DEMO_D2_TARGET_CONTRACT.md),
+> [`DEMO_D2_PRODUCT_DECISIONS.md`](tasks/DEMO_D2_PRODUCT_DECISIONS.md) и
+> [`DEMO_D2_SCENARIO_MARKETING_AUDIT.md`](tasks/DEMO_D2_SCENARIO_MARKETING_AUDIT.md).
+> Не переносить описанный ниже selector или сценарные pools в common D2 route.
+
 **Статус:** согласованный product/design-контракт; frozen schema models реализованы
 offline в S1, demo target policy материализована в S20, pure deterministic selector —
 в S21 (historical offline seam), one-service offline evidence package — в S22.

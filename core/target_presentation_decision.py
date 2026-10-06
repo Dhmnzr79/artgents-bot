@@ -265,7 +265,9 @@ def decide_target_presentation(
 ) -> TargetPresentationDecision:
     """Apply governed slot limits with exactly one navigation channel per response."""
 
-    if alternative_secondary_override:
+    is_price_answer = "price" in spec.required_components
+
+    if alternative_secondary_override and not is_price_answer:
         from contracts.one_call_presentation_result import PresentationQuickReply
 
         secondary_qr = tuple(
@@ -300,6 +302,23 @@ def decide_target_presentation(
     )
     all_dropped.extend(price_dropped)
 
+    if is_price_answer:
+        # A direct price answer must finish cleanly. The only permitted buttons
+        # are a necessary choice menu (for example, a missing treatment scope),
+        # never a commercial or document follow-up.
+        for item in selected_followups.content:
+            all_dropped.append(f"content_suppressed_by_price_answer:{item.ref}")
+        for item in price_qr:
+            all_dropped.append(f"price_suppressed_by_price_answer:{item['ref']}")
+        return TargetPresentationDecision(
+            quick_replies=choice_qr,
+            video=None,
+            situation={"show": False, "mode": "normal"},
+            dropped=tuple(all_dropped),
+            cadence_update=TargetPresentationCadenceUpdate(),
+            channel="choice" if choice_qr else "none",
+        )
+
     video: dict[str, str] | None = None
     situation = {"show": False, "mode": "normal"}
     cadence_update = TargetPresentationCadenceUpdate()
@@ -315,15 +334,6 @@ def decide_target_presentation(
         if price_qr:
             for item in price_qr:
                 all_dropped.append(f"price_suppressed_by_choice_menu:{item['ref']}")
-    elif price_qr and "price" in spec.required_components:
-        channel = "price"
-        quick_replies = price_qr
-        cadence_update = TargetPresentationCadenceUpdate(
-            shown_price_followup_refs=tuple(item["ref"] for item in price_qr),
-        )
-        if selected_followups.content:
-            for item in selected_followups.content:
-                all_dropped.append(f"content_suppressed_by_price_channel:{item.ref}")
     else:
         secondary_qr, video, situation, cadence_update, secondary_dropped = _cap_secondary_content(
             md_root=md_root,

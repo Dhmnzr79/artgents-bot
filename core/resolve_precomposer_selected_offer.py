@@ -341,8 +341,6 @@ def resolve_precomposer_selected_offer(
         return PrecomposerSelectedOfferResult(availability="none")
     if not _scope_axis_authoritative(resolution, "stage"):
         return PrecomposerSelectedOfferResult(availability="none")
-    if resolution.jaw == "both":
-        return PrecomposerSelectedOfferResult(availability="none")
     if resolution.extent == "few_teeth":
         return PrecomposerSelectedOfferResult(availability="none")
 
@@ -361,10 +359,14 @@ def resolve_precomposer_selected_offer(
     option_pin = selected_option_id if option_id_authoritative and selected_option_id else None
 
     effective_scope = _effective_scope_from_resolution(resolution)
+    if resolution.jaw == "both":
+        # Strategy matching has no two-jaw variant. Match the same published
+        # one-jaw offer without changing the patient's original scope fact.
+        effective_scope = effective_scope.model_copy(update={"jaw": "unknown"})
     strategy_context = strategy_match_from_effective_scope(
         effective_scope,
         stage=resolution.stage,  # type: ignore[arg-type]
-        jaw=resolution.jaw,  # type: ignore[arg-type]
+        jaw=resolution.jaw if resolution.jaw != "both" else None,  # type: ignore[arg-type]
     )
     eligible = _eligible_scope_offers(
         bundle=bundle,
@@ -373,6 +375,14 @@ def resolve_precomposer_selected_offer(
         strategy_context=strategy_context,
         selected_option_id=option_pin,
     )
+    if resolution.jaw == "both":
+        # A price per jaw can be quoted as a per-jaw reference. Never select a
+        # tooth/implant/other unit as if it covered the two-jaw request.
+        eligible = tuple(
+            offer for offer in eligible
+            if offer.price.billing_unit == "jaw"
+            and offer.price.mode in {"fixed", "from"}
+        )
     if brand_filter is not None:
         eligible = tuple(offer for offer in eligible if offer.brand_id in brand_filter)
 

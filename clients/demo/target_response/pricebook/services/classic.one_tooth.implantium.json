@@ -9,7 +9,7 @@
     "billing_unit": "tooth_package"
   },
   "package": {
-    "label": "за восстановление одного зуба (имплант + постоянная коронка); КТ при необходимости и временная коронка — отдельно",
+    "label": "за восстановление одного зуба (имплант + постоянная коронка)",
     "includes": [
       "имплант с документами",
       "хирургия и местная анестезия",
@@ -56,7 +56,8 @@
   ],
   "brand_id": "implantium",
   "applies_to_extents": [
-    "one_tooth"
+    "one_tooth",
+    "few_teeth"
   ],
   "required_conditions_metadata": {
     "completeness": "complete",

@@ -1,3 +1,14 @@
+export const TECHNICAL_ERROR_MESSAGE = "Не получилось показать ответ. Понимаю, что это неудобно";
+
+// Presentation only: never publish exception details or claim a lead outcome.
+export function friendlyErrorMessage(error) {
+  if (["demo_session_limit", "demo_daily_limit"].includes(error)) {
+    return "Вы посмотрели возможности демо. Чтобы обсудить бота для вашего проекта, свяжитесь с автором через контакты на сайте.";
+  }
+  if (error === "demo_ip_limit") return "Слишком много вопросов подряд. Подождите минуту и продолжите.";
+  return error ? TECHNICAL_ERROR_MESSAGE : "";
+}
+
 /**
  * Слой HTTP к /ask (без UI).
  * @param {string} apiBase — пустая строка = тот же origin
@@ -9,20 +20,24 @@ export async function postAsk(apiBase, body) {
   // PERF-0: local-only timing (no PII, no network report) — see PERF-0 seam
   // audit "Client (widget) has zero timing instrumentation" finding.
   const perfT0 = performance.now();
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error(TECHNICAL_ERROR_MESSAGE);
+  }
   let data = {};
   try {
     data = await res.json();
   } catch {
-    data = {};
+    throw new Error(TECHNICAL_ERROR_MESSAGE);
   }
   if (!res.ok) {
-    const err = typeof data.error === "string" ? data.error : res.statusText;
-    throw new Error(err || "request_failed");
+    throw new Error(friendlyErrorMessage(data.error || "request_failed"));
   }
   if (typeof console !== "undefined" && console.debug) {
     console.debug("[perf] ask_client_ms", {
@@ -53,7 +68,7 @@ export async function postAsk(apiBase, body) {
  *   onDelta?: (delta: string) => void,
  *   onUi?: (data: unknown) => void,
  *   onDone?: () => void,
- *   onError?: (msg: string) => void,
+ *   onError?: (msg: string, retryable?: boolean) => void,
  * }} callbacks
  */
 export async function streamAsk(apiBase, body, { onStatus, onTyping, onDelta, onUi, onDone, onError } = {}) {
@@ -69,10 +84,13 @@ export async function streamAsk(apiBase, body, { onStatus, onTyping, onDelta, on
   };
 
   /** @param {unknown} data */
-  const isValidUiPayload = (data) => {
-    if (!data || typeof data !== "object" || Array.isArray(data)) return false;
-    return Boolean(data.answer || data.meta);
-  };
+  const isValidUiPayload = (data) =>
+    data && typeof data === "object" && !Array.isArray(data) &&
+    typeof data.answer === "string" && data.ui &&
+    Number.isInteger(data.revision) && typeof data.request_id === "string" &&
+    (!body.request_id || data.request_id === body.request_id) &&
+    (!body.client_id || data.client_id === body.client_id) &&
+    (!body.sid || data.sid === body.sid);
 
   let uiAccepted = false;
   let finalized = false;
@@ -92,98 +110,90 @@ export async function streamAsk(apiBase, body, { onStatus, onTyping, onDelta, on
     onDone?.();
   };
 
-  /** @param {string} msg */
-  const notifyErrorOnce = (msg) => {
-    if (finalized || uiAccepted) return;
-    onError?.(msg);
-  };
+  let lastTransportError = "Не удалось получить ответ";
+  for (let attempt = 0; attempt < 2 && !finalized; attempt += 1) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        let errMsg = res.statusText || "request_failed";
+        try {
+          const d = await res.json();
+          if (typeof d.error === "string") errMsg = d.error;
+        } catch { /* ignore */ }
+        if (uiAccepted) finalizeOnce();
+        else onError?.(errMsg, false);
+        return;
+      }
 
-  /** @param {string} msg */
-  const handleTransportTermination = (msg) => {
-    if (finalized) return;
-    if (uiAccepted) {
-      finalizeOnce();
-      return;
-    }
-    notifyErrorOnce(msg);
-  };
-
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      let errMsg = res.statusText || "request_failed";
-      try {
-        const d = await res.json();
-        if (typeof d.error === "string") errMsg = d.error;
-      } catch { /* ignore */ }
-      throw new Error(errMsg);
-    }
-
-    const contentType = res.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) {
-      const data = await res.json();
-      if (isValidUiPayload(data)) {
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const data = await res.json();
+        if (!isValidUiPayload(data)) throw new Error("Некорректный ответ сервера");
         acceptUiOnce(data);
         finalizeOnce();
-      } else {
-        throw new Error("Некорректный ответ сервера");
+        return;
       }
-      return;
-    }
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let currentEvent = "";
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let currentEvent = "";
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
 
-      // SSE: разбиваем по \n, неполную последнюю строку оставляем в буфере
-      const parts = buffer.split("\n");
-      buffer = parts.pop() ?? "";
+        // SSE: keep an incomplete final line for the next chunk.
+        const parts = buffer.split("\n");
+        buffer = parts.pop() ?? "";
 
-      for (const line of parts) {
-        if (line.startsWith("event: ")) {
-          currentEvent = line.slice(7).trim();
-        } else if (line.startsWith("data: ")) {
-          try {
-            const data = JSON.parse(line.slice(6));
-            if (currentEvent === "status") {
-              markPerfOnce("status");
-              const message = typeof data.message === "string" ? data.message : "";
-              if (message) onStatus?.(message);
-            } else if (currentEvent === "typing") {
-              markPerfOnce("typing");
-              const phase = data.phase === "writing" ? "writing" : "searching";
-              onTyping?.(phase);
-            } else if (currentEvent === "text_delta") {
-              markPerfOnce("text_delta");
-              onDelta?.(String(data.delta ?? ""));
-            } else if (currentEvent === "ui") {
-              acceptUiOnce(data);
-            } else if (currentEvent === "done") {
-              finalizeOnce();
-            }
-          } catch { /* ignore malformed SSE data */ }
-          currentEvent = "";
+        for (const line of parts) {
+          if (line.startsWith("event: ")) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (currentEvent === "status") {
+                markPerfOnce("status");
+                const message = typeof data.message === "string" ? data.message : "";
+                if (message) onStatus?.(message);
+              } else if (currentEvent === "typing") {
+                markPerfOnce("typing");
+                const phase = data.phase === "writing" ? "writing" : "searching";
+                onTyping?.(phase);
+              } else if (currentEvent === "text_delta") {
+                markPerfOnce("text_delta");
+                onDelta?.(String(data.delta ?? ""));
+              } else if (currentEvent === "ui") {
+                acceptUiOnce(data);
+              } else if (currentEvent === "error") {
+                if (uiAccepted) finalizeOnce();
+                else onError?.(typeof data.error === "string" ? data.error : "d2_turn_failed", false);
+                return;
+              } else if (currentEvent === "done" && uiAccepted) {
+                finalizeOnce();
+              }
+            } catch { /* ignore malformed SSE data */ }
+            currentEvent = "";
+          }
         }
       }
-    }
 
-    if (!finalized) {
-      handleTransportTermination("Не удалось получить ответ");
+      if (finalized) break;
+      if (typeof console !== "undefined" && console.debug) {
+        console.debug("[perf] ask_stream_client_ms", perfMs);
+      }
+    } catch (e) {
+      lastTransportError = e instanceof Error ? e.message : "Ошибка сети";
     }
-    if (typeof console !== "undefined" && console.debug) {
-      console.debug("[perf] ask_stream_client_ms", perfMs);
-    }
-  } catch (e) {
-    handleTransportTermination(e instanceof Error ? e.message : "Ошибка сети");
+  }
+  if (!finalized) {
+    if (uiAccepted) finalizeOnce();
+    else onError?.(lastTransportError, true);
   }
 }

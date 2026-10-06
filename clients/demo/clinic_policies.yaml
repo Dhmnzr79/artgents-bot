@@ -82,6 +82,11 @@ service_alternatives:
       Osstem в ассортименте нет. Работаем с Implantium, Impro и Nobel Biocare — могу рассказать
       про отличия систем и ориентиры по стоимости «под ключ».
 
+brand_alternatives:
+  - requested_brand_id: osstem
+    approved_text: >-
+      Osstem в ассортименте нет. Работаем с Implantium, Impro и Nobel Biocare.
+
 service_not_offered_template: >-
   К сожалению, услугу «{requested_service}» в нашей клинике не оказываем.
   Могу подсказать по направлениям, которые у нас есть.
@@ -89,6 +94,12 @@ service_not_offered_template: >-
 hard_stop_template: >-
   Я помогаю по вопросам клиники: услуги, цены, запись и контакты.
   Если у вас есть вопрос по стоматологии в рамках нашей клиники — напишите, пожалуйста.
+
+spam_one_chance_template: >-
+  Напишите, пожалуйста, понятный вопрос по стоматологии — так я смогу помочь.
+
+spam_closed_template: >-
+  Диалог завершён. Чтобы задать новый вопрос, начните новый чат.
 
 manual_contact_template: >-
   Такой вопрос лучше решить напрямую с клиникой — так будет быстрее и корректнее.

@@ -63,7 +63,12 @@ def resolve_response_plan(
     if selected_pair == ("ANSWER", "contacts"):
         terminal = _require_terminal_candidate(authority, selected_pair)
         return _resolve_composer_contacts(precomposer_plan, composer_result, terminal)
-    if selected_pair in {("ADMIN", "standard"), ("ADMIN", "medical_terminal")}:
+    if selected_pair in {
+        ("ADMIN", "standard"),
+        ("ADMIN", "medical_terminal"),
+        ("ADMIN", "spam_warn"),
+        ("ADMIN", "spam_closed"),
+    }:
         terminal = _require_terminal_candidate(authority, selected_pair)
         return _resolve_composer_admin(precomposer_plan, composer_result, terminal)
     if selected_pair == ("CLARIFY", "standard"):
@@ -141,8 +146,27 @@ def _collect_owned_candidates(plan: PreComposerPlan) -> list[object]:
         items.append(plan.price_plan.single)
     if plan.price_plan.multi is not None:
         items.append(plan.price_plan.multi)
+    if plan.d2_price_block is not None:
+        items.append(plan.d2_price_block)
+        items.extend(plan.d2_price_block.rows)
+    for detail in plan.d2_price_detail_blocks:
+        items.append(detail)
+        items.extend(detail.rows)
+    items.extend(plan.d2_part_failure_blocks)
+    items.extend(plan.d2_part_deferred_blocks)
+    items.extend(plan.d2_contact_blocks)
+    items.extend(plan.d2_exact_text_blocks)
+    items.extend(plan.d2_policy_blocks)
+    if plan.d2_canonical_contact is not None:
+        items.append(plan.d2_canonical_contact)
     items.extend(plan.required_offer_conditions)
     items.extend(plan.commercial_facts)
+    items.extend(plan.d2_commercial_promo_blocks)
+    items.extend(plan.d2_compatibility_blocks)
+    if plan.d2_price_booster_block is not None:
+        items.append(plan.d2_price_booster_block)
+    if plan.d2_also_list_block is not None:
+        items.append(plan.d2_also_list_block)
     if plan.service_value_candidate is not None:
         items.append(plan.service_value_candidate)
     if plan.textual_cta_candidate is not None:
@@ -183,6 +207,10 @@ def _resolve_code_owned_terminal(
         terminal_state = "contacts"
     elif terminal.mode == "medical_terminal":
         terminal_state = "medical_terminal"
+    elif terminal.mode == "spam_warn":
+        terminal_state = "spam_warn"
+    elif terminal.mode == "spam_closed":
+        terminal_state = "spam_closed"
     else:
         terminal_state = "admin"
     ui_plan = _resolve_terminal_ui(plan, terminal)
@@ -196,6 +224,7 @@ def _resolve_code_owned_terminal(
         transport_kind=plan.transport_kind,
         patient_text=None,
         terminal_text=terminal.display_text,
+        d2_price_scope_decision=plan.d2_price_scope_decision,
         ui_plan=ui_plan,
         finalized_commercial_ids=finalized,
         session_delta=session_delta,
@@ -218,6 +247,7 @@ def _resolve_composer_contacts(
         transport_kind=plan.transport_kind,
         patient_text=None,
         terminal_text=terminal.display_text,
+        d2_price_scope_decision=plan.d2_price_scope_decision,
         ui_plan=ui_plan,
         finalized_commercial_ids=finalized,
         session_delta=session_delta,
@@ -229,9 +259,15 @@ def _resolve_composer_admin(
     composer: ComposerResult,
     terminal: CodeOwnedTerminalCandidate,
 ) -> ResolvedResponsePlan:
-    terminal_state: TerminalState = (
-        "medical_terminal" if composer.mode == "medical_terminal" else "admin"
-    )
+    if composer.mode == "medical_terminal":
+        terminal_state: TerminalState = "medical_terminal"
+    elif composer.mode == "spam_warn":
+        terminal_state = "spam_warn"
+    elif composer.mode == "spam_closed":
+        terminal_state = "spam_closed"
+    else:
+        terminal_state = "admin"
+
     ui_plan = _resolve_terminal_ui(plan, terminal)
     finalized = FinalizedCommercialIds()
     session_delta = _build_session_delta(plan, finalized, terminal_state=terminal_state)
@@ -243,6 +279,7 @@ def _resolve_composer_admin(
         transport_kind=plan.transport_kind,
         patient_text=None,
         terminal_text=terminal.display_text,
+        d2_price_scope_decision=plan.d2_price_scope_decision,
         ui_plan=ui_plan,
         finalized_commercial_ids=finalized,
         session_delta=session_delta,
@@ -269,6 +306,7 @@ def _resolve_composer_clarify(
         transport_kind=plan.transport_kind,
         patient_text=composer.patient_text,
         terminal_text=None,
+        d2_price_scope_decision=plan.d2_price_scope_decision,
         ui_plan=ui_plan,
         finalized_commercial_ids=finalized,
         session_delta=session_delta,
@@ -279,6 +317,10 @@ def _resolve_composer_answer(
     plan: PreComposerPlan,
     composer: ComposerResult,
 ) -> ResolvedResponsePlan:
+    if composer.d2_part_failure_blocks != plan.d2_part_failure_blocks:
+        raise ResponsePlanContractError("d2_part_failure_blocks_mismatch")
+    if composer.d2_part_deferred_blocks != plan.d2_part_deferred_blocks:
+        raise ResponsePlanContractError("d2_part_deferred_blocks_mismatch")
     diagnostics: list[PlanDiagnostic] = []
     price_block, price_diag = _resolve_price(plan, composer)
     diagnostics.extend(price_diag)
@@ -289,7 +331,8 @@ def _resolve_composer_answer(
     diagnostics.extend(requested_diag)
     requested_ids = {block.fact_id for block in requested_blocks}
 
-    is_price_answer = price_block is not None
+    d2_price_block = plan.d2_price_block
+    is_price_answer = price_block is not None or d2_price_block is not None
     caps = plan.price_caps if is_price_answer else plan.normal_caps
     reserved_service_value_id = _reserved_service_value_fact_id(plan)
 
@@ -300,22 +343,28 @@ def _resolve_composer_answer(
         caps,
     )
     diagnostics.extend(service_value_diag)
-    promo_blocks, promo_diag = _resolve_promo_blocks(
-        plan,
-        facts_by_id,
-        requested_ids,
-        reserved_service_value_id,
-        caps.max_promo,
-    )
+    if plan.d2_commercial_owned:
+        promo_blocks = list(plan.d2_commercial_promo_blocks)
+        promo_diag = []
+        amplifier_blocks: list[ResolvedFactBlock] = []
+        amplifier_diag = []
+    else:
+        promo_blocks, promo_diag = _resolve_promo_blocks(
+            plan,
+            facts_by_id,
+            requested_ids,
+            reserved_service_value_id,
+            caps.max_promo,
+        )
+        amplifier_blocks, amplifier_diag = _resolve_amplifier_blocks(
+            plan,
+            facts_by_id,
+            requested_ids,
+            reserved_service_value_id,
+            promo_blocks,
+            caps.max_automatic_amplifiers,
+        )
     diagnostics.extend(promo_diag)
-    amplifier_blocks, amplifier_diag = _resolve_amplifier_blocks(
-        plan,
-        facts_by_id,
-        requested_ids,
-        reserved_service_value_id,
-        promo_blocks,
-        caps.max_automatic_amplifiers,
-    )
     diagnostics.extend(amplifier_diag)
     textual_cta_block = _resolve_textual_cta(plan)
     ui_plan = _resolve_commerce_ui(plan)
@@ -323,6 +372,7 @@ def _resolve_composer_answer(
     authored_service_alternative_block = plan.authored_service_alternative_block
     finalized = _build_finalized_ids(
         price_block,
+        d2_price_block,
         required_conditions,
         requested_blocks,
         service_value_block,
@@ -331,8 +381,24 @@ def _resolve_composer_answer(
         service_options_block,
         authored_service_alternative_block,
     )
+    finalized = finalized.model_copy(update={
+        "requested_fact_ids": finalized.requested_fact_ids + tuple(i for b in plan.d2_exact_text_blocks for i in b.requested_fact_ids),
+        "promo_fact_ids": finalized.promo_fact_ids + tuple(i for b in plan.d2_exact_text_blocks for i in b.promo_fact_ids),
+    })
     session_delta = _build_session_delta(plan, finalized, terminal_state="none")
     return ResolvedResponsePlan(
+        attribution_kind="content" if (
+            price_block or d2_price_block or plan.d2_price_detail_blocks
+            or composer.information_blocks or plan.d2_contact_blocks
+            or plan.d2_policy_blocks or requested_blocks
+            or any(block.policy_ids or block.requested_fact_ids or block.promo_fact_ids
+                   for block in plan.d2_exact_text_blocks)
+            or any(part.kind == "reference" and part.scope == "service"
+                   and part.status == "answered"
+                   and any(block.request_id == part.request_id and block.display_text.strip()
+                           for block in plan.d2_exact_text_blocks)
+                   for part in plan.d2_request_parts)
+        ) else "plain",
         route=composer.route,
         mode=composer.mode,
         context_strategy=plan.context_strategy,
@@ -340,12 +406,27 @@ def _resolve_composer_answer(
         transport_kind=plan.transport_kind,
         patient_text=composer.patient_text,
         terminal_text=None,
+        d2_price_scope_decision=plan.d2_price_scope_decision,
+        d2_request_parts=plan.d2_request_parts,
+        d2_part_failure_blocks=plan.d2_part_failure_blocks,
+        d2_part_deferred_blocks=plan.d2_part_deferred_blocks,
+        d2_contact_blocks=plan.d2_contact_blocks,
+        d2_exact_text_blocks=plan.d2_exact_text_blocks,
+        d2_policy_blocks=plan.d2_policy_blocks,
+        d2_canonical_contact=plan.d2_canonical_contact,
+        d2_result_status=plan.d2_result_status,
         price_block=price_block,
+        d2_price_block=d2_price_block,
+        d2_price_detail_blocks=plan.d2_price_detail_blocks,
+        information_blocks=composer.information_blocks,
         required_offer_conditions=required_conditions,
         requested_fact_blocks=tuple(requested_blocks),
         service_value_block=service_value_block,
         promo_blocks=tuple(promo_blocks),
         automatic_amplifier_blocks=tuple(amplifier_blocks),
+        d2_price_booster_block=plan.d2_price_booster_block,
+        d2_also_list_block=plan.d2_also_list_block,
+        d2_compatibility_blocks=plan.d2_compatibility_blocks,
         textual_cta_block=textual_cta_block,
         service_options_block=service_options_block,
         authored_service_alternative_block=authored_service_alternative_block,
@@ -638,11 +719,15 @@ def _resolve_commerce_ui(plan: PreComposerPlan) -> ResolvedUiPlan:
         buttons=plan.ui_candidates.buttons,
         widget=plan.ui_candidates.widget,
         video=plan.ui_candidates.video,
+        contact=plan.d2_canonical_contact,
+        source_content_ref=plan.ui_candidates.source_content_ref,
+        price_detail_actions=plan.ui_candidates.price_detail_actions,
     )
 
 
 def _build_finalized_ids(
     price_block: ResolvedPriceBlock | None,
+    d2_price_block,
     required_conditions: tuple[RequiredOfferConditionBlock, ...],
     requested_blocks: list[ResolvedFactBlock],
     service_value_block: ResolvedServiceValueBlock | None,
@@ -665,7 +750,15 @@ def _build_finalized_ids(
         service_value_ids=(
             (service_value_block.fact_id,) if service_value_block is not None else ()
         ),
-        price_offer_ids=tuple(price_block.offer_ids) if price_block is not None else (),
+        price_offer_ids=(
+            tuple(price_block.offer_ids)
+            if price_block is not None
+            else (
+                tuple(row.offer_id for row in d2_price_block.rows)
+                if d2_price_block is not None
+                else ()
+            )
+        ),
         required_offer_condition_ids=tuple(
             block.condition_id for block in required_conditions
         ),

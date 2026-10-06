@@ -198,3 +198,15 @@ docker compose --env-file deploy/production/env.production.example -f deploy/pro
 - PostgreSQL **не** публикуется наружу.
 - Bot **не** публикует 8000.
 - Этот Compose **не** является автоматическим deploy.
+
+# Client IP for demo quotas
+
+The bot service enables `BOT_TRUST_CADDY_IP=1` in Compose. Flask trusts exactly
+one `X-Forwarded-For` hop, for the client IP only. Caddy overwrites that header
+with its direct peer IP for both public bot hosts, so visitor-supplied values
+cannot choose the quota bucket. Keep bot port 8000 internal (never publish it).
+Local startup defaults to ignoring forwarded IP headers.
+
+This configuration assumes visitors connect directly to Caddy. If a CDN or
+another reverse proxy is added in front, revisit the trusted proxy configuration
+before relying on per-visitor limits; do not increase trust blindly.

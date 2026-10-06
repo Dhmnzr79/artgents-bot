@@ -1,28 +1,49 @@
 # Git and workspace workflow
 
-## Permanent folders
+## Permanent folder
 
-- `C:\Cursor Projects\artgents-bot` — standalone clean clone on `main`; do not develop here.
-- `C:\Cursor Projects\artgents-bot-<task>` — one temporary worktree per active task.
-- `C:\Cursor Projects\artgents-workspace-recovery-YYYY-MM-DD` — local recovery only; never commit.
+- `C:\Cursor Projects\artgents-bot-active` — the single active checkout for development and local bot/widget runs. Keep `main` clean; develop on a task branch here.
+- `C:\Cursor Projects\artgents-bot` is the former checkout with preserved local WIP. Do not run the bot from it or clean it up as part of normal tasks.
+- Old registered worktrees are historical state. Leave them untouched until a separate verified cleanup.
 
-Open exactly one task folder in each Cursor window and Codex task.
+Use one active task and one editor window for this folder.
 
 ## Start a task
 
 From the clean standalone clone:
 
 ```powershell
-cd "C:\Cursor Projects\artgents-bot"
+cd "C:\Cursor Projects\artgents-bot-active"
 git fetch --prune origin
 git switch main
 git pull --ff-only
-git worktree add -b codex/<task> "C:\Cursor Projects\artgents-bot-<task>" origin/main
-cd "C:\Cursor Projects\artgents-bot-<task>"
+git switch -c codex/<task> origin/main
 git status --short --branch
 ```
 
-Then open only `artgents-bot-<task>` in Cursor.
+Open this same folder in Cursor for the active task. Use the single local launcher
+below for bot/widget runs; it checks the Git root, uses this folder's `.venv`,
+and refuses a second process on port 9001. Do not reuse the old checkout's
+environment or local `data/` implicitly.
+
+## Local demo bot and widget
+
+In PowerShell, run the one launcher by its full path, even if the terminal
+currently points at another folder:
+
+```powershell
+& "C:\Cursor Projects\artgents-bot-active\scripts\start_local_widget.ps1"
+```
+
+The launcher prints the folder, branch, and commit before starting. If port
+9001 is already occupied, it stops with an error instead of opening another
+bot. Identify the existing process before opening the widget. When the
+launcher starts successfully, open
+`http://127.0.0.1:9001/static/widget-test.html`. Stop the foreground
+process with Ctrl+C. This is a local test run, not a
+production deployment. The local `.env`, `.venv`, logs and runtime data must
+never be committed. Do not launch the old checkout or an old worktree to test
+current D2 behavior.
 
 ## Checkpoint and push
 
@@ -43,23 +64,22 @@ Merge only after the task is complete, Checker passes, CI is green, and the owne
 ## Pause safely
 
 If useful work must pause, make a clearly named WIP checkpoint and push it. Do not leave the
-only copy as uncommitted files in a folder. Never mix a second task into that worktree.
+only copy as uncommitted files in the folder. Never switch tasks with a dirty checkout.
 
 ## Finish after merge
 
-From the standalone clone:
+From a clean task checkout:
 
 ```powershell
 git fetch --prune origin
 git switch main
 git pull --ff-only
-git worktree remove "C:\Cursor Projects\artgents-bot-<task>"
 git branch -d codex/<task>
 ```
 
 Delete the remote topic branch after merge, or enable GitHub's automatic head-branch deletion.
-Never remove a dirty worktree with `--force` until its patch, untracked files, and `.env` have
-been backed up and verified.
+Never remove an old registered worktree manually. Verify its patch, untracked files, and `.env`
+before any separately authorized cleanup with `git worktree remove`.
 
 ## Daily five-line check
 

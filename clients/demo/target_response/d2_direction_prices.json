@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "directions": [
+    {
+      "topic_id": "implantation",
+      "service_ids": [
+        "classic",
+        "all_on_4",
+        "all_on_6",
+        "one_stage"
+      ],
+      "offer_ids": [
+        "classic.one_tooth.implantium",
+        "all_on_4.jaw.implantium",
+        "all_on_6.jaw.implantium",
+        "one_stage.one_tooth.implantium",
+        "classic.one_tooth.impro",
+        "all_on_4.jaw.impro",
+        "all_on_6.jaw.impro",
+        "one_stage.one_tooth.impro",
+        "classic.one_tooth.nobel",
+        "all_on_4.jaw.nobel",
+        "all_on_6.jaw.nobel",
+        "one_stage.one_tooth.nobel"
+      ],
+      "introduction_text": "Вот варианты и цены. Стоимость зависит от протокола и объёма лечения.",
+      "unknown_extent_text": "Какой объём вас интересует: один зуб, вся челюсть или пока не знаете?"
+    },
+    {
+      "topic_id": "prosthetics",
+      "service_ids": [
+        "removable_dentures",
+        "clasp_dentures",
+        "implant_supported_prosthetics"
+      ],
+      "offer_ids": [
+        "removable_dentures.jaw.partial",
+        "removable_dentures.jaw.full",
+        "clasp_dentures.default",
+        "implant_supported_prosthetics.default"
+      ],
+      "introduction_text": "Вот варианты и цены на протезирование. Состав у них разный — обратите внимание, за что указана каждая сумма. Подходящий вариант и итоговую стоимость определят на консультации.",
+      "unknown_extent_text": "Какой объём вас интересует: один зуб, вся челюсть или пока не знаете?"
+    },
+    {
+      "topic_id": "restoration",
+      "service_ids": ["classic", "removable_dentures"],
+      "offer_ids": ["classic.one_tooth.implantium", "removable_dentures.jaw.partial"],
+      "introduction_text": "Вот варианты и цены на восстановление зубов. Здесь разные способы восстановления. Подходящий способ и общую стоимость уточнят на консультации.",
+      "unknown_extent_text": "Стоимость зависит от объёма и способа восстановления. Хотите записаться на консультацию?"
+    }
+  ]
+}

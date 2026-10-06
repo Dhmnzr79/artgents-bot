@@ -24,6 +24,50 @@ _DEMO_HOST = "demo.bot.artgents.ru"
 _DEMO_ORIGIN = "https://artgents.ru"
 _UNKNOWN_HOST = "unknown.bot.artgents.ru"
 
+from tests.d2_ci_http import FakeProvider, http_env, raw, explanation
+from tests.test_d2_http_contract import sse_events
+from contracts.response_plan import SessionKey
+from core.d2_dialogue_store import D2DialogueStore
+
+
+@pytest.mark.parametrize('path', ['/ask', '/ask/stream'])
+@pytest.mark.parametrize('tenant', ['demo', 'nikadent'])
+@pytest.mark.parametrize('explicit', [False, True])
+def test_d2_host_bound_tenant_json_sse(http_env, prod_tenant_boundary, monkeypatch, path, tenant, explicit):
+    client, db, use, _ = http_env
+    fake = use(FakeProvider(raw(explanation('Объяснение клиники.'))))
+    real = app_module.resolve_request_client_id
+    calls = []
+    def resolve(body, *, host):
+        calls.append(host)
+        return real(body, host=host)
+    monkeypatch.setattr(app_module, 'resolve_request_client_id', resolve)
+    payload = {'sid':'host-bound', 'request_id':'r1', 'q':'О клинике'}
+    if explicit:
+        payload['client_id'] = tenant
+    response = client.post(path, json=payload, base_url=f'http://{tenant}.bot.artgents.ru',
+                           headers=_prod_headers(origin=_DEMO_ORIGIN if tenant == 'demo' else _NIKADENT_ORIGIN))
+    assert response.status_code == 200
+    body = response.get_json() if path == '/ask' else dict(sse_events(response))['ui']
+    assert body['client_id'] == tenant and body['answer'] == 'Объяснение клиники.'
+    assert len(calls) == 1 and f'{tenant}.bot.artgents.ru' in calls[0]
+    assert fake.inputs[0].model_view.client_id == tenant
+    assert current_session_client_id() is None
+    with D2DialogueStore(db) as store:
+        assert store.read(SessionKey(client_id=tenant, sid='host-bound')).state.revision == 1
+        other = 'nikadent' if tenant == 'demo' else 'demo'
+        assert store.read(SessionKey(client_id=other, sid='host-bound')) is None
+
+
+@pytest.mark.parametrize('path', ['/ask', '/ask/stream'])
+def test_d2_host_body_mismatch_never_calls_provider_or_creates_state(http_env, prod_tenant_boundary, path):
+    client, db, use, _ = http_env
+    fake = use(FakeProvider(raw(explanation('Не должен выполняться.'))))
+    response = client.post(path, json={'sid':'mismatch','request_id':'r1','q':'Вопрос','client_id':'demo'},
+                           base_url=_nikadent_base_url(), headers=_prod_headers(origin=_NIKADENT_ORIGIN))
+    assert response.status_code == 403
+    assert fake.inputs == [] and not db.exists()
+
 
 def isolated_sqlite_paths(tmp_path: Path):
     sessions_dir = tmp_path / "sessions"
@@ -84,37 +128,6 @@ def _parse_sse_ui_payload(resp) -> dict:
     return json.loads(match.group(1))
 
 
-@pytest.mark.parametrize("path", ["/ask"])
-def test_prod_ask_json_host_without_body_client_id(
-    prod_tenant_boundary,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    path: str,
-) -> None:
-    sqlite_path, sessions_dir = isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    backend = _CountingBackend(answer_envelope("Ответ nikadent."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    sid = f"s-prod-{uuid.uuid4().hex[:8]}"
-    client = app_module.app.test_client()
-    body = {"q": "Расскажите о клинике", "sid": sid}
-
-    resp = client.post(
-        path,
-        json=body,
-        base_url=_nikadent_base_url(),
-        headers=_prod_headers(origin=_NIKADENT_ORIGIN),
-    )
-    assert resp.status_code == 200
-    assert backend.call_count == 1
-    payload = resp.get_json()
-    assert payload["meta"]["client_id"] == "nikadent"
-    assert _table_count(sessions_dir / "nikadent.db") >= 1
-    assert _table_count(sessions_dir / "demo.db") == 0
-    assert current_session_client_id() is None
-
-
 def test_prod_ask_stream_host_mismatch_blocked_at_ingress(
     prod_tenant_boundary,
     monkeypatch: pytest.MonkeyPatch,
@@ -149,35 +162,6 @@ def _assert_prod_nikadent_stream_terminal(
     return payload
 
 
-@pytest.mark.parametrize(
-    "include_body_client_id",
-    [False, True],
-    ids=["host-only", "matching-body"],
-)
-def test_prod_ask_stream_positive_nikadent(
-    prod_tenant_boundary,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    include_body_client_id: bool,
-) -> None:
-    sqlite_path, sessions_dir = isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    backend = _CountingBackend(answer_envelope("Stream Nikadent ответ."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    sid = f"s-stream-pos-{uuid.uuid4().hex[:8]}"
-    body: dict = {"q": "Расскажите о клинике", "sid": sid}
-    if include_body_client_id:
-        body["client_id"] = "nikadent"
-    resp = app_module.app.test_client().post(
-        "/ask/stream",
-        json=body,
-        base_url=_nikadent_base_url(),
-        headers=_prod_headers(origin=_NIKADENT_ORIGIN),
-    )
-    _assert_prod_nikadent_stream_terminal(resp, backend, sessions_dir)
-
-
 def test_prod_ask_stream_invalid_host_403_before_worker(
     prod_tenant_boundary,
     monkeypatch: pytest.MonkeyPatch,
@@ -192,173 +176,6 @@ def test_prod_ask_stream_invalid_host_403_before_worker(
     )
     assert resp.status_code == 403
     assert backend.call_count == 0
-
-
-def test_prod_ask_and_stream_tenant_parity(
-    prod_tenant_boundary,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sqlite_path, sessions_dir = isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    answer_text = "Parity Nikadent ответ."
-    ask_backend = _CountingBackend(answer_envelope(answer_text))
-    stream_backend = _CountingBackend(answer_envelope(answer_text))
-    backends = [ask_backend, stream_backend]
-
-    def _rotating_backend():
-        return backends.pop(0)
-
-    monkeypatch.setattr(
-        "orchestration.sales_fast_widget_turn._default_sales_fast_backend",
-        _rotating_backend,
-    )
-    question = "Расскажите о клинике"
-    ask_resp = app_module.app.test_client().post(
-        "/ask",
-        json={"q": question, "sid": f"s-parity-ask-{uuid.uuid4().hex[:6]}"},
-        base_url=_nikadent_base_url(),
-        headers=_prod_headers(origin=_NIKADENT_ORIGIN),
-    )
-    stream_resp = app_module.app.test_client().post(
-        "/ask/stream",
-        json={"q": question, "sid": f"s-parity-stream-{uuid.uuid4().hex[:6]}"},
-        base_url=_nikadent_base_url(),
-        headers=_prod_headers(origin=_NIKADENT_ORIGIN),
-    )
-    assert ask_resp.status_code == 200
-    ask_payload = ask_resp.get_json()
-    stream_payload = _assert_prod_nikadent_stream_terminal(
-        stream_resp,
-        stream_backend,
-        sessions_dir,
-    )
-    assert ask_payload["meta"]["client_id"] == "nikadent"
-    assert ask_payload.get("answer") == stream_payload.get("answer")
-    assert ask_backend.call_count == 1
-    assert _table_count(sessions_dir / "demo.db") == 0
-
-
-def test_prod_stream_overload_fallback_preserves_validated_tenant(
-    prod_tenant_boundary,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from unittest.mock import MagicMock
-
-    sqlite_path, sessions_dir = isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr(
-        app_module,
-        "_sse_worker_admission",
-        MagicMock(acquire=MagicMock(return_value=False)),
-    )
-    backend = _CountingBackend(answer_envelope("Overload stream ответ."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    resp = app_module.app.test_client().post(
-        "/ask/stream",
-        json={"q": "Расскажите о клинике", "sid": f"s-overload-{uuid.uuid4().hex[:6]}"},
-        base_url=_nikadent_base_url(),
-        headers=_prod_headers(origin=_NIKADENT_ORIGIN),
-    )
-    _assert_prod_nikadent_stream_terminal(resp, backend, sessions_dir)
-
-
-def test_prod_stream_ingress_resolves_once_without_localhost_reresolution(
-    prod_tenant_boundary,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sqlite_path, sessions_dir = isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    real_resolve = client_host.resolve_request_client_id
-    resolve_calls: list[dict] = []
-
-    def _track_resolve(raw, *, host):
-        resolve_calls.append({"raw": raw, "host": host})
-        return real_resolve(raw, host=host)
-
-    monkeypatch.setattr(app_module, "resolve_request_client_id", _track_resolve)
-    backend = _CountingBackend(answer_envelope("Tracked stream."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    resp = app_module.app.test_client().post(
-        "/ask/stream",
-        json={"q": "Расскажите о клинике", "sid": f"s-track-{uuid.uuid4().hex[:6]}"},
-        base_url=_nikadent_base_url(),
-        headers=_prod_headers(origin=_NIKADENT_ORIGIN),
-    )
-    _assert_prod_nikadent_stream_terminal(resp, backend, sessions_dir)
-    assert len(resolve_calls) == 1
-    assert _NIKADENT_HOST in str(resolve_calls[0]["host"])
-    assert "localhost" not in str(resolve_calls[0]["host"]).lower()
-
-
-def test_prod_stream_trusted_handoff_passes_resolved_client_id_to_worker(
-    prod_tenant_boundary,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sqlite_path, sessions_dir = isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    handoffs: list[str | None] = []
-    real_inner = app_module._orchestrate_ask_turn_inner
-
-    def _spy_inner(data, *, resolved_client_id=None):
-        handoffs.append(resolved_client_id)
-        return real_inner(data, resolved_client_id=resolved_client_id)
-
-    monkeypatch.setattr(app_module, "_orchestrate_ask_turn_inner", _spy_inner)
-    backend = _CountingBackend(answer_envelope("Handoff stream."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    tampered_body = {
-        "q": "Расскажите о клинике",
-        "sid": f"s-handoff-{uuid.uuid4().hex[:6]}",
-        "client_id": "demo",
-    }
-    resp = app_module.app.test_client().post(
-        "/ask/stream",
-        json=tampered_body,
-        base_url=_nikadent_base_url(),
-        headers=_prod_headers(origin=_NIKADENT_ORIGIN),
-    )
-    assert resp.status_code == 403
-    assert handoffs == []
-    assert backend.call_count == 0
-
-    resp_ok = app_module.app.test_client().post(
-        "/ask/stream",
-        json={"q": "Расскажите о клинике", "sid": f"s-handoff-ok-{uuid.uuid4().hex[:6]}"},
-        base_url=_nikadent_base_url(),
-        headers=_prod_headers(origin=_NIKADENT_ORIGIN),
-    )
-    _assert_prod_nikadent_stream_terminal(resp_ok, backend, sessions_dir)
-    assert handoffs == ["nikadent"]
-
-
-def test_prod_ask_matching_body_client_id(
-    prod_tenant_boundary,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sqlite_path, sessions_dir = isolated_sqlite_paths(tmp_path)
-    monkeypatch.setattr("session.sqlite_path_for_client", sqlite_path)
-    monkeypatch.setattr("core.client_runtime.sqlite_path_for_client", sqlite_path)
-    backend = _CountingBackend(answer_envelope("Ответ."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    sid = f"s-match-{uuid.uuid4().hex[:8]}"
-    resp = app_module.app.test_client().post(
-        "/ask",
-        json={"q": "Привет", "sid": sid, "client_id": "nikadent"},
-        base_url=_nikadent_base_url(),
-        headers=_prod_headers(origin=_NIKADENT_ORIGIN),
-    )
-    assert resp.status_code == 200
-    assert resp.get_json()["meta"]["client_id"] == "nikadent"
-    assert backend.call_count == 1
 
 
 @pytest.mark.parametrize("path", ["/ask", "/ask/stream"])
@@ -594,20 +411,3 @@ def test_prod_cors_options_bad_host_403(prod_tenant_boundary) -> None:
         headers={"Origin": _NIKADENT_ORIGIN},
     )
     assert resp.status_code == 403
-
-
-def test_prod_demo_host_allows_demo_tenant(
-    prod_tenant_boundary,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    backend = _CountingBackend(answer_envelope("Demo ответ."))
-    _install_sales_fast_transport(monkeypatch, backend)
-    resp = app_module.app.test_client().post(
-        "/ask",
-        json={"q": "Привет", "sid": f"s-demo-host-{uuid.uuid4().hex[:6]}"},
-        base_url=_demo_base_url(),
-        headers=_prod_headers(origin=_DEMO_ORIGIN),
-    )
-    assert resp.status_code == 200
-    assert resp.get_json()["meta"]["client_id"] == "demo"
-    assert backend.call_count == 1

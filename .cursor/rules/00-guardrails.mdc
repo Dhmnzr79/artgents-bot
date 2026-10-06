@@ -7,9 +7,22 @@ Read and follow `/AGENTS.md` before acting.
 
 Cursor-specific requirements:
 
+- For D2 always read the current section of Delivery Roadmap and its mandatory
+  rules. Historical checkpoints do not authorize new work; current product
+  decisions D2-107–109 supersede conflicting financial prose allowances.
+
 - One Cursor window must contain exactly one task worktree.
 - Show the AGENTS.md preflight before the first edit.
 - Stop when the folder, branch, baseline, or task differ.
 - Preserve foreign WIP and stage exact paths only.
 - Report changed files, tests, staging, commit, push, and PR state.
 - Use the generic Checker contract in `/docs/WORKFLOW_CHECKER.md` once per completed checkpoint.
+- Apply AGENTS.md's mandatory architecture acceptance and, for D2, the sole
+  responsibility table in `/docs/tasks/DEMO_D2_TARGET_CONTRACT.md` §3.
+  Before simplification, state before → after → removed dependency in the
+  existing card/report; before accepting it, require the Checker evidence in
+  `/docs/WORKFLOW_CHECKER.md`. A task card cannot waive these requirements.
+- Distinguish bug fixes and documentation from implemented simplification.
+  Discuss scope/behavior/responsibility conflicts with examples in ordinary
+  chat before edits; do not use a popup or request renewed approval for routine
+  choices within the already agreed scheme.

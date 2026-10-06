@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "directions": [
+    {
+      "topic_id": "implantation", "service_ids": ["implantation_single"], "offer_ids": ["implant_one"],
+      "introduction_text": "Вариант восстановления зуба.", "unknown_extent_text": "Какой объём восстановления нужен?"
+    },
+    {
+      "topic_id": "prosthetics", "service_ids": ["prosthetics"], "offer_ids": ["prosthetic_many", "prosthetic_one"],
+      "introduction_text": "Варианты протезирования.", "unknown_extent_text": "Какой объём протезирования нужен?"
+    }
+  ]
+}

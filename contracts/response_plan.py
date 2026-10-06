@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contracts.d2_dialogue_result import DiscussionScope
 from typing import Annotated, Literal, Self, Union
 
 from contracts.response_schema import RequestedDisplayPolicy
@@ -9,9 +10,9 @@ from contracts.response_schema import RequestedDisplayPolicy
 from pydantic import AfterValidator, BaseModel, ConfigDict, Discriminator, Field, Tag, model_validator
 
 ResponseRoute = Literal["ANSWER", "ADMIN", "CLARIFY"]
-ResponseMode = Literal["standard", "contacts", "medical_terminal"]
+ResponseMode = Literal["standard", "contacts", "medical_terminal", "spam_warn", "spam_closed"]
 ContextStrategy = Literal["full_context", "hybrid"]
-ResponseScope = Literal["service", "topic", "clinic"]
+ResponseScope = Literal["service", "topic", "clinic", "mixed"]
 FactApplicability = Literal["clinic_wide", "topic_scoped", "service_scoped"]
 PricePlanKind = Literal["none", "single", "multi"]
 ExecutionKind = Literal["composer", "code_owned_terminal"]
@@ -48,7 +49,15 @@ PlanDiagnosticCode = Literal[
     "materialization_optional_unavailable",
 ]
 TransportKind = Literal["blocking", "streaming"]
-TerminalState = Literal["none", "admin", "contacts", "clarify", "medical_terminal"]
+TerminalState = Literal[
+    "none",
+    "admin",
+    "contacts",
+    "clarify",
+    "medical_terminal",
+    "spam_warn",
+    "spam_closed",
+]
 
 ALLOWED_ROUTE_MODE_PAIRS: frozenset[tuple[ResponseRoute, ResponseMode]] = frozenset(
     {
@@ -56,6 +65,8 @@ ALLOWED_ROUTE_MODE_PAIRS: frozenset[tuple[ResponseRoute, ResponseMode]] = frozen
         ("ANSWER", "contacts"),
         ("ADMIN", "standard"),
         ("ADMIN", "medical_terminal"),
+        ("ADMIN", "spam_warn"),
+        ("ADMIN", "spam_closed"),
         ("CLARIFY", "standard"),
     }
 )
@@ -72,6 +83,8 @@ CODE_OWNED_ROUTE_MODE_PAIRS: frozenset[tuple[ResponseRoute, ResponseMode]] = fro
         ("ANSWER", "contacts"),
         ("ADMIN", "standard"),
         ("ADMIN", "medical_terminal"),
+        ("ADMIN", "spam_warn"),
+        ("ADMIN", "spam_closed"),
     }
 )
 COMPOSER_TERMINAL_OUTCOME_PAIRS: frozenset[tuple[ResponseRoute, ResponseMode]] = frozenset(
@@ -100,6 +113,8 @@ EXPECTED_TERMINAL_STATE: dict[tuple[ResponseRoute, ResponseMode], tuple[Terminal
     ("ANSWER", "contacts"): ("contacts", False),
     ("ADMIN", "standard"): ("admin", False),
     ("ADMIN", "medical_terminal"): ("medical_terminal", False),
+    ("ADMIN", "spam_warn"): ("spam_warn", False),
+    ("ADMIN", "spam_closed"): ("spam_closed", False),
     ("CLARIFY", "standard"): ("clarify", True),
 }
 
@@ -358,6 +373,217 @@ class FrozenPriceOfferRow(ResponsePlanModel):
     brand_id: NonBlankStr | None = None
 
 
+D2PriceMode = Literal["fixed", "from", "range", "no_public_price"]
+D2PartFailureReason = Literal[
+    "d2_no_price_candidates",
+    "d2_no_scope_price_candidates",
+    "d2_model_prose_empty",
+    "d2_model_prose_money",
+    "d2_model_prose_link",
+    "d2_content_source_missing",
+    "d2_price_detail_context_ambiguous",
+]
+D2ResultStatus = Literal["complete", "degraded", "failed"]
+D2ContentPublication = Literal["model_prose"]
+D2_PRICE_DEFERRAL_TEXT = "Стоимость следующей услуги можно спросить следующим сообщением"
+D2_CLARIFICATION_DEFERRAL_TEXT = "Этот вопрос пока отложим. Его можно задать следующим сообщением."
+
+
+class D2FrozenPriceRow(ResponsePlanModel):
+    """A price row frozen from one verified target offer for the D2 path."""
+
+    source_client_id: NonBlankStr
+    offer_id: NonBlankStr
+    service_id: NonBlankStr
+    mode: D2PriceMode
+    display_text: NonBlankStr
+    service_name: NonBlankStr | None = None
+    variant_label: NonBlankStr | None = None
+    price_display_text: NonBlankStr | None = None
+    scope_text: NonBlankStr | None = None
+    amount: int | None = Field(default=None, ge=0)
+    min_amount: int | None = Field(default=None, ge=0)
+    max_amount: int | None = Field(default=None, ge=0)
+    currency: NonBlankStr | None = None
+    billing_unit: NonBlankStr | None = None
+    approved_text: NonBlankStr | None = None
+    condition_texts: tuple[NonBlankStr, ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_mode_values(self) -> Self:
+        if self.mode == "fixed":
+            if self.amount is None or self.currency is None or self.billing_unit is None:
+                raise ValueError("d2_fixed_price_metadata_required")
+            if any(value is not None for value in (self.min_amount, self.max_amount, self.approved_text)):
+                raise ValueError("d2_fixed_price_metadata_conflict")
+        elif self.mode == "from":
+            if self.min_amount is None or self.currency is None or self.billing_unit is None:
+                raise ValueError("d2_from_price_metadata_required")
+            if any(value is not None for value in (self.amount, self.max_amount, self.approved_text)):
+                raise ValueError("d2_from_price_metadata_conflict")
+        elif self.mode == "range":
+            if (
+                self.min_amount is None
+                or self.max_amount is None
+                or self.currency is None
+                or self.billing_unit is None
+            ):
+                raise ValueError("d2_range_price_metadata_required")
+            if self.min_amount > self.max_amount:
+                raise ValueError("d2_price_range_invalid")
+            if self.amount is not None or self.approved_text is not None:
+                raise ValueError("d2_range_price_metadata_conflict")
+        elif self.mode == "no_public_price":
+            if self.approved_text is None:
+                raise ValueError("d2_no_public_price_text_required")
+            if any(
+                value is not None
+                for value in (
+                    self.amount,
+                    self.min_amount,
+                    self.max_amount,
+                    self.currency,
+                    self.billing_unit,
+                )
+            ):
+                raise ValueError("d2_no_public_price_metadata_conflict")
+        return self
+
+
+class D2FrozenPriceBlock(ResponsePlanModel):
+    source_client_id: NonBlankStr
+    rows: tuple[D2FrozenPriceRow, ...]
+
+    @model_validator(mode="after")
+    def _validate_rows(self) -> Self:
+        if not self.rows:
+            raise ValueError("d2_price_rows_out_of_bounds")
+        seen: set[str] = set()
+        for row in self.rows:
+            if row.source_client_id != self.source_client_id:
+                raise ValueError("d2_price_row_owner_mismatch")
+            if row.offer_id in seen:
+                raise ValueError("d2_price_row_duplicate")
+            seen.add(row.offer_id)
+        return self
+
+
+class D2FrozenPriceDetailRow(ResponsePlanModel):
+    source_client_id: NonBlankStr
+    offer_id: NonBlankStr
+    service_id: NonBlankStr
+    service_name: NonBlankStr
+    label: NonBlankStr
+    includes: tuple[NonBlankStr, ...] = ()
+    excludes: tuple[NonBlankStr, ...] = ()
+    stages: tuple[NonBlankStr, ...] = ()
+    missing: bool = False
+
+
+class D2FrozenPriceDetailBlock(ResponsePlanModel):
+    source_client_id: NonBlankStr
+    request_id: NonBlankStr
+    aspect: Literal["includes", "stages"]
+    rows: tuple[D2FrozenPriceDetailRow, ...]
+
+    @model_validator(mode="after")
+    def _validate_rows(self) -> Self:
+        if not self.rows or len({row.offer_id for row in self.rows}) != len(self.rows):
+            raise ValueError("d2_price_detail_rows_invalid")
+        if len({(row.service_id, row.service_name) for row in self.rows}) != 1:
+            raise ValueError("d2_price_detail_service_mismatch")
+        if any(row.source_client_id != self.source_client_id for row in self.rows):
+            raise ValueError("d2_price_detail_owner_mismatch")
+        for row in self.rows:
+            if row.missing and (row.includes or row.excludes or row.stages):
+                raise ValueError("d2_price_detail_missing_has_data")
+            if not row.missing and (
+                (self.aspect == "includes" and (not row.includes or row.stages))
+                or (self.aspect == "stages" and (not row.stages or row.includes or row.excludes))
+            ):
+                raise ValueError("d2_price_detail_aspect_data_mismatch")
+        return self
+
+
+class InformationSourceBlock(ResponsePlanModel):
+    """Model prose with optional verified document provenance."""
+
+    request_id: NonBlankStr
+    source_client_id: NonBlankStr
+    # FullContext prose may have no single document provenance.  In that case
+    # this is deliberately null; it must not be invented from the question.
+    content_ref: NonBlankStr | None
+    display_text: NonBlankStr
+    source_section_refs: tuple[NonBlankStr, ...] = ()
+    publication: D2ContentPublication = "model_prose"
+    snapshot_fingerprint: NonBlankStr = "fixture"
+    replacement_reason: D2PartFailureReason | None = None
+
+    @model_validator(mode="after")
+    def _validate_publication(self) -> Self:
+        if self.replacement_reason is not None:
+            raise ValueError("d2_content_replacement_reason_forbidden")
+        return self
+
+
+class D2ExactTextBlock(ResponsePlanModel):
+    """Code-owned local clarification or reference result; not model prose."""
+    request_id: NonBlankStr
+    source_client_id: NonBlankStr
+    display_text: NonBlankStr
+    requested_fact_ids: tuple[str, ...] = ()
+    promo_fact_ids: tuple[str, ...] = ()
+    policy_ids: tuple[str, ...] = ()
+
+
+class D2ContactFactBlock(ResponsePlanModel):
+    """Exact tenant contact data attached to one D2 request part."""
+
+    request_id: NonBlankStr
+    source_client_id: NonBlankStr
+    display_text: NonBlankStr
+    phone: NonBlankStr | None = None
+
+
+class D2PolicyFactBlock(ResponsePlanModel):
+    """Exact tenant policy text attached to one D2 request part."""
+
+    request_id: NonBlankStr
+    source_client_id: NonBlankStr
+    policy_ids: tuple[NonBlankStr, ...]
+    display_text: NonBlankStr
+
+    @model_validator(mode="after")
+    def _validate_policy_ids(self) -> Self:
+        if len(self.policy_ids) != len(set(self.policy_ids)):
+            raise ValueError("d2_policy_fact_block_duplicate_ids")
+        return self
+
+
+class D2PartFailureBlock(ResponsePlanModel):
+    """Frozen clinic-owned text for a recoverable D2 request-part failure."""
+
+    request_id: NonBlankStr
+    source_client_id: NonBlankStr
+    message_id: NonBlankStr
+    reason: D2PartFailureReason
+    display_text: NonBlankStr
+
+
+class D2PartDeferredBlock(ResponsePlanModel):
+    """Frozen notice for an explicitly deferred task; not an automatic queue."""
+
+    request_id: NonBlankStr
+    source_client_id: NonBlankStr
+    display_text: NonBlankStr = D2_PRICE_DEFERRAL_TEXT
+
+    @model_validator(mode="after")
+    def _validate_display_text(self) -> Self:
+        if self.display_text not in {D2_PRICE_DEFERRAL_TEXT, D2_CLARIFICATION_DEFERRAL_TEXT}:
+            raise ValueError("d2_deferred_part_display_text_invalid")
+        return self
+
+
 class PricePlan(ResponsePlanModel):
     kind: PricePlanKind
     single: CanonicalSinglePriceCandidate | None = None
@@ -544,11 +770,259 @@ class UiVideoCandidate(ResponsePlanModel):
     video_id: NonBlankStr
 
 
+class D2PriceDetailUiAction(ResponsePlanModel):
+    source_client_id: NonBlankStr
+    reply_id: NonBlankStr
+    aspect: Literal["includes", "stages"]
+    service_id: NonBlankStr
+    offer_ids: tuple[NonBlankStr, ...]
+
+    @model_validator(mode="after")
+    def _validate_offers(self) -> Self:
+        if not self.offer_ids or len(self.offer_ids) != len(set(self.offer_ids)):
+            raise ValueError("d2_price_detail_action_offers_invalid")
+        return self
+
+
+def _validate_price_detail_ui_actions(
+    *, actions: tuple[D2PriceDetailUiAction, ...],
+    replies: tuple[UiQuickReplyCandidate, ...],
+    price: D2FrozenPriceBlock | None,
+    details: tuple[D2FrozenPriceDetailBlock, ...],
+) -> None:
+    if not actions:
+        return
+    if price is None and not details:
+        raise ValueError("d2_price_detail_action_without_offer_source")
+    expected_ids = (
+        tuple(row.offer_id for row in price.rows) if price is not None
+        else tuple(row.offer_id for row in details[0].rows)
+    )
+    expected_services = (
+        {row.service_id for row in price.rows} if price is not None
+        else {row.service_id for row in details[0].rows}
+    )
+    if price is None and any(
+        tuple(row.offer_id for row in block.rows) != expected_ids
+        for block in details
+    ):
+        raise ValueError("d2_price_detail_action_ambiguous_offer_source")
+    if len(expected_services) != 1:
+        raise ValueError("d2_price_detail_action_mixed_service")
+    action_ids = [action.reply_id for action in actions]
+    reply_ids = [reply.reply_id for reply in replies]
+    if len(action_ids) != len(set(action_ids)) or set(action_ids) != set(reply_ids):
+        raise ValueError("d2_price_detail_action_reply_mismatch")
+    if any(
+        action.offer_ids != expected_ids or action.service_id not in expected_services
+        for action in actions
+    ):
+        raise ValueError("d2_price_detail_action_offer_mismatch")
+
+
 class UiPlanCandidates(ResponsePlanModel):
     quick_replies: tuple[UiQuickReplyCandidate, ...] = ()
     buttons: tuple[UiButtonCandidate, ...] = ()
     widget: UiWidgetCandidate | None = None
     video: UiVideoCandidate | None = None
+    source_content_ref: NonBlankStr | None = None
+    price_detail_actions: tuple[D2PriceDetailUiAction, ...] = ()
+
+
+class D2PriceScopeDecision(ResponsePlanModel):
+    source_request_id: NonBlankStr
+    topic_id: NonBlankStr
+    service_id: NonBlankStr | None = None
+    brand_id: NonBlankStr | None = None
+    applied_extent: Literal["one_tooth", "few_teeth", "full_arch"] | None = None
+    reason: Literal["known_situation", "overview"]
+    selected_offer_ids: tuple[NonBlankStr, ...]
+    introduction_text: NonBlankStr | None = None
+    unknown_extent_text: NonBlankStr | None = None
+    volume_choices: tuple["D2PriceScopeChoice", ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_scope_decision(self) -> Self:
+        if self.reason == "known_situation" and self.applied_extent is None:
+            raise ValueError("d2_scope_decision_extent_required")
+        if self.reason == "overview" and self.applied_extent is not None:
+            raise ValueError("d2_scope_decision_overview_extent_forbidden")
+        if len(self.selected_offer_ids) != len(set(self.selected_offer_ids)):
+            raise ValueError("d2_scope_decision_offer_duplicate")
+        if len([item.candidate.reply_id for item in self.volume_choices]) != len(
+            set(item.candidate.reply_id for item in self.volume_choices)
+        ):
+            raise ValueError("d2_scope_decision_choice_duplicate")
+        return self
+
+
+class D2PriceScopeChoice(ResponsePlanModel):
+    extent: Literal["one_tooth", "few_teeth", "full_arch", "unknown"]
+    candidate: UiQuickReplyCandidate
+
+
+class D2ResolvedRequestPart(ResponsePlanModel):
+    request_id: NonBlankStr
+    kind: Literal["price", "price_detail", "content", "contact", "clinic_policy", "clarification", "reference", "commercial_fact", "price_clarification", "price_reference"]
+    status: Literal["answered", "unavailable", "deferred"]
+    failure_reason: D2PartFailureReason | None = None
+    discussion_scope: DiscussionScope | None = None
+    scope: ResponseScope
+    service_id: NonBlankStr | None = None
+    topic_id: NonBlankStr | None = None
+    brand_id: NonBlankStr | None = None
+    content_ref: NonBlankStr | None = None
+    content_section_refs: tuple[NonBlankStr, ...] = ()
+    content_publication: D2ContentPublication | None = None
+    snapshot_fingerprint: NonBlankStr | None = None
+
+    @model_validator(mode="after")
+    def _validate_d2_part(self) -> Self:
+        if self.kind in {"price", "price_detail", "contact", "clinic_policy"} and self.content_ref is not None:
+            raise ValueError("d2_price_part_content_ref_forbidden")
+        if self.kind in {"price", "price_detail", "contact", "clinic_policy"} and self.content_section_refs:
+            raise ValueError("d2_price_part_section_refs_forbidden")
+        if self.content_section_refs and self.content_ref is None:
+            raise ValueError("d2_section_refs_require_content_ref")
+        if len(self.content_section_refs) != len(set(self.content_section_refs)):
+            raise ValueError("d2_section_refs_duplicate")
+        if (
+            self.kind == "content"
+            and self.content_ref is None
+            and self.content_publication not in {None, "model_prose"}
+        ):
+            raise ValueError("d2_content_part_content_ref_required")
+        if self.status == "answered" and self.failure_reason is not None:
+            raise ValueError("d2_answered_part_failure_reason_forbidden")
+        if self.status == "deferred":
+            if self.kind not in {"price", "clarification"}:
+                raise ValueError("d2_deferred_part_kind_invalid")
+            if self.failure_reason is not None:
+                raise ValueError("d2_deferred_part_failure_reason_forbidden")
+        if self.kind == "price" and self.status == "unavailable" and self.failure_reason not in {
+            "d2_no_price_candidates", "d2_no_scope_price_candidates",
+        }:
+            raise ValueError("d2_price_part_failure_reason_invalid")
+        if self.kind == "content":
+            if self.status == "answered" and self.content_ref is None:
+                if self.content_publication != "model_prose":
+                    raise ValueError("d2_content_part_publication_required")
+            elif self.status == "answered" and self.content_publication != "model_prose":
+                raise ValueError("d2_content_part_publication_required")
+            if self.status == "unavailable" and self.content_publication is not None:
+                raise ValueError("d2_content_part_unavailable_publication_forbidden")
+            if self.status == "unavailable" and self.failure_reason not in {
+                "d2_model_prose_empty",
+                "d2_model_prose_money",
+                "d2_model_prose_link",
+                "d2_content_source_missing",
+            }:
+                raise ValueError("d2_content_part_failure_reason_invalid")
+            if self.status != "unavailable" and self.snapshot_fingerprint is None:
+                raise ValueError("d2_content_part_snapshot_required")
+        elif self.kind == "price_detail":
+            if self.status == "unavailable":
+                if self.failure_reason not in {
+                    "d2_price_detail_context_ambiguous", "d2_no_price_candidates",
+                    "d2_no_scope_price_candidates",
+                }:
+                    raise ValueError("d2_price_detail_part_failure_reason_invalid")
+            elif self.status != "answered" or self.failure_reason is not None:
+                raise ValueError("d2_price_detail_part_status_invalid")
+            if self.content_publication is not None or self.snapshot_fingerprint is not None:
+                raise ValueError("d2_exact_fact_part_content_provenance_forbidden")
+        elif self.kind in {"contact", "clinic_policy"}:
+            if self.status != "answered" or self.failure_reason is not None:
+                raise ValueError("d2_exact_fact_part_status_invalid")
+            if self.content_publication is not None or self.snapshot_fingerprint is not None:
+                raise ValueError("d2_exact_fact_part_content_provenance_forbidden")
+        elif self.content_publication is not None or self.snapshot_fingerprint is not None:
+            raise ValueError("d2_price_part_content_provenance_forbidden")
+        if self.status == "unavailable":
+            if self.failure_reason is None:
+                raise ValueError("d2_unavailable_part_failure_reason_required")
+        return self
+
+
+def _validate_d2_part_result_shape(
+    parts: tuple[D2ResolvedRequestPart, ...],
+    failure_blocks: tuple[D2PartFailureBlock, ...],
+    deferred_blocks: tuple[D2PartDeferredBlock, ...],
+    result_status: D2ResultStatus | None,
+    d2_price_block: D2FrozenPriceBlock | None,
+    d2_price_detail_blocks: tuple[D2FrozenPriceDetailBlock, ...],
+) -> None:
+    if not parts:
+        if failure_blocks or deferred_blocks or result_status is not None:
+            raise ValueError("d2_part_result_without_parts")
+        return
+    if result_status is None:
+        raise ValueError("d2_part_result_status_required")
+    ids = [part.request_id for part in parts]
+    if len(ids) != len(set(ids)):
+        raise ValueError("d2_request_part_duplicate")
+    price_parts = [part for part in parts if part.kind in {"price", "price_clarification", "price_reference"}]
+    failure_ids = [block.request_id for block in failure_blocks]
+    if len(failure_ids) != len(set(failure_ids)):
+        raise ValueError("d2_part_failure_block_duplicate")
+    unavailable_parts = [part for part in parts if part.status == "unavailable"]
+    if len(failure_blocks) != len(unavailable_parts):
+        raise ValueError("d2_part_failure_block_linkage_invalid")
+    failures_by_request = {block.request_id: block for block in failure_blocks}
+    for part in unavailable_parts:
+        block = failures_by_request.get(part.request_id)
+        if block is None or block.reason != part.failure_reason:
+            raise ValueError("d2_part_failure_block_linkage_invalid")
+    if any(block.request_id not in ids for block in failure_blocks):
+        raise ValueError("d2_part_failure_block_linkage_invalid")
+    deferred_parts = [part for part in parts if part.status == "deferred"]
+    deferred_ids = [block.request_id for block in deferred_blocks]
+    if len(deferred_ids) != len(set(deferred_ids)):
+        raise ValueError("d2_part_deferred_block_duplicate")
+    if deferred_ids != [part.request_id for part in deferred_parts]:
+        raise ValueError("d2_part_deferred_block_linkage_invalid")
+    if any(block.request_id not in ids for block in deferred_blocks):
+        raise ValueError("d2_part_deferred_block_linkage_invalid")
+    if price_parts:
+        first_price_index = next(index for index, part in enumerate(parts) if part.kind in {"price", "price_clarification", "price_reference"})
+        earlier_active_clarification = any(
+            part.kind == "clarification" and part.status == "answered"
+            for part in parts[:first_price_index]
+        )
+        if (parts[first_price_index].status == "deferred" and not earlier_active_clarification) or any(
+            part.status != "deferred" for part in parts[first_price_index + 1:] if part.kind in {"price", "price_clarification", "price_reference"}
+        ):
+            raise ValueError("d2_request_part_price_linkage_invalid")
+        price_part = parts[first_price_index]
+        if price_part.kind != "price" and d2_price_block is not None:
+            raise ValueError("d2_request_part_price_linkage_invalid")
+        if price_part.kind == "price" and price_part.status == "answered" and d2_price_block is None:
+            raise ValueError("d2_request_part_price_linkage_invalid")
+        if price_part.status in {"unavailable", "deferred"} and d2_price_block is not None:
+            raise ValueError("d2_request_part_price_linkage_invalid")
+        if price_part.status not in {"answered", "unavailable"} and not (
+            price_part.status == "deferred" and earlier_active_clarification
+        ):
+            raise ValueError("d2_request_part_price_linkage_invalid")
+    elif d2_price_block is not None:
+        raise ValueError("d2_request_part_price_linkage_invalid")
+    detail_parts = [part for part in parts if part.kind == "price_detail"]
+    detail_by_id = {block.request_id: block for block in d2_price_detail_blocks}
+    if len(detail_by_id) != len(d2_price_detail_blocks) or list(detail_by_id) != [
+        part.request_id for part in detail_parts if part.status == "answered"
+    ]:
+        raise ValueError("d2_price_detail_part_linkage_invalid")
+    if any(part.status not in {"answered", "unavailable"} for part in detail_parts):
+        raise ValueError("d2_price_detail_part_linkage_invalid")
+    expected_status: D2ResultStatus
+    if not unavailable_parts and not deferred_parts:
+        expected_status = "complete"
+    elif len(unavailable_parts) == len(parts):
+        expected_status = "failed"
+    else:
+        expected_status = "degraded"
+    if result_status != expected_status:
+        raise ValueError("d2_part_result_status_mismatch")
 
 
 class PreComposerPlan(ResponsePlanModel):
@@ -561,6 +1035,17 @@ class PreComposerPlan(ResponsePlanModel):
     selected_topic_id: str | None = None
     history_turn_count: int = Field(default=0, ge=0)
     price_plan: PricePlan
+    d2_price_block: D2FrozenPriceBlock | None = None
+    d2_price_detail_blocks: tuple[D2FrozenPriceDetailBlock, ...] = ()
+    d2_price_scope_decision: D2PriceScopeDecision | None = None
+    d2_request_parts: tuple[D2ResolvedRequestPart, ...] = ()
+    d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()
+    d2_part_deferred_blocks: tuple[D2PartDeferredBlock, ...] = ()
+    d2_contact_blocks: tuple[D2ContactFactBlock, ...] = ()
+    d2_exact_text_blocks: tuple[D2ExactTextBlock, ...] = ()
+    d2_policy_blocks: tuple[D2PolicyFactBlock, ...] = ()
+    d2_canonical_contact: CanonicalContactCandidate | None = None
+    d2_result_status: D2ResultStatus | None = None
     required_offer_conditions: UniqueRequiredOfferConditions = ()
     commercial_facts: UniqueCommercialFacts = ()
     promo_candidate_ids: UniquePromoCandidateIds = ()
@@ -579,6 +1064,11 @@ class PreComposerPlan(ResponsePlanModel):
     transport_kind: TransportKind = "blocking"
     service_options_block: ServiceOptionsBlock | None = None
     authored_service_alternative_block: AuthoredServiceAlternativeBlock | None = None
+    d2_commercial_owned: bool = False
+    d2_commercial_promo_blocks: tuple[ResolvedFactBlock, ...] = ()
+    d2_price_booster_block: D2CommercialPackageBlock | None = None
+    d2_also_list_block: D2CommercialPackageBlock | None = None
+    d2_compatibility_blocks: tuple[D2CompatibilityBlock, ...] = ()
 
     @model_validator(mode="after")
     def _validate_scope(self) -> Self:
@@ -604,6 +1094,9 @@ class PreComposerPlan(ResponsePlanModel):
                 raise ValueError("clinic_scope_forbids_selected_service_id")
             if self.selected_topic_id is not None:
                 raise ValueError("clinic_scope_forbids_selected_topic_id")
+        elif self.response_scope == "mixed":
+            if self.selected_service_id is not None or self.selected_topic_id is not None:
+                raise ValueError("mixed_scope_forbids_selected_refs")
         return self
 
     @model_validator(mode="after")
@@ -624,6 +1117,21 @@ class PreComposerPlan(ResponsePlanModel):
             raise ValueError("price_caps_max_amplifiers_exceeded")
         if self.service_options_block is not None and self.authored_service_alternative_block is not None:
             raise ValueError("service_options_and_authored_alternative_conflict")
+        if self.d2_price_block is not None and self.price_plan.kind != "none":
+            raise ValueError("d2_price_block_conflicts_with_legacy_price_plan")
+        _validate_d2_part_result_shape(
+            self.d2_request_parts,
+            self.d2_part_failure_blocks,
+            self.d2_part_deferred_blocks,
+            self.d2_result_status,
+            self.d2_price_block,
+            self.d2_price_detail_blocks,
+        )
+        _validate_price_detail_ui_actions(
+            actions=self.ui_candidates.price_detail_actions,
+            replies=self.ui_candidates.quick_replies,
+            price=self.d2_price_block, details=self.d2_price_detail_blocks,
+        )
         return self
 
     @property
@@ -636,6 +1144,11 @@ class ComposerResult(ResponsePlanModel):
     mode: ResponseMode = "standard"
     patient_text: str | None = None
     requested_fact_ids: UniqueRequestedFactIds = ()
+    information_blocks: tuple[InformationSourceBlock, ...] = ()
+    d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()
+    d2_part_deferred_blocks: tuple[D2PartDeferredBlock, ...] = ()
+    visible_price_block: bool = False
+    code_owned_answer: bool = False
 
     @model_validator(mode="after")
     def _validate_pair_and_invariants(self) -> Self:
@@ -643,22 +1156,29 @@ class ComposerResult(ResponsePlanModel):
         if pair not in ALLOWED_ROUTE_MODE_PAIRS:
             raise ValueError("route_mode_conflict")
         if pair == ("ANSWER", "standard"):
-            if not (self.patient_text and self.patient_text.strip()):
+            if (
+                not (self.patient_text and self.patient_text.strip())
+                and not self.information_blocks
+                and not self.d2_part_failure_blocks
+                and not self.d2_part_deferred_blocks
+                and not self.visible_price_block
+                and not self.code_owned_answer
+            ):
                 raise ValueError("answer_requires_patient_text")
         elif pair == ("ANSWER", "contacts"):
             if self.patient_text is not None:
                 raise ValueError("contacts_requires_null_patient_text")
-            if self.requested_fact_ids:
+            if self.requested_fact_ids or self.information_blocks or self.d2_part_failure_blocks or self.d2_part_deferred_blocks or self.visible_price_block:
                 raise ValueError("contacts_forbids_requested_facts")
         elif self.route == "ADMIN":
             if self.patient_text is not None:
                 raise ValueError("admin_requires_null_patient_text")
-            if self.requested_fact_ids:
+            if self.requested_fact_ids or self.information_blocks or self.d2_part_failure_blocks or self.d2_part_deferred_blocks or self.visible_price_block:
                 raise ValueError("admin_forbids_requested_facts")
         elif self.route == "CLARIFY":
             if not (self.patient_text and self.patient_text.strip()):
                 raise ValueError("clarify_requires_patient_text")
-            if self.requested_fact_ids:
+            if self.requested_fact_ids or self.information_blocks or self.d2_part_failure_blocks or self.d2_part_deferred_blocks or self.visible_price_block:
                 raise ValueError("clarify_forbids_requested_facts")
         return self
 
@@ -718,6 +1238,28 @@ class ResolvedFactBlock(ResponsePlanModel):
     source_client_id: NonBlankStr
 
 
+class D2CommercialPackageBlock(ResponsePlanModel):
+    source_client_id: NonBlankStr
+    package_id: NonBlankStr
+    name: NonBlankStr
+    body_text: NonBlankStr
+
+
+class D2CompatibilityBlock(ResponsePlanModel):
+    source_client_id: NonBlankStr
+    group_id: NonBlankStr
+    member_ids: tuple[NonBlankStr, ...]
+    explanation_text: NonBlankStr
+
+    @model_validator(mode="after")
+    def _validate_members(self) -> Self:
+        if len(self.member_ids) < 2:
+            raise ValueError("d2_compatibility_too_small")
+        if len(set(self.member_ids)) != len(self.member_ids):
+            raise ValueError("d2_compatibility_duplicate_member")
+        return self
+
+
 class ResolvedServiceValueBlock(ResponsePlanModel):
     fact_id: NonBlankStr
     display_text: NonBlankStr
@@ -735,6 +1277,8 @@ class ResolvedUiPlan(ResponsePlanModel):
     widget: UiWidgetCandidate | None = None
     video: UiVideoCandidate | None = None
     contact: CanonicalContactCandidate | None = None
+    source_content_ref: NonBlankStr | None = None
+    price_detail_actions: tuple[D2PriceDetailUiAction, ...] = ()
 
 
 class FinalizedCommercialIds(ResponsePlanModel):
@@ -765,6 +1309,12 @@ class ResponseSessionDelta(ResponsePlanModel):
 def _assert_no_commerce(plan: ResolvedResponsePlan) -> None:
     if plan.price_block is not None:
         raise ValueError("terminal_plan_forbids_price_block")
+    if plan.d2_price_block is not None:
+        raise ValueError("terminal_plan_forbids_d2_price_block")
+    if bool(plan.d2_price_detail_blocks):
+        raise ValueError("terminal_plan_forbids_d2_price_detail_blocks")
+    if plan.information_blocks:
+        raise ValueError("terminal_plan_forbids_information_blocks")
     if plan.required_offer_conditions:
         raise ValueError("terminal_plan_forbids_required_conditions")
     if plan.requested_fact_blocks:
@@ -781,6 +1331,8 @@ def _assert_no_commerce(plan: ResolvedResponsePlan) -> None:
         raise ValueError("terminal_plan_forbids_service_options")
     if plan.authored_service_alternative_block is not None:
         raise ValueError("terminal_plan_forbids_authored_alternative")
+    if plan.d2_price_booster_block is not None or plan.d2_also_list_block is not None or plan.d2_compatibility_blocks:
+        raise ValueError("terminal_plan_forbids_d2_commercial")
     finalized = plan.finalized_commercial_ids
     if any(
         (
@@ -811,11 +1363,11 @@ def _assert_no_commerce(plan: ResolvedResponsePlan) -> None:
 
 def _validate_fact_role_uniqueness(plan: ResolvedResponsePlan) -> None:
     groups = {
-        "requested": tuple(block.fact_id for block in plan.requested_fact_blocks),
+        "requested": tuple(block.fact_id for block in plan.requested_fact_blocks) + tuple(i for b in plan.d2_exact_text_blocks for i in b.requested_fact_ids),
         "service_value": (
             (plan.service_value_block.fact_id,) if plan.service_value_block is not None else ()
         ),
-        "promo": tuple(block.fact_id for block in plan.promo_blocks),
+        "promo": tuple(block.fact_id for block in plan.promo_blocks) + tuple(i for b in plan.d2_exact_text_blocks for i in b.promo_fact_ids),
         "amplifier": tuple(block.fact_id for block in plan.automatic_amplifier_blocks),
     }
     for name, ids in groups.items():
@@ -839,9 +1391,9 @@ def _finalized_shown_service_option_ids(plan: ResolvedResponsePlan) -> tuple[str
 
 def _validate_finalized_ids(plan: ResolvedResponsePlan) -> None:
     finalized = plan.finalized_commercial_ids
-    if finalized.requested_fact_ids != tuple(block.fact_id for block in plan.requested_fact_blocks):
+    if finalized.requested_fact_ids != tuple(block.fact_id for block in plan.requested_fact_blocks) + tuple(i for b in plan.d2_exact_text_blocks for i in b.requested_fact_ids):
         raise ValueError("finalized_requested_fact_ids_mismatch")
-    if finalized.promo_fact_ids != tuple(block.fact_id for block in plan.promo_blocks):
+    if finalized.promo_fact_ids != tuple(block.fact_id for block in plan.promo_blocks) + tuple(i for b in plan.d2_exact_text_blocks for i in b.promo_fact_ids):
         raise ValueError("finalized_promo_fact_ids_mismatch")
     if finalized.amplifier_fact_ids != tuple(
         block.fact_id for block in plan.automatic_amplifier_blocks
@@ -851,9 +1403,16 @@ def _validate_finalized_ids(plan: ResolvedResponsePlan) -> None:
         (plan.service_value_block.fact_id,) if plan.service_value_block is not None else ()
     ):
         raise ValueError("finalized_service_value_ids_mismatch")
-    if finalized.price_offer_ids != (
-        tuple(plan.price_block.offer_ids) if plan.price_block is not None else ()
-    ):
+    expected_price_ids = (
+        tuple(plan.price_block.offer_ids)
+        if plan.price_block is not None
+        else (
+            tuple(row.offer_id for row in plan.d2_price_block.rows)
+            if plan.d2_price_block is not None
+            else ()
+        )
+    )
+    if finalized.price_offer_ids != expected_price_ids:
         raise ValueError("finalized_price_offer_ids_mismatch")
     if finalized.required_offer_condition_ids != tuple(
         block.condition_id for block in plan.required_offer_conditions
@@ -899,6 +1458,80 @@ def _validate_session_scope(plan: ResolvedResponsePlan) -> None:
             raise ValueError("clinic_scope_forbids_active_service_id")
         if delta.active_topic_id is not None:
             raise ValueError("clinic_scope_forbids_active_topic_id")
+    elif plan.response_scope == "mixed":
+        if delta.active_service_id is not None or delta.active_topic_id is not None:
+            raise ValueError("mixed_scope_forbids_active_refs")
+
+
+def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
+    parts = plan.d2_request_parts
+    _validate_d2_part_result_shape(
+        parts,
+        plan.d2_part_failure_blocks,
+        plan.d2_part_deferred_blocks,
+        plan.d2_result_status,
+        plan.d2_price_block,
+        plan.d2_price_detail_blocks,
+    )
+    if not parts:
+        if plan.d2_price_block is not None or bool(plan.d2_price_detail_blocks) or plan.information_blocks:
+            raise ValueError("d2_request_parts_required")
+        return
+    block_ids = [block.request_id for block in plan.information_blocks]
+    if len(block_ids) != len(set(block_ids)):
+        raise ValueError("d2_request_part_content_block_duplicate")
+    content_by_request = {block.request_id: block for block in plan.information_blocks}
+    exact_by_id = {b.request_id: b for b in plan.d2_exact_text_blocks}
+    exact_parts = [p for p in parts if p.kind in {"clarification", "reference", "commercial_fact", "price_clarification", "price_reference"}
+                   and not (p.kind == "clarification" and p.status == "deferred")]
+    if len(exact_by_id) != len(plan.d2_exact_text_blocks) or {p.request_id for p in exact_parts} != set(exact_by_id):
+        raise ValueError("d2_exact_text_linkage_invalid")
+    for part in exact_parts:
+        block = exact_by_id[part.request_id]
+        if part.status != "answered":
+            raise ValueError("d2_exact_text_status_invalid")
+        if (block.requested_fact_ids or block.promo_fact_ids) and part.kind != "commercial_fact":
+            raise ValueError("d2_exact_fact_provenance_invalid")
+
+    contact_ids = [block.request_id for block in plan.d2_contact_blocks]
+    if len(contact_ids) != len(set(contact_ids)):
+        raise ValueError("d2_request_part_contact_block_duplicate")
+    contact_by_request = {block.request_id: block for block in plan.d2_contact_blocks}
+    policy_ids = [block.request_id for block in plan.d2_policy_blocks]
+    if len(policy_ids) != len(set(policy_ids)):
+        raise ValueError("d2_request_part_policy_block_duplicate")
+    policy_by_request = {block.request_id: block for block in plan.d2_policy_blocks}
+    published_content_parts = [
+        part for part in parts
+        if part.kind == "content" and part.status == "answered"
+    ]
+    if len(published_content_parts) != len(content_by_request):
+        raise ValueError("d2_request_part_content_linkage_invalid")
+    for part in published_content_parts:
+        block = content_by_request.get(part.request_id)
+        if (
+            block is None
+            or block.content_ref != part.content_ref
+            or block.source_section_refs != part.content_section_refs
+            or block.publication != part.content_publication
+            or block.snapshot_fingerprint != part.snapshot_fingerprint
+            or block.replacement_reason != part.failure_reason
+        ):
+            raise ValueError("d2_request_part_content_linkage_invalid")
+    contact_parts = [part for part in parts if part.kind == "contact"]
+    if len(contact_parts) != len(contact_by_request):
+        raise ValueError("d2_request_part_contact_linkage_invalid")
+    for part in contact_parts:
+        block = contact_by_request.get(part.request_id)
+        if block is None or block.source_client_id != plan.session_delta.session_key.client_id:
+            raise ValueError("d2_request_part_contact_linkage_invalid")
+    policy_parts = [part for part in parts if part.kind == "clinic_policy"]
+    if len(policy_parts) != len(policy_by_request):
+        raise ValueError("d2_request_part_policy_linkage_invalid")
+    for part in policy_parts:
+        block = policy_by_request.get(part.request_id)
+        if block is None or block.source_client_id != plan.session_delta.session_key.client_id:
+            raise ValueError("d2_request_part_policy_linkage_invalid")
 
 
 def _validate_terminal_state(plan: ResolvedResponsePlan) -> None:
@@ -949,6 +1582,26 @@ def _validate_resolved_client_ownership(plan: ResolvedResponsePlan) -> None:
 
     if plan.price_block is not None:
         _check(plan.price_block)
+    if plan.d2_price_block is not None:
+        _check(plan.d2_price_block)
+        for row in plan.d2_price_block.rows:
+            _check(row)
+    for detail in plan.d2_price_detail_blocks:
+        _check(detail)
+        for row in detail.rows:
+            _check(row)
+    for block in plan.d2_part_failure_blocks:
+        _check(block)
+    for block in plan.d2_part_deferred_blocks:
+        _check(block)
+    for block in (*plan.d2_contact_blocks, *plan.d2_exact_text_blocks):
+        _check(block)
+    for block in plan.d2_policy_blocks:
+        _check(block)
+    if plan.d2_canonical_contact is not None:
+        _check(plan.d2_canonical_contact)
+    for block in plan.information_blocks:
+        _check(block)
     for condition in plan.required_offer_conditions:
         _check(condition)
     for block in plan.requested_fact_blocks:
@@ -965,9 +1618,19 @@ def _validate_resolved_client_ownership(plan: ResolvedResponsePlan) -> None:
         _check(plan.service_options_block)
     if plan.authored_service_alternative_block is not None:
         _check(plan.authored_service_alternative_block)
+    if plan.d2_price_booster_block is not None:
+        _check(plan.d2_price_booster_block)
+    if plan.d2_also_list_block is not None:
+        _check(plan.d2_also_list_block)
+    for block in plan.d2_compatibility_blocks:
+        _check(block)
     ui = plan.ui_plan
     for item in ui.quick_replies:
         _check(item)
+    for action in ui.price_detail_actions:
+        _check(action)
+        if action.reply_id not in {item.reply_id for item in ui.quick_replies}:
+            raise ValueError("d2_price_detail_action_reply_missing")
     for item in ui.buttons:
         _check(item)
     if ui.widget is not None:
@@ -979,6 +1642,8 @@ def _validate_resolved_client_ownership(plan: ResolvedResponsePlan) -> None:
 
 
 class ResolvedResponsePlan(ResponsePlanModel):
+    # Presentation only; never used for routing, policy, prices or lead state.
+    attribution_kind: Literal["content", "lead", "plain"] = "plain"
     route: ResponseRoute
     mode: ResponseMode
     context_strategy: ContextStrategy
@@ -987,11 +1652,26 @@ class ResolvedResponsePlan(ResponsePlanModel):
     patient_text: str | None = None
     terminal_text: str | None = None
     price_block: ResolvedPriceBlock | None = None
+    d2_price_block: D2FrozenPriceBlock | None = None
+    d2_price_detail_blocks: tuple[D2FrozenPriceDetailBlock, ...] = ()
+    d2_price_scope_decision: D2PriceScopeDecision | None = None
+    d2_request_parts: tuple[D2ResolvedRequestPart, ...] = ()
+    d2_part_failure_blocks: tuple[D2PartFailureBlock, ...] = ()
+    d2_part_deferred_blocks: tuple[D2PartDeferredBlock, ...] = ()
+    d2_contact_blocks: tuple[D2ContactFactBlock, ...] = ()
+    d2_exact_text_blocks: tuple[D2ExactTextBlock, ...] = ()
+    d2_policy_blocks: tuple[D2PolicyFactBlock, ...] = ()
+    d2_canonical_contact: CanonicalContactCandidate | None = None
+    d2_result_status: D2ResultStatus | None = None
+    information_blocks: tuple[InformationSourceBlock, ...] = ()
     required_offer_conditions: tuple[RequiredOfferConditionBlock, ...] = ()
     requested_fact_blocks: tuple[ResolvedFactBlock, ...] = ()
     service_value_block: ResolvedServiceValueBlock | None = None
     promo_blocks: tuple[ResolvedFactBlock, ...] = ()
     automatic_amplifier_blocks: tuple[ResolvedFactBlock, ...] = ()
+    d2_price_booster_block: D2CommercialPackageBlock | None = None
+    d2_also_list_block: D2CommercialPackageBlock | None = None
+    d2_compatibility_blocks: tuple[D2CompatibilityBlock, ...] = ()
     textual_cta_block: ResolvedTextualCtaBlock | None = None
     service_options_block: ServiceOptionsBlock | None = None
     authored_service_alternative_block: AuthoredServiceAlternativeBlock | None = None
@@ -1002,7 +1682,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
 
     @property
     def is_price_answer(self) -> bool:
-        return self.price_block is not None
+        return self.price_block is not None or self.d2_price_block is not None
 
     @model_validator(mode="after")
     def _validate_consistency(self) -> Self:
@@ -1011,7 +1691,20 @@ class ResolvedResponsePlan(ResponsePlanModel):
             raise ValueError("route_mode_conflict")
 
         if pair == ("ANSWER", "standard"):
-            if not (self.patient_text and self.patient_text.strip()):
+            if (
+                not (self.patient_text and self.patient_text.strip())
+                and not self.information_blocks
+                and not self.is_price_answer
+                and not self.d2_price_detail_blocks
+                and not self.d2_part_failure_blocks
+                and not self.d2_part_deferred_blocks
+                and not self.promo_blocks
+                and not self.requested_fact_blocks
+                and self.authored_service_alternative_block is None
+                and not self.d2_contact_blocks
+                and not self.d2_policy_blocks
+                and not self.d2_exact_text_blocks
+            ):
                 raise ValueError("answer_requires_patient_text")
             if self.terminal_text is not None:
                 raise ValueError("answer_standard_forbids_terminal_text")
@@ -1034,15 +1727,17 @@ class ResolvedResponsePlan(ResponsePlanModel):
                 raise ValueError("clarify_forbids_terminal_text")
             _assert_no_commerce(self)
 
+        if self.price_block is not None and self.d2_price_block is not None:
+            raise ValueError("legacy_and_d2_price_block_conflict")
         if self.required_offer_conditions and self.price_block is None:
             raise ValueError("conditions_require_price_block")
 
-        if self.service_options_block is not None and self.price_block is not None:
+        if self.service_options_block is not None and self.is_price_answer:
             raise ValueError("service_options_forbidden_with_price_block")
         if self.authored_service_alternative_block is not None:
             if self.service_options_block is not None:
                 raise ValueError("authored_alternative_and_service_options_conflict")
-            if self.price_block is not None:
+            if self.is_price_answer:
                 raise ValueError("authored_alternative_forbidden_with_price_block")
 
         if self.required_offer_conditions:
@@ -1056,8 +1751,14 @@ class ResolvedResponsePlan(ResponsePlanModel):
         _validate_finalized_ids(self)
         _validate_session_delta_ids(self)
         _validate_session_scope(self)
+        _validate_d2_request_parts(self)
         _validate_terminal_state(self)
         _validate_resolved_client_ownership(self)
+        _validate_price_detail_ui_actions(
+            actions=self.ui_plan.price_detail_actions,
+            replies=self.ui_plan.quick_replies,
+            price=self.d2_price_block, details=self.d2_price_detail_blocks,
+        )
         return self
 
 

@@ -134,6 +134,9 @@ jobs:
             tests/test_session_tenant_binding_hardening_offline.py \
             tests/test_tenant_lead_routing_context_offline.py \
             tests/test_tenant_lead_pending_question_offline.py \
+            tests/test_d2_http_contract.py \
+            tests/test_d2_demo_limits.py \
+            tests/test_d2_situation_disabled.py \
             tests/test_pg_tenant_context_offline.py \
             tests/test_pg_tenant_write_contract_offline.py \
             tests/test_pg_schema_readiness_offline.py \
@@ -179,24 +182,27 @@ jobs:
       - name: Install dependencies
         run: pip install --require-hashes -r requirements-ci.lock
 
-      - name: Demo D1R offline regression suites
+      - name: Current D2 offline clinic policy regressions
         env:
           BASETEMP: ${{ runner.temp }}/pytest-basetemp-d1r
         run: |
           unset DASHSCOPE_API_KEY CHAT_API_KEY OPENAI_API_KEY SMTP_PASSWORD SMTP_USER BOT_PG_DSN BOT_MIGRATOR_PG_DSN BOT_TEST_PG_DSN ADMIN_DASHBOARD_TOKEN || true
           mkdir -p "$BASETEMP"
           python -m pytest -p no:cacheprovider --basetemp "$BASETEMP" --tb=short -q \
-            tests/test_request_understanding_schema_offline.py \
+            tests/test_d2_sim2_contract.py \
             tests/test_clinic_policy_resolver_offline.py \
-            tests/test_demo_d1r_http_offline.py \
-            tests/test_demo_d1r_composition_offline.py \
-            tests/test_demo_d1r_route_budget_offline.py \
-            tests/test_demo_clinic_policy_authority_offline.py \
+            tests/test_d2_demo_audit_fixes.py \
+            tests/test_d2_compound_answers.py \
+            tests/test_d2_no_legacy_path.py \
+            tests/test_d2_ci_clinic_policy.py \
             tests/test_tenant_lead_pending_question_offline.py \
             tests/test_clinic_policies_loader.py \
-            tests/test_demo_implant_volume_scope_offline.py \
+            tests/test_d2_discussion_context_http.py \
             tests/test_one_call_stage4_3_contacts_specific.py \
-            tests/test_one_call_tenant_isolation_offline.py
+            tests/test_one_call_tenant_isolation_offline.py \
+            tests/test_d2_code_answer_fixes.py \
+            tests/test_d2_lead_interrupt_http.py \
+            tests/test_d2_situation_disabled.py
 
   postgres-qualification:
     name: PostgreSQL qualification

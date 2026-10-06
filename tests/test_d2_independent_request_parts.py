@@ -1,0 +1,336 @@
+from __future__ import annotations
+
+import json
+from datetime import date
+
+import pytest
+from pydantic import ValidationError
+
+from contracts.response_plan import UiButtonCandidate, UiQuickReplyCandidate, UiVideoCandidate
+from contracts.response_plan_materialization import (
+    D2AuthoredContentAuthority,
+    D2DirectionAuthority,
+    D2PartFailureAuthority,
+    D2SourceUiAuthority,
+    MaterializationOwnershipError,
+)
+from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
+from core.one_call_envelope_protocol import parse_production_envelope_json, production_envelope_template
+from core.response_plan_materialization import resolve_d2_operations
+from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
+from tests.test_d2_multi_request import _sources
+from tests.test_target_offer_projection import _bundle
+
+
+def _envelope(requests):
+    from contracts.d2_dialogue_result import D2DialogueResult
+    return D2DialogueResult.model_validate({"outcome":"dialogue","blocks":requests})
+
+
+def _part(request_id,kind,*,service_id,topic_id,content_ref=None):
+    target={"type":"service","id":service_id} if service_id else ({"type":"topic","id":topic_id} if topic_id else None)
+    operation={"request_id":request_id,"kind":kind,"target":target}
+    if kind == "content":
+        operation.update(content_text="approved meaning",content_ref=content_ref)
+    return operation
+
+
+def _sources_ab(base=None):
+    base = base if base is not None else _sources(_bundle())
+    payload = base.model_dump()
+    payload["d2_authored_content"] = (*payload["d2_authored_content"], D2AuthoredContentAuthority(source_client_id="demo", content_ref="therapy.md", display_text="Материал терапии.", allowed_service_ids=("service_two",)).model_dump())
+    payload["d2_directions"] = (*payload["d2_directions"], D2DirectionAuthority(source_client_id="demo", topic_id="therapy", service_ids=("service_two",)).model_dump())
+    return type(base).model_validate(payload)
+
+
+def _with_scope_failure_authority(sources):
+    payload = sources.model_dump()
+    payload["d2_part_failures"] = [
+        D2PartFailureAuthority(
+            source_client_id="demo",
+            message_id="price-scope",
+            reason="d2_no_scope_price_candidates",
+            display_text="Нет подходящей опубликованной цены.",
+        ).model_dump()
+    ]
+    return type(sources).model_validate(payload)
+
+
+def test_price_and_other_service_content_remain_independent_and_mixed() -> None:
+    outcome = resolve_d2_operations((_envelope([
+        _part("r1", "price", service_id=None, topic_id="implantation"),
+        _part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"),
+    ])).blocks, _sources_ab(), as_of=date(2026, 9, 18))
+    assert outcome.resolved.response_scope == "mixed"
+    assert outcome.resolved.session_delta.active_service_id is None
+    assert [(item.request_id, item.scope) for item in outcome.resolved.d2_request_parts] == [("r1", "topic"), ("r2", "service")]
+    assert outcome.rendered_text.index("Exact package") < outcome.rendered_text.index("approved meaning")
+
+
+def test_request_order_controls_frozen_render_order() -> None:
+    outcome = resolve_d2_operations((_envelope([
+        _part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"),
+        _part("r1", "price", service_id="service_one", topic_id="implantation"),
+    ])).blocks, _sources_ab(), as_of=date(2026, 9, 18))
+    assert outcome.rendered_text.index("approved meaning") < outcome.rendered_text.index("Exact package")
+
+
+def test_two_content_services_are_mixed_and_render_each_source_once() -> None:
+    base = _sources_ab()
+    source_payload = base.model_dump()
+    source_payload["d2_authored_content"] = (*source_payload["d2_authored_content"], D2AuthoredContentAuthority(source_client_id="demo", content_ref="pain-two.md", display_text="Второй материал имплантации.", allowed_service_ids=("service_one",)).model_dump())
+    sources = type(base).model_validate(source_payload)
+    outcome = resolve_d2_operations((_envelope([
+        {**_part("r1", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"),
+         "content_text": "Ответ модели о терапии."},
+        {**_part("r2", "content", service_id="service_one", topic_id="implantation", content_ref="pain-two.md"),
+         "content_text": "Ответ модели об имплантации."},
+    ])).blocks, sources, as_of=date(2026, 9, 18))
+    assert outcome.resolved.response_scope == "mixed"
+    assert outcome.resolved.session_delta.active_service_id is None
+    assert outcome.rendered_text.count("Ответ модели о терапии.") == 1
+    assert outcome.rendered_text.count("Ответ модели об имплантации.") == 1
+    assert outcome.rendered_text.index("Ответ модели о терапии.") < outcome.rendered_text.index("Ответ модели об имплантации.")
+
+
+@pytest.mark.parametrize(
+    "request_refs",
+    [
+        ("therapy.md", "pain-two.md"),
+        ("pain-two.md", "therapy.md"),
+    ],
+)
+def test_two_content_sources_keep_order_without_source_secondary_ui(request_refs: tuple[str, str]) -> None:
+    base = _sources_ab()
+    payload = base.model_dump()
+    payload["d2_authored_content"] = [
+        *payload["d2_authored_content"],
+        D2AuthoredContentAuthority(
+            source_client_id="demo", content_ref="pain-two.md",
+            display_text="Материал имплантации.", allowed_service_ids=("service_one",),
+        ).model_dump(),
+    ]
+    payload["d2_source_ui"] = [
+        D2SourceUiAuthority(
+            source_client_id="demo", content_ref=ref,
+            quick_replies=(UiQuickReplyCandidate(source_client_id="demo", reply_id=reply, label=label),),
+            video=UiVideoCandidate(source_client_id="demo", video_id=video),
+        ).model_dump()
+        for ref, reply, label, video in (
+            ("therapy.md", "therapy_follow", "О терапии", "therapy_video"),
+            ("pain-two.md", "implant_follow", "Об имплантации", "implant_video"),
+        )
+    ]
+    sources = type(base).model_validate(payload)
+    parts_by_ref = {
+        "therapy.md": {**_part("r1", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"),
+                       "content_text": "Ответ модели о терапии."},
+        "pain-two.md": {**_part("r2", "content", service_id="service_one", topic_id="implantation", content_ref="pain-two.md"),
+                        "content_text": "Ответ модели об имплантации."},
+    }
+    outcome = resolve_d2_operations(
+        (_envelope([parts_by_ref[ref] for ref in request_refs])).blocks, sources,
+        as_of=date(2026, 9, 18),
+    )
+    texts_by_ref = {"therapy.md": "Ответ модели о терапии.", "pain-two.md": "Ответ модели об имплантации."}
+    assert [part.content_ref for part in outcome.resolved.d2_request_parts] == list(request_refs)
+    assert outcome.rendered_text.index(texts_by_ref[request_refs[0]]) < outcome.rendered_text.index(texts_by_ref[request_refs[1]])
+    assert outcome.rendered_text.count("Ответ модели о терапии.") == 1
+    assert outcome.rendered_text.count("Ответ модели об имплантации.") == 1
+    assert outcome.resolved.ui_plan.source_content_ref == request_refs[0]
+    assert outcome.ui_projection.quick_replies == ()
+    assert outcome.ui_projection.video is None
+
+
+def test_same_confirmed_service_keeps_unambiguous_focus_despite_missing_topic() -> None:
+    outcome = resolve_d2_operations((_envelope([
+        _part("r1", "price", service_id="service_one", topic_id="implantation"),
+        _part("r2", "content", service_id="service_one", topic_id=None, content_ref="pain.md"),
+    ])).blocks, _sources_ab(), as_of=date(2026, 9, 18))
+    assert outcome.resolved.response_scope == "service"
+    assert outcome.resolved.session_delta.active_service_id == "service_one"
+
+
+def test_clinic_wide_content_is_independent_beside_price() -> None:
+    base = _sources_ab()
+    payload = base.model_dump()
+    payload["d2_authored_content"] = (*payload["d2_authored_content"], D2AuthoredContentAuthority(source_client_id="demo", content_ref="warranty.md", display_text="Общая гарантия.").model_dump())
+    sources = type(base).model_validate(payload)
+    outcome = resolve_d2_operations((_envelope([
+        _part("r1", "price", service_id="service_one", topic_id="implantation"),
+        _part("r2", "content", service_id=None, topic_id=None, content_ref="warranty.md"),
+    ])).blocks, sources, as_of=date(2026, 9, 18))
+    assert outcome.resolved.response_scope == "mixed"
+    assert "approved meaning" in outcome.rendered_text
+    assert outcome.resolved.d2_request_parts[1].content_ref == "warranty.md"
+
+
+def test_missing_content_ref_keeps_model_prose_without_borrowed_source() -> None:
+    content = {
+        **_part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="missing.md"),
+        "content_realization": "model_prose",
+    }
+    outcome = resolve_d2_operations((_envelope([
+        _part("r1", "price", service_id="service_one", topic_id="implantation"),
+        content,
+    ])).blocks, _sources_ab(), as_of=date(2026, 9, 18))
+    part = outcome.resolved.d2_request_parts[1]
+    assert (part.status, part.content_ref, part.failure_reason) == ("answered", None, None)
+    assert outcome.resolved.information_blocks[0].content_ref is None
+    assert outcome.resolved.ui_plan.source_content_ref is None
+    assert "approved meaning" in outcome.rendered_text
+
+
+def test_missing_content_ref_does_not_authorize_unknown_typed_topic() -> None:
+    content = _part(
+        "r1", "content", service_id=None,
+        topic_id="not_in_this_tenant", content_ref="missing.md",
+    )
+    with pytest.raises(MaterializationOwnershipError, match="materialization_foreign_material"):
+        resolve_d2_operations(
+            (_envelope([content])).blocks, _sources_ab(), as_of=date(2026, 9, 18),
+        )
+
+
+def test_proven_foreign_content_owner_fails_closed() -> None:
+    # model_copy intentionally bypasses the outer source validator to exercise
+    # the materializer's independent tenant boundary, not a missing filename.
+    sources = _sources_ab()
+    foreign = D2AuthoredContentAuthority(
+        source_client_id="nikadent", content_ref="foreign.md",
+        display_text="Чужой материал.", allowed_service_ids=("service_two",),
+    )
+    sources = sources.model_copy(update={
+        "d2_authored_content": (*sources.d2_authored_content, foreign),
+    })
+    content = {
+        **_part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="foreign.md"),
+        "content_realization": "model_prose",
+    }
+    with pytest.raises(MaterializationOwnershipError, match="materialization_foreign_material"):
+        resolve_d2_operations((_envelope([
+            _part("r1", "price", service_id="service_one", topic_id="implantation"),
+            content,
+        ])).blocks, sources, as_of=date(2026, 9, 18))
+
+
+def test_direct_d2_path_does_not_call_legacy_materializer(monkeypatch: pytest.MonkeyPatch) -> None:
+    import core.response_plan_materialization as materialization
+    monkeypatch.setattr(materialization, "resolve_materialized_response", lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("legacy")))
+    outcome = materialization.resolve_d2_operations((_envelope([
+        _part("r1", "price", service_id="service_one", topic_id="implantation"),
+        _part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"),
+    ])).blocks, _sources_ab(), as_of=date(2026, 9, 18))
+    assert outcome.resolved.d2_price_block is not None
+
+
+def test_frozen_mixed_plan_does_not_reread_mutated_snapshot() -> None:
+    sources = _sources_ab()
+    outcome = resolve_d2_operations((_envelope([
+        _part("r1", "price", service_id="service_one", topic_id="implantation"),
+        _part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"),
+    ])).blocks, sources, as_of=date(2026, 9, 18))
+    rendered, projected = outcome.rendered_text, outcome.ui_projection
+    sources.material_authority.bundle.offers.clear()
+    from core.response_text_renderer import render_response_text
+    from core.response_ui_projection import project_response_ui
+    assert render_response_text(outcome.resolved) == rendered
+    assert project_response_ui(outcome.resolved) == projected
+
+
+def test_corrupted_frozen_content_linkage_is_rejected() -> None:
+    outcome = resolve_d2_operations((_envelope([
+        _part("r1", "price", service_id="service_one", topic_id="implantation"),
+        _part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"),
+    ])).blocks, _sources_ab(), as_of=date(2026, 9, 18))
+    payload = outcome.resolved.model_dump()
+    payload["d2_request_parts"][1]["content_ref"] = "other.md"
+    with pytest.raises(ValidationError, match="d2_request_part_content_linkage_invalid"):
+        outcome.resolved.__class__.model_validate(payload)
+
+
+def test_c4_strict_scope_remains_owned_by_price_part_with_other_content() -> None:
+    from tests.test_d2_price_scope_selection import _sources_with_scope_metadata, _volume
+
+    price = {**_part("r1", "price", service_id=None, topic_id="implantation"), "volume": _volume("few_teeth")}
+    content = _part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md")
+    outcome = resolve_d2_operations(
+        (_envelope([price, content])).blocks, _sources_ab(_sources_with_scope_metadata()), as_of=date(2026, 9, 18)
+    )
+    assert outcome.resolved.d2_price_scope_decision.applied_extent == "few_teeth"
+    assert [row.offer_id for row in outcome.resolved.d2_price_block.rows] == ["option_a_from"]
+    assert [(part.request_id, part.topic_id, part.content_ref) for part in outcome.resolved.d2_request_parts] == [
+        ("r1", "implantation", None), ("r2", "therapy", "therapy.md")
+    ]
+    assert "approved meaning" in outcome.rendered_text
+    assert "Exact package option_a_from" in outcome.rendered_text
+    assert "Exact package generic_fixed" not in outcome.rendered_text
+
+
+def test_other_direction_content_cannot_supply_missing_known_scope_price() -> None:
+    from tests.test_d2_price_scope_selection import _volume
+
+    price = {**_part("r1", "price", service_id=None, topic_id="implantation"), "volume": _volume("few_teeth")}
+    content = _part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md")
+    outcome = resolve_d2_operations(
+        (_envelope([price, content])).blocks, _with_scope_failure_authority(_sources_ab()), as_of=date(2026, 9, 18)
+    )
+    assert outcome.resolved.d2_result_status == "degraded"
+    assert outcome.resolved.d2_request_parts[0].failure_reason == "d2_no_scope_price_candidates"
+    assert "approved meaning" in outcome.rendered_text
+
+
+def test_other_direction_volume_does_not_filter_price_part() -> None:
+    from tests.test_d2_price_scope_selection import _sources_with_scope_metadata, _volume
+
+    content = {
+        **_part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"),
+        "volume": _volume("few_teeth"),
+    }
+    outcome = resolve_d2_operations(
+        (_envelope([_part("r1", "price", service_id=None, topic_id="implantation"), content])).blocks,
+        _sources_ab(_sources_with_scope_metadata()), as_of=date(2026, 9, 18),
+    )
+    assert outcome.resolved.d2_request_parts[1].discussion_scope.volume.extent == "few_teeth"
+    assert outcome.resolved.d2_price_scope_decision.applied_extent is None
+    assert "generic_fixed" in [row.offer_id for row in outcome.resolved.d2_price_block.rows]
+    assert "approved meaning" in outcome.rendered_text
+
+
+def test_price_suppresses_other_source_secondary_ui_but_keeps_volume_choices_and_cta() -> None:
+    from tests.test_d2_price_scope_selection import _sources_with_scope_metadata
+
+    base = _sources_ab(_sources_with_scope_metadata())
+    payload = base.model_dump()
+    payload["d2_source_ui"] = [
+        D2SourceUiAuthority(
+            source_client_id="demo",
+            content_ref="therapy.md",
+            quick_replies=(UiQuickReplyCandidate(source_client_id="demo", reply_id="therapy_follow", label="О терапии"),),
+            video=UiVideoCandidate(source_client_id="demo", video_id="therapy_video"),
+            cta=UiButtonCandidate(source_client_id="demo", button_id="therapy_cta", label="Записаться", action_kind="cta"),
+        ).model_dump()
+    ]
+    sources = type(base).model_validate(payload)
+    outcome = resolve_d2_operations(
+        (_envelope([
+            _part("r1", "price", service_id=None, topic_id="implantation"),
+            _part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="therapy.md"),
+        ])).blocks, sources, as_of=date(2026, 9, 18)
+    )
+    decision = outcome.resolved.d2_price_scope_decision
+    assert decision is not None
+    assert [choice.extent for choice in decision.volume_choices] == ["one_tooth", "few_teeth", "full_arch", "unknown"]
+    assert [reply.reply_id for reply in outcome.ui_projection.quick_replies] == [
+        choice.candidate.reply_id for choice in decision.volume_choices
+    ]
+    assert "therapy_follow" not in [reply.reply_id for reply in outcome.ui_projection.quick_replies]
+    assert outcome.ui_projection.video is None
+    assert [button.button_id for button in outcome.ui_projection.buttons] == ["therapy_cta"]
+    from core.response_text_renderer import render_response_text
+    from core.response_ui_projection import project_response_ui
+    frozen_text, frozen_ui = outcome.rendered_text, outcome.ui_projection
+    sources.material_authority.bundle.offers.clear()
+    assert render_response_text(outcome.resolved) == frozen_text
+    assert project_response_ui(outcome.resolved) == frozen_ui

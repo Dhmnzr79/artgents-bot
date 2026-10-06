@@ -254,6 +254,8 @@ def validate_clinic_contact_section(
     facts = parse_clinic_contact_facts_from_policies_raw({"contact": contact})
     if not facts.branches and not facts.phone_display.strip():
         errors.append(f"{prefix}: phone_display_required")
+    if not facts.branches and not (facts.address_display or "").strip():
+        errors.append(f"{prefix}: address_display_required")
     if facts.branches and not any(branch.phone_displays for branch in facts.branches):
         errors.append(f"{prefix}: branch_phone_required")
 

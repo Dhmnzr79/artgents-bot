@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contracts.d2_dialogue_result import ClarifiedOperation
+
 import hashlib
 import json
 from dataclasses import asdict
@@ -10,6 +12,7 @@ from typing import Literal, Self
 from pydantic import Field, field_validator, model_validator
 
 from contracts.response_plan import (
+    NonBlankStr,
     FrozenPriceOfferRow,
     ResponsePlanModel,
     ResponseUIProjection,
@@ -33,7 +36,7 @@ from contracts.response_plan_post_composer import (
     SituationStage,
 )
 
-SESSION_SCHEMA_VERSION = 1
+SESSION_SCHEMA_VERSION = 4
 FINGERPRINT_FORMAT_VERSION = 3
 
 ActiveServiceProvenance = Literal["explicit_current", "active_session"]
@@ -175,6 +178,7 @@ class PersistedActiveService(ResponsePlanModel):
 
 
 class PersistedActiveTopic(ResponsePlanModel):
+    discussion_request_id: NonBlankStr | None = None
     topic_id: str
     provenance: ActiveTopicProvenance
     set_at_turn: int
@@ -191,8 +195,24 @@ class PersistedActiveTopic(ResponsePlanModel):
         return self
 
 
+class D2DialogueReceiptRef(ResponsePlanModel):
+    """Request-side index into the same store's atomic completed result."""
+    request_id: NonBlankStr
+    patient_text: NonBlankStr | None = None
+    selected_ui_ref: D2SelectedUiRef | None = None
+    committed_at_turn: int
+
+    @model_validator(mode="after")
+    def _validate(self) -> Self:
+        require_strict_positive_int("committed_at_turn", self.committed_at_turn)
+        if (self.patient_text is None) == (self.selected_ui_ref is None):
+            raise ValueError("dialogue_requires_text_or_selected_ui_ref")
+        return self
+
+
 class SessionDialoguePair(ResponsePlanModel):
-    patient_text: str
+    patient_text: str | None = None
+    selected_ui_ref: D2SelectedUiRef | None = None
     assistant_text: str
     committed_at_turn: int
 
@@ -204,10 +224,25 @@ class SessionDialoguePair(ResponsePlanModel):
     @model_validator(mode="after")
     def _validate(self) -> Self:
         require_strict_non_negative_int("committed_at_turn", self.committed_at_turn)
-        if not self.patient_text or not self.patient_text.strip():
+        if (self.patient_text is None) == (self.selected_ui_ref is None):
+            raise ValueError("dialogue_requires_text_or_selected_ui_ref")
+        if self.patient_text is not None and not self.patient_text.strip():
             raise ValueError("dialogue_patient_blank")
         if not self.assistant_text or not self.assistant_text.strip():
             raise ValueError("dialogue_assistant_blank")
+        return self
+
+
+class D2SelectedUiRef(ResponsePlanModel):
+    """Server-validated UI identity retained without copying its label."""
+
+    reply_id: str
+    source_revision: int
+
+    @model_validator(mode="after")
+    def _validate(self) -> Self:
+        require_exact_nonblank_id("d2_selected_ui_reply_id", self.reply_id)
+        require_strict_positive_int("d2_selected_ui_revision", self.source_revision)
         return self
 
 
@@ -219,6 +254,7 @@ class PersistedShownCommercialIds(ResponsePlanModel):
     price_offer_ids: tuple[str, ...] = ()
     required_offer_condition_ids: tuple[str, ...] = ()
     shown_service_option_ids: tuple[str, ...] = ()
+    secondary_ref_ids: tuple[str, ...] = ()
 
     @model_validator(mode="after")
     def _validate_ids(self) -> Self:
@@ -229,6 +265,7 @@ class PersistedShownCommercialIds(ResponsePlanModel):
         _validate_unique_ids("price_offer_ids", self.price_offer_ids)
         _validate_unique_ids("required_offer_condition_ids", self.required_offer_condition_ids)
         _validate_unique_ids("shown_service_option_ids", self.shown_service_option_ids)
+        _validate_unique_ids("secondary_ref_ids", self.secondary_ref_ids)
         return self
 
 
@@ -240,19 +277,49 @@ class PersistedSituationState(ResponsePlanModel):
     stage: SituationStage
     modifiers: tuple[SituationModifier, ...]
     set_at_turn: int
+    situation_owner_id: str | None = None
+    tooth_count: int | None = None
 
     @field_validator("set_at_turn", mode="before")
     @classmethod
     def _strict_set_at_turn(cls, value: object) -> object:
         return reject_non_strict_int_input("set_at_turn", value)
 
+    @field_validator("tooth_count", mode="before")
+    @classmethod
+    def _strict_tooth_count(cls, value: object) -> object:
+        if value is None:
+            return None
+        return reject_non_strict_int_input("situation_tooth_count", value)
+
+    @field_validator("situation_owner_id", mode="before")
+    @classmethod
+    def _opaque_owner_id(cls, value: object) -> object:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("situation_owner_id_not_string")
+        return require_exact_nonblank_id("situation_owner_id", value)
+
     @model_validator(mode="after")
     def _validate(self) -> Self:
         require_strict_non_negative_int("set_at_turn", self.set_at_turn)
         require_exact_nonblank_id("situation_topic_id", self.topic_id)
+        if self.tooth_count is not None:
+            require_strict_positive_int("situation_tooth_count", self.tooth_count)
+            if self.extent == "one_tooth" and self.tooth_count != 1:
+                raise ValueError("situation_tooth_count_extent_conflict")
+            if self.extent == "few_teeth" and self.tooth_count < 2:
+                raise ValueError("situation_tooth_count_extent_conflict")
+            if self.extent == "unknown":
+                raise ValueError("situation_unknown_extent_forbids_tooth_count")
         return self
 
     def to_runtime(self) -> ResponseSituationState:
+        if self.situation_owner_id is not None or self.tooth_count is not None:
+            raise ResponsePlanSessionContractError(
+                "persisted_situation_c13_fields_not_runtime_compatible"
+            )
         return ResponseSituationState(
             session_key=self.session_key,
             topic_id=self.topic_id,
@@ -349,17 +416,19 @@ class ResponsePlanSessionState(ResponsePlanModel):
     session_key: SessionKey
     revision: int
     last_committed_turn_index: int
-    dialogue_pairs: tuple[SessionDialoguePair, ...] = ()
+    dialogue_pairs: tuple[SessionDialoguePair | D2DialogueReceiptRef, ...] = ()
     active_service: PersistedActiveService | None = None
     active_topic: PersistedActiveTopic | None = None
     situation_state: PersistedSituationState | None = None
     shown_options_snapshot: PersistedShownOptionsSnapshot | None = None
     historical_price_offers: HistoricalPriceOffersSnapshot | None = None
+    d2_shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...] = ()
     accumulated_shown_ids: PersistedShownCommercialIds = Field(
         default_factory=PersistedShownCommercialIds
     )
     terminal_state: TerminalState = "none"
     clarify_pending: bool = False
+    clarify_task: ClarifiedOperation | None = None
 
     @field_validator("schema_version", "revision", "last_committed_turn_index", mode="before")
     @classmethod
@@ -387,9 +456,33 @@ class ResponsePlanSessionState(ResponsePlanModel):
             for row in self.historical_price_offers.rows:
                 if row.source_client_id != client_id:
                     raise ValueError("historical_price_row_client_mismatch")
+        _validate_unique_ids(
+            "d2_shown_price_offer_id",
+            tuple(item.offer_id for item in self.d2_shown_price_offer_refs),
+        )
+        for item in self.d2_shown_price_offer_refs:
+            if item.source_client_id != self.session_key.client_id:
+                raise ValueError("d2_shown_price_offer_client_mismatch")
         for pair in self.dialogue_pairs:
             if pair.committed_at_turn > self.last_committed_turn_index:
                 raise ValueError("dialogue_pair_future_turn")
+        if self.clarify_task is not None and not self.clarify_pending:
+            raise ValueError("clarify_task_requires_pending")
+        return self
+
+
+class D2ShownPriceOfferRef(ResponsePlanModel):
+    """One verified D2 price variant, deliberately without display price text."""
+
+    source_client_id: str
+    offer_id: str
+    service_id: str
+
+    @model_validator(mode="after")
+    def _validate(self) -> Self:
+        require_exact_nonblank_id("d2_price_offer_client_id", self.source_client_id)
+        require_exact_nonblank_id("d2_price_offer_id", self.offer_id)
+        require_exact_nonblank_id("d2_price_offer_service_id", self.service_id)
         return self
 
 

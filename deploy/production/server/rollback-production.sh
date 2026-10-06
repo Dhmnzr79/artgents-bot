@@ -4,6 +4,7 @@ set -Eeuo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 readonly IMAGE_REPO=ghcr.io/dhmnzr79/artgents-bot
+export IMAGE_REPO
 readonly CURRENT_ROOT=/opt/artgents/current
 readonly RELEASES_ROOT="${CURRENT_ROOT}/releases"
 readonly ENV_FILE=/etc/artgents/production.env
@@ -335,7 +336,7 @@ load_receipt_fields() {
   local parsed line key value
   local parsed_source_sha="" parsed_image_digest="" parsed_migration_fingerprint=""
   if ! parsed=$(
-    RECEIPT_PATH="$path" IMAGE_REPO="$IMAGE_REPO" python3 <<'PY'
+    RECEIPT_PATH="$path" python3 <<'PY'
 import json, os, re, sys
 from pathlib import Path
 path = Path(os.environ["RECEIPT_PATH"])

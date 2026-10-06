@@ -346,3 +346,14 @@ def test_rollback_workflow_file_exists() -> None:
     assert _ROLLBACK_WORKFLOW.is_file()
     assert _ROLLBACK_SCRIPT.is_file()
     assert _FINGERPRINT_PY.is_file()
+
+
+@pytest.mark.parametrize("script", [_DEPLOY_SCRIPT, _ROLLBACK_SCRIPT], ids=["deploy", "rollback"])
+def test_readonly_image_repo_exported_without_inline_reassignment(script: Path) -> None:
+    text = _text(script)
+    declaration = f"readonly IMAGE_REPO={_IMAGE_REPO}"
+    assert declaration in text
+    assert re.search(r"^export IMAGE_REPO$", text, re.MULTILINE)
+    assert text.index(declaration) < text.index("export IMAGE_REPO") < text.index("python3")
+    assignments = re.findall(r"^.*\bIMAGE_REPO=.*$", text, re.MULTILINE)
+    assert assignments == [declaration]

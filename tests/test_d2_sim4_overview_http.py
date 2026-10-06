@@ -8,7 +8,6 @@ from core.d2_dialogue_store import D2DialogueStore
 from tests.test_d2_http_contract import FakeProvider, http_env, post, post_sse
 from tests.test_d2_document_click_task_http import _body
 from tests.test_d2_sim2_dialogues import raw, price, explanation
-from tests.test_d2_continuation_scenarios import _situation
 
 
 METHODS = {
@@ -25,7 +24,7 @@ def test_direction_uses_only_configured_methods_and_preserves_units(http_env, tr
     client, db, use, _ = http_env
     kwargs = {"brand_id": brand}
     if extent:
-        kwargs["situation"] = _situation(commitment="hypothetical", extent=extent,
+        kwargs["volume"] = dict(extent=extent, jaw="unknown",
             tooth_count=1 if extent == "one_tooth" else None)
     fake = use(FakeProvider(raw(price(**kwargs))))
     send = post if transport == "json" else post_sse
@@ -56,8 +55,8 @@ def test_direction_uses_only_configured_methods_and_preserves_units(http_env, tr
             if extent != "full_arch":
                 assert "одного зуба" in body["answer"]
             if extent == "few_teeth":
-                assert "ориентир за один зуб" in body["answer"]
-        assert store.read(SessionKey(client_id="demo", sid="sim4")).state.situation_state is None
+                assert "стоимость за один зуб" in body["answer"]
+        assert "situation_state" not in store.read(SessionKey(client_id="demo", sid="sim4")).state.model_dump()
     assert _body(send(client, **args), transport) == body
     assert len(fake.inputs) == 1
 
@@ -79,7 +78,7 @@ def test_click_changes_method_overview_without_model_and_followup_keeps_extent(h
     assert "86 500" in clicked["answer"].replace("\u00a0", " ")
     fake.raw = raw(explanation("Сроки зависят от плана лечения."))
     assert send(client, request_id="next", q="А сколько времени займёт?").status_code == 200
-    assert fake.inputs[-1].context.ordinary.discussion_scope.extent == "one_tooth"
+    assert fake.inputs[-1].context.ordinary.discussion_scope.volume.extent == "one_tooth"
 
 
 @pytest.mark.parametrize("service,expected_count", [("classic", 3), ("all_on_4", 3),
@@ -107,7 +106,7 @@ def test_fourth_catalog_offer_is_visible_only_for_exact_service(http_env):
         rows = store.read_latest_completion(SessionKey(client_id="demo", sid="cp6a")).response.resolved.d2_price_block.rows
         assert len(rows) == 4
         assert "classic.one_tooth.extra" in {r.offer_id for r in rows}
-    fake.raw = raw(price(situation=_situation(commitment="hypothetical")))
+    fake.raw = raw(price(volume=dict(extent="one_tooth", tooth_count=1, jaw="unknown")))
     assert post(client, request_id="overview", q="А имплантация одного зуба вообще?").status_code == 200
     with D2DialogueStore(db) as store:
         rows = store.read_latest_completion(SessionKey(client_id="demo", sid="cp6a")).response.resolved.d2_price_block.rows

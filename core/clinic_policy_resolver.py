@@ -76,6 +76,8 @@ def resolve_clinic_policy_operations(*, client_id, operations, request_ages=None
                     )
                     continue
                 answered = True
+                if policy_key == "no_pediatric_dentistry" and req.context != "past_history":
+                    suppress_booking = True
                 decisions.append(
                     ClinicPolicyRequestDecision(
                         request_id=req.request_id,

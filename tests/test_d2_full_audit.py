@@ -81,7 +81,7 @@ def test_json_and_sse_capture_exact_frozen_answer_provider_and_wire(http_env, mo
 
     monkeypatch.setattr(
         "core.d2_http_adapter.D2HttpProvider",
-        lambda: D2HttpProvider(model="offline-model", transport=transport),
+        lambda **kwargs: D2HttpProvider(model="offline-model", transport=transport, **kwargs),
     )
     first = post(client, sid="audit-json", request_id="json", q="Как делают анестезию?")
     assert first.status_code == 200

@@ -16,6 +16,7 @@ from pg_sink import init_pg_sink
 from config import DEBUG_TOKEN, PORT
 from core.client_host import resolve_request_client_id
 from core.d2_http_adapter import run_d2_ask_json
+from core.d2_demo_limits import D2DemoLimitReached
 from core import d2_diagnostics as diagnostics
 from core.d2_full_audit import full_audit, full_audit_enabled, full_audit_exception
 from core.d2_dialogue_store import D2RequestIdConflict, D2RequestInProgress
@@ -254,7 +255,7 @@ def ask():
         if blocked:
             full_audit("http_result", route="/ask", status="origin_blocked")
             return blocked
-        result = run_d2_ask_json(data, client_id=client_id)
+        result = run_d2_ask_json(data, client_id=client_id, peer_ip=request.remote_addr)
         request.ctx["sid"] = result["sid"]
         request.ctx["session_id"] = result["sid"]
         request.ctx["client_id"] = client_id
@@ -262,6 +263,10 @@ def ask():
         diagnostics.stage("transport")
         full_audit("http_result", route="/ask", status=200, payload=result)
         return safe_jsonify(result)
+    except D2DemoLimitReached as exc:
+        diagnostics.failure(exc)
+        log_json(logger, "demo_model_limit", reason=exc.code)
+        return safe_jsonify({"error": exc.code}), 429
     except D2RequestIdConflict as exc:
         diagnostics.failure(exc)
         full_audit_exception("/ask", exc)
@@ -319,6 +324,7 @@ def ask_stream():
         full_audit("http_result", route="/ask/stream", status="origin_blocked")
         return blocked
 
+    peer_ip = request.remote_addr
     # The generator holds only captured values, never Flask's request context.
     # Closing before the first status leaves the D2 store untouched; closing
     # during the synchronous turn allows its atomic completion to finish.
@@ -329,7 +335,11 @@ def ask_stream():
             diagnostics.stage("transport")
             yield _sse_status_line(_SSE_INITIAL_STATUS_PHRASE)
             try:
-                out = run_d2_ask_json(data, client_id=client_id)
+                out = run_d2_ask_json(data, client_id=client_id, peer_ip=peer_ip)
+            except D2DemoLimitReached as exc:
+                diagnostics.failure(exc)
+                log_json(logger, "demo_model_limit", reason=exc.code)
+                error = exc.code
             except D2RequestIdConflict as exc:
                 diagnostics.failure(exc)
                 full_audit_exception("/ask/stream", exc)

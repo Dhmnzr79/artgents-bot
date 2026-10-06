@@ -70,7 +70,7 @@ def test_success_error_and_typed_lead_action_never_call_legacy(http_env):
 def test_json_route_dependency_is_direct_d2_adapter():
     import app
     source = inspect.getsource(app.ask)
-    assert "run_d2_ask_json(data, client_id=client_id)" in source
+    assert "run_d2_ask_json(data, client_id=client_id, peer_ip=request.remote_addr)" in source
     for old in ("_orchestrate_ask_turn", "_dispatch_orchestration_json",
                 "_service_reply", "finalize_ask", "mem_get"):
         assert old not in source
@@ -94,7 +94,7 @@ def test_sse_success_error_and_lead_action_never_call_legacy(http_env):
 def test_sse_route_dependency_is_direct_d2_adapter():
     import app
     source = inspect.getsource(app.ask_stream)
-    assert "run_d2_ask_json(data, client_id=client_id)" in source
+    assert "run_d2_ask_json(data, client_id=client_id, peer_ip=peer_ip)" in source
     for old in ("_orchestrate_ask_turn", "_stream_ask_turn_response",
                 "_dispatch_orchestration_sse", "finalize_ask", "mem_get"):
         assert old not in source

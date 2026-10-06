@@ -1445,3 +1445,326 @@ Independent DOC focused recheck: PASS; stale header исправлен, P0/P1 н
 109 локальных ссылок существуют; Target §3 не изменён; diff --check чист.
 Runtime/provider проверки повторно не запускались, ранее записанные ограничения
 и результаты §10.7–12 сохраняются. Публикация остаётся scoped checkpoint.
+
+## 14. Защита публичного demo и явная новая беседа — 2026-10-06
+
+Техническое дополнение allowlist: `tests/test_d2_diagnostics.py` и
+`tests/test_d2_no_legacy_path.py`. Передача admission/peer_ip требует обновить
+test constructor и два точных source assertions; прежние проверки диагностики
+и запрета legacy остаются. Продуктовый scope не расширяется.
+
+Owner GO: реализовать три обсуждённых пункта, затем остановиться с отчётом
+для Cursor. Лимит выбран владельцем: 200 модельных попыток за 24 часа;
+10 на SID; существующая IP-настройка 40/60 секунд. Запись оставить demo_stub.
+Визуальные изменения и финальная проверка диалогов — следующие отдельные шаги.
+Тип: технические bug fixes/защита расходов, не архитектурное упрощение.
+§3, понимание вопроса, цены, UI authenticity, medical и lead/privacy сохраняются.
+
+Root/Git top C:/Cursor Projects/artgents-bot-active, ветка codex/d2-stage1-contract.
+HEAD 4d4b0276d83208f2043f31f6af31be35b4d496ae; main/merge-base
+141ce91fb1731cd990fcf8391550150016c73e7f. Baseline — текущий HEAD плюс
+5-file SIM-4 acceptance WIP; затрагиваемые старые файлы сохранены в
+%TEMP%/d2-demo-limits-baseline-0qudrdhf. Staging пуст.
+Foreign data/ и SIM0 не читать/не менять. SIM4 WIP сохранить.
+
+Exact allowlist:
+- app.py;
+- core/d2_http_adapter.py;
+- core/d2_live_provider.py;
+- core/d2_demo_limits.py (новый);
+- static/widget/api.js;
+- static/widget/widget.js;
+- tests/test_d2_http_contract.py (factory принимает optional admission);
+- tests/test_d2_diagnostics.py (factory передаёт admission);
+- tests/test_d2_no_legacy_path.py (точные вызовы adapter с peer_ip);
+- tests/test_d2_demo_limits.py (новый);
+- tests/js/d2_error_copy.mjs;
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md;
+- docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md;
+- docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md.
+
+Astra: одна техническая таблица в существующем SQLite demo, атомарная проверка
+всех квот перед transport, commit до network. Считаются допущенные попытки,
+включая ошибки provider; повтор готового ответа и клики без модели не считаются.
+Квоты не добавляются в dialogue schema/контекст/receipt. HTTP429 или SSE error,
+без успешного completion; существующий rollback сохраняет lead и освобождает
+reservation. Другие tenant не подключаются к quota callback.
+
+IP берётся из захваченного remote_addr до SSE; forwarded header не считается
+доверенным. За прокси это может быть один адрес для нескольких посетителей:
+проверить trusted proxy настройку отдельно до публикации; не называть это
+доказанной идентификацией публичного IP. Дневной предел скользящий за24часа,
+IP окно скользящее, SID лимит сохраняется при рестарте процесса.
+Предел общий для процессов с одним SQLite-файлом demo; раздельные копии БД
+не образуют общий счётчик. Это ограничение числа попыток, не точной суммы/токенов.
+
+После ошибки demo показывает кнопку, вызывающую существующий resetSession
+только по клику. Старые server rows/заявка не удаляются и не восстанавливаются.
+Лимит IP/суток новым SID не сбрасывается. Это новый разговор, не отмена заявки.
+Демо dispatcher/lead text/доставка остаются прежними по прямому указанию владельца.
+
+Проверки одним адресным offline checkpoint: admission реального HTTP provider
+со stub transport, JSON/SSE,11-я попытка, daily/IP, replay/free clicks, ошибки,
+другой tenant, persisted counters и конкурентный остаток квоты. JS error copy
+без автоповтора. Browser/live не запускать без бюджета. Один независимый Checker.
+Commit/push/merge/deploy не входят. После отчёта — Cursor; затем визуал,
+затем финальный checklist/public demo проверка.
+
+### 14.1. Результат реализации и offline evidence
+
+Добавлены одна техническая таблица attempts и admission callback непосредственно
+перед transport существующего D2HttpProvider. В HTTP/SSE добавлена передача peer
+и публикация quota error; в клиенте — понятный текст и ручная «Новая беседа».
+Удалённых semantic dependencies нет: это bug fix/техническая защита, не SIM.
+Новые классификаторы, model calls, dialogue поля, patient memory, auto recovery
+не добавлены. Demo lead dispatcher, receipt и тексты не менялись.
+
+Executor: 48 PASS/94.94s (9 quota + D2-119/120 и lead cancel), artifacts
+%TEMP%/d2-interface-offline-__2jjas8/results.xml. Дополнительные 3 quota cases
+PASS/8.43s, ssjhdaw9: истечение rolling daily/IP; named lead при quota denial
+сохраняется целиком, новый SID не наследует имя. Всего 51 PASS в этих наборах.
+JS d2_error_copy: PASS (JSON/SSE, no retry, сохранение прежнего UI).
+
+Diagnostics/direct-D2 compatibility: 28 PASS/11 FAIL/46.36s, mh00wnny.
+Чистый exported HEAD 4d4b027: те же 28 PASS/11 FAIL/49.36s, gqhn37bi,
+baseline root %TEMP%/d2-demo-clean-baseline-fb1swnao. Failures по тем же IDs:
+старые fixtures/parse и request_understanding; не исправляются этим scope.
+Проверки не ослаблялись; весь CI зелёным не объявляется.
+
+Реальный browser/new-chat click и live качество не проверены; модельный transport
+во всех прогонах offline stub, network blocked. Calls provider/live/SMTP:0.
+Старый SID и server lead rows не удаляются; новый разговор начинается только
+по клику и не сбрасывает daily/IP. Прежний разговор можно продолжить, если его
+schema совместима и квоты допускают новый модельный вызов. Несовместимая schema
+остаётся ошибкой прежнего валидатора; новый recovery/migration не вводится.
+
+Branch/HEAD прежние; staging пуст; commit/push/PR/merge/deploy нет.
+5-file SIM4 WIP, foreign data/ и SIM0 сохранены. Independent Checker: PASS,
+P0/P1 нет. Независимые 12 уникальных cases PASS:9/16.74s (9m01b_zr) и
+3/7.68s (vd1cfm2e); JS PASS. Checker сверил XML: те же 11 baseline failure IDs.
+Фактический admission/rollback/manual reset и границы §3 подтверждены чтением
+call path. Реальный DOM click/live widget не аттестованы. Результаты executor
+и Checker не суммируются. Node syntax и diff --check чистые.
+Cursor review: PASS, P0/P1 нет. Независимый прогон12 PASS/21.42s,
+%TEMP%/d2-interface-offline-jkbkakgi; JS PASS; provider/live/SMTP:0.
+Снимок baseline Cursor прочитать не смог; SIM4 WIP отделён по diff, не побайтово.
+P2: tests/test_d2_full_audit.py factory не принимала новый admission keyword.
+Для focused исправления объявлено расширение allowlist ровно этим test файлом,
+Interface Task и Ledger; baseline/ветка прежние, runtime не меняется.
+Factory передаёт kwargs в реальный D2HttpProvider, не обходит admission.
+Focused full-audit прогон:12 PASS/10 FAIL/14.96s (accrzrk9); чистый HEAD:
+12 PASS/те же10 FAIL/16.07s (624a6mm5). Ошибка constructor исправлена,
+прежние ошибки fixtures/assertions остаются; full-audit PASS не заявляется.
+Проверки/fixtures не ослаблялись, live/provider/SMTP:0, commit/push нет.
+Далее визуал и финальная widget приёмка — отдельные шаги.
+
+## 15. Итоговый demo audit: policy CTA и brand details — 2026-10-06
+
+Owner GO после read-only Astra: исправить запрет записи после детского отказа
+и передачу brand в существующий подбор деталей, затем Cursor и widget.
+Тип: два bug fixes, не архитектурное упрощение. Sole owners — Target§3:
+clinic_policy_resolver решает разрешение записи, price owner выбирает offers.
+Read-only аудит нашёл статически достижимые P1/P2, новые live случаи не заявлялись.
+Medical UI во время lead pause, «Позвонить», hard-crash recovery, визуал,
+админка/KB cleanup/SIM5/общий REC5 не входят в реализацию этого checkpoint.
+
+Root/Git C:/Cursor Projects/artgents-bot-active; codex/d2-stage1-contract,
+HEAD4d4b0276d83208f2043f31f6af31be35b4d496ae, main/mergebase141ce91fb1731cd990fcf8391550150016c73e7f.
+Baseline текущий WIP§14 и SIM4 плюс HEAD. Staging пуст. Foreign data/ и SIM0
+не читать/менять; остальные изменения сохранять. Snapshot трёх runtime файлов:
+%TEMP%/d2-demo-audit-fix-baseline-20261006.
+Exact allowlist: core/d2_dialogue.py, core/response_plan_materialization.py,
+core/clinic_policy_resolver.py, tests/test_d2_demo_audit_fixes.py (новый),
+этот Interface Task, DEMO_D2_DELIVERY_ROADMAP.md, DEMO_D2_CHECKPOINT_LEDGER.md.
+Необходимое техническое расширение allowlist: contracts/response_plan.py,
+только существующий whitelist failure_reason price_detail. Пустой выбор после
+brand filter должен публиковать согласованный gap; существующие d2_no_price_candidates
+и d2_no_scope_price_candidates разрешаются без новых полей/состояний/schema version.
+
+Policy: существующий suppress_forbidden_booking_cta не теряется между policy
+owner и final UI; он передаётся локальным аргументом функции, не новым полем
+model/state/schema/wire. Source/directory/global и textual CTA подчиняются
+одному готовому запрету до final render/freeze. Для применённого детского отказа
+PolicyOperation тот же resolver выставляет тот же флаг; отсутствие ОМС само
+по себе не запрещает взрослую платную консультацию. Возраст/subject classifier
+не добавляется; медицинские и lead/privacy правила не заменяются.
+
+Details: существующий _d2_price_block получает brand/известный extent. Новый
+явный параметр не теряется из-за старых shown refs. Selected action сохраняет
+точный показанный набор без модели; противоречащие offer ID/ordinal не подменяют
+вариант. Отсутствие подходящих offers публикует явный пробел в существующем
+failure block, не заимствует другой бренд и не добавляет model call/retry.
+
+Offline: JSON/SSE полный refusal→UI→forged click→adult continuation; replay,
+child policy/mixed, adult ОМС CTA, fresh Nobel detail/смена бренда после цены,
+детали без бренда и verified click, gap и conflicting selector; saved offers
+и следующий input. Один независимый focused Checker, затем Cursor.
+Live/provider/SMTP, commit/push/merge/deploy не разрешены; runtime/tests verdict
+до фактических результатов не объявляется.
+
+### 15.1. Результат и доказательства
+
+Устранены потеря computed запрета CTA и потеря brand/extent при прямом detail.
+Добавлены только локальная передача существующего policy флага, разрешение
+existing price-gap reasons для detail unavailable и адресные dialogue tests.
+Selected UI action остаётся owner показанного набора; обычный brand request
+использует canonical brand ID из каталога (Nobel = nobel_biocare).
+Новые функции-классификаторы, поля model/state/wire, patient память, model calls
+и retry не добавлены. История/completion/replay и server lead сохранены.
+
+Красное воспроизведение двух исходных дефектов на чистом HEAD:
+2 FAIL/4.39s, %TEMP%/d2-interface-offline-b6d1gj8u/results.xml. Новый detail
+возвращал3бренда; child refusal имел default_consult CTA. Исходный fake output
+имел правильные age/brand; проблема исполнения, не промпта или live provider.
+Первый прогон новых fixtures ошибочно использовал alias nobel вместо canonical
+nobel_biocare; исправлены tests. Temporary pack для отсутствующих данных
+остаётся валидным; реальный pack не меняется.
+
+Executor coherent checkpoint:60 PASS/105.84s,8717warnings,
+%TEMP%/d2-interface-offline-dic2tpmj/results.xml (20 new +D2-119/120+policy).
+После запуска уточнён forged-click ref до фактического button:default_consult;
+runtime не менялся, окончательную версию новых20cases проверяет Checker.
+Staging пуст; branch/HEAD прежние; previous WIP и foreigndata/SIM0 сохранены.
+Полный CI и старые diagnostics/full-audit debt не закрываются. Live/widget
+качество не проверено; provider/live/SMTP/network0. Commit/push/merge/deploy нет.
+Дополнительно extent applicability:2 PASS/4.26s e5u9ev54/results.xml,
+full_arch Nobel и one_tooth без подходящего offer. Новых cases теперь22.
+Independent Checker:PASS bug-fix§15, P0/P1 нет. Независимые22 уникальных cases:
+20 PASS/43.32s o2bhrwwj +2 PASS/4.03s r6etvt5b. Focused6child cases с фактическим
+default_consult ref:PASS/14.99s ahi2taso, повтор не прибавляется к уникальным.
+Проверены owners/call path, сохранение adult/ОМС CTA, brand/extent/gap,
+strict selector и frozen click/replay без provider. Cursor и owner widget
+acceptance остаются; PASS относится только к bug fixes, не закрывает весь REC5.
+
+## 16. Передача явно заданных параметров моделью — 2026-10-06
+
+Owner GO после live/widget наблюдения: уточнить существующий D2 prompt одним
+общим правилом и нейтральным структурным примером detail с брендом. Только
+prompt bug fix, не архитектурное упрощение. Target§3: понимание реплики остаётся
+у единственного existing model call; сервер выполняет полученные параметры.
+§15 Cursor PASS22/43.68s shf_m7eo подтверждает исполнение правильного payload,
+не надёжность извлечения бренда живой моделью. Последние widget trace8219c3a/
+e009f213: свежий Nobel вопрос, price_detail безbrand_id, сервер показал3offers.
+Raw модельного понимания нельзя исправлять серверным поиском слов/вторым вызовом.
+
+Root/Git C:/Cursor Projects/artgents-bot-active, codex/d2-stage1-contract,
+HEAD4d4b0276d83208f2043f31f6af31be35b4d496ae; main/mergebase141ce91fb1731cd990fcf8391550150016c73e7f.
+BaselineHEAD плюс прежние SIM4/§14/§15 WIP. Staging пуст; всё вне allowlist
+сохранить, foreigndata/иSIM0 не читать/менять.
+Exact allowlist: core/one_call_prompt_contract.py, этот Interface Task,
+DEMO_D2_DELIVERY_ROADMAP.md, DEMO_D2_CHECKPOINT_LEDGER.md.
+После finding Checker allowlist адресно расширен tests/test_d2_sim2_contract.py:
+существующий helper ожидал пять примеров; обновлены количество/индексы и
+placeholder-подстановка шестого примера, сохранены прежние проверки parser.
+
+Заменить общее brand правило формулировкой обязательного сохранения явно
+заданного ограничения услуги в существующих typed fields price/detail/content.
+Это применяется к составу, этапам, свежему вопросу и продолжению всех tenant.
+Один пример с placeholders service/brand, без Nobel/All-on-4/особой фразы.
+Сохраняются unknownbrandlowercase и отсутствие параметра, если его не задали;
+упоминание бренда при сравнении не превращается в выбор. Контекст применяется
+только для ясного продолжения; явный новый бренд заменяет предыдущий, не
+переносится в несвязанную услугу. Schema/required/null, provider settings,
+серверные handlers/memory и число вызовов не меняются. Prompt version39.
+
+Offline проверить достижение current instructions в production prompt и
+соседние clarification/known-action/admin cases. Не писать mirror-тест текста.
+Независимый scoped Checker, затем live owner widget: fresh brand, состав,
+смена бренда, переформулировки, без бренда и другая услуга. Offline PASS не
+закрывает brand extraction; provider calls агента0, новый live-budget не дан.
+Commit/push/merge/deploy и прочие SIM stages не входят.
+
+Executor §16: 18 PASS /41.19s, y9vm5dbg/results.xml, изолированный offline
+runner с заблокированной сетью. Clarification module, current document click
+и admin clinic-contact node покрыли сборку production prompt и соседние пути.
+Новый mirror-тест не добавлен. Live извлечение параметров не аттестовано.
+Checker воспроизвёл новую несовместимость helper: current FAIL6==5 /2.16s
+ocirb69c, clean HEAD тот же node PASS /2.80s ef4u5p3m. После исправления
+executor targeted conformance/repair: 7 PASS /4.67s, 9wcu020b/results.xml.
+Independent Checker: PASS prompt bug fix v39 после focused recheck;
+P1 helper закрыт. Независимые 7 PASS /4.69s, 378a272v/results.xml.
+Production ordinary prompt содержит v39/BRAND_CATALOG; known-task прежний.
+P0/P1 нет; live extraction не аттестована. Owner передал Cursor PASS §16:
+47 PASS/1 baseline FAIL, 15.67s, 8eyvfyjb (extent menu copy вне §16).
+Затем owner сообщил по widget «вроде всё окей»; это наблюдение владельца,
+не новый анализ raw trace и не независимая live аттестация.
+
+## 17. Редактура кодовых цен, состава и этапов оплаты — 2026-10-06
+
+Owner GO на таблицу формулировок в чате. Bug fix представления, не
+архитектурное упрощение. Target §3: модель понимает запрос; price owner
+выбирает и замораживает факты; renderer меняет только оформление.
+Baseline: C:/Cursor Projects/artgents-bot-active, codex/d2-stage1-contract,
+HEAD4d4b0276d83208f2043f31f6af31be35b4d496ae, origin/main/merge-base
+141ce91fb1731cd990fcf8391550150016c73e7f плюс прежний SIM4/§14–16 WIP.
+Staging пуст; foreign data/ и SIM0 не читать/менять.
+
+Exact allowlist:
+- core/response_text_renderer.py
+- core/response_plan_materialization.py
+- core/d2_snapshot_sources.py
+- clients/demo/target_response/d2_direction_prices.json (только introduction_text)
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md
+- docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md
+- docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md
+- tests/test_d2_price_copy.py (проверка фактов и объединения, не mirror-копия кода)
+- tests/test_d2_clarification_scope_http.py
+- tests/test_d2_af1a_price_task_http.py
+- tests/test_d2_discussion_context_http.py
+- tests/test_d2_price_guidance_http.py
+- tests/test_d2_sim4_overview_http.py
+- tests/test_d2_snapshot_sources.py
+- tests/test_d2_price_details_http.py
+- tests/test_d2_rec4_price_ui_http.py
+- tests/test_d2_demo_audit_fixes.py (только expectations изменённого detail gap)
+
+Один заголовок варианта/услуги; естественные подписи общего состава и
+различий; исключения означают «не входят в стоимость», не автоматически
+«оплачиваются отдельно». Этапы и условия сохраняют исходные сроки, суммы,
+порядок и текст данных, меняются только разделители/служебные фразы.
+Fixed/from/range/no_public_price, offers, UI IDs/labels, CTA, lead/privacy,
+medical policy, replay и next-turn projection не меняются. Нет смыслового
+удаления условий, новой памяти, классификатора или model call.
+Вводные demo сокращаются с сохранением зависимости цены от объёма/протокола,
+разного состава/способов и уточнения подходящего варианта на консультации.
+Сам состав, специальные условия и authored no_public_price не переписывать.
+Пропорциональный offline набор + один scoped Checker. Live/provider/SMTP0;
+commit/push/merge/deploy и закрытие SIM4/5/REC5 не входят.
+
+Результат §17: убраны повторные заголовки и разделители «;» в price/detail
+подаче. Общий/частично общий состав и разные exclusions остаются различимы.
+Добавлены только редакторские подписи и 16 адресных presentation cases
+(8 formatter invariants, 4 price modes, 4 JSON/SSE click/replay).
+Новых model calls/полей schema/state/решений о цене нет; UI labels и refs прежние.
+Executor: 82 PASS/5 FAIL, 135.85s moz7_83i/results.xml; затем новые 4 mode
+cases PASS/1.83s st61nm01/results.xml. Пять FAIL старого test_d2_price_modes
+на clean HEAD те же: 5 FAIL/2.43s y_x040ua, content_realization extra_forbidden
+до materializer/renderer. Этот старый fixture не мигрировался и не скрывался.
+Independent Checker: 12 PASS/8.92s 99_z7tq9, focused4 PASS/1.61s t12_sog9;
+повторы не суммировать. Own baseline/current XML mode failures совпали.
+Финальный Independent Checker PASS §17, P0/P1 нет. Прочитаны финальные
+документы и все 17 файлов allowlist; старый completion replay возвращает
+сохранённый текст, не переоформляет receipt. diff --check чист;
+provider/live/SMTP0; staging пуст, commit/push/merge/deploy нет.
+Foreign data/SIM0 и прежний WIP сохранены; widget/Cursor §17 pending.
+
+### Owner widget findings и публикация checkpoint — 2026-10-06
+
+Owner показал три price-overview ответа. Widget §17 НЕ принят: сервер
+создаёт indented продолжения price list, а widget answer_format.js выводит
+их отдельными p. В removable_dentures повторяется один смысл из package.label
+и required_conditions_metadata с разным регистром/точкой; exact dedup не
+объединяет их. Это presentation defect последней правки плюс прежний authored
+дубль, не ошибка модельной прозы. Общие вводные/unknown extent тоже требуют
+редакторской приёмки. Данные и UI сейчас не исправлялись.
+
+Owner GO: commit/push накопленного checkpoint SIM4/§14–17. Сохранить факты
+offline/Checker PASS отдельно от отрицательной widget приёмки. Состав:
+все уже изменённые tracked файлы этих работ плюс core/d2_demo_limits.py,
+tests/test_d2_demo_limits.py, tests/test_d2_demo_audit_fixes.py,
+tests/test_d2_price_copy.py. Exact staged names проверить до commit; foreign
+data/ и SIM0 исключены. Дополнительный allowlist документации этой фиксации:
+этот Task, Roadmap, Ledger, Current Status. Нового runtime здесь нет.
+Merge/deploy, исправление widget defects и live experiment не разрешены этим GO.
+Обсуждён следующий отдельный тест готовых frozen structured facts моделью;
+скрипт/модель/call budget ещё не выбраны и тест не запускался.

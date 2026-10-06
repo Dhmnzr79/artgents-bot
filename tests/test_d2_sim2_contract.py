@@ -94,24 +94,29 @@ def prompt_example(index):
     from core.d2_live_provider import build_d2_d1r_messages
     system, _ = build_d2_d1r_messages(_request())
     examples = re.findall(r"```json\s*(.*?)\s*```", system["content"], re.DOTALL)
-    assert len(examples) == 5
+    assert len(examples) == 6
     text = examples[index].replace("<topic_id>", "implantation")
     text = text.replace("<service_id>", "classic").replace("<other_service_id>", "all_on_4")
+    text = text.replace("<requested_service_id>", "classic").replace("<requested_brand_id>", "nobel_biocare")
     return json.loads(text)
 
 
-@pytest.mark.parametrize("index,kind", [(0, "price"), (1, "price"), (2, "content"), (3, "content"), (4, "price")])
+@pytest.mark.parametrize("index,kind", [(0, "price"), (1, "price"), (2, "content"), (3, "content"), (4, "price_detail"), (5, "price")])
 def test_sent_prompt_examples_conform_to_current_parser(index, kind):
     result = parse(prompt_example(index))
     block = result.blocks[0]
     operation = block
     assert operation.kind == kind and operation.request_id == "r1"
-    if index in (0, 3, 4):
+    if index in (0, 3, 5):
         assert operation.topic_id == "implantation" and operation.service_id is None
+    elif index == 4:
+        assert operation.service_id == "classic"
+        assert operation.brand_id == "nobel_biocare"
+        assert operation.price_detail_aspect == "stages"
     else:
         assert block.clarification.missing == "service"
         assert "operation" not in block.model_dump()
-    if index == 4:
+    if index == 5:
         assert operation.kind == "price"
         assert operation.volume.extent == "few_teeth"
         assert operation.volume.tooth_count == 3

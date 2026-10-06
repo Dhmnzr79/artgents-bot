@@ -1,5 +1,117 @@
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
+## Owner widget findings / checkpoint publication — 2026-10-06
+
+После offline/Checker §17 owner выявил неудовлетворительную текстовую подачу:
+price bullet продолжения становятся отдельными абзацами в текущем widget;
+package label и required conditions дублируют исключение разным регистром и
+пунктуацией. Виджет НЕ прошёл приёмку. Не считать §17 общим quality PASS.
+Изменений для устранения этих findings в этом checkpoint нет.
+Owner разрешил commit/push накопленного SIM4/§14–17; baseline4d4b027,
+ветка codex/d2-stage1-contract. Foreign data/SIM0 исключены, секреты/логи/БД
+не публикуются. Следующий модельный experiment только обсуждён, не реализован
+и не запущен. Модель и hard budget ещё не согласованы. Merge/deploy не входят.
+
+## Редактура кодовых цен и деталей — 2026-10-06
+
+Owner GO на таблицу текстов, Interface §17. Presentation bug fix, не
+архитектурное упрощение. Убраны повторные заголовки price_detail и цепочки
+условий через точку с запятой; добавлены согласованные подписи общего состава,
+различий, исключений и оплаты. Snapshot/runtime baseline перед этой правкой:
+%TEMP%/d2-price-copy-baseline-20261006. Прежний §15 diff не относится к §17.
+Суммы, scope/units, approved no_public_price, пункты packages, timing и
+выбор offers сохранены. В demo меняются только introduction_text с сохранением
+их смысловых условий. Model/UI/session/lead/medical механизм не меняется.
+Executor: 82 PASS/5 baseline FAIL,135.85s moz7_83i; focused4 modes PASS/1.83s
+st61nm01. Old price_modes fixture content_realization отклоняется до renderer;
+cleanHEAD те же5FAIL/2.43s y_x040ua. Старый тест не мигрировался.
+Independent Checker:16uniquePASS (12/8.92s99_z7tq9 +4/1.61st12_sog9),
+snapshot scope и baseline/current XML failures проверены. Финальный PASS§17,
+P0/P1 нет; live/widget/Cursor§17 не аттестованы. Provider/live/SMTP0,
+staging пуст, commit/push/merge/deploy нет. Foreign/прежний WIP сохранены.
+
+## Передача заданных параметров в D2 prompt — 2026-10-06
+
+Owner GO Interface Task §16; prompt-only bug fix, не simplification.
+Prompt v39: общее правило сохраняет явно заданные brand/volume/payment
+в существующих полях операции; один нейтральный пример price_detail.
+Убрана отдельная краткая инструкция brand ID, объединена с общим правилом.
+Schema, серверный подбор, память, provider settings и число вызовов не менялись.
+Executor: 18 PASS /41.19s, изолированный runner, сеть заблокирована;
+%TEMP%/d2-interface-offline-y9vm5dbg/results.xml. Проверены production prompt,
+clarification/click/replay/следующий input и соседний admin path.
+Это не доказательство live извлечения бренда. Owner передал Cursor PASS§16,
+47PASS/1baselineFAIL,15.67s8eyvfyjb; затем сообщил «вроде всё окей» в widget.
+Raw live trace в этом checkpoint повторно не анализировался.
+Checker выявил новую тестовую несовместимость: helper ожидал пять примеров.
+Узкое расширение allowlist test_d2_sim2_contract.py объявлено до правки;
+сохранены прежние parser assertions и добавлена проверка шестого примера.
+Targeted executor: 7 PASS /4.67s, 9wcu020b/results.xml.
+Independent Checker PASS v39, P1 helper закрыт; focused 7 PASS /4.69s,
+378a272v/results.xml. P0/P1 нет; live/widget не аттестованы.
+Provider/live/SMTP0; branch codex/d2-stage1-contract, HEAD4d4b027,
+staging пуст, commit/push/merge/deploy нет. Прежний WIP и foreign сохранены.
+
+## Demo audit fixes: policy action и brand details — 2026-10-06
+
+Owner GO после read-only Astra; bug fixes Interface Task§15, не simplification.
+Baseline4d4b027 плюс сохранённый SIM4/§14 WIP. Политика запрещает booking CTA
+доfinalUI, details передают brand/extent существующему price owner; verified
+click сохраняет offers, явный selector conflict остаётся strict, пустой набор
+публикует gap. Model/state/wire поля и model calls не добавлены.
+До исправления два адресных новых теста на чистом HEAD:2FAIL/4.39s b6d1gj8u,
+именно CTA после child refusal и3brands вместоNobel. ApprovedbrandID=nobel_biocare,
+label Nobel; данные реального tenant не меняются. Executor60PASS/105.84s
+dic2tpmj; extent2PASS/4.26s e5u9ev54; финальный ref forged-click уточнён в тесте,
+Checker PASS bug-fix§15, P0/P1нет.22uniquePASS:20/43.32s o2bhrwwj и
+2/4.03s r6etvt5b; повтор6child/default_consult PASS14.99s ahi2taso не суммировать.
+Cursor и widget pending; новый runtime не менялся после проверки.
+No live/provider/SMTP0; staging пуст, commit/push/merge/deploy нет.
+Medical paused UI/contact action/hard-crash внеscope; previousWIP иforeign сохранены.
+
+## Public demo: квоты и ручная новая беседа — 2026-10-06
+
+Baseline 4d4b027 плюс существующий SIM4 WIP, codex/d2-stage1-contract.
+Owner GO Interface Task §14: 10 attempts/SID, 200 rolling24h, 40/60sec peer;
+demo_stub не менять. Одна техническая SQLite таблица и callback перед transport;
+HTTP429/SSE error, friendly client copy, существующий resetSession по клику.
+Semantics/§3/lead/tenant protections не заменялись; это bug fix, не simplification.
+Executor:48 PASS/94.94s __2jjas8 +3 targeted PASS/8.43s ssjhdaw9; JS PASS.
+Дополнительный compatibility набор28 PASS/11 FAIL46.36s mh00wnny; чистый HEAD
+те же28 PASS/11 FAIL49.36s gqhn37bi. Старые diagnostic fixtures не менялись,
+baseline debt не закрывается. Полные результаты и exact allowlist — Interface§14.
+Independent Checker PASS, P0/P1 нет:12 unique cases PASS (9m01b_zr9/16.74s;
+vd1cfm2e3/7.68s), JS PASS. XML comparison подтверждает одинаковые11baselineFAIL.
+Cursor/browser/live не проведены. Calls0,
+staging пуст, commit/push/merge/deploy нет; SIM4 WIP и foreign data/SIM0 сохранены.
+До публикации проверить trusted proxy/IP: remote_addr за прокси может быть общим.
+Суточный предел защищает общий demo файл независимо от смены SID/IP; раздельные
+БД не делят счётчик. Квота не гарантирует точную сумму расходов.
+
+Cursor PASS текущего checkpoint:12 PASS/21.42s (jkbkakgi), JS PASS, calls0.
+P2 test_d2_full_audit factory исправлен для kwargs/admission; exact allowlist
+расширен только этим тестом и текущими report docs, runtime не менялся.
+Focused22cases:12 PASS/10 FAIL14.96s (`accrzrk9`);
+чистый HEAD:12 PASS/те же10FAIL16.07s `624a6mm5`. Старый full-audit debt остаётся,
+полный PASS этого файла не заявляется. SIM4 snapshot Cursor недоступен для
+чтения; отделение SIM4 выполнено по diff, не побайтово.
+
+## SIM-4 — актуализация приёмки, 2026-10-03
+
+Baseline 4d4b027, codex/d2-stage1-contract. Owner GO на продолжение;
+админка/оптимизация базы вне scope. Exact allowlist и трассировка — верх SIM4 Task.
+Устаревший overview test импортировал удалённый _situation и останавливал
+collection на исходном HEAD. Fixture заменён прямым volume; assertions требуют
+отсутствия patient state и проверяют текущий scope.volume. Старую структуру
+не возвращали. Runtime и tenant data неизменны, нового упрощения не заявляем.
+Executor: 92 PASS /133.00s (44 overview +36 guidance +12 clarification);
+изолированный runner t41z8gih. Baseline collection failure: fma5zyty.
+Astra подтвердила current configured-only price path. Independent Checker PASS
+текущего checkpoint: 48 PASS /73.54s (44 overview +4 unknown/detail),
+258y7xh8/results.xml; P0/P1 нет. Повторы executor/Checker не суммируются.
+Старые CI debts, Cursor и live/widget не закрыты. Calls0, staging пуст,
+commit/push/merge/deploy нет. Foreign data/ и SIM0 сохранены.
+
 ## UI отмены записи и подготовка публикации — 2026-10-03
 
 Interface Task §12: отмена только при телефоне, включая его паузу; оба пути

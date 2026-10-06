@@ -2,6 +2,42 @@
 
 ## Актуальный порядок после независимого аудита — 2026-10-02
 
+Owner GO 2026-10-06 на commit/push накопленного SIM4/Interface §14–17.
+Widget §17 НЕ принят: разорванные price list continuation, дубли authored
+условий и тяжёлая подача остаются открытыми. Offline/Checker PASS не закрывает
+эти findings. Текущее состояние зафиксировать перед отдельно обсуждаемым
+экспериментом модельного изложения уже выбранных фактов; live/model/budget
+ещё не согласованы, новый runtime не реализован. SIM4/5/REC5 не закрывать.
+
+Owner GO 2026-10-06, Interface §17: редактура кодовой подачи price/includes/
+stages по согласованной таблице. Без новых model calls, выбора offers или
+пересказа финансовых условий моделью. Суммы, единицы, исключения и сроки
+сохраняются; точные общие пункты и различия остаются видимыми.
+Это presentation bug fix, не новый SIM и не закрытие SIM4/5/REC5.
+
+Owner GO 2026-10-06, Interface§16: general prompt правило сохранения явных
+brand/volume параметров при price/detail/content и нейтральный example.
+Widget показал пропуск brand моделью после§15; server bug-fix PASS не закрывает
+живое понимание. Версия39 без новых fields/calls/semantic repair. Только
+scoped offline/review; owner живые переформулировки обязательны до приёмки.
+
+Owner GO 2026-10-06 после итогового read-only Astra: ограниченный bug-fix
+Interface§15 — сохранять computed policy запрет записи до UI и brand/extent
+при подборе price details. Не расширяет архитектуру/SIM5; medical pause UI
+требует отдельного решения, hard-crash recovery отложен владельцем для demo.
+После scoped review — widget и визуал; общие SIM4/5/REC5 автоматически не закрыты.
+
+Owner GO 2026-10-06: перед публикацией одного demo выполнить ограниченную
+техническую защиту Interface Task §14: 10 модельных попыток/SID,
+200 за скользящие24часа и существующий IP предел40/60сек; demo_stub оставить;
+после ошибки — явная новая беседа существующим resetSession, без auto recovery.
+Это отдельный bug-fix checkpoint, не расширение SIM-4. Далее Cursor review,
+визуальные изменения и финальная проверка диалогов. Админка/чистка базы вне scope.
+
+Продолжение 2026-10-03: владелец разрешил оставшуюся приёмку SIM-4 на
+baseline 4d4b027. Актуальные границы и результаты — верх SIM4 Task.
+Админка и оптимизация базы/FullContext не включены. Нового live-бюджета нет.
+
 Дополнение owner GO 2026-10-03, D2-120: перед следующими SIM исправить
 продолжение после medical handoff и вежливое отображение технических ошибок
 в existing widget/JSON/SSE client. Это bug fixes текущего Interface Task §11,

@@ -77,7 +77,7 @@ def test_classic_price_clicks_freeze_all_shown_offers_without_provider(http_env,
                              ref=replies["Что входит"], ui_revision=price["revision"]))
     assert len(fake.inputs) == 1
     assert includes["answer"].count("имплант с документами") == 1
-    assert "Для всех показанных вариантов" in includes["answer"]
+    assert "Состав одинаковый для всех этих вариантов" in includes["answer"]
     assert {item["label"] for item in includes["ui"]["quick_replies"]} == {
         "Что входит", "Этапы оплаты",
     }
@@ -156,7 +156,7 @@ def test_partial_stage_data_hides_only_stage_button_and_names_gap(http_env):
     assert detail.status_code == 200, detail.get_json()
     answer = detail.get_json()["answer"]
     assert "Implantium" in answer and "Impro" in answer and "Nobel Biocare" in answer
-    assert "не опубликованы" in answer
+    assert "порядок оплаты не указан" in answer
     assert len(fake.inputs) == 2
 
 
@@ -350,7 +350,7 @@ def test_direct_detail_reads_exact_data_when_followup_capability_is_off(http_env
     detail = post(client, sid=sid, request_id="detail", q="Какие этапы оплаты?")
     assert detail.status_code == 200, detail.get_json()
     assert "Nobel Biocare" in detail.get_json()["answer"]
-    assert "не опубликованы" not in detail.get_json()["answer"]
+    assert "порядок оплаты не указан" not in detail.get_json()["answer"]
     assert len(fake.inputs) == 2
 
 
@@ -380,7 +380,7 @@ def test_detail_and_exact_contact_keep_order(http_env):
                     q="Этапы оплаты имплантации и адрес клиники?")
     assert response.status_code == 200, response.get_json()
     answer = response.get_json()["answer"]
-    assert answer.index("Этапы оплаты") < answer.index("г. Москва")
+    assert answer.index("Как оплачивается") < answer.index("г. Москва")
     assert "Хирургический этап" in answer
     assert len(fake.inputs) == 1
 

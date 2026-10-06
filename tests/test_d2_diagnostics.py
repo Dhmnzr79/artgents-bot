@@ -28,7 +28,7 @@ def observed(http_env, monkeypatch):
             raise reply
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=reply))])
 
-    monkeypatch.setattr(adapter, "D2HttpProvider", lambda: D2HttpProvider(transport=transport))
+    monkeypatch.setattr(adapter, "D2HttpProvider", lambda **kwargs: D2HttpProvider(transport=transport, **kwargs))
     monkeypatch.setattr(diagnostics, "_write", lambda fields: events.append(dict(fields)))
     yield http_env, events, calls, replies
     assert diagnostics._current.get() is None

@@ -21,7 +21,7 @@ def test_price_then_duration_needs_no_patient_identity_and_persists_scope(http_e
     fake = use(FakeProvider(raw(price("classic","service",volume=volume(3)))))
     send = post if transport == "json" else post_sse
     first = _body(send(client,request_id="price",q="Сколько стоит восстановить три зуба с помощью классической имплантации?"),transport)
-    assert "ориентир за один зуб" in first["answer"]
+    assert "стоимость за один зуб" in first["answer"]
     fake.raw = raw(explanation("Срок лечения зависит от этапов заживления.",
         target={"type":"service","id":"classic"},volume=volume(3),
         content_ref="implantation__faq__duration.md"))

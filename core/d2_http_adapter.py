@@ -14,6 +14,7 @@ from core.client_runtime import per_client_data_dir
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore, D2RequestIdConflict, D2RequestInProgress
 from core.d2_live_provider import D2HttpProvider
+from core.d2_demo_limits import admit_demo_call
 from session import (
     bind_session_client, capture_lead_session_row, restore_lead_session_row, sid_from_body,
 )
@@ -62,7 +63,7 @@ def _audit_lead_after(sid: str, *, phase: str) -> None:
         full_audit_exception("lead_session_after", exc)
 
 
-def run_d2_ask_json(data: dict, *, client_id: str) -> dict:
+def run_d2_ask_json(data: dict, *, client_id: str, peer_ip: str | None = None) -> dict:
     diagnostics.stage("request")
     supported = {"client_id", "sid", "request_id", "q", "ref", "ui_revision", "situation_action"}
     if set(data) - supported:
@@ -108,7 +109,9 @@ def run_d2_ask_json(data: dict, *, client_id: str) -> dict:
             turn = run_d2_dialogue_turn(
                 session_key=key,
                 user_message=user_message,
-                provider=D2HttpProvider(),
+                provider=D2HttpProvider(admission=lambda: admit_demo_call(
+                    store._connection, sid=sid, peer_ip=peer_ip,
+                )) if client_id == "demo" else D2HttpProvider(),
                 clients_root=_clients_root(),
                 store=store,
                 now=datetime.now(timezone.utc),

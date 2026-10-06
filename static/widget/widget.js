@@ -1609,6 +1609,13 @@ export function mountWidget(root, config) {
         errBox.appendChild(retry);
       }
       errBox.hidden = false;
+      if (clientId === "demo") {
+        const fresh = document.createElement("button");
+        fresh.type = "button";
+        fresh.textContent = "Новая беседа";
+        fresh.addEventListener("click", resetSession);
+        errBox.appendChild(fresh);
+      }
     } else {
       errBox.textContent = "";
       errBox.hidden = true;

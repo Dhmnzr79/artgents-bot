@@ -188,7 +188,7 @@ def test_branded_few_teeth_text_keeps_reference_or_honest_gap(http_env, brand_id
     with D2DialogueStore(db) as store:
         saved = store.read_latest_completion(SessionKey(client_id="demo", sid="af1a-gap"))
         if has_reference:
-            assert "ориентир за один зуб" in reply.get_json()["answer"]
+            assert "стоимость за один зуб" in reply.get_json()["answer"]
             assert tuple(r.offer_id for r in saved.response.resolved.d2_price_block.rows) == ("classic.one_tooth.implantium",)
             assert saved.response.resolved.d2_request_parts[0].discussion_scope.volume.tooth_count == 3
         else:

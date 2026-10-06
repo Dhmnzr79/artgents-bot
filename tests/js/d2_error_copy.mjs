@@ -46,3 +46,19 @@ globalThis.fetch = async () => response([
 await streamAsk("", body, { onUi: () => published++, onDone: () => completed++, onError: () => failed++ });
 assert.deepEqual([published, completed, failed], [1, 1, 0]);
 console.log("PASS: friendly error copy, JSON/SSE/network, same-ID replay, committed UI preservation");
+
+for (const code of ["demo_session_limit", "demo_daily_limit"])
+  assert.match(friendlyErrorMessage(code), /Вы посмотрели возможности демо/);
+assert.match(friendlyErrorMessage("demo_ip_limit"), /Подождите минуту/);
+calls = 0;
+let quotaErrors = [];
+globalThis.fetch = async () => {
+  calls++;
+  return response([["error", { error: "demo_daily_limit" }]]);
+};
+await streamAsk("", body, { onError: (code, retryable) => quotaErrors.push([code, retryable]) });
+assert.deepEqual(quotaErrors, [["demo_daily_limit", false]]);
+assert.equal(calls, 1);
+globalThis.fetch = async () => Response.json({ error: "demo_session_limit" }, { status: 429 });
+await assert.rejects(postAsk("", body), { message: friendlyErrorMessage("demo_session_limit") });
+console.log("PASS: demo limit messages and no automatic retry");

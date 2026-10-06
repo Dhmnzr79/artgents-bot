@@ -781,6 +781,7 @@ def _run_reserved_d2_dialogue_turn(
     contact_button = canonical_contact = None
     commercial_operations = []
     directory_cta = None
+    suppress_forbidden_booking_cta = False
     for block in result.blocks:
         is_price = isinstance(block, PriceOperation)
         if is_price and first_price_seen:
@@ -843,6 +844,9 @@ def _run_reserved_d2_dialogue_turn(
             canonical_contact = canonical_contact or canonical
             continue
         if isinstance(block, PolicyOperation):
+            policy = resolve_clinic_policy_operations(client_id=session_key.client_id,
+                operations=(block,))
+            suppress_forbidden_booking_cta |= policy.suppress_forbidden_booking_cta
             answer = build_d2_clinic_policy_response(
                 tenant, session_key=session_key, request=block,
             )
@@ -859,6 +863,7 @@ def _run_reserved_d2_dialogue_turn(
         if isinstance(block, PriceOperation):
             policy = resolve_clinic_policy_operations(client_id=session_key.client_id,
                 operations=(block,))
+            suppress_forbidden_booking_cta |= policy.suppress_forbidden_booking_cta
             blocked = tuple(d.policy_key for d in policy.decisions if d.outcome == "blocked" and d.policy_key)
             if blocked:
                 rule = PolicyOperation(request_id=block.request_id, kind="clinic_policy",
@@ -921,6 +926,7 @@ def _run_reserved_d2_dialogue_turn(
         selected_price_detail_action=selected_price_detail_action,
         commercial_operations=tuple(commercial_operations),
         directory_cta=directory_cta,
+        suppress_forbidden_booking_cta=suppress_forbidden_booking_cta,
     )
     if not response.rendered_text.strip():
         raise ValueError("d2_empty_completed_answer")

@@ -2,6 +2,10 @@ export const TECHNICAL_ERROR_MESSAGE = "Не получилось показат
 
 // Presentation only: never publish exception details or claim a lead outcome.
 export function friendlyErrorMessage(error) {
+  if (["demo_session_limit", "demo_daily_limit"].includes(error)) {
+    return "Вы посмотрели возможности демо. Чтобы обсудить бота для вашего проекта, свяжитесь с автором через контакты на сайте.";
+  }
+  if (error === "demo_ip_limit") return "Слишком много вопросов подряд. Подождите минуту и продолжите.";
   return error ? TECHNICAL_ERROR_MESSAGE : "";
 }
 
@@ -33,7 +37,7 @@ export async function postAsk(apiBase, body) {
     throw new Error(TECHNICAL_ERROR_MESSAGE);
   }
   if (!res.ok) {
-    throw new Error(TECHNICAL_ERROR_MESSAGE);
+    throw new Error(friendlyErrorMessage(data.error || "request_failed"));
   }
   if (typeof console !== "undefined" && console.debug) {
     console.debug("[perf] ask_client_ms", {

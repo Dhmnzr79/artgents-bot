@@ -917,7 +917,10 @@ class D2ResolvedRequestPart(ResponsePlanModel):
                 raise ValueError("d2_content_part_snapshot_required")
         elif self.kind == "price_detail":
             if self.status == "unavailable":
-                if self.failure_reason != "d2_price_detail_context_ambiguous":
+                if self.failure_reason not in {
+                    "d2_price_detail_context_ambiguous", "d2_no_price_candidates",
+                    "d2_no_scope_price_candidates",
+                }:
                     raise ValueError("d2_price_detail_part_failure_reason_invalid")
             elif self.status != "answered" or self.failure_reason is not None:
                 raise ValueError("d2_price_detail_part_status_invalid")

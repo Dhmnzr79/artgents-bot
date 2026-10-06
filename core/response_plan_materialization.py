@@ -310,6 +310,7 @@ def resolve_d2_operations(
     exact_deferred_blocks=(),
     commercial_operations=(),
     directory_cta=None,
+    suppress_forbidden_booking_cta=False,
 ):
     """Resolve already-decided operations; never reconstruct a semantic envelope."""
     client_id = sources.material_authority.source_client_id
@@ -565,15 +566,17 @@ def resolve_d2_operations(
                 shown_price_offer_refs=effective_refs, selected_action=selected_price_detail_action,
             )
         except MaterializationContractError as error:
-            if str(error) != "d2_price_detail_context_ambiguous":
+            if str(error) not in {"d2_price_detail_context_ambiguous", "d2_no_price_candidates", "d2_no_scope_price_candidates"}:
                 raise
             detail_failure_reason = str(error)
+            ambiguous = detail_failure_reason == "d2_price_detail_context_ambiguous"
             failure_blocks.append(D2PartFailureBlock(
                 request_id=detail_parts[0].request_id,
                 source_client_id=client_id,
-                message_id="d2-price-detail-clarify",
-                reason="d2_price_detail_context_ambiguous",
-                display_text="Уточните, для какой услуги или варианта показать детали.",
+                message_id="d2-price-detail-clarify" if ambiguous else "d2-price-detail-unavailable",
+                reason=detail_failure_reason,
+                display_text=("Уточните, для какой услуги или варианта показать детали." if ambiguous
+                    else "Для этого варианта детали не указаны."),
             ))
         if detail_block is not None and not price_parts and not content_parts:
             detail_services = {row.service_id for row in detail_block.rows}
@@ -751,6 +754,7 @@ def resolve_d2_operations(
         sources=sources,
         request_parts=tuple(request_parts),
         directory_cta=directory_cta,
+        suppress_forbidden_booking_cta=suppress_forbidden_booking_cta,
         suppress_secondary=(
             bool(price_parts or detail_parts)
             or direct_promotion
@@ -855,11 +859,11 @@ def resolve_d2_operations(
         textual_cta_candidate=(
             _materialize_textual_cta(sources)
             if (
-                price_block is not None
-                or any(
+                not suppress_forbidden_booking_cta
+                and (price_block is not None or any(
                     part.status == "answered" and part.kind == "content"
                     for part in request_parts
-                )
+                ))
             )
             else None
         ),
@@ -972,6 +976,12 @@ def _d2_price_detail_offer_ids(
 ) -> tuple[str, ...]:
     client_id = sources.session_key.client_id
     bundle = sources.material_authority.bundle
+    applied_extent = part.volume.extent if part.volume is not None and part.volume.extent != "unknown" else None
+    detail_service_id = part.service_id
+    if detail_service_id is None and shown_price_offer_refs and (part.brand_id is not None or applied_extent is not None):
+        services = {ref.service_id for ref in shown_price_offer_refs}
+        if len(services) == 1:
+            detail_service_id = next(iter(services))
     if selected_action is not None:
         if (
             selected_action.source_client_id != client_id
@@ -991,16 +1001,17 @@ def _d2_price_detail_offer_ids(
         offer_ids = (ref.offer_id,)
     elif part.price_detail_offer_id is not None:
         offer_ids = (part.price_detail_offer_id,)
-    elif shown_price_offer_refs and (
+    elif shown_price_offer_refs and part.brand_id is None and applied_extent is None and (
         part.service_id is None or all(ref.service_id == part.service_id for ref in shown_price_offer_refs)
     ):
         if part.service_id is None and len({ref.service_id for ref in shown_price_offer_refs}) != 1:
             raise MaterializationContractError("d2_price_detail_context_ambiguous")
         offer_ids = tuple(ref.offer_id for ref in shown_price_offer_refs)
-    elif part.service_id is not None:
+    elif detail_service_id is not None:
         price, _ = _d2_price_block(
-            bundle=bundle, client_id=client_id, service_ids=(part.service_id,),
+            bundle=bundle, client_id=client_id, service_ids=(detail_service_id,),
             published_terms=sources.d2_published_terms_by_offer,
+            brand_id=part.brand_id, applied_extent=applied_extent,
             direct_service_only=True,
         )
         offer_ids = tuple(row.offer_id for row in price.rows)
@@ -1017,6 +1028,9 @@ def _d2_price_detail_offer_ids(
             or not bundle.services[offer.service_id].active
             or offer_id not in sources.d2_published_terms_by_offer
             or (part.service_id is not None and offer.service_id != part.service_id)
+            or (selected_action is None and part.brand_id is not None and offer.brand_id != part.brand_id)
+            or (selected_action is None and applied_extent is not None
+                and not _d2_offer_applies(offer, bundle.services[offer.service_id], applied_extent))
         ):
             raise MaterializationOwnershipError("d2_price_detail_offer_foreign")
     return offer_ids
@@ -1045,7 +1059,7 @@ def _d2_price_detail_block(
         available = _d2_price_detail_has_data(offer, part.price_detail_aspect)
         stages = tuple(
             f"{stage.label} — {_format_d2_amount(stage.amount)}\u00a0{_d2_currency(stage.currency)}"
-            + (f"; {stage.timing_text}" if stage.timing_text else "")
+            + (f". {stage.timing_text}" if stage.timing_text else "")
             for stage in (offer.payment_stages or ())
         ) if available and part.price_detail_aspect == "stages" else ()
         rows.append(D2FrozenPriceDetailRow(
@@ -1106,7 +1120,7 @@ def _d2_price_scope_decision(
             reason="known_situation" if applied_extent is not None else "overview",
             selected_offer_ids=selected_offer_ids,
             introduction_text=(
-                f"Вот опубликованные цены для {brand.canonical_name}."
+                f"Для {brand.canonical_name} есть такие варианты:"
                 if brand is not None else presentation.introduction_text
             ),
             # Clarification copy only with volume buttons (D2-005/074). After
@@ -1367,8 +1381,8 @@ def _d2_price_block(
     if applied_extent == "few_teeth":
         rows = tuple(
             row.model_copy(update={"condition_texts": (*row.condition_texts,
-                "Это ориентир за один зуб, а не расчёт на несколько. "
-                "Итоговую стоимость по вашему запросу уточнят на консультации. "
+                "Здесь указана стоимость за один зуб. "
+                "Стоимость восстановления нескольких зубов уточнят на консультации. "
                 "Хотите записаться?")})
             if row.billing_unit in {"tooth", "tooth_package"} else row
             for row in rows
@@ -1865,6 +1879,7 @@ def _d2_select_ui(
     request_parts: tuple[D2ResolvedRequestPart, ...],
     directory_cta=None,
     suppress_secondary: bool,
+    suppress_forbidden_booking_cta=False,
 ) -> UiPlanCandidates:
     source_cta = next(
         (item for item in source_ui.buttons if item.action_kind == "cta"),
@@ -1881,7 +1896,7 @@ def _d2_select_ui(
         part.kind in {"clarification", "price_clarification"} or part.status == "deferred"
         for part in request_parts
     )
-    selected_cta = None if pure_clarification else source_cta or directory_cta or global_cta
+    selected_cta = None if pure_clarification or suppress_forbidden_booking_cta else source_cta or directory_cta or global_cta
     return UiPlanCandidates(
         quick_replies=() if suppress_secondary else source_ui.quick_replies,
         buttons=(selected_cta,) if selected_cta is not None else (),

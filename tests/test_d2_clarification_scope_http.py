@@ -84,7 +84,7 @@ def test_service_clarification_keeps_scope_through_click_replay_and_next_input(
             assert tuple(r.offer_id for r in result.d2_price_block.rows) == ("classic.one_tooth.implantium",)
             assert "76 200" in clicked["answer"].replace("\u00a0", " ")
             if extent == "few_teeth":
-                assert "ориентир за один зуб" in clicked["answer"]
+                assert "стоимость за один зуб" in clicked["answer"]
         else:
             assert result.d2_price_block is None
             assert result.d2_request_parts[0].status == "unavailable"
@@ -116,7 +116,7 @@ def test_known_direction_and_explicit_three_teeth_use_unit_reference_after_infor
     # Check the revised instructions actually reach the ordinary provider path.
     assert D2_OPERATIONS_INSTRUCTIONS in build_d2_d1r_messages(fake.inputs[-1])[0]["content"]
     assert "76 200" in body["answer"].replace("\u00a0", " ")
-    assert "ориентир за один зуб" in body["answer"]
+    assert "стоимость за один зуб" in body["answer"]
     assert not any(r["reply_id"].startswith("service:") for r in body["ui"]["quick_replies"])
     with D2DialogueStore(db) as store:
         result = store.read_latest_completion(SessionKey(client_id="demo", sid="known-topic")).response.resolved

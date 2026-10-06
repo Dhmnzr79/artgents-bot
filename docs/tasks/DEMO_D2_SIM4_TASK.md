@@ -1,6 +1,109 @@
 # SIM-4 — явный демо-обзор и кодовые финансовые факты
 
-## Последующее состояние — независимый аудит и подготовка передачи
+## Возобновление SIM-4 — 2026-10-03
+
+Owner GO: начать оставшуюся приёмку SIM-4. Админка, оптимизация базы/aliases,
+SIM-5 cleanup и новые продуктовые правила вне этого шага.
+Root/Git top: C:/Cursor Projects/artgents-bot-active; ветка codex/d2-stage1-contract.
+Baseline HEAD 4d4b0276d83208f2043f31f6af31be35b4d496ae; origin/main и merge-base
+141ce91fb1731cd990fcf8391550150016c73e7f. Staging пуст. Foreign data/ и
+DEMO_D2_SIM0_TASK.md не читать/не менять. Продолжается существующая ветка.
+
+Тип: актуализация тестов и приёмка существующего механизма, не новое
+архитектурное упрощение. Владельцы решений — Target Contract §3 без изменений.
+Исходное удаление конкурирующих путей обзора проверяется на текущем runtime:
+configured pool → brand/extent → один offer методики → cap 3; exact service
+сохраняет все применимые offers. Общий catalog fallback/family expansion
+не должны быть достижимы на этом пути. D2-114 риск prose и D2-116 unit/gap,
+D2-117 direct volume, D2-119 unknown-click сохраняются.
+
+Exact allowlist текущей правки:
+- tests/test_d2_sim4_overview_http.py;
+- docs/tasks/DEMO_D2_SIM4_TASK.md;
+- docs/tasks/DEMO_D2_CURRENT_STATUS.md;
+- docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md;
+- docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md.
+
+Первый baseline запуск трёх ценовых наборов остановился на collection:
+overview импортирует удалённый _situation. Артефакт fma5zyty/results.xml.
+Это проверено на неизменённом HEAD, не регрессия новой правки.
+Исправление fixtures: прямой volume, отсутствие patient state и volume
+в текущем discussion_scope. Ценовые ожидания/количество случаев не ослабляются.
+
+Один адресный offline набор: sim4_overview_http, price_guidance_http,
+clarification_scope_http; затем независимый Checker. JSON/SSE, цены/units,
+бренды/объёмы, exact service >3, отсутствие заимствования вне pool,
+неизменность финансовых блоков при ошибочной prose, replay и следующий input.
+Runtime/tenant data не меняются без объяснения необходимой правки.
+Live/provider/SMTP, commit/push/merge/deploy в этот шаг не входят.
+Нижние baseline, GO и результаты исторические; актуальные итоги добавляются здесь.
+
+### Текущие offline результаты
+
+Executor: **92 PASS**, 133.00 s, 11642 warnings; runner с блокировкой socket,
+временными tenant/SQLite/logs. Артефакт `%TEMP%/d2-interface-offline-t41z8gih/results.xml`.
+Состав: overview 44 + price_guidance 36 + clarification_scope 12.
+До правки на HEAD сборка не проходила: отсутствующий _situation; первоначальная
+ошибка collection сохранена в `%TEMP%/d2-interface-offline-fma5zyty/results.xml`.
+Исправлен один тестовый файл; runtime, цены, pack и продуктовые правила не менялись.
+Новые поля/ветки/модельные вызовы/повторы/адаптеры не добавлены.
+
+Старые 13 baseline failures из прежнего отчёта не перепроверены и не объявлены
+исправленными. Известный flaky phone-pause assert «999» вне набора, не менялся.
+Полный CI, Cursor и live/widget остаются отдельными незакрытыми проверками.
+Provider/live/SMTP 0. Commit/push/merge/deploy не выполнялись, staging пуст.
+
+Independent Checker: **PASS текущего checkpoint приёмки SIM-4**, P0/P1 нет.
+Собственный назначенный набор: **48 PASS /73.54s**, 6011 warnings,
+0 fail/error/skip; `%TEMP%/d2-interface-offline-258y7xh8/results.xml`.
+44 overview + 2 unknown acknowledgement + 2 price-detail consumption/history.
+Executor и Checker результаты не суммируются: overview повторён независимо.
+Проверена фактическая цепочка strict parser → volume → configured sources →
+pool-only/exact price → frozen completion → следующий scope. Runtime и tenant
+не менялись, пять файлов allowlist, staging пуст, diff --check чист.
+Это не закрытие полного SIM-4: Cursor/live/widget/full CI остаются впереди.
+
+### Архитектурная сверка текущего пути
+
+Astra read-only: operation.volume → _d2_price_scope_decision → _d2_price_block.
+Overview исполняет только заданный ordered_offer_ids; brand/extent фильтруются
+до выбора первого предложения услуги и cap 3. Exact-service использует
+активные offers только этой услуги, без overview cap. Только no_price/no_scope
+дают разрешённый пробел; ошибки принадлежности не превращаются в подбор.
+Few_teeth не умножает цену, сохраняет единицу и утверждённую оговорку.
+
+Конкурирующие overview paths не найдены на активной цепочке. Оставшаяся
+_d2_scope_offer_ids объявлена, но не имеет callers в core/tests; её удаление
+относится к SIM-5, сейчас функция не менялась. Нового удаления runtime в этой
+приёмке нет; результат нельзя называть новой архитектурной заменой.
+
+### Оставшаяся ручная проверка и Cursor
+
+Полный этап не закрывается одними fake provider fixtures. Для Cursor:
+проверить diff от 4d4b027 и действующий вызов /ask и /ask/stream → D2 operation
+→ snapshot sources → resolver/materializer → frozen price → completion →
+следующий input; ожидания tests не ослаблены, runtime и clinic pack неизменны.
+Independent Checker не заменяет отдельный Cursor gate.
+
+После offline/review пользователь проверяет в виджете (новая беседа на группу):
+1. «Сколько стоит имплантация?» → «Один зуб» → «А сколько времени займёт?».
+   Только утверждённый обзор, затем classic/one_stage, тема и объём сохраняются.
+2. «Сколько стоит классическая имплантация трёх зубов?» → «А если двух?».
+   Разрешённый единичный ориентир явно за один зуб, без умноженного итога.
+3. «Сколько стоит восстановление зубов?» → «Пока не знаю».
+   Короткая согласованная фраза + CTA; цены не повторяются, заявка не стартует.
+4. «Сколько стоит имплантация на всю челюсть Nobel?».
+   Только применимые предложения запрошенного бренда; бренд не подменяется.
+5. «Сколько стоит классическая имплантация?» → «Что входит» → «Этапы оплаты».
+   Нажатая кнопка скрыта, ненажатая доступна; суммы и состав не меняются.
+6. «Как проходит отбеливание и сколько стоит?».
+   Живое объяснение и утверждённая цена без имплантационного объёма/условий.
+
+При разборе неуспеха сначала отличать неверное понимание модели от ошибки
+исполнения корректной операции. Live вызовы агента без отдельного бюджета
+не выполняются. Эти вопросы — план проверки, не заявление о её прохождении.
+
+## Историческое состояние — независимый аудит и подготовка передачи
 
 После prompt33 владелец вручную проверил 7 запросов: 6 ответов, 1 parse failure
 с повторением структуры (trace7ca91fe2). Это не таймаут: ответ provider получен;

@@ -51,7 +51,7 @@ def test_price_guidance_keeps_requested_scope_units_and_continuation(http_env, t
         assert "31 000" in answer and "уже установленном импланте" in answer
         assert "установка импланта" in answer
     if count != 1:
-        assert "ориентир за один зуб" in answer and "консультации" in answer
+        assert "стоимость за один зуб" in answer and "консультации" in answer
         if topic != "implantation":
             assert "45 000" in answer and "челюсть" in answer
         assert "228 600" not in answer and "152 400" not in answer
@@ -82,7 +82,7 @@ def test_known_service_without_price_keeps_explanation_and_consultation(http_env
     assert response.status_code == 200
     body = _body(response, transport)
     assert "Пояснение процедуры" in body["answer"]
-    assert "Стоимость по вашему запросу не указана" in body["answer"]
+    assert "Для этого варианта цена не указана" in body["answer"]
     assert "у администратора" in body["answer"] and "Хотите записаться" in body["answer"]
     assert "вариант восстановления" not in body["answer"]
     assert "₽" not in body["answer"]
@@ -110,7 +110,7 @@ def test_partial_overview_keeps_numeric_price_and_authored_no_price_row(http_env
     assert "76 200" in body["answer"].replace("\u00a0", " ")
     assert offer["price"]["approved_text"] in body["answer"]
     assert "45 000" not in body["answer"].replace("\u00a0", " ")
-    assert "Стоимость по вашему запросу не указана" not in body["answer"]
+    assert "Для этого варианта цена не указана" not in body["answer"]
     assert body["lead_effect"]["status"] == "not_requested"
     assert len(fake.inputs) == 1
 
@@ -129,4 +129,4 @@ def test_missing_brand_does_not_select_a_different_reference(http_env):
     use(FakeProvider(raw(price("implantation", "topic", brand_id="impro", volume=scope(3)))))
     body = post(client, q="Сколько стоят три импланта Impro?").get_json()
     assert "76 200" not in body["answer"].replace("\u00a0", " ")
-    assert "Стоимость по вашему запросу не указана" in body["answer"]
+    assert "Для этого варианта цена не указана" in body["answer"]

@@ -67,7 +67,7 @@ def http_env(monkeypatch, tmp_path):
     monkeypatch.setattr(sqlite3, "connect", isolated_connect)
 
     def use_provider(fake):
-        monkeypatch.setattr(adapter, "D2HttpProvider", lambda: fake)
+        monkeypatch.setattr(adapter, "D2HttpProvider", lambda **_kwargs: fake)
         return fake
 
     yield app.app.test_client(), db, use_provider, tmp_path

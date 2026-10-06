@@ -182,9 +182,11 @@ class D2HttpProvider:
     """The HTTP turn's single raw D1R call using the existing D2 prompt."""
 
     def __init__(self, *, model: str = DEFAULT_LLM_MODEL,
-                 transport: Callable[..., object] = chat_completions_create) -> None:
+                 transport: Callable[..., object] = chat_completions_create,
+                 admission: Callable[[], None] | None = None) -> None:
         self.model = model
         self._transport = transport
+        self._admission = admission
 
     def generate(self, request: D2ProviderInput) -> str:
         diagnostics.stage("prompt")
@@ -194,6 +196,8 @@ class D2HttpProvider:
             temperature=0, max_completion_tokens=1024,
             timeout_seconds=LLM_REQUEST_TIMEOUT_SEC,
         )
+        if self._admission is not None:
+            self._admission()
         response = diagnostics.call_provider(self._transport,
             model=self.model, temperature=0, max_completion_tokens=1024,
             timeout=LLM_REQUEST_TIMEOUT_SEC, messages=(system, user),

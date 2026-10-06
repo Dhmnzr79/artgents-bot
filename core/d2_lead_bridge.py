@@ -554,6 +554,7 @@ def _plain_answer(
     )
     composer = ComposerResult(route="ANSWER", mode="standard", patient_text=text)
     resolved = resolve_response_plan(plan, composer)
+    resolved = resolved.model_copy(update={"attribution_kind": "lead"})
     return MaterializedResponseOutcome(
         resolved=resolved,
         rendered_text=render_response_text(resolved),

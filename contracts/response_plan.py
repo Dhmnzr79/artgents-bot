@@ -1642,6 +1642,8 @@ def _validate_resolved_client_ownership(plan: ResolvedResponsePlan) -> None:
 
 
 class ResolvedResponsePlan(ResponsePlanModel):
+    # Presentation only; never used for routing, policy, prices or lead state.
+    attribution_kind: Literal["content", "lead", "plain"] = "plain"
     route: ResponseRoute
     mode: ResponseMode
     context_strategy: ContextStrategy

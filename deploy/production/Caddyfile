@@ -21,6 +21,7 @@ demo.bot.artgents.ru {
 	import public_bot_tls
 	reverse_proxy bot:8000 {
 		header_up Host {http.request.host}
+		header_up X-Forwarded-For {http.request.remote.host}
 	}
 }
 
@@ -28,6 +29,7 @@ nikadent.bot.artgents.ru {
 	import public_bot_tls
 	reverse_proxy bot:8000 {
 		header_up Host {http.request.host}
+		header_up X-Forwarded-For {http.request.remote.host}
 	}
 }
 

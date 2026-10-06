@@ -37,6 +37,7 @@ def _response_payload(turn, *, session_key: SessionKey) -> dict:
     ui = turn.response.ui_projection.model_dump(mode="json")
     return {
         "answer": turn.response.rendered_text,
+        "attribution_kind": turn.response.resolved.attribution_kind,
         "sid": session_key.sid,
         "client_id": session_key.client_id,
         "request_id": turn.request_id,

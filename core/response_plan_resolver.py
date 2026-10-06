@@ -387,6 +387,18 @@ def _resolve_composer_answer(
     })
     session_delta = _build_session_delta(plan, finalized, terminal_state="none")
     return ResolvedResponsePlan(
+        attribution_kind="content" if (
+            price_block or d2_price_block or plan.d2_price_detail_blocks
+            or composer.information_blocks or plan.d2_contact_blocks
+            or plan.d2_policy_blocks or requested_blocks
+            or any(block.policy_ids or block.requested_fact_ids or block.promo_fact_ids
+                   for block in plan.d2_exact_text_blocks)
+            or any(part.kind == "reference" and part.scope == "service"
+                   and part.status == "answered"
+                   and any(block.request_id == part.request_id and block.display_text.strip()
+                           for block in plan.d2_exact_text_blocks)
+                   for part in plan.d2_request_parts)
+        ) else "plain",
         route=composer.route,
         mode=composer.mode,
         context_strategy=plan.context_strategy,

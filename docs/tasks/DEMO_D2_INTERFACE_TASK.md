@@ -2132,3 +2132,113 @@ Owner widget smoke §24 — 2026-10-06: после предложенных сц
 сообщил «Вроде ок» и разрешил commit/push §23–24. Это owner smoke, не
 полная REC-5/live quality аттестация. Далее — внешний вид виджета без
 изменения архитектуры ответов. Foreign data/SIM0 в checkpoint не включать.
+
+## §25. Volume chips — owner GO 2026-10-06
+
+Presentation bug fix, не architecture simplification. Root
+C:/Cursor Projects/artgents-bot-active; branch codex/d2-stage1-contract;
+baseline db332cda882c6069d1e2fff2ba01d9430f828d19; origin/main и merge-base
+141ce91fb1731cd990fcf8391550150016c73e7f. Foreign data/SIM0 не читать/не менять.
+Allowlist: static/widget/widget.js, static/widget/widget.css, этот документ.
+Существующие volume:* quick replies получают clinic-msg__volume-chip;
+контейнер flex-wrap с gap8px. Ширина по тексту, высота минимум44px,
+transparent background, radius999px и outline border1px. Стрелки у chips
+не выводятся. Theme action color и focus-ring сохранены. Остальные replies
+и CTA не меняются; click/ref/ui_revision/visibility работают прежним путём.
+Новых contracts/state/provider calls нет. node --check и diff --check PASS.
+Independent Checker PASS: CSS scope и unchanged click/ref/ui_revision
+подтверждены. Real widget layout пока не аттестован.
+Commit/push этой presentation правки не выполнялись.
+
+## §26. Flat primary palette — owner GO 2026-10-06
+
+Presentation only; baseline db332cd + uncommitted §25 volume chips.
+Allowlist: static/widget/widget.js, static/widget/widget.css,
+clients/demo/brand.yaml, static/widget-test.html, этот документ. Foreign data/SIM0 сохранить.
+Owner: убрать24/7 badge, translucent/blur header, button gradients;
+demo primary #0C2FE0 для buttons/outlines/link arrows; user bubble
+#F3F4F6 одинаковый для всех clinics. Primary brand применяется к action,
+hover вычисляется прежним helper. Gradient assembly/button1/button2 vars
+и badge DOM/CSS удалены; sticky header остаётся opaque white без blur.
+Demo brand pack теперь один brand key. Старые palette fields других
+клиник не редактировались. Reply handlers/backend/answer contracts не менялись.
+node --check и diff --check PASS; independent Checker PASS §26,
+blocking findings0. Browser подтвердил
+white header/no badge; работающий server отдаёт cached purple tenant theme,
+нужен restart для нового demo brand. Provider calls0.
+
+§26 correction: screenshot расследование выявило отдельный inline theme
+в static/widget-test.html, переданный прямо mountWidget без brand.yaml.
+Старый purple не был server cache: первоначальное объяснение неверно.
+Тестовый theme заменён одним brand #0C2FE0; obsolete gradient fields удалены.
+Для test page достаточно reload; API embed читает brand.yaml отдельно.
+
+§26 visual continuation: owner requested thin right arrow with shaft
+instead of chevron, currentColor (client primary). Allowlist unchanged
+widget.js/widget.css/task. Existing reply click handlers unchanged; volume
+chips stay icon-free. SVG24x24 with1.5pxstroke; no model/provider calls.
+
+§26 owner continuation: arrow reduced18px, compact arrowhead; welcome
+logo DOM/helper/SVG/CSS removed, welcome text left aligned. Config/backend
+logo fields not changed. No provider calls or answer-contract changes.
+
+## §27. Waiting labels and relevant attribution — owner GO2026-10-06
+
+Bug fix/presentation, не architecture simplification. Root
+C:/Cursor Projects/artgents-bot-active; branch codex/d2-stage1-contract;
+HEAD db332cd + visual WIP§25–26, origin/main и merge-base141ce91.
+Foreign data/SIM0 сохранить. Allowlist current addition: contracts/response_plan.py,
+core/response_plan_resolver.py, core/d2_lead_bridge.py, core/d2_dialogue.py,
+core/d2_http_adapter.py, static/widget/widget.js, static/widget/widget.css,
+tests/test_d2_attribution.py, tests/js/d2_attribution_waiting.mjs, этот документ.
+Existing visual WIP clients/demo/brand.yaml и static/widget-test.html preserve.
+Owner approved display field and cosmetic sequential searching/checking/writing.
+ResolvedResponsePlan attribution_kind content/lead/plain defaultplain freezes
+proven published result only; bridge owns lead label. HTTP copies field,
+widget uses it for final/live UI. No model-input/schema or completion-pair
+changes; no routing/policy/price/UI authorization changes. Old receipts default
+plain conservatively, no migration. Astra consulted, §3 owners unchanged.
+Icons: book/content, calendar/lead, message/plain; search/checkdocument/pencil
+for waiting. Cosmetic timers1500/3500ms stop on result/error/reset; lead clicks
+show writing directly. No extra provider calls or checks. Targeted offline
+attribution/replay/context and compound regression; JS waiting timer checks.
+Evidence/Checker pending. No staging/commit/push/live/SMTP.
+
+§27 evidence: executor35PASS/50.55s d281mxnj (attribution14+compound21).
+JS waiting labels/timer cancellation PASS; node syntax/diff checkPASS.
+Independent Checker PASS:14PASS/21.76s td3f_m8m, routing/modelinput/replay
+boundaries подтверждены. P2 commercial-fact signature omission исправлена
+по уже frozen requested_fact_ids/promo_fact_ids; extra2JSON/SSE PASS/4.98s
+4ploxov3; focused independent Checker PASS2/5.02s5ne5m3qu, P2 закрыт. Lead-name waiting использует последний
+attribution_kind только для cosmeticwriting; JS covers. Provider/live/SMTP0.
+## §28. Caddy client IP — owner GO 2026-10-06
+
+Technical bug fix, not architecture simplification. Baseline db332cd on
+codex/d2-stage1-contract, origin/main and merge-base 141ce91; existing visual
+and attribution WIP preserved. Foreign data/ and SIM0 untouched.
+Allowlist: app.py, deploy/production/Caddyfile, deploy/production/compose.yml,
+deploy/production/README.md, tests/test_proxy_client_ip.py, this card.
+Owner approved single-Caddy-hop IP correction for public demo. Compose enables
+BOT_TRUST_CADDY_IP=1; ProxyFix trusts one IP hop only, all other header trust
+disabled. Caddy replaces X-Forwarded-For with direct peer IP. Bot port stays
+internal. Local startup ignores forwarded headers by default. Both ask routes
+retain request.remote_addr and existing quota ownership; §3 owners unchanged.
+No dialogue, model, quota thresholds, tenant or lead changes. Offline tests
+cover separate IP buckets, same IP across sessions, disabled trust, JSON/SSE.
+Evidence: executor 19 PASS / 32.01s (proxy7 + demo-quota12), isolated runner
+artifacts %TEMP%/d2-interface-offline-3_j9tmym. Independent Checker functional
+PASS, proxy7 PASS / 11.61s, s51zo7pf. Diff check clean after line-ending
+correction. Real Caddy / external deployment not tested; no local Caddy binary.
+No live/provider calls, staging, commit, push or deploy.
+
+## §29. Demo greeting and checkpoint — owner GO 2026-10-06
+
+Presentation/content only. Owner-provided greeting copied verbatim into
+clients/demo/widget_config.json and static/widget-test.html. Header close icon
+uses existing clinic brand color. No dialogue behavior or provider changes.
+Owner authorized commit/push of accumulated §25–29 changes on the existing
+task branch; exact file list includes their runtime/config/docs and three new
+offline test files. data/ and docs/tasks/DEMO_D2_SIM0_TASK.md remain excluded.
+Prior independent PASS for §25–28 and targeted offline evidence apply; minor
+greeting/color edits do not require another bot test run. External deployment
+and public embed smoke remain pending. No merge/deploy authorization.

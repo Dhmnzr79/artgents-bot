@@ -65,6 +65,7 @@ services:
     command: ["/app/start.sh"]
     environment:
       APP_ENV: prod
+      BOT_TRUST_CADDY_IP: "1"
       ALLOWED_CLIENTS: ${ALLOWED_CLIENTS:?set ALLOWED_CLIENTS}
       DEFAULT_CLIENT_ID: ${DEFAULT_CLIENT_ID:?set DEFAULT_CLIENT_ID}
       BOT_PG_DSN: ${BOT_PG_DSN:?set BOT_PG_DSN}

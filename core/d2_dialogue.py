@@ -945,6 +945,7 @@ def _run_reserved_d2_dialogue_turn(
             status="answered", scope="clinic")
         values = response.resolved.model_dump()
         values.update(
+            attribution_kind=booking.response.resolved.attribution_kind,
             d2_request_parts=(*response.resolved.d2_request_parts, booking_part),
             d2_exact_text_blocks=(*response.resolved.d2_exact_text_blocks,
                 D2ExactTextBlock(request_id=booking_part.request_id,

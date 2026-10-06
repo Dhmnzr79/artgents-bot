@@ -11,6 +11,7 @@ from flask import (
     send_from_directory,
     stream_with_context,
 )
+from werkzeug.middleware.proxy_fix import ProxyFix
 from pg_sink import init_pg_sink
 
 from config import DEBUG_TOKEN, PORT
@@ -40,6 +41,12 @@ from session import (
 
 
 app = Flask(__name__, static_folder="static")
+# Enable only behind the single Caddy hop with no public access to port 8000.
+# Caddy overwrites X-Forwarded-For; other forwarded headers are not trusted here.
+if os.getenv("BOT_TRUST_CADDY_IP", "0") == "1":
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app, x_for=1, x_proto=0, x_host=0, x_port=0, x_prefix=0,
+    )
 logger = get_logger("bot")
 APP_ENV = (os.getenv("APP_ENV") or "local").strip().lower()
 init_pg_sink(logger)

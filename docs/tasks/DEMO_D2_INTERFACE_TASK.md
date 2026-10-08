@@ -2490,3 +2490,106 @@ read) are non-blocking and do not authorize extra refactoring. Widget acceptance
 is the owner's manual report; implementer made no live provider calls.
 Owner then explicitly authorized a separate commit and push of these eight files.
 Other audit groups and foreign WIP remain excluded; merge/deploy not authorized.
+
+## §34. Audit group 2 — commercial applicability and final compatibility
+
+Owner GO 2026-10-09: continue the described second-group plan, including neutral
+absence-of-data response and one existing failure-reason enum extension.
+Baseline `746229b3e75ecc28b5ef4596d8eeed4c35563d80`, branch
+`codex/d2-stage1-contract`. Allowlist: `contracts/response_plan.py`,
+`core/response_plan_materialization.py`, `core/d2_commercial_plan.py`,
+`core/response_plan_fact_policy.py`, `core/d2_contacts_cta.py`,
+`core/d2_directory.py`, `clients/demo/target_response/pricebook/facts.json`,
+`tests/test_d2_commercial_route_fixes.py`, `tests/test_d2_directory_ui_scenarios.py`,
+`tests/test_response_plan_fact_policy.py`, this card and Roadmap.
+Widget HTML/CSS, `data/` and SIM-0 excluded. No live/commit/push/merge/deploy.
+
+Classification: applicability bug fixes and compatibility-path simplification.
+Before → after → removed dependency: compatibility was calculated inside
+individual promo selection using an incomplete offer/promo set; now only the
+final materializer's published positive fact/promo and price/detail offer IDs
+are checked by the existing commercial owner. Remove the early calculation
+and its offer-ID input; retain authored groups and explanations, not a new policy.
+Contract §3 price/commercial owner and protections remain unchanged.
+
+Direct self-qualified free-consult information is allowed clinic/topic-wide
+using existing requested_display_policy, never as blanket service entitlement.
+Free CTA uses the same existing applicability evaluator in automatic mode plus
+date and resolved service scope; neutral CTA remains for unsupported scope.
+Explicit installment exclusions use only authored excluded_scope_text; other
+known but inapplicable/expired facts get a neutral existing-style gap rather
+than an invented refusal. Unknown/foreign IDs remain strict errors.
+The gap uses d2_commercial_fact_unavailable in the existing failure enum/block,
+preserving sibling answers. No new model operation, memory, retry or call.
+
+Acceptance: direct clinic/topic/service facts; excluded and unknown applicability;
+expiry; doctors CTA caries/classic; direct and automatic promo combinations;
+final price/detail IDs; rejected or negative facts do not trigger compatibility;
+JSON/SSE/replay, tenant and UI boundaries. Targeted offline and independent Checker.
+
+Partial commercial execution uses the existing request-part granularity: useful
+approved text and positive IDs are retained, but any unavailable requested member
+marks that whole commercial part unavailable. A lone such part has result failed;
+with an answered sibling it has result degraded. Both remain ordinary published
+responses, not transport errors. Existing exact/failure blocks must freeze identical
+text, rendered once; there is no new partial status or provenance field.
+Independent Checker first rejected false complete accounting; the focused repair
+covers mixed available/expired facts and available fact/empty requested promotions.
+
+§34 final targeted offline evidence, 2026-10-09: **77 passed**, 241.49s,
+0 failed/errors/skipped. Suites: commercial route fixes, fact policy, D2 commercial
+plan and tenant commercial contract; targeted date/scope CTA and child refusal/
+forged booking checks. Forty new JSON/SSE cases plus two new pure policy cases
+cover conditions, exclusions, expiry, final price/detail combinations, missing
+detail provenance, partial execution, replay and next-turn projection. Earlier
+new-case failures were corrected; existing selected checks passed throughout.
+The runner disables dotenv, blocks network and isolates SQLite/logs. JUnit:
+`C:/Users/denis/.codex/visualizations/2026/10/02/01a0fd5a-1bf9-7ed0-9738-a748f948637a/commercial-route-check/results.xml`.
+Provider/live/SMTP calls: 0. Existing utcnow deprecation warnings remain.
+No whole-CI or live model/widget acceptance claimed. HEAD remains `746229b`;
+staging empty; no commit/push/merge/deploy. Foreign widget WIP hashes unchanged;
+data/ and SIM-0 were neither read nor changed. Context/model-contract groups open.
+Independent Checker focused recheck: **PASS**, sole P1 closed, no new blockers.
+Checker independently read final JUnit/output and actual renderer/projection paths,
+without rerunning tests. Early compatibility dependency removed; final published-ID
+check remains with the commercial owner. PASS is §34 only; Cursor/widget acceptance
+and whole-CI remain open. `git diff --check` clean; no staging or Git mutation.
+
+§34 widget follow-up, owner GO: live owner runs exposed visible_fact_id_role_conflict
+for free_implant_consult or implant_same_day_discount requested both directly and
+through promotion_scope=general. Widget acceptance remains open; earlier scoped
+PASS did not cover these combinations. Bug fix allowlist: materialization module,
+commercial route tests, this card and Roadmap. Keep prior §34 and foreign WIP.
+Direct approved fact publication has priority over its promo copy; other selected
+promos remain. Preserve strict role uniqueness, tenant/price/medical protections,
+existing request parts and absence-of-data semantics. No phrase-specific rule,
+new model call, state, retry or fields. Commit/push/live not authorized.
+Assembly first resolves each direct fact in its own operation scope, then assigns
+promotional roles against the complete applicable direct-ID set. Role provenance
+is recorded once in stable operation order; independent repeated requests may
+repeat authored prose, as the owner preferred to losing an answer. An otherwise
+fully covered promo request retains its approved prose without a second role ID.
+Eligibility gaps are determined before deduplication; rejected/expired/negative
+direct facts do not reserve a positive ID. Automatic promo filtering and final
+compatibility remain unchanged. General vs service selection by the model is
+not repaired by the server in this follow-up; audit group 4 remains separate.
+
+Overlap follow-up offline evidence: **98 passed**, 378.17s, no failures/errors/skips.
+Coherent run: all 68 commercial route cases (28 new overlap cases), 11 fact-policy,
+4 commercial-plan and 15 tenant commercial-contract cases. Exact live output shapes
+for consultation and discount are represented; both operation orders, auto promo,
+repeat direct/promo requests, fully covered promo-only request, inapplicable direct,
+replay, next projection and strict role-conflict rejection pass. No validator change.
+Evidence: `C:/Users/denis/.codex/visualizations/2026/10/02/01a0fd5a-1bf9-7ed0-9738-a748f948637a/commercial-overlap-check/results.xml`;
+runner network/dotenv/SQLite isolation unchanged. Provider/live/SMTP: 0.
+Whole CI and widget acceptance still open; previous 77-case count is not added to 98.
+Baseline/HEAD `746229b`, staging empty, no commit/push/merge/deploy.
+Focused overlap Checker: **PASS**, no P0/P1. Independently read 98-case JUnit/output;
+role guard, partial results, automatic filtering and final compatibility preserved.
+No rerun or Checker edits; general/service model choice remains separate.
+
+§34 final acceptance, 2026-10-09: owner reported widget OK after the overlap repair;
+Cursor focused review PASS, no blockers/test weakening/scope creep, SAFE_TO_COMMIT=YES.
+Owner then explicitly authorized commit and push of the complete 12-file §34
+checkpoint, including the overlap fix. Widget HTML/CSS, data/ and SIM-0 remain
+excluded. Full CI, groups 3/4 and merge/deploy are not authorized or closed here.

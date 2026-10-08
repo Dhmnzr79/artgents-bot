@@ -13,7 +13,6 @@ class D2ResolvedCommercialPlan:
     promo_blocks: tuple[ResolvedFactBlock, ...] = ()
     price_booster_block: D2CommercialPackageBlock | None = None
     also_list_block: D2CommercialPackageBlock | None = None
-    compatibility_blocks: tuple[D2CompatibilityBlock, ...] = ()
 
 
 def resolve_d2_commercial_plan(
@@ -22,7 +21,6 @@ def resolve_d2_commercial_plan(
     service_id: str | None,
     include_packages: bool,
     shown_promo_fact_ids: tuple[str, ...] = (),
-    offer_ids: tuple[str, ...] = (),
     promo_form: str = "short",
     promotion_scope: str = "service",
     skip_shown: bool = True,
@@ -87,20 +85,26 @@ def resolve_d2_commercial_plan(
                 name=package.name,
                 body_text=package.body_text,
             )
-    selected = {block.fact_id for block in promo_blocks} | set(offer_ids)
-    compatibility = tuple(
-        D2CompatibilityBlock(
-            source_client_id=client_id,
-            group_id=group.group_id,
-            member_ids=tuple(member for member in group.offer_or_fact_ids if member in selected),
-            explanation_text=group.explanation_text,
-        )
-        for group in authority.incompatibility_groups
-        if sum(member in selected for member in group.offer_or_fact_ids) >= 2
-    )
     return D2ResolvedCommercialPlan(
         promo_blocks=tuple(promo_blocks),
         price_booster_block=booster,
         also_list_block=also,
-        compatibility_blocks=compatibility,
+    )
+
+
+def resolve_d2_commercial_compatibility(
+    *, authority: D2CommercialAuthority | None, published_ids: frozenset[str],
+) -> tuple[D2CompatibilityBlock, ...]:
+    """Check authored groups once, against the complete published positive set."""
+    if authority is None:
+        return ()
+    return tuple(
+        D2CompatibilityBlock(
+            source_client_id=authority.source_client_id,
+            group_id=group.group_id,
+            member_ids=tuple(member for member in group.offer_or_fact_ids if member in published_ids),
+            explanation_text=group.explanation_text,
+        )
+        for group in authority.incompatibility_groups
+        if sum(member in published_ids for member in group.offer_or_fact_ids) >= 2
     )

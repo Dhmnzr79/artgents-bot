@@ -1,3 +1,17 @@
+Owner GO 2026-10-09: Interface §34 — second audit repair group, commercial
+applicability and final published-set compatibility, including neutral data gap.
+Context/model-contract groups remain proposals; no live/commit/push/merge/deploy.
+§34 implemented locally: 77 targeted offline PASS and independent focused Checker
+PASS after correcting partial-result accounting. Cursor/widget acceptance pending;
+full CI and audit groups 3/4 not closed by this checkpoint.
+§34 widget acceptance reopened: owner encountered direct-fact/promo role overlap
+for consultation and discount. Bounded dedup bug fix authorized; keep role guard
+strict, direct applicable fact wins, no new scenario or model call. No commit/push.
+Overlap repair completed locally: 98 targeted offline PASS, focused Checker PASS;
+Cursor focused PASS and owner widget OK. No role-validator weakening.
+Owner authorized the complete 12-file §34 checkpoint commit/push on 2026-10-09;
+foreign WIP excluded. Full CI, remaining audit groups and merge/deploy remain open.
+
 Owner GO 2026-10-09: Interface §33 — first audit repair group only: input privacy
 and paused text cancellation. Other three groups remain proposals. No live,
 commit/push, merge or deploy in this checkpoint; widget WIP remains excluded.

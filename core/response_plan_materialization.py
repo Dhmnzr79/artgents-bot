@@ -91,7 +91,7 @@ from core.d2_content_realization import (
     realize_d2_content,
     realize_d2_unattributed_content,
 )
-from core.d2_commercial_plan import resolve_d2_commercial_plan
+from core.d2_commercial_plan import resolve_d2_commercial_plan, resolve_d2_commercial_compatibility
 from core.response_plan_condition_evidence import materialization_price_scope_label
 from core.response_plan_fact_projection import (
     fact_active_as_of,
@@ -316,24 +316,11 @@ def resolve_d2_operations(
     client_id = sources.material_authority.source_client_id
     if client_id != sources.session_key.client_id:
         raise MaterializationOwnershipError("materialization_client_mismatch")
+    commercial_failures = []
+    prepared_commercial = []
     for operation in commercial_operations:
         texts = []
-        promo_ids = ()
-        if operation.promotion_scope != "none":
-            if operation.promotion_scope == "service" and operation.service_id is None:
-                raise MaterializationContractError("d2_promotion_service_required")
-            local = resolve_d2_commercial_plan(
-                authority=sources.d2_commercial, service_id=operation.service_id,
-                include_packages=False, shown_promo_fact_ids=sources.shown_promo_fact_ids,
-                offer_ids=(), promo_form="full", promotion_scope=operation.promotion_scope,
-                skip_shown=False, max_promo=4,
-                active_promo_ids=frozenset(f.id for f in sources.material_authority.bundle.facts.values() if fact_active_as_of(f, as_of)),
-            )
-            if not local.promo_blocks:
-                raise MaterializationContractError("d2_promotion_no_eligible_facts")
-            texts.extend(b.display_text for b in local.promo_blocks)
-            promo_ids = tuple(b.fact_id for b in local.promo_blocks)
-        facts = _d2_requested_fact_candidates(operation.fact_ids, sources=sources, client_id=client_id, as_of=as_of)
+        missing_fact = False
         topic = operation.topic_id or (unambiguous_topic_for_service_ids(
             sources.material_authority.bundle, (operation.service_id,)
         ) if operation.service_id else None)
@@ -342,19 +329,77 @@ def resolve_d2_operations(
             resolved_topic_id=topic, reference_service_id=operation.service_id,
             implant_context_confirmed=topic == "implantation",
         )
-        facts = tuple(f for f in facts if evaluate_requested_fact_display(
-            fact=f, context=fact_context, evaluation_purpose="requested",
-        ) == "allowed")
-        texts.extend(f.display_text for f in facts)
-        if not texts:
-            raise MaterializationContractError("d2_commercial_fact_required")
+        fact_ids = []
+        bundle = sources.material_authority.bundle
+        for fact_id in operation.fact_ids:
+            fact = bundle.facts.get(fact_id)
+            if fact is None:
+                raise MaterializationContractError("d2_commercial_fact_unknown")
+            if not fact_active_as_of(fact, as_of):
+                missing_fact = True
+                continue
+            outcome = evaluate_requested_fact_display(
+                fact=fact, context=fact_context, bundle=bundle, evaluation_purpose="requested",
+            )
+            if outcome == "allowed":
+                texts.append(fact.text_fact)
+                fact_ids.append(fact.id)
+            elif operation.service_id in fact.excluded_service_ids:
+                # An authored negative answer is not a published positive benefit.
+                texts.append(fact.excluded_scope_text)
+            else:
+                missing_fact = True
+        prepared_commercial.append((operation, texts, fact_ids, missing_fact))
+
+    # Reserve only applicable direct facts, across the whole response, before
+    # assigning promotional roles. Each operation keeps its own scope checks.
+    direct_ids = {i for _, _, ids, _ in prepared_commercial for i in ids}
+    recorded_requested = {i for b in exact_text_blocks for i in b.requested_fact_ids}
+    direct_ids.update(recorded_requested)
+    recorded_promos = {i for b in exact_text_blocks for i in b.promo_fact_ids}
+    for operation, fact_texts, fact_ids, missing_fact in prepared_commercial:
+        texts = []
+        promo_ids = ()
+        if operation.promotion_scope != "none":
+            if operation.promotion_scope == "service" and operation.service_id is None:
+                raise MaterializationContractError("d2_promotion_service_required")
+            local = resolve_d2_commercial_plan(
+                authority=sources.d2_commercial, service_id=operation.service_id,
+                include_packages=False, shown_promo_fact_ids=sources.shown_promo_fact_ids,
+                promo_form="full", promotion_scope=operation.promotion_scope,
+                skip_shown=False, max_promo=4,
+                active_promo_ids=frozenset(f.id for f in sources.material_authority.bundle.facts.values() if fact_active_as_of(f, as_of)),
+            )
+            missing_fact = missing_fact or not bool(local.promo_blocks)
+            visible_promos = tuple(b for b in local.promo_blocks
+                if b.fact_id not in direct_ids and b.fact_id not in recorded_promos)
+            texts.extend(b.display_text for b in visible_promos)
+            promo_ids = tuple(b.fact_id for b in visible_promos)
+            recorded_promos.update(promo_ids)
+            # A separate, fully covered request may repeat approved prose;
+            # it must not invent a gap or register the same fact a second time.
+            if not texts and not fact_texts:
+                texts.extend(b.display_text for b in local.promo_blocks)
+        texts.extend(fact_texts)
+        published_fact_ids = tuple(dict.fromkeys(i for i in fact_ids if i not in recorded_requested))
+        recorded_requested.update(published_fact_ids)
+        if not texts or missing_fact:
+            texts.append("У меня пока недостаточно информации по этому вопросу")
+            commercial_failures.append(D2PartFailureBlock(
+                request_id=operation.request_id, source_client_id=client_id,
+                message_id="d2-commercial-unavailable", reason="d2_commercial_fact_unavailable",
+                display_text="\n\n".join(texts),
+            ))
+            missing_fact = True
         exact_text_blocks = (*exact_text_blocks, D2ExactTextBlock(
             request_id=operation.request_id, source_client_id=client_id,
             display_text="\n\n".join(texts),
-            requested_fact_ids=tuple(f.fact_id for f in facts), promo_fact_ids=promo_ids,
+            requested_fact_ids=published_fact_ids, promo_fact_ids=promo_ids,
         ))
         exact_parts = (*exact_parts, D2ResolvedRequestPart(
-            request_id=operation.request_id, kind="commercial_fact", status="answered", scope="clinic",
+            request_id=operation.request_id, kind="commercial_fact",
+            status="unavailable" if missing_fact else "answered", scope="clinic",
+            failure_reason="d2_commercial_fact_unavailable" if missing_fact else None,
         ))
 
     price_parts = tuple(item for item in operations if item.kind == "price")
@@ -428,7 +473,7 @@ def resolve_d2_operations(
     )
 
     price_block: D2FrozenPriceBlock | None = None
-    failure_blocks: list[D2PartFailureBlock] = []
+    failure_blocks: list[D2PartFailureBlock] = list(commercial_failures)
     deferred_blocks: list[D2PartDeferredBlock] = [D2PartDeferredBlock(request_id=p.request_id, source_client_id=client_id) for p in deferred_price_parts]
     price_failure_reason: str | None = None
     price_scopes_by_id: dict[str, tuple[tuple[str, ...], str, str | None]] = {}
@@ -733,7 +778,9 @@ def resolve_d2_operations(
             sources,
         )
     elif len(commercial_operations) == 1 and not multiple_content_parts:
-        source_content_ref = _d2_direct_fact_source_ref(commercial_operations[0].fact_ids, sources)
+        source_content_ref = _d2_direct_fact_source_ref(
+            tuple(i for block in exact_text_blocks for i in block.requested_fact_ids), sources,
+        )
     shared_content_source = source_content_ref is not None and all(
         part.request_id in content_blocks_by_id
         and content_blocks_by_id[part.request_id].content_ref == source_content_ref
@@ -811,7 +858,6 @@ def resolve_d2_operations(
         commercial_service_id = content_parts[0].service_id if content_parts else None
     else:
         commercial_service_id = None
-    offer_ids = tuple(row.offer_id for row in price_block.rows) if price_block is not None else ()
     active_promo_ids = frozenset(
         fact.id
         for fact in sources.material_authority.bundle.facts.values()
@@ -822,7 +868,6 @@ def resolve_d2_operations(
         service_id=commercial_service_id,
         include_packages=price_block is not None and not direct_promotion and not direct_fact,
         shown_promo_fact_ids=sources.shown_promo_fact_ids,
-        offer_ids=offer_ids,
         promo_form="full" if direct_promotion else "short",
         promotion_scope=promotion_scope if direct_promotion else "service",
         skip_shown=not direct_promotion,
@@ -834,6 +879,17 @@ def resolve_d2_operations(
         sources=sources,
         client_id=client_id,
         as_of=as_of,
+    )
+    published_price_rows = price_block.rows if price_block is not None else ()
+    published_ids = frozenset((
+        *(row.offer_id for row in published_price_rows),
+        *(row.offer_id for detail in detail_blocks for row in detail.rows if not row.missing),
+        *(fact_id for block in exact_text_blocks
+          for fact_id in (*block.requested_fact_ids, *block.promo_fact_ids)),
+        *(block.fact_id for block in commercial.promo_blocks),
+    ))
+    compatibility = resolve_d2_commercial_compatibility(
+        authority=sources.d2_commercial, published_ids=published_ids,
     )
     plan = PreComposerPlan(
         session_key=sources.session_key,
@@ -877,7 +933,7 @@ def resolve_d2_operations(
         }),
         d2_price_booster_block=commercial.price_booster_block,
         d2_also_list_block=commercial.also_list_block,
-        d2_compatibility_blocks=commercial.compatibility_blocks,
+        d2_compatibility_blocks=compatibility,
         commercial_facts=commercial_facts,
     )
     if direct_promotion and not commercial.promo_blocks:

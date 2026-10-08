@@ -204,6 +204,7 @@ def build_d2_directory_response(
             as_of=as_of,
             cta_key="doctor",
             prefer_free_consult=True,
+            service_id=service_id,
         )
         return _answer(
             session_key=session_key,

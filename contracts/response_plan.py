@@ -382,6 +382,7 @@ D2PartFailureReason = Literal[
     "d2_model_prose_link",
     "d2_content_source_missing",
     "d2_price_detail_context_ambiguous",
+    "d2_commercial_fact_unavailable",
 ]
 D2ResultStatus = Literal["complete", "degraded", "failed"]
 D2ContentPublication = Literal["model_prose"]
@@ -1488,8 +1489,16 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
         raise ValueError("d2_exact_text_linkage_invalid")
     for part in exact_parts:
         block = exact_by_id[part.request_id]
-        if part.status != "answered":
+        commercial_gap = (
+            part.kind == "commercial_fact" and part.status == "unavailable"
+            and part.failure_reason == "d2_commercial_fact_unavailable"
+        )
+        if part.status != "answered" and not commercial_gap:
             raise ValueError("d2_exact_text_status_invalid")
+        if commercial_gap:
+            failure = next(b for b in plan.d2_part_failure_blocks if b.request_id == part.request_id)
+            if failure.display_text != block.display_text:
+                raise ValueError("d2_commercial_gap_text_linkage_invalid")
         if (block.requested_fact_ids or block.promo_fact_ids) and part.kind != "commercial_fact":
             raise ValueError("d2_exact_fact_provenance_invalid")
 

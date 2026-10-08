@@ -2435,3 +2435,58 @@ doctors-result projection also remain open. These findings are not fixed by this
 The four proposed repair groups (input/lead, commercial rules, context, model contract)
 are proposals, not implementation authority. No new responsibility or product rule is
 introduced by recording them. Prior widget HTML/CSS and foreign WIP are excluded.
+
+## §33. Audit group 1 — input privacy and paused cancellation, owner GO 2026-10-09
+
+Baseline: `f9f017955aae0ea9f1b369aac545305b891d8bac`, branch
+`codex/d2-stage1-contract`. Owner approved the concrete first-group plan in chat.
+Allowlist: `core/user_text_privacy.py`, `core/d2_lead_bridge.py`,
+`core/d2_dialogue.py`, `tests/test_user_text_privacy_contract_offline.py`,
+`tests/test_d2_lead_interrupt_http.py`,
+`tests/test_tenant_lead_pending_question_offline.py`, this card and Roadmap.
+Foreign widget HTML/CSS, `data/` and SIM-0 remain excluded.
+
+Classification: input-path simplification plus paused-cancellation bug fix.
+Before → after → removed dependency: arbitrary comma prefixes (including `Я …`)
+were structurally guessed as names and deleted before model understanding;
+now only an exact bound profile name is stripped on those two paths.
+The structural name-acceptance calls on both paths are removed. Explicit
+`Меня зовут…` introductions and existing phone/email masking remain.
+Per Contract §3, the model still owns question meaning; privacy only removes
+identified contact data, without a new semantic classifier or exception words.
+
+Paused text cancellation previously bypassed the existing lead owner; now
+the tenant-bound admission gate checks the existing `parse_lead_cancel` only
+for an existing paused lead, then the same owner executes `exit_lead_flow`.
+Ordinary paused questions and cancel text outside a lead remain ordinary turns.
+No new cancellation language, state, payload field, model call or retry.
+
+Acceptance: complete provider-visible question meaning on fresh, pending and
+paused turns; explicit-introduction/bound-name/contact privacy; cancellation
+at paused name and phone slots, PII/pending cleanup, no provider/effect, replay;
+ordinary paused questions retain lead state, UI authenticity and tenant isolation.
+Targeted offline checks and independent Checker precede completion. No live,
+commit, push, merge or deploy is authorized by this checkpoint.
+
+§33 offline evidence, 2026-10-09: **105 passed**, 443.27s across privacy,
+D2 lead interruption, cancel UI and tenant pending-question suites. The 30 new
+cases cover 14 privacy cases and 16 endpoint cases; no skips or failing tests.
+Only the old bare-name privacy fixture was updated to supply an actually bound
+profile name; no substantive assertion was removed. The isolated runner disables
+dotenv loading, blocks network and places logs/SQLite under the evidence folder.
+JUnit: `C:/Users/denis/.codex/visualizations/2026/10/02/01a0fd5a-1bf9-7ed0-9738-a748f948637a/input-lead-check/results.xml`.
+Existing `datetime.utcnow()` deprecation warnings remain outside scope.
+Provider/live/SMTP calls: 0. No whole-CI or live/widget acceptance claimed.
+Independent Checker: **PASS**, no P0/P1; read tests first, traced actual JSON/SSE
+call paths, removed dependency and existing cancellation owner, and independently
+read the JUnit (105 PASS / 0 FAIL / 0 SKIP). No redundant test rerun. PASS is §33
+only; other audit groups, full CI and live/widget acceptance remain open.
+Staging empty; HEAD remains `f9f0179`; no commit/push/merge/deploy.
+
+§33 subsequent acceptance, 2026-10-09: owner reported widget scenarios OK;
+Cursor read-only review also PASS, no P0/P1 or weakened tests. Its two P2 notes
+(the same cancellation predicate evaluated twice and a second pause-flag SQLite
+read) are non-blocking and do not authorize extra refactoring. Widget acceptance
+is the owner's manual report; implementer made no live provider calls.
+Owner then explicitly authorized a separate commit and push of these eight files.
+Other audit groups and foreign WIP remain excluded; merge/deploy not authorized.

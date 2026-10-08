@@ -354,6 +354,7 @@ def run_d2_dialogue_turn(
         if pending_answer is None and lead_gate and d2_lead_needs_pre_provider(
             session_key=session_key,
             lead_ui_ref=lead_ui_ref,
+            user_message=user_message,
         ):
             return _run_lead_pre_provider_turn(
                 session_key=session_key,

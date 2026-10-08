@@ -50,6 +50,76 @@ def _begin(client, fake, transport, sid, *, phone=False):
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
 @pytest.mark.parametrize("phone", [False, True])
+@pytest.mark.parametrize("cancel_text", ["Отменить запись", "Не хочу записываться!"])
+def test_paused_text_cancel_clears_owner_without_model_and_replays(http_env, transport, phone, cancel_text):
+    client, db, use_provider, _ = http_env
+    fake = use_provider(FakeProvider(envelope_adult_booking_only()))
+    sid = "paused-text-cancel"
+    _begin(client, fake, transport, sid, phone=phone)
+    pending = _send(client, transport, sid=sid, request_id="question", q="Как проходит лечение?")
+    fake.raw = _content_raw("Объяснение по материалам клиники.")
+    _send(client, transport, sid=sid, request_id="answer", q="",
+          ref=LEAD_PENDING_ANSWER_REF, ui_revision=pending["revision"])
+    with session_client_scope("demo"):
+        assert mem_get(sid)["lead_intent"] == "paused"
+    # An adverse model result cannot confirm cancellation or overwrite lead state.
+    fake.raw = "{invalid-model-output"
+    args = dict(sid=sid, request_id="cancel", q=cancel_text)
+    cancelled = _send(client, transport, **args)
+    assert len(fake.inputs) == 2
+    assert cancelled["lead_effect"]["status"] == "not_requested"
+    assert not ({LEAD_RESUME_REF, LEAD_CANCEL_REF} & _refs(cancelled))
+    with session_client_scope("demo"):
+        state = mem_get(sid)
+        assert state["lead_intent"] == "none"
+        assert state["lead_resume_step"] == ""
+        assert state["lead_pending_interruption_text"] == ""
+        assert not state["profile"].get("name") and not state["profile"].get("phone")
+    assert _send(client, transport, **args) == cancelled
+    assert len(fake.inputs) == 2
+    with D2DialogueStore(db) as store:
+        saved = store.read_latest_completion(SessionKey(client_id="demo", sid=sid))
+        assert saved.response.rendered_text == cancelled["answer"]
+        assert "Анна" not in store.read(SessionKey(client_id="demo", sid=sid)).model_dump_json()
+
+
+@pytest.mark.parametrize("transport", ["json", "sse"])
+@pytest.mark.parametrize("query", [
+    "По ОМС, сколько стоит имплантация?",
+    "Мне больно, что делать?",
+    "Я взрослый, можно записаться?",
+])
+def test_actual_provider_receives_complete_question_prefix(http_env, transport, query):
+    client, _, use_provider, _ = http_env
+    fake = use_provider(FakeProvider(_content_raw("Ответ модели по теме вопроса.")))
+    _send(client, transport, sid="prefix", request_id="fresh", q=query)
+    assert fake.inputs[-1].user_message == query
+    fake = use_provider(FakeProvider(envelope_adult_booking_only()))
+    _begin(client, fake, transport, "pending-prefix", phone=True)
+    pending = _send(client, transport, sid="pending-prefix", request_id="question", q=query)
+    fake.raw = _content_raw("Ответ на вопрос во время записи.")
+    answered = _send(client, transport, sid="pending-prefix", request_id="answer", q="",
+                     ref=LEAD_PENDING_ANSWER_REF, ui_revision=pending["revision"])
+    assert fake.inputs[-1].user_message == query
+    followup = _send(client, transport, sid="pending-prefix", request_id="followup", q=query)
+    assert fake.inputs[-1].user_message == query
+    assert _refs(followup) == _refs(answered) == {LEAD_RESUME_REF, LEAD_CANCEL_REF}
+    with session_client_scope("demo"):
+        assert mem_get("pending-prefix")["profile"]["name"] == "Анна"
+        assert mem_get("pending-prefix")["lead_intent"] == "paused"
+
+
+@pytest.mark.parametrize("transport", ["json", "sse"])
+def test_cancel_text_outside_lead_remains_ordinary_turn(http_env, transport):
+    client, _, use_provider, _ = http_env
+    fake = use_provider(FakeProvider(_content_raw("Если появятся вопросы, спрашивайте.")))
+    _send(client, transport, sid="no-lead", request_id="cancel", q="Отменить запись")
+    assert len(fake.inputs) == 1
+    assert fake.inputs[0].user_message == "Отменить запись"
+
+
+@pytest.mark.parametrize("transport", ["json", "sse"])
+@pytest.mark.parametrize("phone", [False, True])
 def test_pending_question_gets_d2_answer_and_resumes_exact_slot(http_env, transport, phone):
     client, db, use_provider, _ = http_env
     fake = use_provider(FakeProvider(envelope_adult_booking_only()))

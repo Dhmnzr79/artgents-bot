@@ -486,7 +486,7 @@ def test_mixed_phone_not_auto_submit(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_provider_privacy_strips_contacts() -> None:
-    q = prepare_lead_pending_provider_question("Анна, а сколько стоит All-on-4?")
+    q = prepare_lead_pending_provider_question("Анна, а сколько стоит All-on-4?", profile_name="Анна")
     assert q and "Анна" not in q and "All-on-4" in q
     q2 = prepare_lead_pending_provider_question("Мой номер +79991234567, а рассрочка есть?")
     assert q2 and "7999" not in q2 and "1234567" not in q2 and "рассрочка" in q2.lower()

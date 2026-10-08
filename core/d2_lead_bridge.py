@@ -42,6 +42,7 @@ from lead_interrupt import (
     LEAD_PENDING_CONTINUE_NAME_REF,
     LEAD_PENDING_RETRY_PHONE_REF,
     LEAD_RESUME_REF,
+    parse_lead_cancel,
 )
 from name_gate import accept_lead_name
 from session import (
@@ -55,6 +56,7 @@ from session import (
     mark_booking_intent_ever,
     mem_get,
     peek_lead_activity,
+    peek_lead_paused,
     resume_lead_from_pause,
     set_lead_intent,
     set_lead_pending_interruption,
@@ -182,11 +184,12 @@ def d2_lead_needs_pre_provider(
     *,
     session_key: SessionKey,
     lead_ui_ref: str | None,
+    user_message: str,
 ) -> bool:
     """True when the turn must short-circuit before the D1R provider.
 
     Ordinary D2 turns may probe the client binding but never read session mem.
-    Active-lead short-circuit runs only when the bound
+    Active lead and paused text cancellation run only when the bound
     session client exactly matches ``session_key.client_id``.
     A mismatched binding fails closed.
     """
@@ -207,7 +210,9 @@ def d2_lead_needs_pre_provider(
         _, active_lead = peek_lead_activity(session_key.sid)
     except SessionClientNotBoundError:
         return False
-    return active_lead
+    return active_lead or (
+        peek_lead_paused(session_key.sid) and parse_lead_cancel(user_message)
+    )
 
 
 def resolve_d2_booking_lead_entry(

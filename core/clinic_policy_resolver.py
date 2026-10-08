@@ -43,9 +43,9 @@ def resolve_clinic_policies(
         operations=understanding.requests, request_ages={r.request_id: _subject_age(understanding.subjects, r.subject_id) for r in understanding.requests})
 
 
-def resolve_clinic_policy_operations(*, client_id, operations, request_ages=None):
+def resolve_clinic_policy_operations(*, client_id, operations, request_ages=None, policy_keys=None):
     """Apply existing clinic rules to narrow operations, without model envelope."""
-    allowed_keys = _pack_policy_keys(client_id)
+    allowed_keys = _pack_policy_keys(client_id) if policy_keys is None else frozenset(policy_keys)
     decisions: list[ClinicPolicyRequestDecision] = []
     ledger: list[RequestLedgerEntry] = []
     suppress_booking = False

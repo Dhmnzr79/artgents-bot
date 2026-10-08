@@ -256,6 +256,21 @@ def _clinic_policy_catalog_json(snapshot: D2TenantSnapshot) -> str:
             answer = body.get("approved_text")
             if isinstance(brand_id, str) and brand_id.strip() and isinstance(answer, str) and answer.strip():
                 brand_rows.append({"brand_id": brand_id.strip(), "answer": answer.strip()})
+    service_rows: list[dict[str, object]] = []
+    raw_services = parsed.get("service_alternatives") if isinstance(parsed, dict) else None
+    if isinstance(raw_services, list):
+        for body in raw_services:
+            if not isinstance(body, dict):
+                continue
+            requested = body.get("requested_service_id")
+            alternatives = body.get("alternative_service_ids")
+            if not isinstance(requested, str) or not requested.strip() or not isinstance(alternatives, list):
+                continue
+            ids = list(dict.fromkeys(item.strip() for item in alternatives
+                if isinstance(item, str) and item.strip() and item.strip() != requested.strip()))[:2]
+            answer = body.get("approved_text")
+            if ids and isinstance(answer, str) and answer.strip():
+                service_rows.append({"requested_service_id": requested.strip(), "alternative_service_ids": ids})
     contact = parsed.get("contact") if isinstance(parsed, dict) else None
     branch_rows: list[dict[str, object]] = []
     branches = contact.get("branches") if isinstance(contact, dict) else None
@@ -279,6 +294,7 @@ def _clinic_policy_catalog_json(snapshot: D2TenantSnapshot) -> str:
             "policies_available": bool(rows),
             "policies": rows,
             "brand_policies": brand_rows,
+            "service_alternatives": service_rows,
             "contact_branches": branch_rows,
         },
         ensure_ascii=False, separators=(",", ":"), sort_keys=True,

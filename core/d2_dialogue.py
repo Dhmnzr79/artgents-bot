@@ -53,6 +53,7 @@ from core.d2_snapshot_sources import (
     build_d2_manual_contact_terminal_response,
     build_d2_snapshot_sources,
     build_d2_clinic_policy_response,
+    d2_authored_policy_answers,
     build_d2_brand_policy_response,
     build_d2_service_availability_response,
     build_d2_unknown_reference_response,
@@ -776,6 +777,7 @@ def _run_reserved_d2_dialogue_turn(
     commercial_operations = []
     directory_cta = None
     suppress_forbidden_booking_cta = False
+    policy_keys = d2_authored_policy_answers(tenant)
     for block in result.blocks:
         if block.kind == "booking":
             continue
@@ -841,10 +843,10 @@ def _run_reserved_d2_dialogue_turn(
             continue
         if isinstance(block, PolicyOperation):
             policy = resolve_clinic_policy_operations(client_id=session_key.client_id,
-                operations=(block,))
+                operations=(block,), policy_keys=policy_keys)
             suppress_forbidden_booking_cta |= policy.suppress_forbidden_booking_cta
             answer = build_d2_clinic_policy_response(
-                tenant, session_key=session_key, request=block,
+                tenant, session_key=session_key, request=block, policy_result=policy,
             )
             # Rules have already been applied to this local operation. The final
             # renderer receives code-owned text, not a second route decision.
@@ -853,24 +855,34 @@ def _run_reserved_d2_dialogue_turn(
                 policy_ids=tuple(dict.fromkeys(d.policy_key for d in policy.decisions
                     if d.outcome == "allowed_by_known_rules" and d.policy_key))))
             exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
-                kind="reference", status="answered", scope="clinic"))
+                kind="clarification" if answer.resolved.route == "CLARIFY" else "reference",
+                status="answered", scope="clinic"))
             continue
         if isinstance(block, CommercialOperation):
             commercial_operations.append(block)
             continue
         if isinstance(block, PriceOperation):
             policy = resolve_clinic_policy_operations(client_id=session_key.client_id,
-                operations=(block,))
+                operations=(block,), policy_keys=policy_keys)
             suppress_forbidden_booking_cta |= policy.suppress_forbidden_booking_cta
             blocked = tuple(d.policy_key for d in policy.decisions if d.outcome == "blocked" and d.policy_key)
             if blocked:
                 rule = PolicyOperation(request_id=block.request_id, kind="clinic_policy",
                     policy_ids=blocked, age_group=block.age_group, context=block.context)
                 answer = build_d2_clinic_policy_response(tenant, session_key=session_key,
-                    request=rule)
+                    request=rule, policy_result=policy)
                 exact_text.append(D2ExactTextBlock(request_id=block.request_id,
                     source_client_id=session_key.client_id, display_text=answer.rendered_text,
                     policy_ids=blocked))
+                exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
+                    kind="price_reference", status="answered", scope="clinic"))
+                continue
+            if any(d.outcome == "needs_clarification" for d in policy.decisions):
+                # The payment is known; the clinic rule is absent. Publish the existing gap.
+                answer = build_d2_clinic_policy_response(tenant, session_key=session_key,
+                    request=block, policy_result=policy)
+                exact_text.append(D2ExactTextBlock(request_id=block.request_id,
+                    source_client_id=session_key.client_id, display_text=answer.rendered_text))
                 exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
                     kind="price_reference", status="answered", scope="clinic"))
                 continue
@@ -889,7 +901,10 @@ def _run_reserved_d2_dialogue_turn(
             exact_text.append(D2ExactTextBlock(request_id=block.request_id,
                 source_client_id=session_key.client_id, display_text=reference_response.rendered_text))
             exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
-                kind="price_reference" if is_price else "reference", status="answered", scope="clinic"))
+                kind="price_reference" if is_price else "reference", status="answered",
+                scope="service" if isinstance(target, ServiceTarget) else "clinic",
+                service_id=target.id if isinstance(target, ServiceTarget) else None,
+                brand_id=brand))
             # These producers publish an exact availability/reference fact,
             # with no service-choice UI. Only explicit clarification owns a task.
             continue
@@ -943,7 +958,9 @@ def _run_reserved_d2_dialogue_turn(
             d2_request_parts=(*response.resolved.d2_request_parts, booking_part),
             d2_exact_text_blocks=(*response.resolved.d2_exact_text_blocks,
                 D2ExactTextBlock(request_id=booking_part.request_id,
-                    source_client_id=session_key.client_id, display_text=booking.response.rendered_text)),
+                    source_client_id=session_key.client_id, display_text=booking.response.rendered_text,
+                    policy_ids=tuple(dict.fromkeys(i
+                        for b in booking.response.resolved.d2_exact_text_blocks for i in b.policy_ids)))),
             ui_plan=booking.response.resolved.ui_plan,
             textual_cta_block=None,
             d2_result_status=("degraded" if any(part.status != "answered"

@@ -585,7 +585,7 @@ def build_d2_manual_contact_terminal_response(
     )
 
 
-def _authored_policy_answers(snapshot: D2TenantSnapshot) -> dict[str, str]:
+def d2_authored_policy_answers(snapshot: D2TenantSnapshot) -> dict[str, str]:
     raw = _clinic_policies_raw(snapshot).get("policies")
     if not isinstance(raw, dict):
         return {}
@@ -636,7 +636,7 @@ def build_d2_clinic_policy_response(
     snapshot: D2TenantSnapshot,
     *,
     session_key: SessionKey,
-    understanding=None, request=None,
+    understanding=None, request=None, policy_result=None,
 ) -> MaterializedResponseOutcome:
     """B10/D2-068: typed policy_ids → authored answers from tenant snapshot.
 
@@ -644,31 +644,32 @@ def build_d2_clinic_policy_response(
     """
     if snapshot.client_id != session_key.client_id:
         raise D2SnapshotBindingError("policy_client_mismatch")
-    answers = _authored_policy_answers(snapshot)
+    answers = d2_authored_policy_answers(snapshot)
     if request is None:
         request = understanding.requests[0]
-        age = next((s.age_group for s in understanding.subjects if s.subject_id == request.subject_id), "unknown")
-    else:
-        age = request.age_group
-    inferred: list[str] = list(request.policy_ids)
-    if request.payment_scheme_intent == "eligibility_question":
-        payment_key = {"oms": "no_oms", "dms": "no_dms"}.get(request.payment_scheme)
-        if payment_key and payment_key not in inferred:
-            inferred.append(payment_key)
-    if (
-        age == "child"
-        and request.context != "past_history"
-        and "no_pediatric_dentistry" not in inferred
-        and "no_pediatric_dentistry" in answers
-    ):
-        inferred.append("no_pediatric_dentistry")
-
+    if policy_result is None:
+        from core.clinic_policy_resolver import resolve_clinic_policy_operations
+        if understanding is not None:
+            # Historical direct helper: keep its input shape, use the same snapshot keys.
+            from core.clinic_policy_resolver import _subject_age
+            policy_result = resolve_clinic_policy_operations(
+                client_id=session_key.client_id, operations=(request,),
+                request_ages={request.request_id: _subject_age(understanding.subjects, request.subject_id)},
+                policy_keys=answers,
+            )
+        else:
+            policy_result = resolve_clinic_policy_operations(
+                client_id=session_key.client_id, operations=(request,), policy_keys=answers,
+            )
+    inferred = tuple(dict.fromkeys(d.policy_key for d in policy_result.decisions
+        if d.request_id == request.request_id and d.policy_key))
     if not inferred:
-        # Ambiguous «по полису?» without typed id/scheme → clarify (B10).
+        ambiguous = (request.kind == "clinic_policy" and not request.policy_ids
+            and request.payment_scheme == "unspecified")
         return _d2_code_owned_answer(
             session_key=session_key,
-            text=_POLICY_CLARIFY,
-            route="CLARIFY",
+            text=_POLICY_CLARIFY if ambiguous else _INFO_GAP,
+            route="CLARIFY" if ambiguous else "ANSWER",
         )
 
     texts: list[str] = []
@@ -710,7 +711,7 @@ def build_d2_clinic_policy_fact_block(
     )
     if request is None or request.kind != "clinic_policy" or not request.policy_ids:
         raise D2SnapshotBindingError("mixed_policy_id_required")
-    answers = _authored_policy_answers(snapshot)
+    answers = d2_authored_policy_answers(snapshot)
     policy_ids = tuple(dict.fromkeys(request.policy_ids))
     texts = [answers.get(policy_id) for policy_id in policy_ids]
     if any(text is None for text in texts):

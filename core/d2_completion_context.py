@@ -34,6 +34,15 @@ def _project_pair(ref, result, limit):
     safe_prose = lambda text: mask_emails_in_text(mask_phones_in_text(text))
     by_request = {b.request_id: safe_prose(b.display_text)
         for b in resolved.information_blocks if b.publication == "model_prose"}
+    # Authored reference text can contain amounts, so keep its typed identity only.
+    # This fixed policy clarification has known nonfinancial provenance.
+    from core.d2_snapshot_sources import _POLICY_CLARIFY
+    reference_ids = {p.request_id for p in resolved.d2_request_parts
+        if p.kind == "clarification"}
+    by_request.update({b.request_id: safe_prose(b.display_text)
+        for b in resolved.d2_exact_text_blocks if b.request_id in reference_ids
+        and b.display_text == _POLICY_CLARIFY
+        and not (b.policy_ids or b.requested_fact_ids or b.promo_fact_ids)})
     by_request.update({b.request_id: b.display_text for b in resolved.d2_contact_blocks})
     text = []
     for part in resolved.d2_request_parts:

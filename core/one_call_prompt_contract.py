@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from config import SALES_ONE_PLUS_MODEL
 
-ONE_CALL_PROMPT_CONTRACT_VERSION = 39
+ONE_CALL_PROMPT_CONTRACT_VERSION = 40
 ONE_CALL_MODEL_SNAPSHOT = SALES_ONE_PLUS_MODEL
 
 ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS = """When D2_SELECTED_UI_REF is null, there is no selected UI action. When it is an object, it is a server-validated typed action identity from the current revision. It is not patient text; do not create, authorize, or infer any UI/lead action from it. Use its typed identity with D2_SESSION_CONTEXT and, when present, D2_SELECTED_DOCUMENT_ACTION.
@@ -318,6 +318,12 @@ A target is either service(id), topic(id), or unresolved; do not duplicate
 service/topic/status at the top. Use unresolved for an unidentified named term,
 not to claim that the clinic does not provide a service. Use the catalog ID
 for a known inactive service; code owns its availability statement.
+A known inactive service is identified, not ambiguous: return a completed content,
+price or price_detail operation with that original service target. The server owns
+its approved availability answer and alternatives. Do not turn a proposed alternative
+into clarification choices or silently substitute it for the requested service.
+Service clarification is only for genuine ambiguity between distinct possible meanings,
+not for requesting consent to an alternative. A single alternative is not a choice menu.
 Contact fields must match the question (phone/address/hours/parking), not
 default to phone. Choose branch ID only when the branch is identified.
 Clinic policies and commercial facts use exact string IDs supplied by this tenant.

@@ -2364,3 +2364,74 @@ Final checkpoint inventory (23 files, exact; §30 + §31):
 Staging remains empty, HEAD 8dccb3b; no commit/push/merge/deploy. Foreign data/
 and docs/tasks/DEMO_D2_SIM0_TASK.md unchanged and excluded. Historical suites
 outside the requested CI jobs are not certified green by this checkpoint.
+
+
+## §32. Clinic policy route consistency — owner GO 2026-10-08
+
+Baseline f593248, codex/d2-stage1-contract, root C:/Cursor Projects/artgents-bot-active;
+origin/main cdeddc4, merge-base f593248. Existing widget-test.html/widget.css WIP
+and foreign data/ and DEMO_D2_SIM0_TASK.md are outside this checkpoint.
+Snapshot policy authority is architecture simplification: cached filesystem keys
+plus repeated age/payment inference -> captured tenant answers + one resolver decision
+-> remove cached loader and duplicate inference from all reachable D2 policy/booking paths.
+Sole decision owner remains clinic_policy_resolver; §3 responsibility is unchanged.
+Execution/projection fixes and prompt instruction are bug fixes, not simplification.
+Exact allowlist: core/clinic_policy_resolver.py, core/d2_snapshot_sources.py,
+core/d2_dialogue.py, core/d2_lead_bridge.py, core/d2_completion_context.py,
+core/one_call_prompt_contract.py, core/d2_tenant_snapshot.py, tests/test_d2_policy_route_fixes.py,
+this card and DEMO_D2_DELIVERY_ROADMAP.md.
+Known inactive services retain their original typed ID; alternatives are not ambiguity
+choices or user-selected services. Singleton clarification remains invalid.
+Ambiguous insurance question uses existing clarification part + ordinary history;
+no new payment axis/pending state. Explicit payment with absent clinic rule uses the
+existing information gap, without silently continuing a payable price.
+Completion projection retains reference identities, the fixed insurance clarification and
+effective policy IDs. Captured service_alternatives IDs enter the existing model catalog;
+arbitrary authored reference text stays in receipts, since it may contain money.
+No full rendered financial answer, prices/details/promos or PII copied.
+Pure booking refusal keeps applied policy IDs without duplicate displayed text.
+Mixed child/adult booking semantics and generic expansion of policy registry are excluded.
+No new fields, session schema, semantic classifier, retries, model calls or recovery.
+Tests: JSON/SSE decisions/UI/replay/history, captured rules vs legacy loader, empty
+registry, inactive services, strict bad outputs, payment gaps, lead/privacy boundaries.
+Astra consulted before implementation. Offline-only; live quality remains unverified.
+Implementation authorization initially excluded commit/push/merge/deploy/provider calls.
+Owner subsequently authorized a separate §32 checkpoint commit and push; merge/deploy
+and new live provider calls remain unauthorized.
+
+§32 implementation evidence, 2026-10-08:
+- Removed cached policy-key lookup from active D2 policy/price/booking calls and
+  duplicate age/payment inference from the policy text producer. The historical
+  understanding wrapper remains outside the active D2 route; its API was not deleted.
+- Added existing resolver-result consumption, clarification part/history, explicit
+  payment information-gap execution, original inactive-service identity and captured
+  alternative IDs, and booking refusal policy-ID projection. No schema/state/calls added.
+- New regression cases: 26 PASS across two isolated network-blocked runs (22 + 4).
+  Related main run: 157 PASS / 7 FAIL, 675.68s; edge run: 4 PASS, 28.20s.
+  All seven failures belong to historical D1-envelope test_d2_lead_scenarios.py;
+  clean HEAD f593248 archive reproduces exactly the same seven (1 PASS / 7 FAIL).
+  These tests were neither weakened nor migrated in this checkpoint.
+- Artifacts under allowed visualization root: policy-route-check-6cr6u0fp,
+  policy-edge-check-1qyieaxc, policy-head-baseline-ueyb_oxo (JUnit results.xml).
+- Live/provider/SMTP: 0. Prompt guidance does not prove live inactive-service
+  recognition; user widget acceptance remains necessary.
+- Scope limitation: after prior price service A, a missing insurance rule for service B
+  may retain A's discussion pointer (existing clinic-scope price_reference behavior).
+  No new carry semantics introduced. Mixed child/adult booking remains excluded.
+- Staging empty; HEAD f593248 unchanged. Widget HTML/CSS WIP and foreign data/,
+  DEMO_D2_SIM0_TASK.md preserved. No commit/push/merge/deploy.
+- Independent Checker: PASS for §32, no P0/P1. Actual call path, new tests and
+  all three JUnit reports reviewed; seven legacy failures independently confirmed.
+  P2 gap carry limitation remains explicit. No live/widget acceptance claimed.
+
+§32 checkpoint limitation after full read-only Astra audit, 2026-10-08:
+The narrow offline PASS is not full architecture or live acceptance. Audit reproduced
+six open mechanisms: comma-prefix privacy stripping loses question meaning;
+commercial applicability can reject a valid operation and cancel independent answers;
+stale offer refs survive topic change; doctors CTA ignores free-consult applicability;
+direct promotions can lose mandatory compatibility copy; paused lead text cancellation
+does not reach its existing owner. Model schema/parser/executor mismatches and incomplete
+doctors-result projection also remain open. These findings are not fixed by this commit.
+The four proposed repair groups (input/lead, commercial rules, context, model contract)
+are proposals, not implementation authority. No new responsibility or product rule is
+introduced by recording them. Prior widget HTML/CSS and foreign WIP are excluded.

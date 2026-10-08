@@ -1,3 +1,17 @@
+Owner GO 2026-10-08: Interface §32 — clinic-policy consistency. Captured rules
+and one resolver decision replace cached D2 keys/repeated inference; retain existing
+clarification/reference history and booking policy IDs; correct known inactive-service
+prompt usage. No new model call, memory/state, price prose or registry redesign.
+Mixed child/adult booking remains open. Offline/Checker and later owner live acceptance
+are separate; this does not close SIM4/SIM5/REC5.
+§32 implemented offline: new 26 PASS; related 157 PASS / seven exact clean-HEAD
+legacy failures plus four edge PASS. Independent Checker PASS; live acceptance pending.
+Owner authorized a separate §32 checkpoint commit/push after the 2026-10-08 full
+read-only Astra audit. Full acceptance remains open: input privacy corruption,
+commercial executability/CTA/compatibility, stale offer context and paused lead
+text cancellation were reproduced. Details and limits are in Interface §32.
+Four repair groups are proposed only; no implementation GO or SIM4/SIM5/REC5 closure.
+
 # D2 — действующая дорожная карта демо-диалога
 
 ## Актуальный порядок после независимого аудита — 2026-10-02

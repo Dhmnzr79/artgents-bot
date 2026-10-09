@@ -1,0 +1,3 @@
+# False positive: offline test evidence prose, no credential or private payload.
+# Restricted to this finding in the preserved checkpoint, not the whole file/rule.
+bc26997ced1f3988b76b121c7e5aa51b14bc0f54:docs/tasks/DEMO_D2_INTERFACE_TASK.md:generic-api-key:2673

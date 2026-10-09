@@ -127,13 +127,16 @@
 
 /* Однотонные кнопки в основном цвете клиента. */
 .clinic-shell__launcher.clinic-shell__launcher--demo {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   width: auto;
   max-width: none;
   margin: 0;
   padding: 14px 26px;
   border: none;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--clinic-brand);
   color: #fff;
   font-family: inherit;
@@ -155,6 +158,14 @@
   -webkit-appearance: none;
   outline: none;
   animation: clinic-demo-launcher-pulse 9s ease-in-out infinite;
+}
+
+.clinic-shell__launcher--demo::after {
+  content: "";
+  flex: 0 0 18px;
+  width: 18px;
+  height: 14px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 14' fill='none'%3E%3Cpath d='M1 7h16M11 1l6 6-6 6' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 .clinic-shell__launcher--demo:hover {

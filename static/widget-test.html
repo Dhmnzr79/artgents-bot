@@ -29,6 +29,27 @@
       font-size: 0.9em;
       color: #f0f2ff;
     }
+
+    .topic-section {
+      margin-top: 24px;
+      padding: 20px;
+      border: 1px solid #444a68;
+    }
+
+    .topic-button {
+      padding: 12px 18px;
+      border: 0;
+      border-radius: 0;
+      background: #0C2FE0;
+      color: #fff;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .topic-button:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 3px;
+    }
   </style>
 </head>
 <body>
@@ -53,6 +74,18 @@
       <a href="debug/ask-inspector.html"><code>/static/debug/ask-inspector.html</code></a>
       — её можно целиком удалить вместе с папкой <code>static/debug/</code>, на виджет она не влияет.
     </p>
+    <section class="topic-section">
+      <h2>Страх боли</h2>
+      <p>Спросите консультанта, как проходит имплантация и что помогает уменьшить дискомфорт.</p>
+      <button type="button" class="topic-button" data-widget-question="Я боюсь боли при имплантации. Расскажите, как проходит обезболивание и что я буду чувствовать.">Обсудить страх боли</button>
+    </section>
+    <section class="topic-section">
+      <h2>Приживаемость имплантов</h2>
+      <p>Узнайте о приживлении и гарантиях клиники.</p>
+      <button type="button" class="topic-button" data-widget-question="От чего зависит приживаемость имплантов и что будет, если имплант не приживётся?">Узнать о приживаемости</button>
+    </section>
+    <p>Обе кнопки продолжают тот же чат. Для проверки сначала поговорите через кнопку внизу, сверните чат и выберите тему здесь. Не сбрасывайте SID.</p>
+    <p id="topic-status" role="status" aria-live="polite"></p>
   </main>
 
   <script type="application/json" id="clinic-widget-config">
@@ -94,6 +127,36 @@
     const mount = document.createElement("div");
     document.body.appendChild(mount);
     mountWidget(mount, config);
+
+    const topicStatus = document.getElementById("topic-status");
+    const launcher = mount.querySelector("[data-clinic-launcher-open], [data-clinic-launcher]");
+    const input = mount.querySelector("[data-clinic-input]");
+    const form = mount.querySelector("[data-clinic-composer-form]");
+    const send = mount.querySelector("[data-clinic-send]");
+
+    for (const button of document.querySelectorAll("[data-widget-question]")) {
+      button.addEventListener("click", () => {
+        if (launcher.getAttribute("aria-expanded") !== "true") launcher.click();
+        if (input.inputMode === "numeric") {
+          topicStatus.textContent = "Сначала завершите или отмените ввод телефона в чате, затем выберите тему.";
+          return;
+        }
+        if (input.value.trim() || mount.querySelector(".clinic-shell__welcome-screen.is-leaving")) {
+          topicStatus.textContent = "Сначала отправьте текущий вопрос или дождитесь начала ответа.";
+          return;
+        }
+        input.value = button.dataset.widgetQuestion;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        if (send.disabled) {
+          input.value = "";
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          topicStatus.textContent = "Дождитесь ответа или завершите повторную отправку в чате, затем выберите тему.";
+          return;
+        }
+        topicStatus.textContent = "";
+        form.requestSubmit(send);
+      });
+    }
   </script>
 </body>
 </html>

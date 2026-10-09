@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.d2_ci_http import completed_context
+
 import json
 import os
 import shutil
@@ -349,8 +351,9 @@ def test_stage2_keeps_ordered_price_refs_without_price_text_for_second_option_fo
         store_path=store_path,
     )
     offer_ids = _offer_ids(first)
-    assert len(offer_ids) == 3
-    assert [item.offer_id for item in saved.state.d2_shown_price_offer_refs] == list(offer_ids)
+    assert offer_ids == ("classic.one_tooth.implantium", "one_stage.one_tooth.implantium")
+    with D2DialogueStore(store_path) as store:
+        assert [item.offer_id for item in completed_context(store, key).ordinary.d2_shown_price_offer_refs] == list(offer_ids)
     assert len(saved.state.dialogue_pairs) == 1
     assert saved.state.dialogue_pairs[0].request_id == first.request_id
 
@@ -370,7 +373,8 @@ def test_stage2_keeps_ordered_price_refs_without_price_text_for_second_option_fo
     ]
     assert "historical_price_offers" not in provider.inputs[0].context.ordinary.model_dump()
     assert all(not hasattr(item, "display_text") for item in carried)
-    assert [item.offer_id for item in saved.state.d2_shown_price_offer_refs] == list(offer_ids)
+    with D2DialogueStore(store_path) as store:
+        assert [item.offer_id for item in completed_context(store, key).ordinary.d2_shown_price_offer_refs] == list(offer_ids)
 
 
 def test_stage2_bounds_live_prose_pairs_and_expires_them_with_context(tmp_path: Path) -> None:

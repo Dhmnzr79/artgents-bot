@@ -864,7 +864,7 @@ class D2PriceScopeChoice(ResponsePlanModel):
 
 class D2ResolvedRequestPart(ResponsePlanModel):
     request_id: NonBlankStr
-    kind: Literal["price", "price_detail", "content", "contact", "clinic_policy", "clarification", "reference", "commercial_fact", "price_clarification", "price_reference"]
+    kind: Literal["price", "price_detail", "content", "contact", "clinic_policy", "doctors", "clarification", "reference", "commercial_fact", "price_clarification", "price_reference"]
     status: Literal["answered", "unavailable", "deferred"]
     failure_reason: D2PartFailureReason | None = None
     discussion_scope: DiscussionScope | None = None
@@ -879,9 +879,15 @@ class D2ResolvedRequestPart(ResponsePlanModel):
 
     @model_validator(mode="after")
     def _validate_d2_part(self) -> Self:
-        if self.kind in {"price", "price_detail", "contact", "clinic_policy"} and self.content_ref is not None:
+        if self.kind == "doctors" and (
+            self.scope != "service" or self.service_id is None
+            or self.discussion_scope is None
+            or self.discussion_scope.service_id != self.service_id
+        ):
+            raise ValueError("d2_doctors_part_scope_invalid")
+        if self.kind in {"price", "price_detail", "contact", "clinic_policy", "doctors"} and self.content_ref is not None:
             raise ValueError("d2_price_part_content_ref_forbidden")
-        if self.kind in {"price", "price_detail", "contact", "clinic_policy"} and self.content_section_refs:
+        if self.kind in {"price", "price_detail", "contact", "clinic_policy", "doctors"} and self.content_section_refs:
             raise ValueError("d2_price_part_section_refs_forbidden")
         if self.content_section_refs and self.content_ref is None:
             raise ValueError("d2_section_refs_require_content_ref")
@@ -932,7 +938,7 @@ class D2ResolvedRequestPart(ResponsePlanModel):
                 raise ValueError("d2_price_detail_part_status_invalid")
             if self.content_publication is not None or self.snapshot_fingerprint is not None:
                 raise ValueError("d2_exact_fact_part_content_provenance_forbidden")
-        elif self.kind in {"contact", "clinic_policy"}:
+        elif self.kind in {"contact", "clinic_policy", "doctors"}:
             if self.status != "answered" or self.failure_reason is not None:
                 raise ValueError("d2_exact_fact_part_status_invalid")
             if self.content_publication is not None or self.snapshot_fingerprint is not None:
@@ -1483,7 +1489,7 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
         raise ValueError("d2_request_part_content_block_duplicate")
     content_by_request = {block.request_id: block for block in plan.information_blocks}
     exact_by_id = {b.request_id: b for b in plan.d2_exact_text_blocks}
-    exact_parts = [p for p in parts if p.kind in {"clarification", "reference", "commercial_fact", "price_clarification", "price_reference"}
+    exact_parts = [p for p in parts if p.kind in {"clarification", "reference", "doctors", "commercial_fact", "price_clarification", "price_reference"}
                    and not (p.kind == "clarification" and p.status == "deferred")]
     if len(exact_by_id) != len(plan.d2_exact_text_blocks) or {p.request_id for p in exact_parts} != set(exact_by_id):
         raise ValueError("d2_exact_text_linkage_invalid")

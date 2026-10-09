@@ -3,6 +3,8 @@ from core.d2_completion_context import discussion_scope
 import json
 from datetime import datetime, timedelta, timezone
 
+from tests.d2_ci_http import completed_context
+
 import pytest
 
 from contracts.response_plan import SessionKey
@@ -422,7 +424,7 @@ def test_switch_discards_previous_service_price_details(http_env, target):
     fake.raw = raw(explanation("Расскажу о протезировании.", target=target))
     assert post(client, request_id="switch", q="Расскажите о протезировании.").status_code == 200
     with D2DialogueStore(db) as store:
-        assert not store.read(SessionKey(client_id="demo", sid="cp6a")).state.d2_shown_price_offer_refs
+        assert not completed_context(store, SessionKey(client_id="demo", sid="cp6a")).ordinary.d2_shown_price_offer_refs
     fake.raw = raw(explanation("Пояснение.", request_id="r1"),
         {"kind": "price_detail", "request_id": "r2", "price_detail_aspect": "includes"})
     answer = post(client, request_id="next", q="А что входит?")

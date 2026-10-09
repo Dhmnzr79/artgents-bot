@@ -964,3 +964,21 @@ and current acceptance. This supersedes earlier statements preserving that
 particular intake; ordinary lead/privacy and all §3 protections remain required.
 No UI or model mechanism is added. Historical storage/legacy helpers remain
 untouched; reintroduction needs explicit approval. See INTERFACE_TASK §30.
+
+## Audit group 3 — owner GO, 2026-10-09
+
+§34 committed/pushed as `49cf0b4`, Cursor PASS and owner widget acceptance.
+Next: INTERFACE_TASK §35 removes independent persisted current offers and derives
+them from completed results/current discussion. Doctors retain their existing
+typed provenance in safe history. No new carry policy, memory or model call.
+Schema 6 requires a new local conversation; saved leads are not removed.
+Offline and independent Checker evidence follows; group 4 remains separate.
+
+§35 implementation/offline checkpoint complete: final 80 passed plus focused
+continuation 1 passed after reproducing and correcting its pre-existing count
+expectation on clean HEAD. Checker PASS; 0 live calls, no commit/push.
+Cursor PASS subsequently received. Owner authorized a separate §35 commit/push.
+Live/widget acceptance remains open: correct context was delivered, but whitening
+includes produced invalid_envelope/unrelated prose and second-doctor follow-up
+selected the first doctor. See card for evidence. These model-output defects and
+historical suites are not closed by §35; group 4 remains next.

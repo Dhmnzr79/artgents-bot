@@ -2593,3 +2593,89 @@ Cursor focused review PASS, no blockers/test weakening/scope creep, SAFE_TO_COMM
 Owner then explicitly authorized commit and push of the complete 12-file §34
 checkpoint, including the overlap fix. Widget HTML/CSS, data/ and SIM-0 remain
 excluded. Full CI, groups 3/4 and merge/deploy are not authorized or closed here.
+
+## §35 — audit group 3: completed-result context (owner GO, 2026-10-09)
+
+Baseline: `49cf0b4d003abbba4e977e6851a2234690547835`, branch
+`codex/d2-stage1-contract`, permanent root `C:/Cursor Projects/artgents-bot-active`.
+origin/main `cdeddc4952254b7c8d7e96201d8fb77bf5267e73`; merge base
+`c085c387b1a6ef278d6e83387082f1542759f9c1`. Staging empty at entry.
+Foreign widget HTML/CSS, untracked data/ and SIM-0 preserved and excluded.
+
+Classification: offer context is architecture simplification; preserving the
+doctors result type is a bug fix. Before: discussion receipt plus separately
+updated persisted offer list. After: current scope and offers read from completed
+results by the existing context projection owner (§3). Remove the state field,
+two helpers and both ordinary/non-price offer writers. Existing input refs remain
+a derived projection, not a parallel memory. Latest published rows replace refs;
+non-price results retain input refs only for the same nonempty scope. Pending,
+mixed, expired and changed scopes cannot retain them. Missing price/detail does
+not resurrect old offers. Price policy gaps preserve the original valid target.
+Contacts retain discussion as before; no new semantic carry rules.
+
+Doctors keep the existing operation's type through exact publication, rendering
+and safe bounded history, including public names/order. General financial
+reference text remains excluded. No new memory, field, classifier, retry or model
+call. State schema 5→6 rejects old local sessions; owner uses New conversation.
+No automatic recovery, migration or deletion of saved leads.
+
+Exact allowlist: `contracts/d2_session_context.py`, `contracts/response_plan.py`,
+`core/d2_session_context.py`, `core/d2_completion_context.py`, `core/d2_dialogue.py`,
+`core/response_text_renderer.py`, `tests/d2_ci_http.py`,
+`tests/test_d2_session_context.py`, `tests/test_d2_sim3_completion_context.py`,
+`tests/test_d2_continuation_scenarios.py`, `tests/test_d2_sim2_dialogues.py`,
+this card and `docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md`.
+Tests migrate assertions to actual completion projection, preserving ownership,
+money/privacy, pending, TTL, real UI and replay checks. Offline targeted checks
+and independent Checker required; live/commit/push/merge/deploy not authorized.
+
+Historical REC-4/old stage3 suites still contain superseded D1 envelopes or
+patient-state expectations and are outside this checkpoint; no legacy restoration
+or wholesale test migration is claimed. Current D2 assertions use the real
+completion projection. Checker caught loss of scope after a targetless detail:
+final publication now freezes the existing input descriptor only for resolved
+rows belonging to the verified input refs, with no explicit target/volume/brand.
+Explicit model parameters remain authoritative; no phrase parsing or new memory.
+
+§35 final evidence: coherent final selection had **80 passed, 1 baseline failure**,
+271.05s. The old continuation assertion expected three overview offers. Clean
+tracked HEAD export reproduced the identical failure (1 failed, 11.55s), with
+the existing two SIM-4 offer IDs. Assertion now checks those exact ordered IDs,
+not merely a count; publication/next-input/both stored projections stay checked.
+Focused final continuation recheck: **1 passed**, 11.67s. No remaining failure
+in the selected checkpoint. Counts from earlier runs are not added to these.
+The remaining 80 final checks cover TTL/schema, JSON/SSE contacts beyond bounded
+history, same/new/ambiguous/pending scopes, explicit missing DMS policy, exact
+doctors names/order and adverse shapes, missing detail exclusion, replay and
+tenant/receipt ownership. Pre-existing child-price denial and absent-payment-rule
+checks pass. Dependency collection: **366 collected**, 7.43s, no import errors;
+collection is not execution. Existing utcnow deprecation warnings remain.
+
+Artifacts under `C:/Users/denis/.codex/visualizations/2026/10/02/01a0fd5a-1bf9-7ed0-9738-a748f948637a/`:
+`context-route-final/results.xml`, `context-continuation-recheck/results.xml`,
+`context-baseline-check/results.xml`, `context-helper-collection/output.txt`.
+Network/dotenv blocked; isolated SQLite/logs. Provider/live/SMTP calls: **0**.
+Independent Checker: **PASS** after focused repair, no open P1/test weakening;
+read actual paths and JUnit, no edits or test reruns. Original separate carrier
+and both helpers/writers removed; existing guards remain. Added only derived
+completion read and preserved doctors type/provenance, not prompt rules.
+Saved leads untouched. Full CI, live understanding, Cursor/widget acceptance
+and group 4 remain open. `git diff --check` clean. HEAD `49cf0b4`, staging empty,
+no commit/push/merge/deploy. Thirteen checkpoint files; foreign widget WIP hashes
+unchanged, data/ and SIM-0 preserved and excluded.
+
+§35 checkpoint authorization, 2026-10-09: owner supplied Cursor **PASS**, no
+blockers/test weakening/scope creep, SAFE_TO_WIDGET_TEST=YES, and explicitly
+authorized commit/push of these 13 files. Independent Checker PASS remains
+scoped to the completed-result mechanism, not live interpretation quality.
+Owner widget run confirmed correct input context but exposed two open model
+defects: professional_whitening → targetless includes returned an unrelated
+root array and failed parsing (invalid_envelope); doctors list → second doctor
+received the complete correct list/order but selected Kuznetsov (first) instead
+of Orlov (second). Whitening includes data is empty, but this observed failure
+occurred at parse before missing-detail execution. No new fix or provider call
+was made during the read-only log investigation. Live/widget acceptance is
+therefore not closed. Group 4 must address model-contract reliability and test
+context use without treating schema compliance as proof of semantic correctness.
+Checkpoint preserves this known debt; it does not authorize merge/deploy.
+Foreign widget HTML/CSS, data/ and SIM-0 remain excluded and untouched.

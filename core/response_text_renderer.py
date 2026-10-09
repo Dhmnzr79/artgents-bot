@@ -47,7 +47,7 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
                 parts.append(failures_by_request[part.request_id].display_text.strip())
             elif part.status == "deferred":
                 parts.append(deferred_by_request[part.request_id].display_text.strip())
-            elif part.kind in {"clarification", "reference", "commercial_fact", "price_clarification", "price_reference"}:
+            elif part.kind in {"clarification", "reference", "doctors", "commercial_fact", "price_clarification", "price_reference"}:
                 parts.append(exact_by_request[part.request_id].display_text.strip())
             elif part.kind == "price":
                 if plan.d2_price_block is not None and plan.patient_text:

@@ -835,7 +835,6 @@ export function mountWidget(root, config) {
           <div class="clinic-shell__feed" data-clinic-feed></div>
         </main>
         <form class="clinic-shell__composer" data-clinic-composer-form>
-          <div class="clinic-shell__error" data-clinic-err hidden></div>
           <div class="clinic-shell__composer-inner">
             <textarea class="clinic-shell__textarea" rows="1" data-clinic-input placeholder="Введите сообщение" aria-label="Введите сообщение"></textarea>
             <button type="submit" class="clinic-btn-send" data-clinic-send disabled aria-label="Отправить сообщение">${SEND_BTN_SVG}</button>
@@ -868,7 +867,6 @@ export function mountWidget(root, config) {
   const input = root.querySelector("[data-clinic-input]");
   const sendBtn = root.querySelector("[data-clinic-send]");
   const composerForm = root.querySelector("[data-clinic-composer-form]");
-  const errBox = root.querySelector("[data-clinic-err]");
   const unreadDot = root.querySelector("[data-clinic-unread]");
   const btnClose = root.querySelector("[data-clinic-close]");
   const launcherTeaserEl = root.querySelector("[data-clinic-launcher-teaser]");
@@ -1597,35 +1595,49 @@ export function mountWidget(root, config) {
   }
 
   function setError(msg) {
-    const displayMessage = friendlyErrorMessage(msg);
-    state.errorLine = displayMessage || "";
-    if (msg) {
-      errBox.textContent = displayMessage;
-      if (state.retryBody) {
-        const retry = document.createElement("button");
-        retry.type = "button";
-        retry.textContent = "Повторить запрос";
-        retry.addEventListener("click", () => {
-          const body = state.retryBody;
-          if (!body || state.pending) return;
-          setError("");
-          beginPendingRequest(body);
-          void runStreamAsk(feed, apiBase, body);
-        });
-        errBox.appendChild(retry);
-      }
-      errBox.hidden = false;
-      if (clientId === "demo") {
-        const fresh = document.createElement("button");
-        fresh.type = "button";
-        fresh.textContent = "Новая беседа";
-        fresh.addEventListener("click", resetSession);
-        errBox.appendChild(fresh);
-      }
-    } else {
-      errBox.textContent = "";
-      errBox.hidden = true;
+    state.errorLine = friendlyErrorMessage(msg) || "";
+  }
+
+  function renderErrorTurn() {
+    if (!state.errorLine) return;
+    const wrap = document.createElement("div");
+    wrap.className = "clinic-turn clinic-turn--error";
+    wrap.setAttribute("data-clinic-err", "");
+    wrap.setAttribute("aria-live", "polite");
+    wrap.appendChild(createPlainAttributionEl(config.botName));
+    const bubble = document.createElement("div");
+    bubble.className = "clinic-msg clinic-msg--bot";
+    const text = document.createElement("div");
+    text.className = "clinic-msg__body";
+    text.textContent = state.errorLine;
+    bubble.appendChild(text);
+    wrap.appendChild(bubble);
+    const controls = document.createElement("div");
+    controls.className = "clinic-turn__error-actions";
+    if (state.retryBody) {
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "clinic-btn-ghost";
+      retry.textContent = "Повторить запрос";
+      retry.addEventListener("click", () => {
+        const body = state.retryBody;
+        if (!body || state.pending) return;
+        setError("");
+        beginPendingRequest(body);
+        void runStreamAsk(feed, apiBase, body);
+      });
+      controls.appendChild(retry);
     }
+    if (clientId === "demo") {
+      const fresh = document.createElement("button");
+      fresh.type = "button";
+      fresh.className = "clinic-btn-ghost";
+      fresh.textContent = "Новая беседа";
+      fresh.addEventListener("click", resetSession);
+      controls.appendChild(fresh);
+    }
+    if (controls.children.length) wrap.appendChild(controls);
+    feed.appendChild(wrap);
   }
 
   /**
@@ -1818,6 +1830,7 @@ export function mountWidget(root, config) {
       feed.appendChild(wrap);
     });
 
+    renderErrorTurn();
     const typingWrap = document.createElement("div");
     typingWrap.className = "clinic-shell__typing-wrap";
     fillTypingLabel(typingLabel, typingLabelForPhase(state.typingPhase));

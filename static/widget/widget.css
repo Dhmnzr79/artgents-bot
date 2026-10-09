@@ -1272,6 +1272,13 @@
   border: 1px solid #fecaca;
 }
 
+.clinic-turn__error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .clinic-btn-ghost {
   padding: 8px 12px;
   font-size: 13px;
@@ -1284,6 +1291,24 @@
 .clinic-btn-ghost:focus-visible {
   outline: none;
   box-shadow: var(--clinic-focus);
+}
+
+.clinic-turn__error-actions .clinic-btn-ghost {
+  flex: 0 1 auto;
+  max-width: 100%;
+  padding: 5px 12px;
+  border: 1px solid var(--clinic-action);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--clinic-action);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.clinic-turn__error-actions .clinic-btn-ghost:hover {
+  border-color: var(--clinic-action-hover);
+  color: var(--clinic-action-hover);
 }
 
 .clinic-shell__video-overlay {

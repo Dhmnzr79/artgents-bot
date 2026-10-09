@@ -330,5 +330,70 @@ Checkpoint 1B принят для сохранения commit/push. Модель
 
 Точки реализации: `setError`/`renderFeed` в `static/widget/widget.js`,
 `.clinic-shell__error` в `static/widget/widget.css`, копия в `static/widget/api.js`.
-Сейчас только записан план, runtime/UI не изменён. До демонстрации — targeted
-UI/offline проверки, Cursor и widget acceptance владельца.
+При согласовании был записан только план. Реализация и evidence — в 1C ниже;
+до демонстрации требуются Cursor и widget acceptance владельца.
+
+### Checkpoint 1C — спокойное отображение сбоя, owner GO 2026-10-09
+
+Baseline `b56db62`, ветка `codex/model-price-experiment`; preflight: чистая
+рабочая папка/staging, foreign WIP нет; `origin/main`/merge-base `efa3f77`.
+Классификация: presentation bug fix, не архитектурное упрощение.
+Существующий `errorLine` показывается обычным bot turn в feed, с plain-подписью,
+без записи в messages/server completion и без отдельной красной панели.
+Это временное отображение текущего сбоя: очищается при следующем запросе,
+повторе или явном reset как прежняя панель. Существующие manual retry/new chat
+controls сохраняются; новые вызовы, автоматический reset/retry не добавляются.
+Серверные статусы, логирование, последняя опубликованная UI revision и заявка
+не меняются. Сообщения demo quotas сохраняют отдельную копию и действующие лимиты.
+Config error вне диалога не меняется.
+
+Exact allowlist: `static/widget/widget.js`, `static/widget/api.js`,
+`static/widget/widget.css`, `tests/js/d2_widget_harness.mjs`,
+`tests/js/d2_error_copy.mjs`, `docs/tasks/DEMO_MODEL_PRICE_EXPERIMENT.md`.
+Acceptance: ошибка внутри feed как обычный текст, только имя бота; нет source
+подписи/клинического CTA/технических деталей, повтор сохраняет request ID,
+продолжение сохраняет SID, reset только явный, quota copy не заменена общим
+сбоем. JSON/SSE/network/accepted UI preservation и браузерный DOM/CSS offline.
+Checker → Cursor → widget. Live/provider/SMTP budget 0.
+
+#### Evidence 1C
+
+Удалены отдельный dialogue error DOM-slot и его `errBox` writer. `setError`
+теперь обновляет прежний errorLine; renderFeed выводит его через обычные bot
+классы и plain attribution. Manual retry/new chat controls перенесены туда же.
+CSS добавляет только раскладку этих controls; config error CSS не менялся.
+Новых сообщений в серверной/клиентской истории, payload, revision или вызовов нет.
+
+- `node --check static/widget/widget.js` и JS harness: PASS.
+- `node tests/js/d2_error_copy.mjs`: PASS — JSON/SSE/network copy, сохранение
+  accepted UI, прежний same-ID transport replay и отдельные quota сообщения.
+- Network-blocked offline runner, label `1c-browser-verified`,
+  `tests/test_d2_widget_replay.py::test_real_d2_payloads_render_and_retry_in_browser`:
+  **1 passed**, 19.99s. Это headless browser с реальными D2 fake-provider
+  HTTP-payloads, mock browser fetch и временными tenant/БД.
+  DOM/CSS: ошибка внутри feed, цвет как у обычного текста, plain имя без source,
+  без красной панели/клинического CTA; явный retry с прежним request ID,
+  продолжение с тем же SID, quota copy и явная новая беседа.
+- Старый harness остановился на `scope UI missing`: искал volume через link
+  selector, хотя baseline уже использует chips. Selector актуализирован без
+  ослабления label/ref/ui_revision/click assertions. Точная ошибка воспроизведена
+  на виджете/harness из `b56db62` во временном `1c-baseline-harness.mjs`.
+  Mock reply теперь привязывает SID к текущему запросу для проверки продолжения
+  без reset; это browser fixture, не runtime изменение tenant/authentication.
+
+Артефакты/JUnit/payloads вне Git в `d2-stage1-5omr8j_3`; сырой пользовательский
+диалог не копировался. Provider/live/SMTP calls: 0. `git diff --check` чист.
+Шесть файлов allowlist, staging пуст, foreign WIP нет; commit/push не выполнялись.
+Независимый Checker: **PASS 1C**; проследил API callbacks, все setError callers,
+feed/controls/retryBody, отсутствие поддельного completion и ослабления tests.
+Focused recheck добавленной проверки нового SID после явного reset:
+ослабления нет, runtime PASS сохраняется. Cursor/widget acceptance ещё впереди.
+
+Cursor: PASS 1C; владелец проверил виджет и подтвердил обычное оформление сбоя.
+Дополнение по просьбе владельца: controls «Повторить» / «Новая беседа» оформлены
+компактными чипсами без заливки, с фирменной обводкой 1px и круглым радиусом.
+Изменение только CSS внутри error-actions; callbacks, запросы и остальные
+ghost-кнопки не меняются. Дополнение — presentation bug fix.
+Над чипсами отступ 10px по последнему уточнению владельца. Focused Checker
+подтвердил изоляцию chip CSS и сохранение focus-style; финальный отступ —
+только CSS, `git diff --check` чист. Owner GO: сохранить 1C и продолжить.

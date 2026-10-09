@@ -5,6 +5,7 @@ const source = fs.readFileSync(new URL("../../static/widget/api.js", import.meta
 const { postAsk, streamAsk, friendlyErrorMessage, TECHNICAL_ERROR_MESSAGE } =
   await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
 assert.equal(friendlyErrorMessage(""), "");
+assert.equal(TECHNICAL_ERROR_MESSAGE, "Сейчас не получилось ответить. Понимаю, что это неудобно. Попробуйте задать другой вопрос.");
 for (const code of ["d2_invalid_turn", "d2_turn_failed", "request_in_progress", "private exception details"])
   assert.equal(friendlyErrorMessage(code), TECHNICAL_ERROR_MESSAGE);
 const body = { sid: "offline", client_id: "demo", request_id: "stable", q: "test" };

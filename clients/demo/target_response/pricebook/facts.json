@@ -6,7 +6,7 @@
     "text_fact": "Поможем подготовить документы для оформления налогового вычета за лечение.",
     "render_mode": "strict",
     "active": true,
-    "detail_ref": "clinic__info__payment_terms.md#nalogovyj-vychet",
+    "detail_ref": "clinic__info__payment_terms.md#korotko",
     "allowed_service_ids": [
       "aligners",
       "all_on_4",
@@ -41,7 +41,7 @@
     "microfact_text": "Рассрочка до 12 месяцев, оформление на консультации.",
     "render_mode": "strict",
     "active": true,
-    "detail_ref": "clinic__info__payment_terms.md#rassrochka",
+    "detail_ref": "clinic__info__payment_terms.md#korotko",
     "allowed_service_ids": [
       "classic",
       "one_stage",
@@ -180,7 +180,7 @@
     "microfact_text": "Оплата по этапам лечения.",
     "render_mode": "strict",
     "active": true,
-    "detail_ref": "clinic__info__payment_terms.md#oplata-po-etapam",
+    "detail_ref": "clinic__info__payment_terms.md#korotko",
     "allowed_service_ids": [
       "classic",
       "one_stage",
@@ -207,7 +207,7 @@
     "microfact_text": "Стоимость фиксируется в договоре.",
     "render_mode": "strict",
     "active": true,
-    "detail_ref": "clinic__info__payment_terms.md#fiksatsiya-stoimosti",
+    "detail_ref": "clinic__info__payment_terms.md#korotko",
     "allowed_service_ids": [
       "aligners",
       "all_on_4",

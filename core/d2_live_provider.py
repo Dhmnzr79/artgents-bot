@@ -90,7 +90,9 @@ def build_d2_d1r_messages(request: D2ProviderInput) -> tuple[dict[str, str], dic
     system = "\n\n".join((
         one_call_contract_header(),
         "=== D2_OPERATIONS_INSTRUCTIONS ===\n" + D2_OPERATIONS_INSTRUCTIONS,
-        "=== D2_RESULT_SCHEMA ===\n" + json.dumps(D2DialogueResult.model_json_schema(), ensure_ascii=False),
+        "=== D2_RESULT_SCHEMA ===\n" + json.dumps(
+            D2DialogueResult.model_json_schema(), ensure_ascii=False, separators=(",", ":"),
+        ),
         request.model_view.service_reference_catalog.block_text(),
         request.model_view.active_service_catalog.block_text(),
         request.model_view.commercial_fact_catalog.block_text(),

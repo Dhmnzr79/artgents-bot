@@ -5,7 +5,6 @@ topic: prosthetics
 subtopic: implant_supported_prosthetics
 
 aliases:
-  - "протезирование на имплантах"
   - "зубы на имплантах"
   - "несъемные зубы на имплантах"
   - "несъёмные зубы на имплантах"

@@ -397,3 +397,66 @@ ghost-кнопки не меняются. Дополнение — presentation 
 Над чипсами отступ 10px по последнему уточнению владельца. Focused Checker
 подтвердил изоляцию chip CSS и сохранение focus-style; финальный отступ —
 только CSS, `git diff --check` чист. Owner GO: сохранить 1C и продолжить.
+
+### Checkpoint 2A — измерение входа и компактная сериализация, 2026-10-09
+
+1C сохранён и отправлен: `7c78ea3723042523ea3de489abfd10914d50a62c`.
+Baseline 2A — тот же commit, ветка `codex/model-price-experiment`;
+`origin/main`/merge-base `efa3f77`, working tree/staging чистые, foreign WIP нет.
+Exact allowlist: `core/d2_live_provider.py`, этот файл.
+Классификация: оптимизация представления, не архитектурное упрощение.
+Owner GO — продолжить подготовку эксперимента. Модельные цены ещё не включены.
+
+Offline измерение реального ordinary prompt Demo до изменения:
+- system: 158917 символов; user начального запроса: 701;
+- APPROVED_MD_CORPUS: 115588 символов, 58 документов;
+- D2_OPERATIONS_INSTRUCTIONS: 14067;
+- JSON schema: 17510 без заголовка;
+- остальные каталоги/заголовки и разделители составляют остаток.
+
+В JSON схемы удаляются только сериализационные пробелы: 17510 → 16160
+символов. Экономия 1350 символов, около 0,85% исходного system prompt.
+Ни title, ни descriptions, defaults, constraints, required, discriminator,
+$defs или другие поля не удаляются. Ожидаемый system после: 157567 символов.
+Known-task path не содержит эту схему и должен остаться побайтно прежним.
+Весь корпус, каталоги, context, IDs, порядок offers, policy и binding сохраняются.
+Количество символов — не количество токенов и не доказанная экономия расходов:
+локальный tokenizer отсутствует, реальные provider calls запрещены бюджетом 0.
+
+Astra consultation: начинать с сериализации; не удалять blanket null/defaults,
+документы, service/brand/source bindings или catalog IDs. Основной объём — корпус;
+более существенное сокращение требует отдельной карты использования/дублирования.
+Оно пока не выполнено, весь этап 2 этим checkpoint не закрывается.
+
+Transport сейчас посылает `response_format={type: json_object}`; `llm.py`
+передаёт kwargs SDK без запрета json_schema. Это не подтверждает фактическую
+поддержку strict schema endpoint/model. Transport/схема проверки не переключаются.
+
+Acceptance: decoded JSON отправленной схемы полностью равен прежнему,
+все остальные system/user части ordinary и known-task побайтно равны baseline;
+сохранены полный корпус, ограничения clarification и валидность prompt examples.
+Offline → независимый Checker → Cursor; provider/live/SMTP budget 0.
+
+#### Evidence 2A
+
+Network-blocked сравнение с исходником provider из `git show 7c78ea3`:
+decoded schema полностью равна baseline и текущему `D2DialogueResult`;
+ordinary остальные system/user части совпадают побайтно. Все 58 полных MD
+сохранены. Known-task system/user совпадают побайтно (system 117703 символа).
+Ordinary system измерен: 158917 → 157567 символов, ровно 1350 разницы.
+Числовые отчёты `2a-prompt-inventory.json`, `2a-equivalence.json` вне Git,
+в прежнем temporary artifact root `d2-stage1-5omr8j_3`; сырые prompt/ПД не сохранены.
+
+`2a-prompt-guards.xml`: 8 passed, 1 failed. Прошли фактически отправленная схема,
+шесть prompt examples через parser и изоляция authorized explanation/known task.
+Единственный fail `test_prompt_contains_the_complete_tenant_fullcontext_corpus_and_policies`
+ожидает устаревшую инструкцию `content_ref: exact filename ...`.
+`2a-baseline.xml` подтверждает тот же fail на provider из `7c78ea3`.
+Содержательная отдельная проверка полного корпуса и равенства схемы прошла;
+старый тест/промпт под его строку не менялись.
+
+Тесты не изменялись; staging пуст, provider/live/SMTP 0; commit/push 2A не выполнялись.
+Независимый Checker и Cursor проверяют только этот узкий checkpoint;
+весь этап 2, дубли корпуса и модельные цены ещё не закрыты.
+Checker: PASS 2A, блокеров/test weakening/scope creep нет; прочитаны отчёты
+равенства и оба JUnit. Следующий шаг — Cursor review этого узкого diff.

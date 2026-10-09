@@ -5,7 +5,6 @@ topic: treatment
 subtopic: teeth_treatment
 
 aliases:
-  - "лечение зубов"
   - "лечить зубы"
   - "вылечить зубы"
   - "стоматологическое лечение"

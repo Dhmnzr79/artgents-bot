@@ -144,8 +144,8 @@ def test_payment_terms_document_restored() -> None:
 
 def test_facts_have_payment_and_promo_detail_refs() -> None:
     facts = json.loads(_FACTS_PATH.read_text(encoding="utf-8"))
-    assert facts["installment_12"]["detail_ref"] == "clinic__info__payment_terms.md#rassrochka"
-    assert facts["payment_stages"]["detail_ref"] == "clinic__info__payment_terms.md#oplata-po-etapam"
+    assert facts["installment_12"]["detail_ref"] == "clinic__info__payment_terms.md#korotko"
+    assert facts["payment_stages"]["detail_ref"] == "clinic__info__payment_terms.md#korotko"
     assert (
         facts["implant_same_day_discount"]["detail_ref"]
         == "clinic__info__promo__implant_same_day_discount.md#korotko"

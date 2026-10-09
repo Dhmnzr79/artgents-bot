@@ -5,7 +5,6 @@ topic: implantation
 subtopic: all_on_4_vs_all_on_6
 
 aliases:
-  - "all-on-4 или all-on-6"
   - "все на 4 или все на 6"
   - "что лучше all-on-4 или all-on-6"
   - "4 или 6 имплантов на челюсть"

@@ -5,7 +5,6 @@ topic: implantation
 subtopic: bone_graft_vs_all_on_4
 
 aliases:
-  - "костная пластика или all-on-4"
   - "наращивание кости или all-on-4"
   - "синус-лифтинг или all-on-4"
   - "что лучше костная пластика или все на 4"

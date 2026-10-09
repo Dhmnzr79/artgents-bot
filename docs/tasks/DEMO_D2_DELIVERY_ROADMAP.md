@@ -997,3 +997,15 @@ decision; §36 does not close this remaining contract issue or the whole group.
 preliminary wider run 93 passed before price-scope correction. No provider/live
 calls or whole-CI/widget acceptance. Independent Checker PASS for narrow §36;
 price-contract decision and live errors remain open, not whole-group closure.
+
+## Сохранение baseline и следующий эксперимент — 2026-10-09
+
+Owner согласовал сохранение текущей работы и отдельную ветку для модельных
+ценовых ответов в той же постоянной папке. PR #22 влит после зелёного CI;
+baseline `efa3f77`, тег `checkpoint/pre-model-price-2026-10-09` сохранён на GitHub.
+Локальные данные заархивированы; старые worktree и базы не удалялись.
+Текущий активный план — [DEMO_MODEL_PRICE_EXPERIMENT.md](DEMO_MODEL_PRICE_EXPERIMENT.md).
+Этот checkpoint только документационный: модельная ценовая проза ещё не
+включена, §3 не изменён, вся группа 4 и известные live-ошибки не объявлены закрытыми.
+Большая чистка старого сборщика и корпуса клиента остаётся отдельной последующей
+работой, а не условием минимального эксперимента. Live-бюджет требуется отдельно.

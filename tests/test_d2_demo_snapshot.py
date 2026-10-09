@@ -184,13 +184,20 @@ def test_real_price_and_section_are_ordered(reverse: bool) -> None:
     assert [button.button_id for button in outcome.ui_projection.buttons] == ["consult"]
 
 
-def test_overview_readiness_is_not_optional_ui() -> None:
+def test_missing_overview_is_a_price_part_gap_not_snapshot_failure() -> None:
     snapshot = load_d2_tenant_snapshot("demo", clients_root=Path("clients"))
     view = build_d2_model_view(snapshot)
-    payload = {"outcome":"dialogue","blocks":[_request('r1', 'price', topic_id='implantation')]}
+    assert any(item.content_ref.startswith("whitening__") for item in snapshot.content)
+    assert "whitening" not in {item.topic_id for item in view.direction_prices}
+    payload = {"outcome":"dialogue","blocks":[_request('r1', 'price', topic_id='whitening')]}
     envelope = parse_production_envelope_json(json.dumps(payload, ensure_ascii=False), active_service_catalog=view.active_service_catalog, service_reference_catalog=view.service_reference_catalog, commercial_fact_catalog=view.commercial_fact_catalog, d2_contract=True)
-    with pytest.raises(D2SnapshotBindingError, match="direction_overview_not_configured"):
-        build_d2_snapshot_sources(snapshot, model_view=view, operations=envelope.blocks, session_key=SessionKey(client_id='demo', sid='overview'))
+    sources = build_d2_snapshot_sources(snapshot, model_view=view, operations=envelope.blocks, session_key=SessionKey(client_id='demo', sid='overview'))
+    outcome = resolve_d2_operations(envelope.blocks, sources, as_of=_AS_OF)
+    assert outcome.resolved.d2_result_status == "failed"
+    assert outcome.resolved.d2_price_block is None
+    assert outcome.resolved.d2_request_parts[0].failure_reason == "d2_no_price_candidates"
+    assert "цена не указана" in outcome.rendered_text
+    assert "₽" not in outcome.rendered_text
 
 
 def test_real_path_never_calls_legacy_or_network(monkeypatch: pytest.MonkeyPatch) -> None:

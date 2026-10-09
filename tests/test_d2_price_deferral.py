@@ -8,7 +8,6 @@ from pydantic import ValidationError
 from contracts.response_plan import D2_PRICE_DEFERRAL_TEXT
 from contracts.response_plan_materialization import (
     D2PartFailureAuthority,
-    MaterializationOwnershipError,
 )
 from core.response_plan_materialization import resolve_d2_operations
 from core.response_text_renderer import render_response_text
@@ -152,10 +151,15 @@ def test_deferred_price_is_frozen_linked_and_does_not_rerender_or_change_ui() ->
         _part("r2", "price", service_id=None, topic_id="foreign_topic"),
     ],
 )
-def test_deferred_price_foreign_tenant_reference_fails_closed(deferred) -> None:
-    with pytest.raises(MaterializationOwnershipError, match="materialization_foreign_material"):
-        resolve_d2_operations(
-            (_envelope([_price("r1", "service_one"), deferred])).blocks,
-            _sources_ab(),
-            as_of=_AS_OF,
-        )
+def test_absent_deferred_price_does_not_publish_or_discard_first_price(deferred) -> None:
+    outcome = resolve_d2_operations(
+        (_envelope([_price("r1", "service_one"), deferred])).blocks,
+        _sources_ab(), as_of=_AS_OF,
+    )
+    assert outcome.resolved.d2_result_status == "degraded"
+    assert [p.status for p in outcome.resolved.d2_request_parts] == ["answered", "deferred"]
+    assert {r.service_id for r in outcome.resolved.d2_price_block.rows} == {"service_one"}
+    assert [b.request_id for b in outcome.resolved.d2_part_deferred_blocks] == ["r2"]
+    assert outcome.rendered_text.count(D2_PRICE_DEFERRAL_TEXT) == 1
+    assert outcome.resolved.finalized_commercial_ids.price_offer_ids == tuple(
+        r.offer_id for r in outcome.resolved.d2_price_block.rows)

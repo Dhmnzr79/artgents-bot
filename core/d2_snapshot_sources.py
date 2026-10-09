@@ -232,14 +232,9 @@ def build_d2_snapshot_sources(
     # snapshot-binding hard errors. Foreign tenant identity stays fatal above.
     # Soft-fail happens in the materializer as d2_content_source_missing.
 
-    # Broad prices require explicit authored direction membership and order.
+    # Ordinary price availability belongs to materialization. Missing authored
+    # overview must not discard independently answerable operations.
     configured_topics = {item.topic_id for item in model_view.direction_prices}
-    if any(
-        request.kind == "price" and request.service_id is None and request.topic_id is not None
-        and request.topic_id not in configured_topics
-        for request in operations
-    ):
-        raise D2SnapshotBindingError("direction_overview_not_configured")
 
     tone = _yaml_file(snapshot, "tone.yaml")
     ui_yaml = _yaml_file(snapshot, "ui.yaml")

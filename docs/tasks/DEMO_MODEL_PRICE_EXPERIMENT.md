@@ -211,8 +211,103 @@ Owner GO на примере «Сколько стоит отбеливание 
 клика, другие fact/policy/source ID и принятая очередь детской/payment/brand
 policy не ослабляются этим решением. Единую границу нужно спроектировать с
 удалением прежних разрозненных решений, без нового классификатора или retry.
-Изменение ещё не реализовано. Сначала Cursor/widget для 1A, затем отдельный
-allowlist и проверки этой части; не объявлять весь этап закрытым по PASS 1A.
+На момент согласования изменение ещё не было реализовано. Очередность:
+Cursor/widget для 1A, затем отдельный allowlist и проверки этой части.
+Реализация и приёмка 1B записаны ниже; весь этап 1 этим не закрывается.
+
+### Checkpoint 1B — общая граница ordinary price, owner GO 2026-10-09
+
+Baseline `cbe4628` (1A сохранён и pushed), та же ветка
+`codex/model-price-experiment`, чистый checkout, staging пуст, foreign WIP нет.
+Классификация: архитектурное упрощение узкой ценовой границы и согласованное
+изменение исхода отсутствующих данных; не полное упрощение D2.
+
+До: отсутствие overview обрывает snapshot binding, затем отдельная проверка
+membership scope обрывает материализацию всех частей. После: ordinary price
+разрешается materializer по текущему проверенному снимку; отсутствующий ID
+или обзор даёт существующий price failure, независимая часть сохраняется.
+Удаляемая зависимость: snapshot binding и предварительная membership-проверка
+больше не принимают решение о доступности обычной цены. Единственный владелец
+этого решения — существующая материализация price по §3.
+
+Astra проверила общую границу: низкоуровневый `_d2_price_block` также используется
+price_detail, поэтому его строгие ownership проверки не смягчаются. Отсутствующая
+ordinary-price услуга получает gap только в существующей обработке ordinary price.
+Подтверждённый чужой source/session/view/UI/offer остаётся fatal. Детская/payment/
+brand policy и проверенные клики сохраняют прежнюю очередь и авторизацию.
+Исполняется первая цена; последующие остаются deferred, без поиска замены.
+
+Exact allowlist: `core/d2_snapshot_sources.py`,
+`core/response_plan_materialization.py`, `tests/test_d2_price_reference_gaps.py`,
+`tests/test_d2_demo_snapshot.py`, `tests/test_d2_price_deferral.py`,
+`docs/tasks/DEMO_MODEL_PRICE_EXPERIMENT.md`.
+Allowlist расширен одним существующим deferred-тестом: отсутствие обычного ID
+раньше называлось foreign без доказательства tenant mismatch; новое ожидание
+проверяет сохранение первой цены и отсутствие публикации отложенной.
+Проверки: JSON/SSE, цена отдельно/с адресом в обоих порядках, неизвестные service/
+topic и известная тема без обзора, доступная цена, replay/следующий context,
+первый/последующий отсутствующий ID; price_detail, tenant/UI и policy guards.
+Без live-вызовов, новых полей, fallback, классификатора, второго вызова или памяти.
+Порядок приёмки: Checker → Cursor → widget; результаты записаны ниже.
+
+#### Evidence 1B
+
+Runtime реализован в двух указанных файлах. Удалены snapshot overview gate,
+membership helper и оба его reachable вызова; отсутствующий ordinary target
+разрешается внутри существующей price-materialization обработки, без общего
+catch ownership errors. Строгий общий price/detail helper не изменён.
+Отсутствующий direction сохраняет исходный topic без поиска другой услуги;
+чужая authority найденного direction отклоняется.
+
+Артефакты в прежней temporary-папке `d2-stage1-5omr8j_3` вне Git:
+- `1b-red.xml`: 22 failed на исходном runtime. Contact fixture затем исправлена
+  на действующее `contact_address`; red не является отдельной аттестацией
+  составных contact случаев с ошибочным тестовым payload.
+- `1b-final-guards.xml`: **47 passed**, 44.51s, 0 failures/skips, окончательный
+  runtime и тесты. Проверены ordinary gaps, порядок адреса, completion/replay,
+  следующий provider context без старых offers, deferred порядок, strict detail,
+  foreign snapshot/direction, volume/detail клики без модели и policy precedence.
+- `1b-ui-auth.xml`: **1 passed**, 3.20s: forged/stale/foreign service click
+  отклонены до provider.
+- Более широкий `1b-final.xml`: 48 passed, 8 failed. Все восемь неизменённых
+  старых assertions воспроизведены на двух runtime-файлах из `cbe4628` в
+  изолированном `baseline_runner.py` (`1b-baseline.xml`: те же 8 failed).
+  Это старые expectations content copy и legacy detail payload; не исправлялись.
+  Старый snapshot assertion про implantation также уже не задавал отсутствующий
+  overview; заменён на текущую canonical whitening без настроенного overview.
+
+Прогон: прежний network-blocked `runner.py`, label `1b-final-guards`,
+`tests/test_d2_price_reference_gaps.py`, новый snapshot selector и deferred
+selector; актуальные selectors из `test_d2_sim2_dialogues.py`: volume/followup,
+price-details known action, null target policy/reference, child policy;
+`test_d2_commercial_route_fixes.py::test_unknown_fact_remains_strict_and_does_not_publish_sibling`.
+Отдельный label `1b-ui-auth` для
+`test_d2_sim2_dialogues.py::test_service_authenticity_before_provider`.
+Network blocked, временные БД/tenant packs; provider/live/SMTP calls: **0**.
+`git diff --check` чист. На момент review staging пуст, foreign WIP отсутствует;
+1B commit/push ещё не выполнялись. Независимый Checker: **PASS 1B**; прочитал фактические пути
+ordinary price/verified clicks/detail, JUnit и точное совпадение baseline failures.
+Подтвердил удаление заявленных gate/helper/calls, отсутствие ослабления проверок
+и сохранение policy precedence. Cursor: **PASS 1B** по переданному владельцем
+review. Владелец подтвердил успешную widget-проверку 1B: составной вопрос
+с ценой/адресом в обоих порядках и обычный ценовой ответ. При доступной цене
+она публикуется; недоступные модельные ID отдельно проверены offline.
+Checkpoint 1B принят для сохранения commit/push. Модельные цены, весь этап 1
+и UI ошибок этим PASS не закрываются.
+
+#### Widget-наблюдение владельца — оформление кодового ответа, 2026-10-09
+
+На вопрос «Сколько стоит отбеливание и где вы находитесь?» на скриншоте
+показаны доступная цена от 18 000 ₽ и адрес. Это успешный ответ с доступными
+данными, не демонстрация ценового gap. Владелец отметил неудачную подачу
+кодовой сборки: цена/условия, контактные сведения, скидка и общие маркетинговые
+фразы выглядят разрозненно, без естественной связи между частями.
+Прямое решение владельца: пока оставить оформление как есть, без runtime
+правок. Сохранить этот составной вопрос для будущего сравнения с модельными
+ценовыми ответами: проверить связность, краткость и отсутствие незапрошенных
+вводных при сохранении точных сумм, единиц и условий. Замечание о подаче
+само по себе не означает принятия всех widget-сценариев 1B и не разрешает новый
+фильтр/вызов модели/изменение выбора данных.
 
 ## Обязательно перед демонстрациями — сообщение сбоя в обычной ленте
 

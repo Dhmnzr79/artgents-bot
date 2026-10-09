@@ -482,15 +482,11 @@ def resolve_d2_operations(
             price_scopes_by_id[part.request_id] = ((), "clinic", None)
             continue
         deferred_scope = _d2_price_scope(part, client_id=client_id, sources=sources)
-        _d2_validate_price_scope_ownership(deferred_scope[0], bundle=sources.material_authority.bundle)
         price_scopes_by_id[part.request_id] = deferred_scope
     if price_parts:
         price_part = price_parts[0]
         for part in price_parts:
             price_scope = _d2_price_scope(part, client_id=client_id, sources=sources)
-            _d2_validate_price_scope_ownership(
-                price_scope[0], bundle=sources.material_authority.bundle
-            )
             price_scopes_by_id[part.request_id] = price_scope
         service_ids, response_scope, selected_topic_id = price_scopes_by_id[price_part.request_id]
         deferred_blocks.extend(
@@ -502,6 +498,13 @@ def resolve_d2_operations(
         )
         applied_extent = price_part.volume.extent if price_part.volume is not None and price_part.volume.extent != "unknown" else None
         try:
+            # An absent ordinary model ID is unavailable data, not proof of
+            # another tenant. Keep low-level offer/detail ownership strict.
+            if not service_ids or any(
+                service_id not in sources.material_authority.bundle.services
+                for service_id in service_ids
+            ):
+                raise MaterializationContractError("d2_no_price_candidates")
             direct_service_only = price_part.service_id is not None
             direction_order = next(
                 (
@@ -1343,19 +1346,11 @@ def _d2_price_scope(
     if part.topic_id is None:
         raise MaterializationContractError("d2_price_scope_required")
     for direction in sources.d2_directions:
-        if direction.topic_id == part.topic_id and direction.source_client_id == client_id:
+        if direction.topic_id == part.topic_id:
+            if direction.source_client_id != client_id:
+                raise MaterializationOwnershipError("materialization_foreign_material")
             return direction.service_ids, "topic", direction.topic_id
-    raise MaterializationOwnershipError("materialization_foreign_material")
-
-
-def _d2_validate_price_scope_ownership(
-    service_ids: tuple[str, ...],
-    *,
-    bundle: ResponseSchemaBundle,
-) -> None:
-    """Validate every deferred price reference without looking up its offers."""
-    if not service_ids or any(service_id not in bundle.services for service_id in service_ids):
-        raise MaterializationOwnershipError("materialization_foreign_material")
+    return (), "topic", part.topic_id
 
 
 def _d2_price_block(

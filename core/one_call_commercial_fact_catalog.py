@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from contracts.response_schema import ResponseSchemaBundle
+from contracts.response_schema import ResponseDataCatalog
 
 if TYPE_CHECKING:
     from core.one_call_exact_commercial_catalog import ExactCommercialCatalogSnapshot
@@ -46,7 +46,7 @@ class CommercialFactCatalogSnapshot:
         )
 
     @classmethod
-    def from_bundle(cls, bundle: ResponseSchemaBundle) -> CommercialFactCatalogSnapshot:
+    def from_bundle(cls, bundle: ResponseDataCatalog) -> CommercialFactCatalogSnapshot:
         from core.one_call_exact_commercial_catalog import ExactCommercialCatalogSnapshot
 
         return cls.from_exact_catalog(ExactCommercialCatalogSnapshot.from_bundle(bundle))

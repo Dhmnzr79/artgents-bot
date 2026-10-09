@@ -701,21 +701,19 @@ class TargetMarketingPolicy(TargetSchemaModel):
         return self
 
 
-class ResponseSchemaBundle(TargetSchemaModel):
-    """In-memory aggregate used only for deterministic cross-reference validation."""
+class ResponseDataCatalog(TargetSchemaModel):
+    """Client data and shared reference checks, without legacy selection policies."""
 
     services: dict[NonBlankStr, TargetService]
     brands: TargetBrandCatalog
     offers: list[TargetOffer]
     facts: dict[NonBlankStr, TargetCommercialFact]
-    strategy: TargetClinicStrategy
-    marketing: TargetMarketingPolicy
     family_prices: TargetFamilyPriceCatalog = Field(
         default_factory=TargetFamilyPriceCatalog
     )
 
     @model_validator(mode="after")
-    def _local_references_exist(self) -> "ResponseSchemaBundle":
+    def _local_references_exist(self) -> "ResponseDataCatalog":
         offer_ids = [offer.offer_id for offer in self.offers]
         if _duplicates(offer_ids):
             raise ValueError("bundle_offer_id_duplicate")
@@ -746,6 +744,27 @@ class ResponseSchemaBundle(TargetSchemaModel):
                 raise ValueError("bundle_fact_service_missing")
             if any(fact_id not in self.facts for fact_id in fact.incompatible_with):
                 raise ValueError("bundle_fact_incompatible_missing")
+
+        for service in self.services.values():
+            ref = service.service_value_ref
+            if ref and ref.removeprefix("fact:") not in self.facts:
+                raise ValueError("bundle_marketing_fact_missing")
+
+        for record in self.family_prices.records:
+            if any(service_id not in self.services for service_id in record.applies_to_service_ids):
+                raise ValueError("bundle_family_price_service_missing")
+        return self
+
+
+class ResponseSchemaBundle(ResponseDataCatalog):
+    """Legacy tooling catalog with its selection and marketing policies."""
+
+    strategy: TargetClinicStrategy
+    marketing: TargetMarketingPolicy
+
+    @model_validator(mode="after")
+    def _legacy_policy_references_exist(self) -> "ResponseSchemaBundle":
+        offer_id_set = {offer.offer_id for offer in self.offers}
 
         if any(
             service_id not in self.services
@@ -779,13 +798,6 @@ class ResponseSchemaBundle(TargetSchemaModel):
 
         self._validate_promo_authority_refs()
 
-        for record in self.family_prices.records:
-            if any(
-                service_id not in self.services
-                for service_id in record.applies_to_service_ids
-            ):
-                raise ValueError("bundle_family_price_service_missing")
-
         return self
 
     def _validate_generic_price_policy_refs(
@@ -815,12 +827,6 @@ class ResponseSchemaBundle(TargetSchemaModel):
         refs.extend(self.marketing.promotion_overview.ordered_fact_refs)
         for rule in self.marketing.scenario_rules.values():
             refs.extend(rule.ordered_amplifier_refs)
-        service_value_refs = [
-            service.service_value_ref
-            for service in self.services.values()
-            if service.service_value_ref
-        ]
-        refs.extend(service_value_refs)
         return refs
 
     def _validate_promo_authority_refs(self) -> None:
@@ -887,5 +893,6 @@ S1_MODEL_TYPES = (
     TargetPromotionOverview,
     TargetScenarioRule,
     TargetMarketingPolicy,
+    ResponseDataCatalog,
     ResponseSchemaBundle,
 )

@@ -16,12 +16,12 @@ from contracts.d2_tenant_snapshot import (
     D2ModelView,
     D2TenantSnapshot,
 )
-from contracts.response_schema import ResponseSchemaBundle
+from contracts.response_schema import ResponseDataCatalog
 from contracts.response_plan_materialization import D2AuthoredContentAuthority, D2AuthoredContentSection
 from core.d2_published_offer_terms import build_d2_published_offer_terms
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
-from core.response_schema_loader import ResponseSchemaLoadError, load_response_schema_bundle_from_texts
+from core.response_schema_loader import ResponseSchemaLoadError, load_response_data_catalog_from_texts
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 
 
@@ -33,7 +33,7 @@ _FRONTMATTER = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
 _HEADING = re.compile(r"^(#{1,6})\s+(.+?)(?:\s+\{#([^}]+)\})?\s*$")
 _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 _REQUIRED_TARGET = (
-    "service_catalog.json", "brand_catalog.json", "clinic_strategy.yaml", "marketing.yaml",
+    "service_catalog.json", "brand_catalog.json",
     "pricebook/facts.json",
 )
 
@@ -61,7 +61,8 @@ def _read_set(client_root: Path) -> tuple[tuple[str, bytes], ...]:
             if base.name == "md":
                 raise D2TenantSnapshotError("required_path_missing:md")
             continue
-        files.extend(item for item in base.rglob(pattern) if item.is_file())
+        files.extend(item for item in base.rglob(pattern)
+                     if item.is_file() and item not in (target / "marketing.yaml", target / "clinic_strategy.yaml"))
     for name in ("tone.yaml", "ui.yaml", "video_catalog.yaml", "doctor_catalog.json", "clinic_policies.yaml"):
         path = client_root / name
         if path.is_file():
@@ -136,7 +137,7 @@ def load_d2_tenant_snapshot(client_id: str, *, clients_root: Path) -> D2TenantSn
         raise D2TenantSnapshotError("tenant_pack_changed_during_capture")
     texts = {path.removeprefix("target_response/"): data.decode("utf-8") for path, data in first if path.startswith("target_response/")}
     try:
-        bundle = load_response_schema_bundle_from_texts(texts)
+        bundle = load_response_data_catalog_from_texts(texts)
     except (UnicodeDecodeError, ResponseSchemaLoadError) as exc:
         raise D2TenantSnapshotError(f"schema_load_failed:{exc}") from exc
     _direction_prices(first, bundle)
@@ -175,7 +176,7 @@ def load_d2_tenant_snapshot(client_id: str, *, clients_root: Path) -> D2TenantSn
     return D2TenantSnapshot(client_id=client_id, fingerprint=_fingerprint(client_id, first), bundle=bundle, files=first, content=tuple(content), diagnostics=tuple(diagnostics))
 
 
-def build_d2_bundle(snapshot: D2TenantSnapshot):
+def build_d2_bundle(snapshot: D2TenantSnapshot) -> ResponseDataCatalog:
     """Return a fresh validated bundle from captured bytes, never from the filesystem."""
     texts = {
         path.removeprefix("target_response/"): data.decode("utf-8")
@@ -183,7 +184,7 @@ def build_d2_bundle(snapshot: D2TenantSnapshot):
         if path.startswith("target_response/")
     }
     try:
-        return load_response_schema_bundle_from_texts(texts)
+        return load_response_data_catalog_from_texts(texts)
     except (UnicodeDecodeError, ResponseSchemaLoadError) as exc:
         raise D2TenantSnapshotError(f"snapshot_bundle_invalid:{exc}") from exc
 
@@ -302,7 +303,7 @@ def _clinic_policy_catalog_json(snapshot: D2TenantSnapshot) -> str:
 
 
 def _direction_prices(
-    files: tuple[tuple[str, bytes], ...], bundle: ResponseSchemaBundle,
+    files: tuple[tuple[str, bytes], ...], bundle: ResponseDataCatalog,
 ) -> tuple[D2DirectionPriceConfig, ...]:
     raw = dict(files).get("target_response/d2_direction_prices.json")
     if raw is None:
@@ -358,7 +359,7 @@ def _commercial_texts(*values: str) -> tuple[str, ...]:
 
 
 def _commercial_contract(
-    files: tuple[tuple[str, bytes], ...], bundle: ResponseSchemaBundle, client_id: str,
+    files: tuple[tuple[str, bytes], ...], bundle: ResponseDataCatalog, client_id: str,
 ) -> D2CommercialPack:
     raw = dict(files).get("target_response/d2_commercial.json")
     if raw is None:

@@ -9,7 +9,7 @@ from contracts.response_plan import CommercialFactCandidate, FactApplicability, 
 from contracts.response_plan_composer import RequestableFactDescriptor
 from contracts.response_plan_fact_policy import RequestedFactPolicyContext
 from contracts.response_plan_post_composer import PostComposerDiagnostic
-from contracts.response_schema import ResponseSchemaBundle, TargetCommercialFact
+from contracts.response_schema import ResponseDataCatalog, TargetCommercialFact
 from contracts.target_service_content_topic import parse_service_catalog_content_topic
 from core.response_plan_fact_policy import (
     evaluate_requested_fact_display,
@@ -22,7 +22,7 @@ def fact_explicit_only(fact: TargetCommercialFact) -> bool:
 
 
 def project_commercial_fact_candidate(
-    bundle: ResponseSchemaBundle,
+    bundle: ResponseDataCatalog,
     fact: TargetCommercialFact,
     *,
     source_client_id: str,
@@ -69,7 +69,7 @@ def _fact_applicability(fact: TargetCommercialFact) -> FactApplicability:
 
 
 def _topics_from_service_ids(
-    bundle: ResponseSchemaBundle,
+    bundle: ResponseDataCatalog,
     service_ids: tuple[str, ...],
 ) -> frozenset[str]:
     topics: set[str] = set()
@@ -84,7 +84,7 @@ def _topics_from_service_ids(
 
 
 def _requires_implant_scope(
-    bundle: ResponseSchemaBundle,
+    bundle: ResponseDataCatalog,
     fact: TargetCommercialFact,
 ) -> bool:
     if fact.kind != "warranty":
@@ -98,7 +98,7 @@ def _requires_implant_scope(
 
 
 def build_requestable_fact_descriptors(
-    bundle: ResponseSchemaBundle,
+    bundle: ResponseDataCatalog,
     *,
     as_of: date,
 ) -> tuple[RequestableFactDescriptor, ...]:
@@ -168,7 +168,7 @@ def _policy_context(
 
 
 def resolve_requested_fact_candidates(
-    bundle: ResponseSchemaBundle,
+    bundle: ResponseDataCatalog,
     *,
     source_client_id: str,
     requested_fact_ids: tuple[str, ...],

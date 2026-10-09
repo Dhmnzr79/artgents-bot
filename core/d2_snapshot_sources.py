@@ -7,7 +7,7 @@ from pathlib import Path
 import yaml
 
 from contracts.d2_tenant_snapshot import D2ModelView, D2TenantSnapshot
-from contracts.response_schema import ResponseSchemaBundle
+from contracts.response_schema import ResponseDataCatalog
 from contracts.one_call_envelope import OneCallEnvelope
 from contracts.response_plan import (
     CodeOwnedTerminalCandidate,
@@ -341,7 +341,7 @@ def _volume_choices_for_topic(
     )
 
 
-def _commercial_authority(client_id: str, model_view: D2ModelView, bundle: ResponseSchemaBundle) -> D2CommercialAuthority:
+def _commercial_authority(client_id: str, model_view: D2ModelView, bundle: ResponseDataCatalog) -> D2CommercialAuthority:
     pack = model_view.commercial
     return D2CommercialAuthority(
         source_client_id=client_id,

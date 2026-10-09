@@ -10,7 +10,7 @@ from pydantic import field_validator, model_validator
 from contracts.response_plan import ResponsePlanModel
 
 from contracts.response_plan_materialization import D2AuthoredContentAuthority, D2PublishedOfferTerms
-from contracts.response_schema import ResponseSchemaBundle, TargetBrandCatalog
+from contracts.response_schema import ResponseDataCatalog, TargetBrandCatalog
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
@@ -144,7 +144,7 @@ class D2CommercialPack(ResponsePlanModel):
 class D2TenantSnapshot:
     client_id: str
     fingerprint: str
-    bundle: ResponseSchemaBundle
+    bundle: ResponseDataCatalog
     files: tuple[tuple[str, bytes], ...]
     content: tuple[D2AuthoredContentAuthority, ...]
     diagnostics: tuple[str, ...] = ()

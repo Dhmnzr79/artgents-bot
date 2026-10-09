@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
-from contracts.response_schema import ResponseSchemaBundle
+from contracts.response_schema import ResponseDataCatalog
 
 _ACTIVE_SERVICE_CATALOG_HEADER = "=== ACTIVE_SERVICE_CATALOG ==="
 
@@ -14,7 +14,7 @@ def _option_is_active(option) -> bool:
     return option.active is not False
 
 
-def _collect_allowed_patient_stages(bundle: ResponseSchemaBundle) -> tuple[str, ...]:
+def _collect_allowed_patient_stages(bundle: ResponseDataCatalog) -> tuple[str, ...]:
     stages: set[str] = set()
     for service_id in sorted(bundle.services):
         service = bundle.services[service_id]
@@ -39,7 +39,7 @@ class ActiveServiceCatalogSnapshot:
     allowed_patient_stages: frozenset[str] = field(default_factory=frozenset)
 
     @classmethod
-    def from_bundle(cls, bundle: ResponseSchemaBundle) -> ActiveServiceCatalogSnapshot:
+    def from_bundle(cls, bundle: ResponseDataCatalog) -> ActiveServiceCatalogSnapshot:
         rows: list[dict[str, str]] = []
         active_ids: list[str] = []
         for service_id in sorted(bundle.services):

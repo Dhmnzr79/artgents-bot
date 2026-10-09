@@ -19,7 +19,7 @@ from contracts.response_plan_composer import (
     _VALID_STAGES,
 )
 from contracts.response_plan_dialogue_context import require_non_negative_int
-from contracts.response_schema import ResponseSchemaBundle
+from contracts.response_schema import ResponseDataCatalog
 from contracts.effective_scope import EffectiveScope
 
 PostComposerDiagnosticCode = Literal[
@@ -103,7 +103,7 @@ class PostComposerDiagnostic:
 @dataclass(frozen=True, slots=True)
 class PostComposerMaterialAuthority:
     source_client_id: str
-    bundle: ResponseSchemaBundle
+    bundle: ResponseDataCatalog
 
     def __post_init__(self) -> None:
         if not self.source_client_id or not self.source_client_id.strip():

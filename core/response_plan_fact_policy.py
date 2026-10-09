@@ -12,7 +12,7 @@ from contracts.response_plan_fact_policy import (
 )
 from contracts.response_schema import TargetCommercialFact
 from contracts.target_service_content_topic import parse_service_catalog_content_topic
-from contracts.response_schema import ResponseSchemaBundle
+from contracts.response_schema import ResponseDataCatalog
 
 FactEvaluationPurpose = Literal["requested", "automatic"]
 
@@ -40,7 +40,7 @@ def evaluate_requested_fact_display(
     *,
     fact: TargetCommercialFact | CommercialFactCandidate,
     context: RequestedFactPolicyContext,
-    bundle: ResponseSchemaBundle | None = None,
+    bundle: ResponseDataCatalog | None = None,
     evaluation_purpose: FactEvaluationPurpose = "requested",
 ) -> RequestedFactDisplayOutcome:
     _ = bundle
@@ -169,7 +169,7 @@ def _schema_applicability(fact: TargetCommercialFact) -> FactApplicability:
 
 def _requires_implant_scope(
     fact: TargetCommercialFact,
-    bundle: ResponseSchemaBundle | None,
+    bundle: ResponseDataCatalog | None,
 ) -> bool:
     if fact.kind != "warranty":
         return False

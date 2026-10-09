@@ -17,12 +17,75 @@ from core.response_schema_loader import (
     YamlMergeKeyError,
     load_response_schema_bundle,
     load_response_schema_bundle_from_texts,
+    load_response_data_catalog_from_texts,
 )
 
 
 def _write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _captured_json(root: Path) -> dict[str, str]:
+    return {path.relative_to(root).as_posix(): path.read_text(encoding="utf-8")
+            for path in root.rglob("*.json")}
+
+
+def test_catalog_and_legacy_bundle_share_exact_data_and_one_reference_validator(tmp_path):
+    from contracts.response_schema import ResponseDataCatalog
+
+    root = _write_pack(tmp_path / "pack")
+    legacy = load_response_schema_bundle(root)
+    catalog = load_response_data_catalog_from_texts(_captured_json(root))
+    assert type(catalog) is ResponseDataCatalog
+    assert legacy.model_dump(exclude={"marketing", "strategy"}) == catalog.model_dump()
+    assert ResponseSchemaBundle._local_references_exist == ResponseDataCatalog._local_references_exist
+    with pytest.raises(ResponseSchemaLoadError, match="required_path_missing"):
+        load_response_schema_bundle_from_texts(_captured_json(root))
+
+
+@pytest.mark.parametrize("fault,code", [
+    ("service", "bundle_offer_service_missing"), ("option", "bundle_offer_option_missing"),
+    ("brand", "bundle_offer_brand_missing"), ("offer_fact", "bundle_offer_fact_missing"),
+    ("duplicate_offer", "bundle_offer_id_duplicate"), ("fact_key", "bundle_fact_key_id_mismatch"),
+    ("fact_service", "bundle_fact_service_missing"), ("incompatible", "bundle_fact_incompatible_missing"),
+    ("service_value", "bundle_marketing_fact_missing"), ("family", "bundle_family_price_service_missing"),
+])
+def test_catalog_preserves_cross_reference_guards(tmp_path, fault, code):
+    root = _write_pack(tmp_path / "pack")
+    texts = _captured_json(root)
+    offer_path = "pricebook/services/a-later-id.json"
+    offer = json.loads(texts[offer_path])
+    facts = json.loads(texts["pricebook/facts.json"])
+    if fault in {"service", "option", "brand"}:
+        offer[fault + "_id"] = "missing"
+    elif fault == "offer_fact":
+        offer["fact_refs"] = ["missing"]
+    elif fault == "duplicate_offer":
+        texts["pricebook/services/duplicate.json"] = texts[offer_path]
+    elif fault == "fact_key":
+        facts["wrong"] = facts.pop("consultation_offer")
+        offer["fact_refs"] = ["wrong"]
+    elif fault == "fact_service":
+        facts["consultation_offer"]["allowed_service_ids"] = ["missing"]
+    elif fault == "incompatible":
+        facts["consultation_offer"]["incompatible_with"] = ["missing"]
+    elif fault == "service_value":
+        services = json.loads(texts["service_catalog.json"])
+        services["service_one"]["service_value_ref"] = "fact:missing"
+        texts["service_catalog.json"] = json.dumps(services)
+    elif fault == "family":
+        texts["pricebook/family_prices.json"] = json.dumps({"version": 1, "records": [{
+            "family_price_id": "family", "topic": "implantology", "applies_to_service_ids": ["missing"],
+            "approved_context": "Проверочный ориентир",
+            "price": {"mode": "from", "min_amount": 100, "currency": "RUB", "billing_unit": "tooth_package"},
+        }]})
+    texts[offer_path] = json.dumps(offer)
+    texts["pricebook/facts.json"] = json.dumps(facts)
+    with pytest.raises(ResponseSchemaLoadError) as error:
+        load_response_data_catalog_from_texts(texts)
+    assert error.value.code == "schema_invalid"
+    assert code in str(error.value.__cause__)
 
 
 def _service_payload(*, name: str = "Service One") -> dict[str, object]:

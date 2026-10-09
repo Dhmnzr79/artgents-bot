@@ -1,5 +1,62 @@
 # Эксперимент: ценовые ответы модели
 
+## Снятие legacy-policy зависимости — checkpoint KB2, 2026-10-09
+
+Owner GO: после объяснения, что D2 не использует marketing.yaml, но shared
+loader требует его, владелец согласовал отделение действующего каталога D2
+от старых маркетинговых настроек. Консультация Astra: общий каталог через
+наследование без нового runtime decision layer и без new-to-old adapter.
+
+Классификация: архитектурное упрощение. Before → after → removed dependency:
+D2 snapshot/captured rebuild создаёт ResponseSchemaBundle с обязательными
+marketing/strategy → создаёт ResponseDataCatalog с прежними data checks;
+legacy bundle наследует каталог и добавляет только старые policy checks →
+удалены вызовы legacy YAML parsing/validation и влияние этих файлов на D2
+fingerprint. Единственный owner цен/коммерческого выбора — прежний D2 resolver
+по §3; финансовые тексты всё ещё собирает код. Старые инструменты продолжают
+явно использовать legacy bundle. Нет defaults legacy policy, конвертера,
+второго snapshot object, semantic branch, retry/model call/memory.
+
+Preflight: C:/Cursor Projects/artgents-bot-active; codex/model-price-experiment;
+HEAD 6108ac956e9589ac6a162f28d37c62844d24e02e; origin/main и merge-base efa3f77.
+Staging пуст. Сохранить пять pre-existing 2B WIP файлов, включая untracked
+tests/test_d2_price_catalog_input.py; core/d2_live_provider.py не менять.
+
+Exact KB2 allowlist (15 файлов): contracts/response_schema.py;
+contracts/d2_tenant_snapshot.py; contracts/response_plan_post_composer.py;
+core/response_schema_loader.py; core/d2_tenant_snapshot.py;
+core/d2_snapshot_sources.py; core/service_reference_catalog.py;
+core/one_call_active_service_catalog.py; core/one_call_commercial_fact_catalog.py;
+core/service_data_context.py; core/response_plan_fact_projection.py;
+core/response_plan_fact_policy.py; tests/test_response_schema_loader.py;
+tests/test_d2_tenant_snapshot.py; этот документ.
+
+Все client files сохранить. Это снятие runtime-зависимости, не удаление
+legacy YAML из папки и не retirement legacy tooling/onboarding. Проверить
+отсутствующие/испорченные legacy YAML, неизменные fingerprint/view/prompt/sources,
+constructor sentinel, общие data guards, JSON/SSE commercial/replay/context,
+tenant/privacy и прежнюю обязательность политики для legacy loader.
+Offline и независимый Checker; provider/live/SMTP 0, без commit/push.
+
+Evidence KB2: `kb2-final.xml` — 230 passed, 0 failed, 86.38s: schema contract,
+legacy loader/external refs, D2 snapshot/commercial contract, pre-existing 2B
+input assertions и все commercial JSON/SSE route cases. `kb2-guards.xml` —
+26 passed, 0 failed, 18.58s: новые data guards, snapshot/source/prompt equality,
+JSON/SSE price/replay/next context, installment exclusion, lead privacy и
+foreign-tenant pending. Первичный `kb2-catalog.xml`: 138 passed, 1 failed —
+новая family-price fixture использовала amount вместо min_amount; исправлена,
+содержательная проверка неизвестной услуги сохранена. Это не runtime failure.
+`git diff --check` чист. Client files побайтно неизменны. Независимый Astra
+Checker PASS KB2: blockers/test weakening нет; подтверждены удаление D2
+legacy parsing/validation/fingerprint зависимости и сохранность data guards.
+230 final + 10 final recheck + 26 guards JUnit прочитаны независимо.
+После запуска final исправлены только endings трёх annotation-only файлов;
+`kb2-final-recheck.xml` на финальном runtime: 10 passed, 0 failed, 13.54s,
+snapshot + JSON/SSE replay/next context и lead privacy/tenant boundary.
+Независимый trace отмечается отдельно.
+
+Commit isolation evidence: kb2-staged-final.xml — 44 passed; staged KB2 без C1/2B, provider 0.
+
 ## Чистка коммерческой базы — checkpoint KB1, 2026-10-09
 
 Offline evidence: `kb1-targeted.xml` — 37 passed, 0 failed, 22.51s.

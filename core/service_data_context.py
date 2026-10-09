@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from contracts.doctor_schema import TargetDoctorCatalog
-from contracts.response_schema import ResponseSchemaBundle, TargetOffer, TargetService
+from contracts.response_schema import ResponseDataCatalog, TargetOffer, TargetService
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +35,7 @@ class ServiceDataContextError(ValueError):
 
 
 def build_service_data_context(
-    bundle: ResponseSchemaBundle,
+    bundle: ResponseDataCatalog,
     doctor_catalog: TargetDoctorCatalog,
     service_id: str,
 ) -> ServiceDataContext:

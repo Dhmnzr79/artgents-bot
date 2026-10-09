@@ -2364,3 +2364,405 @@ Final checkpoint inventory (23 files, exact; §30 + §31):
 Staging remains empty, HEAD 8dccb3b; no commit/push/merge/deploy. Foreign data/
 and docs/tasks/DEMO_D2_SIM0_TASK.md unchanged and excluded. Historical suites
 outside the requested CI jobs are not certified green by this checkpoint.
+
+
+## §32. Clinic policy route consistency — owner GO 2026-10-08
+
+Baseline f593248, codex/d2-stage1-contract, root C:/Cursor Projects/artgents-bot-active;
+origin/main cdeddc4, merge-base f593248. Existing widget-test.html/widget.css WIP
+and foreign data/ and DEMO_D2_SIM0_TASK.md are outside this checkpoint.
+Snapshot policy authority is architecture simplification: cached filesystem keys
+plus repeated age/payment inference -> captured tenant answers + one resolver decision
+-> remove cached loader and duplicate inference from all reachable D2 policy/booking paths.
+Sole decision owner remains clinic_policy_resolver; §3 responsibility is unchanged.
+Execution/projection fixes and prompt instruction are bug fixes, not simplification.
+Exact allowlist: core/clinic_policy_resolver.py, core/d2_snapshot_sources.py,
+core/d2_dialogue.py, core/d2_lead_bridge.py, core/d2_completion_context.py,
+core/one_call_prompt_contract.py, core/d2_tenant_snapshot.py, tests/test_d2_policy_route_fixes.py,
+this card and DEMO_D2_DELIVERY_ROADMAP.md.
+Known inactive services retain their original typed ID; alternatives are not ambiguity
+choices or user-selected services. Singleton clarification remains invalid.
+Ambiguous insurance question uses existing clarification part + ordinary history;
+no new payment axis/pending state. Explicit payment with absent clinic rule uses the
+existing information gap, without silently continuing a payable price.
+Completion projection retains reference identities, the fixed insurance clarification and
+effective policy IDs. Captured service_alternatives IDs enter the existing model catalog;
+arbitrary authored reference text stays in receipts, since it may contain money.
+No full rendered financial answer, prices/details/promos or PII copied.
+Pure booking refusal keeps applied policy IDs without duplicate displayed text.
+Mixed child/adult booking semantics and generic expansion of policy registry are excluded.
+No new fields, session schema, semantic classifier, retries, model calls or recovery.
+Tests: JSON/SSE decisions/UI/replay/history, captured rules vs legacy loader, empty
+registry, inactive services, strict bad outputs, payment gaps, lead/privacy boundaries.
+Astra consulted before implementation. Offline-only; live quality remains unverified.
+Implementation authorization initially excluded commit/push/merge/deploy/provider calls.
+Owner subsequently authorized a separate §32 checkpoint commit and push; merge/deploy
+and new live provider calls remain unauthorized.
+
+§32 implementation evidence, 2026-10-08:
+- Removed cached policy-key lookup from active D2 policy/price/booking calls and
+  duplicate age/payment inference from the policy text producer. The historical
+  understanding wrapper remains outside the active D2 route; its API was not deleted.
+- Added existing resolver-result consumption, clarification part/history, explicit
+  payment information-gap execution, original inactive-service identity and captured
+  alternative IDs, and booking refusal policy-ID projection. No schema/state/calls added.
+- New regression cases: 26 PASS across two isolated network-blocked runs (22 + 4).
+  Related main run: 157 PASS / 7 FAIL, 675.68s; edge run: 4 PASS, 28.20s.
+  All seven failures belong to historical D1-envelope test_d2_lead_scenarios.py;
+  clean HEAD f593248 archive reproduces exactly the same seven (1 PASS / 7 FAIL).
+  These tests were neither weakened nor migrated in this checkpoint.
+- Artifacts under allowed visualization root: policy-route-check-6cr6u0fp,
+  policy-edge-check-1qyieaxc, policy-head-baseline-ueyb_oxo (JUnit results.xml).
+- Live/provider/SMTP: 0. Prompt guidance does not prove live inactive-service
+  recognition; user widget acceptance remains necessary.
+- Scope limitation: after prior price service A, a missing insurance rule for service B
+  may retain A's discussion pointer (existing clinic-scope price_reference behavior).
+  No new carry semantics introduced. Mixed child/adult booking remains excluded.
+- Staging empty; HEAD f593248 unchanged. Widget HTML/CSS WIP and foreign data/,
+  DEMO_D2_SIM0_TASK.md preserved. No commit/push/merge/deploy.
+- Independent Checker: PASS for §32, no P0/P1. Actual call path, new tests and
+  all three JUnit reports reviewed; seven legacy failures independently confirmed.
+  P2 gap carry limitation remains explicit. No live/widget acceptance claimed.
+
+§32 checkpoint limitation after full read-only Astra audit, 2026-10-08:
+The narrow offline PASS is not full architecture or live acceptance. Audit reproduced
+six open mechanisms: comma-prefix privacy stripping loses question meaning;
+commercial applicability can reject a valid operation and cancel independent answers;
+stale offer refs survive topic change; doctors CTA ignores free-consult applicability;
+direct promotions can lose mandatory compatibility copy; paused lead text cancellation
+does not reach its existing owner. Model schema/parser/executor mismatches and incomplete
+doctors-result projection also remain open. These findings are not fixed by this commit.
+The four proposed repair groups (input/lead, commercial rules, context, model contract)
+are proposals, not implementation authority. No new responsibility or product rule is
+introduced by recording them. Prior widget HTML/CSS and foreign WIP are excluded.
+
+## §33. Audit group 1 — input privacy and paused cancellation, owner GO 2026-10-09
+
+Baseline: `f9f017955aae0ea9f1b369aac545305b891d8bac`, branch
+`codex/d2-stage1-contract`. Owner approved the concrete first-group plan in chat.
+Allowlist: `core/user_text_privacy.py`, `core/d2_lead_bridge.py`,
+`core/d2_dialogue.py`, `tests/test_user_text_privacy_contract_offline.py`,
+`tests/test_d2_lead_interrupt_http.py`,
+`tests/test_tenant_lead_pending_question_offline.py`, this card and Roadmap.
+Foreign widget HTML/CSS, `data/` and SIM-0 remain excluded.
+
+Classification: input-path simplification plus paused-cancellation bug fix.
+Before → after → removed dependency: arbitrary comma prefixes (including `Я …`)
+were structurally guessed as names and deleted before model understanding;
+now only an exact bound profile name is stripped on those two paths.
+The structural name-acceptance calls on both paths are removed. Explicit
+`Меня зовут…` introductions and existing phone/email masking remain.
+Per Contract §3, the model still owns question meaning; privacy only removes
+identified contact data, without a new semantic classifier or exception words.
+
+Paused text cancellation previously bypassed the existing lead owner; now
+the tenant-bound admission gate checks the existing `parse_lead_cancel` only
+for an existing paused lead, then the same owner executes `exit_lead_flow`.
+Ordinary paused questions and cancel text outside a lead remain ordinary turns.
+No new cancellation language, state, payload field, model call or retry.
+
+Acceptance: complete provider-visible question meaning on fresh, pending and
+paused turns; explicit-introduction/bound-name/contact privacy; cancellation
+at paused name and phone slots, PII/pending cleanup, no provider/effect, replay;
+ordinary paused questions retain lead state, UI authenticity and tenant isolation.
+Targeted offline checks and independent Checker precede completion. No live,
+commit, push, merge or deploy is authorized by this checkpoint.
+
+§33 offline evidence, 2026-10-09: **105 passed**, 443.27s across privacy,
+D2 lead interruption, cancel UI and tenant pending-question suites. The 30 new
+cases cover 14 privacy cases and 16 endpoint cases; no skips or failing tests.
+Only the old bare-name privacy fixture was updated to supply an actually bound
+profile name; no substantive assertion was removed. The isolated runner disables
+dotenv loading, blocks network and places logs/SQLite under the evidence folder.
+JUnit: `C:/Users/denis/.codex/visualizations/2026/10/02/01a0fd5a-1bf9-7ed0-9738-a748f948637a/input-lead-check/results.xml`.
+Existing `datetime.utcnow()` deprecation warnings remain outside scope.
+Provider/live/SMTP calls: 0. No whole-CI or live/widget acceptance claimed.
+Independent Checker: **PASS**, no P0/P1; read tests first, traced actual JSON/SSE
+call paths, removed dependency and existing cancellation owner, and independently
+read the JUnit (105 PASS / 0 FAIL / 0 SKIP). No redundant test rerun. PASS is §33
+only; other audit groups, full CI and live/widget acceptance remain open.
+Staging empty; HEAD remains `f9f0179`; no commit/push/merge/deploy.
+
+§33 subsequent acceptance, 2026-10-09: owner reported widget scenarios OK;
+Cursor read-only review also PASS, no P0/P1 or weakened tests. Its two P2 notes
+(the same cancellation predicate evaluated twice and a second pause-flag SQLite
+read) are non-blocking and do not authorize extra refactoring. Widget acceptance
+is the owner's manual report; implementer made no live provider calls.
+Owner then explicitly authorized a separate commit and push of these eight files.
+Other audit groups and foreign WIP remain excluded; merge/deploy not authorized.
+
+## §34. Audit group 2 — commercial applicability and final compatibility
+
+Owner GO 2026-10-09: continue the described second-group plan, including neutral
+absence-of-data response and one existing failure-reason enum extension.
+Baseline `746229b3e75ecc28b5ef4596d8eeed4c35563d80`, branch
+`codex/d2-stage1-contract`. Allowlist: `contracts/response_plan.py`,
+`core/response_plan_materialization.py`, `core/d2_commercial_plan.py`,
+`core/response_plan_fact_policy.py`, `core/d2_contacts_cta.py`,
+`core/d2_directory.py`, `clients/demo/target_response/pricebook/facts.json`,
+`tests/test_d2_commercial_route_fixes.py`, `tests/test_d2_directory_ui_scenarios.py`,
+`tests/test_response_plan_fact_policy.py`, this card and Roadmap.
+Widget HTML/CSS, `data/` and SIM-0 excluded. No live/commit/push/merge/deploy.
+
+Classification: applicability bug fixes and compatibility-path simplification.
+Before → after → removed dependency: compatibility was calculated inside
+individual promo selection using an incomplete offer/promo set; now only the
+final materializer's published positive fact/promo and price/detail offer IDs
+are checked by the existing commercial owner. Remove the early calculation
+and its offer-ID input; retain authored groups and explanations, not a new policy.
+Contract §3 price/commercial owner and protections remain unchanged.
+
+Direct self-qualified free-consult information is allowed clinic/topic-wide
+using existing requested_display_policy, never as blanket service entitlement.
+Free CTA uses the same existing applicability evaluator in automatic mode plus
+date and resolved service scope; neutral CTA remains for unsupported scope.
+Explicit installment exclusions use only authored excluded_scope_text; other
+known but inapplicable/expired facts get a neutral existing-style gap rather
+than an invented refusal. Unknown/foreign IDs remain strict errors.
+The gap uses d2_commercial_fact_unavailable in the existing failure enum/block,
+preserving sibling answers. No new model operation, memory, retry or call.
+
+Acceptance: direct clinic/topic/service facts; excluded and unknown applicability;
+expiry; doctors CTA caries/classic; direct and automatic promo combinations;
+final price/detail IDs; rejected or negative facts do not trigger compatibility;
+JSON/SSE/replay, tenant and UI boundaries. Targeted offline and independent Checker.
+
+Partial commercial execution uses the existing request-part granularity: useful
+approved text and positive IDs are retained, but any unavailable requested member
+marks that whole commercial part unavailable. A lone such part has result failed;
+with an answered sibling it has result degraded. Both remain ordinary published
+responses, not transport errors. Existing exact/failure blocks must freeze identical
+text, rendered once; there is no new partial status or provenance field.
+Independent Checker first rejected false complete accounting; the focused repair
+covers mixed available/expired facts and available fact/empty requested promotions.
+
+§34 final targeted offline evidence, 2026-10-09: **77 passed**, 241.49s,
+0 failed/errors/skipped. Suites: commercial route fixes, fact policy, D2 commercial
+plan and tenant commercial contract; targeted date/scope CTA and child refusal/
+forged booking checks. Forty new JSON/SSE cases plus two new pure policy cases
+cover conditions, exclusions, expiry, final price/detail combinations, missing
+detail provenance, partial execution, replay and next-turn projection. Earlier
+new-case failures were corrected; existing selected checks passed throughout.
+The runner disables dotenv, blocks network and isolates SQLite/logs. JUnit:
+`C:/Users/denis/.codex/visualizations/2026/10/02/01a0fd5a-1bf9-7ed0-9738-a748f948637a/commercial-route-check/results.xml`.
+Provider/live/SMTP calls: 0. Existing utcnow deprecation warnings remain.
+No whole-CI or live model/widget acceptance claimed. HEAD remains `746229b`;
+staging empty; no commit/push/merge/deploy. Foreign widget WIP hashes unchanged;
+data/ and SIM-0 were neither read nor changed. Context/model-contract groups open.
+Independent Checker focused recheck: **PASS**, sole P1 closed, no new blockers.
+Checker independently read final JUnit/output and actual renderer/projection paths,
+without rerunning tests. Early compatibility dependency removed; final published-ID
+check remains with the commercial owner. PASS is §34 only; Cursor/widget acceptance
+and whole-CI remain open. `git diff --check` clean; no staging or Git mutation.
+
+§34 widget follow-up, owner GO: live owner runs exposed visible_fact_id_role_conflict
+for free_implant_consult or implant_same_day_discount requested both directly and
+through promotion_scope=general. Widget acceptance remains open; earlier scoped
+PASS did not cover these combinations. Bug fix allowlist: materialization module,
+commercial route tests, this card and Roadmap. Keep prior §34 and foreign WIP.
+Direct approved fact publication has priority over its promo copy; other selected
+promos remain. Preserve strict role uniqueness, tenant/price/medical protections,
+existing request parts and absence-of-data semantics. No phrase-specific rule,
+new model call, state, retry or fields. Commit/push/live not authorized.
+Assembly first resolves each direct fact in its own operation scope, then assigns
+promotional roles against the complete applicable direct-ID set. Role provenance
+is recorded once in stable operation order; independent repeated requests may
+repeat authored prose, as the owner preferred to losing an answer. An otherwise
+fully covered promo request retains its approved prose without a second role ID.
+Eligibility gaps are determined before deduplication; rejected/expired/negative
+direct facts do not reserve a positive ID. Automatic promo filtering and final
+compatibility remain unchanged. General vs service selection by the model is
+not repaired by the server in this follow-up; audit group 4 remains separate.
+
+Overlap follow-up offline evidence: **98 passed**, 378.17s, no failures/errors/skips.
+Coherent run: all 68 commercial route cases (28 new overlap cases), 11 fact-policy,
+4 commercial-plan and 15 tenant commercial-contract cases. Exact live output shapes
+for consultation and discount are represented; both operation orders, auto promo,
+repeat direct/promo requests, fully covered promo-only request, inapplicable direct,
+replay, next projection and strict role-conflict rejection pass. No validator change.
+Evidence: `C:/Users/denis/.codex/visualizations/2026/10/02/01a0fd5a-1bf9-7ed0-9738-a748f948637a/commercial-overlap-check/results.xml`;
+runner network/dotenv/SQLite isolation unchanged. Provider/live/SMTP: 0.
+Whole CI and widget acceptance still open; previous 77-case count is not added to 98.
+Baseline/HEAD `746229b`, staging empty, no commit/push/merge/deploy.
+Focused overlap Checker: **PASS**, no P0/P1. Independently read 98-case JUnit/output;
+role guard, partial results, automatic filtering and final compatibility preserved.
+No rerun or Checker edits; general/service model choice remains separate.
+
+§34 final acceptance, 2026-10-09: owner reported widget OK after the overlap repair;
+Cursor focused review PASS, no blockers/test weakening/scope creep, SAFE_TO_COMMIT=YES.
+Owner then explicitly authorized commit and push of the complete 12-file §34
+checkpoint, including the overlap fix. Widget HTML/CSS, data/ and SIM-0 remain
+excluded. Full CI, groups 3/4 and merge/deploy are not authorized or closed here.
+
+## §37 — single-offer price paragraph (owner GO, 2026-10-09)
+
+Owner requested fixing detached lower-case conditions in the aligners price
+answer. Classification: presentation bug fix, not architecture simplification.
+Baseline HEAD6381945 plus reviewed §36 WIP. Allowlist:
+`core/response_text_renderer.py`, `tests/test_d2_price_copy.py`, this card.
+Preserve §36 and foreign widget/data/SIM0 work; no commit/push/live/deploy.
+The existing renderer joins a single offer's name, price, billing scope and
+conditions into one paragraph. Conditions become sentences with initial upper
+case, preserving the remaining authored text, amount/mode/unit and order.
+No model routing, selection, frozen data, multi-offer grouping, UI or task
+contract changes. Natural wrapping at the widget width remains; no forced
+single-line CSS, phrase-specific template or model call.
+Acceptance: fixed/from/range/no-public-price retain every condition and amount;
+actual JSON/SSE aligners and periodontitis responses keep scope and conditions
+with their price paragraph, frozen data unchanged. Targeted offline and Checker.
+
+§37 evidence: **8 passed**, 15.29s, 0 failures/skips; isolated offline runner,
+dotenv disabled, network blocked, logs/SQLite outside repository data.
+JUnit: `C:/Users/denis/.codex/visualizations/2026/10/02/01a0fd5a-1bf9-7ed0-9738-a748f948637a/price-paragraph-check/results.xml`.
+Independent Checker **PASS**, no blockers; presentation bug fix only.
+`git diff --check` clean, provider/live/SMTP0. HEAD6381945, staging empty;
+no commit/push/merge/deploy. Prior §36 and foreign WIP preserved.
+
+## §36 — audit group 4: ordinary contract / authorized task boundary
+
+Owner GO 2026-10-09: proceed with the fourth agreed audit group after §35.
+Baseline `6381945762102a6934df45e2a6c1ccadfed2802c`, branch
+`codex/d2-stage1-contract`. Classification: architecture simplification.
+Before → after → removed dependency: ordinary output/schema allowed a
+server-only explanation without clarification, then the ordinary parser
+rejected it → ordinary pending content requires clarification, while verified
+explanation-only tasks live solely in the existing server task input → remove
+the ordinary schema's dependence on internal click state and its compensating
+post-checks. Sole owners remain Target Contract §3:
+model owns ordinary meaning; server owns verified UI task; price owner owns sums.
+
+Allowlist: `contracts/d2_dialogue_result.py`, `contracts/d2_dialogue.py`,
+`core/d2_dialogue.py`, `core/d2_snapshot_sources.py`,
+`core/one_call_envelope_protocol.py`, `core/one_call_prompt_contract.py`,
+`tests/test_d2_sim2_contract.py`, `tests/test_d2_sim2_dialogues.py`,
+`tests/test_d2_document_click_task_http.py`, this card, Roadmap, Checkpoint Ledger.
+Foreign widget HTML/CSS, `data/` and SIM-0 excluded. No live/commit/push/merge/deploy.
+
+The internal authorized explanation type replaces the broad result constructor;
+it is not an ordinary wire variant or a persisted state. Existing task fields,
+source/brand/volume/ID and explanation-only reply remain. All price types and
+their late target check remain unchanged. No semantic heuristics, adapters,
+retry, new wire fields,
+memory or provider calls. Schema continues to come from ordinary Pydantic types.
+Contract header advances to v41 solely for changed structural requirements.
+
+Acceptance: actual sent schema and parser agree on pending clarification;
+internal task cannot become ordinary output or persisted pending; authorized
+reply cannot mutate task/source and never publishes seed. JSON/SSE document,
+service and price/detail actions, independent siblings, replay, next context,
+tenant/UI/lead/privacy and medical protections remain. Targeted offline tests
+with isolated SQLite/network followed by independent Checker.
+
+Limits: provider still requests json_object, not enforced full schema. Whitening
+root-array error and second-doctor semantic mistake are not closed by this
+structural change. No phrase-specific prompt patch or server semantic repair.
+
+Scope correction before completion: requiring direct-price target is deferred.
+The late target gate follows child/payment/brand policy execution, so null target
+is not universally unexecutable: it can publish an authored clinic answer.
+Rejecting it earlier would hide that answer. No conditional exception, inferred
+target or new refusal is introduced. This unresolved price-contract aspect
+needs an owner decision; this checkpoint certifies only the independent
+ordinary/authorized explanation replacement, not closure of the whole group.
+
+§36 evidence: preliminary wider selection **93 passed**, 330.64s; its code
+preceded the price-scope correction, so it is not a final-tree attestation.
+Final focused recheck **64 passed**, 124.89s, zero failures/skips: full SIM-2
+contract suite, eight null-target child/payment/brand JSON/SSE cases, service
+clarification→explanation, and document task/click/replay through JSON/SSE.
+The wider selection also covered malformed task replies, UI authenticity,
+price/detail/volume clicks without model, siblings and pending lead privacy.
+Both runners disabled dotenv, blocked network and isolated logs/SQLite.
+Final JUnit: `C:/Users/denis/.codex/visualizations/2026/10/02/01a0fd5a-1bf9-7ed0-9738-a748f948637a/contract-boundary-final/results.xml`.
+No new baseline failure found in these selections; historical suites/full CI
+not attested. Existing datetime.utcnow warnings out of scope. Provider/live/SMTP
+0, staging empty, no commit/push/merge/deploy. Widget hashes unchanged.
+Independent Checker: **PASS** for narrow §36, no blockers/test weakening;
+independently read final JUnit and traced removal and preserved policy paths.
+This does not close the entire group, residual price decision or live errors.
+
+## §35 — audit group 3: completed-result context (owner GO, 2026-10-09)
+
+Baseline: `49cf0b4d003abbba4e977e6851a2234690547835`, branch
+`codex/d2-stage1-contract`, permanent root `C:/Cursor Projects/artgents-bot-active`.
+origin/main `cdeddc4952254b7c8d7e96201d8fb77bf5267e73`; merge base
+`c085c387b1a6ef278d6e83387082f1542759f9c1`. Staging empty at entry.
+Foreign widget HTML/CSS, untracked data/ and SIM-0 preserved and excluded.
+
+Classification: offer context is architecture simplification; preserving the
+doctors result type is a bug fix. Before: discussion receipt plus separately
+updated persisted offer list. After: current scope and offers read from completed
+results by the existing context projection owner (§3). Remove the state field,
+two helpers and both ordinary/non-price offer writers. Existing input refs remain
+a derived projection, not a parallel memory. Latest published rows replace refs;
+non-price results retain input refs only for the same nonempty scope. Pending,
+mixed, expired and changed scopes cannot retain them. Missing price/detail does
+not resurrect old offers. Price policy gaps preserve the original valid target.
+Contacts retain discussion as before; no new semantic carry rules.
+
+Doctors keep the existing operation's type through exact publication, rendering
+and safe bounded history, including public names/order. General financial
+reference text remains excluded. No new memory, field, classifier, retry or model
+call. State schema 5→6 rejects old local sessions; owner uses New conversation.
+No automatic recovery, migration or deletion of saved leads.
+
+Exact allowlist: `contracts/d2_session_context.py`, `contracts/response_plan.py`,
+`core/d2_session_context.py`, `core/d2_completion_context.py`, `core/d2_dialogue.py`,
+`core/response_text_renderer.py`, `tests/d2_ci_http.py`,
+`tests/test_d2_session_context.py`, `tests/test_d2_sim3_completion_context.py`,
+`tests/test_d2_continuation_scenarios.py`, `tests/test_d2_sim2_dialogues.py`,
+this card and `docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md`.
+Tests migrate assertions to actual completion projection, preserving ownership,
+money/privacy, pending, TTL, real UI and replay checks. Offline targeted checks
+and independent Checker required; live/commit/push/merge/deploy not authorized.
+
+Historical REC-4/old stage3 suites still contain superseded D1 envelopes or
+patient-state expectations and are outside this checkpoint; no legacy restoration
+or wholesale test migration is claimed. Current D2 assertions use the real
+completion projection. Checker caught loss of scope after a targetless detail:
+final publication now freezes the existing input descriptor only for resolved
+rows belonging to the verified input refs, with no explicit target/volume/brand.
+Explicit model parameters remain authoritative; no phrase parsing or new memory.
+
+§35 final evidence: coherent final selection had **80 passed, 1 baseline failure**,
+271.05s. The old continuation assertion expected three overview offers. Clean
+tracked HEAD export reproduced the identical failure (1 failed, 11.55s), with
+the existing two SIM-4 offer IDs. Assertion now checks those exact ordered IDs,
+not merely a count; publication/next-input/both stored projections stay checked.
+Focused final continuation recheck: **1 passed**, 11.67s. No remaining failure
+in the selected checkpoint. Counts from earlier runs are not added to these.
+The remaining 80 final checks cover TTL/schema, JSON/SSE contacts beyond bounded
+history, same/new/ambiguous/pending scopes, explicit missing DMS policy, exact
+doctors names/order and adverse shapes, missing detail exclusion, replay and
+tenant/receipt ownership. Pre-existing child-price denial and absent-payment-rule
+checks pass. Dependency collection: **366 collected**, 7.43s, no import errors;
+collection is not execution. Existing utcnow deprecation warnings remain.
+
+Artifacts under `C:/Users/denis/.codex/visualizations/2026/10/02/01a0fd5a-1bf9-7ed0-9738-a748f948637a/`:
+`context-route-final/results.xml`, `context-continuation-recheck/results.xml`,
+`context-baseline-check/results.xml`, `context-helper-collection/output.txt`.
+Network/dotenv blocked; isolated SQLite/logs. Provider/live/SMTP calls: **0**.
+Independent Checker: **PASS** after focused repair, no open P1/test weakening;
+read actual paths and JUnit, no edits or test reruns. Original separate carrier
+and both helpers/writers removed; existing guards remain. Added only derived
+completion read and preserved doctors type/provenance, not prompt rules.
+Saved leads untouched. Full CI, live understanding, Cursor/widget acceptance
+and group 4 remain open. `git diff --check` clean. HEAD `49cf0b4`, staging empty,
+no commit/push/merge/deploy. Thirteen checkpoint files; foreign widget WIP hashes
+unchanged, data/ and SIM-0 preserved and excluded.
+
+§35 checkpoint authorization, 2026-10-09: owner supplied Cursor **PASS**, no
+blockers/test weakening/scope creep, SAFE_TO_WIDGET_TEST=YES, and explicitly
+authorized commit/push of these 13 files. Independent Checker PASS remains
+scoped to the completed-result mechanism, not live interpretation quality.
+Owner widget run confirmed correct input context but exposed two open model
+defects: professional_whitening → targetless includes returned an unrelated
+root array and failed parsing (invalid_envelope); doctors list → second doctor
+received the complete correct list/order but selected Kuznetsov (first) instead
+of Orlov (second). Whitening includes data is empty, but this observed failure
+occurred at parse before missing-detail execution. No new fix or provider call
+was made during the read-only log investigation. Live/widget acceptance is
+therefore not closed. Group 4 must address model-contract reliability and test
+context use without treating schema compliance as proof of semantic correctness.
+Checkpoint preserves this known debt; it does not authorize merge/deploy.
+Foreign widget HTML/CSS, data/ and SIM-0 remain excluded and untouched.

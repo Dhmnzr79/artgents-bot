@@ -37,6 +37,30 @@ def test_provider_safe_strips_phone_email_and_self_intro() -> None:
     assert "имплантац" in safe.lower()
 
 
+@pytest.mark.parametrize("query", [
+    "По ОМС, сколько стоит имплантация?",
+    "По ДМС, сколько стоит лечение?",
+    "Мне больно, что делать?",
+    "Для ребёнка, можно записаться?",
+    "Я взрослый, можно записаться?",
+    "Я по ОМС, можно лечиться?",
+])
+@pytest.mark.parametrize("profile_name", ["", "Анна"])
+def test_question_prefix_is_not_guessed_as_name(query, profile_name):
+    assert provider_safe_user_text(query, profile_name=profile_name) == query
+    assert observability_safe_user_text(query) == query
+    assert sanitize_dialog_history_for_provider(f"user: {query}") == f"user: {query}"
+    assert prepare_lead_pending_provider_question(query, profile_name=profile_name) == query
+
+
+@pytest.mark.parametrize("prefix", ["Анна", "Я Анна"])
+def test_only_bound_name_prefix_is_removed(prefix):
+    query = f"{prefix}, сколько стоит имплантация?"
+    assert provider_safe_user_text(query) == query
+    assert provider_safe_user_text(query, profile_name="Ирина") == query
+    assert provider_safe_user_text(query, profile_name="Анна") == "сколько стоит имплантация?"
+
+
 def test_observability_safe_matches_provider_placeholders() -> None:
     raw = f"Пишите {_MARKER_EMAIL} или {_MARKER_PHONE}"
     out = observability_safe_user_text(raw)

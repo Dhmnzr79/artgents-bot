@@ -1,3 +1,38 @@
+Owner GO 2026-10-09: Interface §34 — second audit repair group, commercial
+applicability and final published-set compatibility, including neutral data gap.
+Context/model-contract groups remain proposals; no live/commit/push/merge/deploy.
+§34 implemented locally: 77 targeted offline PASS and independent focused Checker
+PASS after correcting partial-result accounting. Cursor/widget acceptance pending;
+full CI and audit groups 3/4 not closed by this checkpoint.
+§34 widget acceptance reopened: owner encountered direct-fact/promo role overlap
+for consultation and discount. Bounded dedup bug fix authorized; keep role guard
+strict, direct applicable fact wins, no new scenario or model call. No commit/push.
+Overlap repair completed locally: 98 targeted offline PASS, focused Checker PASS;
+Cursor focused PASS and owner widget OK. No role-validator weakening.
+Owner authorized the complete 12-file §34 checkpoint commit/push on 2026-10-09;
+foreign WIP excluded. Full CI, remaining audit groups and merge/deploy remain open.
+
+Owner GO 2026-10-09: Interface §33 — first audit repair group only: input privacy
+and paused text cancellation. Other three groups remain proposals. No live,
+commit/push, merge or deploy in this checkpoint; widget WIP remains excluded.
+Subsequent §33 acceptance: 105 offline PASS, Checker and Cursor PASS, owner widget
+OK. Owner authorized the eight-file checkpoint commit/push on 2026-10-09;
+merge/deploy and other audit groups remain outside this authorization.
+
+Owner GO 2026-10-08: Interface §32 — clinic-policy consistency. Captured rules
+and one resolver decision replace cached D2 keys/repeated inference; retain existing
+clarification/reference history and booking policy IDs; correct known inactive-service
+prompt usage. No new model call, memory/state, price prose or registry redesign.
+Mixed child/adult booking remains open. Offline/Checker and later owner live acceptance
+are separate; this does not close SIM4/SIM5/REC5.
+§32 implemented offline: new 26 PASS; related 157 PASS / seven exact clean-HEAD
+legacy failures plus four edge PASS. Independent Checker PASS; live acceptance pending.
+Owner authorized a separate §32 checkpoint commit/push after the 2026-10-08 full
+read-only Astra audit. Full acceptance remains open: input privacy corruption,
+commercial executability/CTA/compatibility, stale offer context and paused lead
+text cancellation were reproduced. Details and limits are in Interface §32.
+Four repair groups are proposed only; no implementation GO or SIM4/SIM5/REC5 closure.
+
 # D2 — действующая дорожная карта демо-диалога
 
 ## Актуальный порядок после независимого аудита — 2026-10-02
@@ -929,3 +964,36 @@ and current acceptance. This supersedes earlier statements preserving that
 particular intake; ordinary lead/privacy and all §3 protections remain required.
 No UI or model mechanism is added. Historical storage/legacy helpers remain
 untouched; reintroduction needs explicit approval. See INTERFACE_TASK §30.
+
+## Audit group 3 — owner GO, 2026-10-09
+
+§34 committed/pushed as `49cf0b4`, Cursor PASS and owner widget acceptance.
+Next: INTERFACE_TASK §35 removes independent persisted current offers and derives
+them from completed results/current discussion. Doctors retain their existing
+typed provenance in safe history. No new carry policy, memory or model call.
+Schema 6 requires a new local conversation; saved leads are not removed.
+Offline and independent Checker evidence follows; group 4 remains separate.
+
+§35 implementation/offline checkpoint complete: final 80 passed plus focused
+continuation 1 passed after reproducing and correcting its pre-existing count
+expectation on clean HEAD. Checker PASS; 0 live calls, no commit/push.
+Cursor PASS subsequently received. Owner authorized a separate §35 commit/push.
+Live/widget acceptance remains open: correct context was delivered, but whitening
+includes produced invalid_envelope/unrelated prose and second-doctor follow-up
+selected the first doctor. See card for evidence. These model-output defects and
+historical suites are not closed by §35; group 4 remains next.
+
+## Audit group 4 — owner GO, 2026-10-09
+
+§35 checkpoint `6381945` pushed. Continue with Interface Task §36: remove
+server-only explanation states from ordinary model output and its compensating
+post-checks. Preserve price types, gaps, clarification, verified actions and §3 ownership.
+No model/provider calls or new memory/semantic rules. Structural offline evidence
+does not close whitening malformed JSON or second-doctor live understanding.
+Direct-price required target deferred: null target can already publish child /
+payment / brand policy before the late gate. Earlier rejection needs an owner
+decision; §36 does not close this remaining contract issue or the whole group.
+§36 final focused offline evidence: 64 passed, 124.89s, no failures/skips;
+preliminary wider run 93 passed before price-scope correction. No provider/live
+calls or whole-CI/widget acceptance. Independent Checker PASS for narrow §36;
+price-contract decision and live errors remain open, not whole-group closure.

@@ -19,6 +19,8 @@ data/bot.db
 data/bot.db-*
 data/*/bot.db
 data/*/bot.db-*
+data/*/d2_dialogue.sqlite
+data/*/d2_dialogue.sqlite-*
 
 # Локальные логи (вся папка, включая ротацию *.jsonl.*)
 logs/

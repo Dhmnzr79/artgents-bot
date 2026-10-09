@@ -78,16 +78,16 @@ def _strip_explicit_self_introduction(text: str, *, profile_name: str = "") -> s
 
     match = _YA_INTRO_RX.match(s)
     if match:
-        maybe = _accepted_personal_name(match.group(1).strip())
+        prefix = match.group(1).strip()
         rest = match.group(2).strip()
-        if maybe and rest and (not prof or maybe.casefold() == prof.casefold()):
+        if prof and rest and prefix.casefold() == prof.casefold():
             return rest
 
     intro = _INTRO_COMMA_RX.match(s)
     if intro:
-        maybe_name = _accepted_personal_name(intro.group(1).strip())
+        prefix = intro.group(1).strip()
         rest = intro.group(2).strip()
-        if maybe_name and rest and (not prof or maybe_name.casefold() == prof.casefold()):
+        if prof and rest and prefix.casefold() == prof.casefold():
             return rest
 
     return s

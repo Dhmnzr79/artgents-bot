@@ -47,7 +47,7 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
                 parts.append(failures_by_request[part.request_id].display_text.strip())
             elif part.status == "deferred":
                 parts.append(deferred_by_request[part.request_id].display_text.strip())
-            elif part.kind in {"clarification", "reference", "commercial_fact", "price_clarification", "price_reference"}:
+            elif part.kind in {"clarification", "reference", "doctors", "commercial_fact", "price_clarification", "price_reference"}:
                 parts.append(exact_by_request[part.request_id].display_text.strip())
             elif part.kind == "price":
                 if plan.d2_price_block is not None and plan.patient_text:
@@ -230,10 +230,15 @@ def _render_compact_price_group(
         if row.variant_label:
             name += f" — {row.variant_label}"
         scope = f" {row.scope_text}" if row.scope_text else ""
-        parts.append(f"{name} — {price_text(row)}{scope}")
+        paragraph = f"{name} — {price_text(row)}{scope}"
         conditions = tuple(text for text in common if text != row.scope_text)
         if conditions:
-            parts.append(" ".join(text if text.endswith((".", "!", "?")) else text + "." for text in conditions))
+            sentences = " ".join(
+                text[:1].upper() + text[1:] + ("" if text.endswith((".", "!", "?")) else ".")
+                for text in conditions
+            )
+            paragraph += (" " if paragraph.endswith((".", "!", "?")) else ". ") + sentences
+        parts.append(paragraph)
         return
 
     if not show_service_in_each_row:

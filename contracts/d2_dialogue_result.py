@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Union
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 class Closed(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -212,9 +212,9 @@ class PendingPriceOperation(PriceOperation):
 
 
 class PendingExplanationOperation(ExplanationFields):
-    """The same explanation task before its explanation-only completion."""
+    """An ordinary question that still requires clarification."""
     pending_question: str = Field(min_length=1, max_length=4000)
-    clarification: Clarification | None = None
+    clarification: Clarification
 
 
 class PendingDetailOperation(DetailOperation):
@@ -225,14 +225,8 @@ PendingOperation = Annotated[Union[PendingPriceOperation, PendingExplanationOper
     PendingDetailOperation], Field(discriminator="kind")]
 
 
-def _require_clarification(operation):
-    if operation.clarification is None:
-        raise ValueError("pending_clarification_required")
-    return operation
-
-
 # A storage boundary on the same operation types, not a persisted wrapper.
-ClarifiedOperation = Annotated[PendingOperation, AfterValidator(_require_clarification)]
+ClarifiedOperation = PendingOperation
 
 
 Block = Union[PriceOperation, PendingPriceOperation, ExplanationOperation,
@@ -260,13 +254,23 @@ class D2DialogueResult(Closed):
         """One ordered domain view, no reclassification or copied payload."""
         return self.blocks
 
+class AuthorizedExplanationOperation(ExplanationFields):
+    """Server-owned source/scope after a verified click; never ordinary output."""
+    pending_question: str = Field(min_length=1, max_length=4000)
+
+
+class D2ExplanationTask(Closed):
+    outcome: Literal["dialogue"] = "dialogue"
+    blocks: tuple[AuthorizedExplanationOperation, ...] = Field(min_length=1)
+
+
 def validate_d2_payload(payload: dict, *, active_service_ids: frozenset[str], known_task=None):
     if known_task is not None:
-        expected = tuple(b for b in known_task.blocks if isinstance(b, PendingExplanationOperation))
+        expected = known_task.blocks
         items = payload.get("explanations")
         if set(payload) != {"explanations"} or not isinstance(items, list) or len(items) != len(expected):
             raise ValueError("known_task_explanations_required")
-        replacements = {}
+        completed = []
         for original, item in zip(expected, items):
             if not isinstance(item, dict) or set(item) - {"request_id", "content_text"} or item.get("request_id") != original.request_id:
                 raise ValueError("known_task_explanation_invalid")
@@ -274,17 +278,14 @@ def validate_d2_payload(payload: dict, *, active_service_ids: frozenset[str], kn
                 raise ValueError("known_task_explanation_text_required")
             values = original.model_dump()
             values.pop("pending_question")
-            values.pop("clarification")
             values.update(item)
-            replacements[original.request_id] = ExplanationOperation.model_validate(values)
+            completed.append(ExplanationOperation.model_validate(values))
         result = D2DialogueResult.model_validate({
             "outcome": known_task.outcome,
-            "blocks": tuple(replacements.get(b.request_id, b) for b in known_task.blocks),
+            "blocks": tuple(completed),
         })
     else:
         result = D2DialogueResult.model_validate(payload)
-        if any(isinstance(b, PendingExplanationOperation) and b.clarification is None for b in result.blocks):
-            raise ValueError("pending_clarification_required")
     for block in result.blocks:
         if isinstance(block, DoctorsOperation) and block.service_id not in active_service_ids:
             raise ValueError("doctors_service_not_active")

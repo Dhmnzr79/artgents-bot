@@ -103,7 +103,7 @@ class D2SessionContextProjection(ResponsePlanModel):
     retained_shown_ids: PersistedShownCommercialIds
 
 
-D2_SESSION_SCHEMA_VERSION = 5
+D2_SESSION_SCHEMA_VERSION = 6
 
 
 class D2SessionState(ResponsePlanModel):
@@ -114,7 +114,6 @@ class D2SessionState(ResponsePlanModel):
     last_committed_turn_index: int
     dialogue_pairs: tuple[D2DialogueReceiptRef, ...] = ()
     discussion_request_id: NonBlankStr | None = None
-    d2_shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...] = ()
     accumulated_shown_ids: PersistedShownCommercialIds = PersistedShownCommercialIds()
     terminal_state: TerminalState = "none"
     clarify_pending: bool = False
@@ -133,11 +132,6 @@ class D2SessionState(ResponsePlanModel):
             raise ValueError("session_schema_version_invalid")
         require_exact_nonblank_id("session_client_id", self.session_key.client_id)
         require_exact_nonblank_id("session_sid", self.session_key.sid)
-        refs = self.d2_shown_price_offer_refs
-        if len({r.offer_id for r in refs}) != len(refs):
-            raise ValueError("d2_shown_price_offer_id_duplicate")
-        if any(r.source_client_id != self.session_key.client_id for r in refs):
-            raise ValueError("d2_shown_price_offer_client_mismatch")
         if any(p.committed_at_turn > self.last_committed_turn_index for p in self.dialogue_pairs):
             raise ValueError("dialogue_pair_future_turn")
         if self.clarify_task is not None and not self.clarify_pending:

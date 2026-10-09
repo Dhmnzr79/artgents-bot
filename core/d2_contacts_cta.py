@@ -32,6 +32,9 @@ from core.clinic_contact_policies import (
 )
 from core.d2_tenant_snapshot import build_d2_bundle
 from core.response_plan_fact_projection import fact_active_as_of
+from core.response_plan_fact_policy import evaluate_requested_fact_display
+from contracts.response_plan_fact_policy import RequestedFactPolicyContext
+from contracts.target_service_content_topic import parse_service_catalog_content_topic
 from core.response_plan_resolver import resolve_response_plan
 from core.response_text_renderer import render_response_text
 from core.response_ui_projection import project_response_ui
@@ -128,12 +131,24 @@ def resolve_d2_lead_cta_button(
     as_of: date,
     cta_key: str = "booking",
     prefer_free_consult: bool = False,
+    service_id: str | None = None,
 ) -> UiButtonCandidate | None:
-    """D2-013/048: authored CTA label; free wording only with date-active free fact."""
+    """D2-013/048: free wording requires date and automatic scope applicability."""
     labels = _tone_cta_labels(snapshot)
     label = labels.get(cta_key) or labels.get("booking")
     button_id = cta_key if cta_key in labels else "booking"
-    if prefer_free_consult and free_consult_fact_active(snapshot, as_of=as_of):
+    bundle = build_d2_bundle(snapshot)
+    fact = bundle.facts.get(_FREE_CONSULT_FACT_ID)
+    service = bundle.services.get(service_id) if service_id else None
+    topic = parse_service_catalog_content_topic(service.content_ref) if service else None
+    context = RequestedFactPolicyContext(
+        response_scope="service" if service_id else "clinic",
+        reference_service_id=service_id, resolved_topic_id=topic,
+        implant_context_confirmed=topic == "implantation",
+    )
+    if (prefer_free_consult and fact is not None and fact_active_as_of(fact, as_of)
+        and evaluate_requested_fact_display(fact=fact, context=context, bundle=bundle,
+                                            evaluation_purpose="automatic") == "allowed"):
         free_label = _ui_free_book_label(snapshot)
         if free_label:
             label = free_label

@@ -34,7 +34,19 @@ def _project_pair(ref, result, limit):
     safe_prose = lambda text: mask_emails_in_text(mask_phones_in_text(text))
     by_request = {b.request_id: safe_prose(b.display_text)
         for b in resolved.information_blocks if b.publication == "model_prose"}
+    # Authored reference text can contain amounts, so keep its typed identity only.
+    # This fixed policy clarification has known nonfinancial provenance.
+    from core.d2_snapshot_sources import _POLICY_CLARIFY
+    reference_ids = {p.request_id for p in resolved.d2_request_parts
+        if p.kind == "clarification"}
+    by_request.update({b.request_id: safe_prose(b.display_text)
+        for b in resolved.d2_exact_text_blocks if b.request_id in reference_ids
+        and b.display_text == _POLICY_CLARIFY
+        and not (b.policy_ids or b.requested_fact_ids or b.promo_fact_ids)})
     by_request.update({b.request_id: b.display_text for b in resolved.d2_contact_blocks})
+    doctor_ids = {p.request_id for p in resolved.d2_request_parts if p.kind == "doctors"}
+    by_request.update({b.request_id: safe_prose(b.display_text)
+        for b in resolved.d2_exact_text_blocks if b.request_id in doctor_ids})
     text = []
     for part in resolved.d2_request_parts:
         if part.kind == "price" and resolved.patient_text:
@@ -67,6 +79,46 @@ def _project_pair(ref, result, limit):
     )
 
 
+def _published_offers(resolved):
+    blocks = (*((resolved.d2_price_block,) if resolved.d2_price_block else ()),
+        *resolved.d2_price_detail_blocks)
+    return tuple({row.offer_id: D2ShownPriceOfferRef(
+        source_client_id=row.source_client_id, offer_id=row.offer_id,
+        service_id=row.service_id)
+        for block in blocks for row in block.rows
+        if not getattr(row, "missing", False)}.values())
+
+
+def _current_offers(context, snapshot, store, scope):
+    # The last completed result is the sole source; history is not a fallback.
+    if scope is None or snapshot.state.clarify_pending:
+        return ()
+    latest = store.read_latest_completion(context.session_key)
+    if latest is None:
+        return ()
+    if (latest.context.session_key != context.session_key
+        or latest.committed_revision != context.source_revision
+        or latest.context.source_turn_index + 1 != context.source_turn_index):
+        raise ValueError("d2_latest_receipt_invalid")
+    resolved = latest.response.resolved
+    if resolved.response_scope == "mixed":
+        return ()
+    refs = _published_offers(resolved)
+    has_price_result = any(p.kind in {"price", "price_detail", "price_reference", "price_clarification"}
+        for p in resolved.d2_request_parts)
+    if not refs and not has_price_result and latest.context.freshness == "fresh" and (
+        latest.context.ordinary.discussion_scope == scope
+    ):
+        refs = latest.context.ordinary.d2_shown_price_offer_refs
+    if len({r.offer_id for r in refs}) != len(refs):
+        raise ValueError("d2_shown_price_offer_id_duplicate")
+    if any(r.source_client_id != context.session_key.client_id for r in refs):
+        raise ValueError("d2_shown_price_offer_client_mismatch")
+    if scope.service_id is not None and any(r.service_id != scope.service_id for r in refs):
+        raise ValueError("d2_shown_price_offer_scope_mismatch")
+    return refs
+
+
 def project_completed_dialogue(context, snapshot, store, policy):
     """TTL already authorized this read; projection never interprets user text."""
     if context.freshness != "fresh":
@@ -85,7 +137,9 @@ def project_completed_dialogue(context, snapshot, store, policy):
         scope = discussion_scope(result.response.resolved)
         if scope is None:
             raise ValueError("d2_discussion_receipt_scope_mismatch")
-    ordinary = context.ordinary.model_copy(update={"dialogue_pairs": tuple(pairs), "discussion_scope": scope})
+    ordinary = context.ordinary.model_copy(update={"dialogue_pairs": tuple(pairs),
+        "discussion_scope": scope,
+        "d2_shown_price_offer_refs": _current_offers(context, snapshot, store, scope)})
     return context.model_copy(update={"ordinary": ordinary})
 
 

@@ -49,6 +49,19 @@ def _warranty_fact() -> TargetCommercialFact:
     )
 
 
+@pytest.mark.parametrize("purpose", ["requested", "automatic"])
+def test_explicit_exclusion_prevents_positive_entitlement(purpose):
+    fact = _installment_fact().model_copy(update={
+        "excluded_service_ids": ["classic"], "excluded_scope_text": "На эту услугу рассрочки нет.",
+    })
+    assert evaluate_requested_fact_display(
+        fact=fact,
+        context=RequestedFactPolicyContext(response_scope="service", reference_service_id="classic",
+                                            resolved_topic_id="implantation", implant_context_confirmed=True),
+        evaluation_purpose=purpose,
+    ) == "restricted_scope"
+
+
 def test_clinic_installment_allowed_with_display_permission() -> None:
     outcome = evaluate_requested_fact_display(
         fact=_installment_fact(),

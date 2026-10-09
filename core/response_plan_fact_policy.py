@@ -66,6 +66,9 @@ def evaluate_requested_fact_display(
 
     if not active:
         return "inactive"
+    if (isinstance(fact, TargetCommercialFact)
+        and context.reference_service_id in fact.excluded_service_ids):
+        return "restricted_scope"
 
     if requires_implant_scope and not context.implant_context_confirmed:
         return "missing_implant_scope"

@@ -55,7 +55,6 @@ def project_d2_session_context(
         freshness="fresh",
         last_user_turn_at=last_user_turn_at,
         ordinary=D2OrdinarySessionContext(
-            d2_shown_price_offer_refs=source.d2_shown_price_offer_refs,
             clarify_pending=source.clarify_pending,
             clarify_task=source.clarify_task,
         ),

@@ -225,6 +225,7 @@ def test_free_cta_label_requires_date_window(tmp_path: Path) -> None:
         as_of=date(2027, 1, 1),
         cta_key="doctor",
         prefer_free_consult=True,
+        service_id="classic",
     )
     assert expired is not None
     assert "бесплатн" not in expired.label.casefold()
@@ -234,6 +235,7 @@ def test_free_cta_label_requires_date_window(tmp_path: Path) -> None:
         as_of=date(2026, 9, 22),
         cta_key="doctor",
         prefer_free_consult=True,
+        service_id="classic",
     )
     assert active is not None
     assert "бесплатн" in active.label.casefold()

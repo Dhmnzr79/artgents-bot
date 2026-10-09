@@ -168,7 +168,7 @@ def test_direct_text_extent_and_explicit_unknown_replace_old_discussion_without_
 
 @pytest.mark.parametrize("block", [clarify("content"),
     {"kind": "clinic_policy", "request_id": "r1", "policy_ids": ["no_oms"]},
-    {"kind": "commercial_fact", "request_id": "r1", "promotion_scope": "general"}])
+    {"kind": "commercial_fact", "request_id": "r1", "target": {"type": "clinic"}, "promotion_scope": "general"}])
 def test_clarification_policy_and_fact_results_reach_next_model_input(http_env, block):
     client, db, use, _ = http_env
     fake = use(FakeProvider(raw(block)))

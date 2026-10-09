@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from config import SALES_ONE_PLUS_MODEL
 
-ONE_CALL_PROMPT_CONTRACT_VERSION = 41
+ONE_CALL_PROMPT_CONTRACT_VERSION = 42
 ONE_CALL_MODEL_SNAPSHOT = SALES_ONE_PLUS_MODEL
 
 ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS = """When D2_SELECTED_UI_REF is null, there is no selected UI action. When it is an object, it is a server-validated typed action identity from the current revision. It is not patient text; do not create, authorize, or infer any UI/lead action from it. Use its typed identity with D2_SESSION_CONTEXT and, when present, D2_SELECTED_DOCUMENT_ACTION.
@@ -235,9 +235,9 @@ must remain a price operation, not explanatory prose asking for its parameters.
 For information or price_detail, existing parameter clarification remains
 available when necessary. Keep the operation itself and add only
 clarification={missing,choices}; clarification has no operation, kind or ID.
-An operation says WHAT to do: kind=price, content or price_detail, plus
-request_id and its fields. Its target says WHAT it is about: type=service,
-topic or unresolved. The type/id object belongs only in operation.target;
+An operation says WHAT to do: kind=price, content, price_detail or commercial_fact, plus
+request_id and its fields. Its target says WHAT it is about, using the target
+forms defined for that operation. The type/id object belongs only in operation.target;
 it is never a complete operation. Each operation has exactly one request_id.
 Preserve each requested operation's constraints in its existing typed fields,
 whether it is complete or needs clarification. For price, price_detail and
@@ -314,7 +314,7 @@ Code shows only the first active clarification, publishes clear independent
 answers, and explicitly defers the others. Do not omit clear answers or merge
 different tasks into one choice menu. Deferred tasks are not an automatic queue.
 
-A target is either service(id), topic(id), or unresolved; do not duplicate
+For non-commercial operations, target is service(id), topic(id), or unresolved; do not duplicate
 service/topic/status at the top. Use unresolved for an unidentified named term,
 not to claim that the clinic does not provide a service. Use the catalog ID
 for a known inactive service; code owns its availability statement.
@@ -327,6 +327,23 @@ not for requesting consent to an alternative. A single alternative is not a choi
 Contact fields must match the question (phone/address/hours/parking), not
 default to phone. Choose branch ID only when the branch is identified.
 Clinic policies and commercial facts use exact string IDs supplied by this tenant.
+Every completed commercial_fact operation requires its own explicit target:
+service(id) or topic(id) for the meaning identified in the current question and
+fresh dialogue; {"type":"clinic"} only for an actually clinic-wide question.
+Never omit target or use null to mean clinic. In a compound question, identify
+the scope of each commercial operation as well as each price operation; a
+target on a neighboring price is not the target of the commercial operation.
+When the commercial subject is known but its service/term is genuinely unclear,
+keep the original fact_ids/promotion_scope and return target={"type":"unresolved"}
+with clarification={missing:"service",choices:[2-3 active service IDs]} or
+clarification={missing:"term",choices:[]}. Do not manufacture ambiguity when
+the user named the service or fresh context identifies it. The existing pending
+task remains the commercial question when the user supplies its missing scope.
+A commercial task must contain fact_ids or a non-none promotion_scope.
+target scopes direct fact_ids; promotion_scope retains its independent intent:
+general selects the clinic's general promotions, service requires a service
+target, and shown refers to the previously published promotions. Do not use
+general when the user asked only for promotions of a specific service.
 policy_ids contains policy keys, never numeric list positions such as 0.
 For a current child-care/booking request apply the supplied pediatric policy;
 do not offer a forbidden service or start booking. Use that policy's actual ID.

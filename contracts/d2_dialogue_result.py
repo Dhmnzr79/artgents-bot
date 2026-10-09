@@ -27,6 +27,11 @@ class UnresolvedTarget(Closed):
     type: Literal["unresolved"]
 
 
+class ClinicTarget(Closed):
+    """Explicit clinic-wide commercial meaning, never an omitted target."""
+    type: Literal["clinic"]
+
+
 Target = Annotated[Union[ServiceTarget, TopicTarget, UnresolvedTarget], Field(discriminator="type")]
 
 
@@ -170,10 +175,26 @@ class BookingOperation(PolicyScope):
     policy_ids: tuple[str, ...] = ()
 
 
-class CommercialOperation(ScopedOperation):
+class CommercialFields(ScopedOperation):
     kind: Literal["commercial_fact"]
     fact_ids: tuple[str, ...] = ()
     promotion_scope: Literal["none", "general", "service", "shown"] = "none"
+
+    @model_validator(mode="after")
+    def commercial_task_required(self):
+        if not self.fact_ids and self.promotion_scope == "none":
+            raise ValueError("commercial_task_required")
+        return self
+
+
+class CommercialOperation(CommercialFields):
+    target: Annotated[Union[ServiceTarget, TopicTarget, ClinicTarget], Field(discriminator="type")]
+
+    @model_validator(mode="after")
+    def promotion_service_required(self):
+        if self.promotion_scope == "service" and self.service_id is None:
+            raise ValueError("d2_promotion_service_required")
+        return self
 
 
 class OffTopicOperation(Operation):
@@ -221,8 +242,13 @@ class PendingDetailOperation(DetailOperation):
     clarification: Clarification
 
 
+class PendingCommercialOperation(CommercialFields):
+    target: UnresolvedTarget
+    clarification: MeaningClarification
+
+
 PendingOperation = Annotated[Union[PendingPriceOperation, PendingExplanationOperation,
-    PendingDetailOperation], Field(discriminator="kind")]
+    PendingDetailOperation, PendingCommercialOperation], Field(discriminator="kind")]
 
 
 # A storage boundary on the same operation types, not a persisted wrapper.
@@ -231,7 +257,7 @@ ClarifiedOperation = PendingOperation
 
 Block = Union[PriceOperation, PendingPriceOperation, ExplanationOperation,
     PendingExplanationOperation, DetailOperation, PendingDetailOperation,
-    ContactOperation, PolicyOperation, BookingOperation, CommercialOperation,
+    ContactOperation, PolicyOperation, BookingOperation, CommercialOperation, PendingCommercialOperation,
     OffTopicOperation, DoctorsOperation]
 
 

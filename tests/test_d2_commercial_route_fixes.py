@@ -23,6 +23,9 @@ def commercial(fact_id=None, *, target=None, request_id="r1", promotion_scope="n
               "fact_ids": [fact_id] if fact_id else [], "promotion_scope": promotion_scope}
     if target:
         result["target"] = {"type": target[0], "id": target[1]}
+    else:
+        # These fixtures intentionally ask for the clinic-wide fact/list.
+        result["target"] = {"type": "clinic"}
     return result
 
 

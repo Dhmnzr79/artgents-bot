@@ -434,7 +434,7 @@ def test_switch_discards_previous_service_price_details(http_env, target):
 
 
 @pytest.mark.parametrize("commercial", [
-    {"promotion_scope": "general"},
+    {"target": {"type": "clinic"}, "promotion_scope": "general"},
     {"fact_ids": ["installment_12"], "target": {"type": "service", "id": "all_on_4"}},
 ])
 def test_commercial_part_keeps_prose_and_published_fact_history(http_env, commercial):

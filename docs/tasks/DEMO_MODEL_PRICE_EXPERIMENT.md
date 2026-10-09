@@ -1,5 +1,79 @@
 # Эксперимент: ценовые ответы модели
 
+## Явная область коммерческого вопроса — checkpoint C1, 2026-10-09
+
+Owner GO после обсуждения: различать общий/scoped/неясный коммерческий вопрос.
+Класс дефекта: missing target превращается в clinic, хотя модель могла потерять
+явно названную услугу; в compound соседняя price scope не доказывает commercial
+scope. Проверены live логи кариес/installment и whitening price+discount; это
+подтверждённые semantic ошибки, не техническое падение и не регрессия KB2.
+
+Классификация: архитектурное упрощение с исправлением контракта. Before → after
+→ removed dependency: optional commercial target=none → обязательный явный
+clinic/service/topic target в завершённой задаче либо unresolved+clarification
+в pending → удаляется автоматическое достраивание отсутствующей области до
+clinic. Единственный owner области — модель по §3. Существующий код проверяет
+применимость фактов; ни текстовый классификатор, ни перенос из соседней операции,
+ни second call/retry/fallback, ни новая память не добавляются. Pending commercial
+использует существующий clarify_task/TTL/UI service click. Неизвестна область
+уже распознанной commercial задачи; неизвестный сам предмет вопроса здесь не
+получает нового pending_question/универсального сценария.
+
+Содержательная операция: непустые fact_ids либо прежнее promotion_scope.
+Общая область выражается ClinicTarget только в commercial; общий Target других
+операций не расширяется. Existing promotion_scope остаётся независимым намерением
+подбора: general=общий список (в том числе рядом с scoped direct facts), service=
+прежний service profile, shown=прежние опубликованные promos. Нельзя запрещать
+согласованный scoped direct fact + general promos или изобретать topic promo
+selection. Пропущенная/невалидная форма остаётся прежним строгим отказом границы;
+это не гарантия, что модель никогда ошибочно не выберет explicit clinic.
+
+Preflight: C:/Cursor Projects/artgents-bot-active; codex/model-price-experiment;
+HEAD 6108ac956e9589ac6a162f28d37c62844d24e02e; origin/main/merge-base efa3f77.
+Staging пуст; pre-existing KB2 (15 файлов) + 2B WIP сохраняются целиком.
+Exact C1 allowlist (8): contracts/d2_dialogue_result.py;
+core/one_call_prompt_contract.py; tests/test_d2_commercial_route_fixes.py;
+tests/test_d2_attribution.py; tests/test_d2_sim3_completion_context.py;
+tests/test_d2_sim2_dialogues.py; tests/test_d2_commercial_scope.py; этот документ.
+Клиентские данные и materializer не менять. Тестовые general fixtures получают
+explicit clinic по смыслу; scoped fixtures сохраняют свои targets. Нельзя
+добавлять автоматическое clinic-default к production parser или общему fake raw.
+
+Acceptance: actual sent schema запрещает omitted/null/unresolved complete scope
+и пустую задачу; generic/scoped/excluded по разным фактам; price+discount
+не противоречат; pending→verified click без model call, textual follow-up→один
+call, replay/next context, forged/stale/foreign click, pending TTL. Независимые
+части сохраняются для корректного pending; invalid whole envelope по-прежнему
+строгий. Offline/Checker; provider/live/SMTP 0; без commit/push.
+
+Evidence C1: `c1-adverse-final.xml` — 38 passed, 0 failed, 31.86s на
+финальном новом test file: scope/schema, две формы empty rejection, разные
+факты/scopes/exclusions, compound whitening, pending service click/text/topic
+change, term+независимый address, forged/stale/foreign/expired UI, replay.
+`c1-prompt-final.xml` — 10 passed, 0 failed, 6.86s после устранения противоречия
+старого общего перечня target и коммерческого clinic exception в instructions.
+Actual schema/compound/term и pre-existing 2B input/known-task assertions зелёные.
+Первичный `c1-scope.xml`: 104 passed, 2 failed только в новой TTL fixture
+(несуществующий store.commit); исправлен тест через прежний isolated SQL activity
+pattern. Прежние 72 commercial route cases в этом run прошли, runtime не менялся.
+Основной `c1-final.xml` — 244 passed, 0 failed, 228.13s: новая коммерческая
+форма + существующие SIM2 contracts/dialogues, attribution, SIM3 completion
+context и 2B input. Runtime contract старше запуска; четыре adverse/term кейса
+позже начала этого набора полностью проверены отдельным 38 PASS.
+По P2 редакционному замечанию Checker общий закрытый перечень target заменён
+ссылкой на формы соответствующей операции, без runtime изменения;
+`c1-checker-recheck.xml` — 6 passed, 0 failed, 2.35s на конечной инструкции.
+Client data неизменны, `git diff --check` чист. Live понимание модели этим
+offline не доказано. Независимый Astra Checker PASS только C1: blockers/test
+weakening нет, P2 prompt исправлен; traced pending→stored task→verified click,
+explicit scope и отсутствие missing→clinic. XML 244/38/6 PASS прочитаны.
+KB2/2B и модельные цены не входят в эту аттестацию. Staging пуст; без commit/push.
+
+Widget acceptance: владелец проверил ответы и сообщил «Все ок».
+Owner GO: сохранить KB2 и C1 отдельными коммитами и push; 2B оставить локально.
+
+Commit isolation evidence: c1-staged-final.xml — 126 passed, 0 failed; C1 на сохранённом KB2 без 2B, provider 0.
+
 ## Снятие legacy-policy зависимости — checkpoint KB2, 2026-10-09
 
 Owner GO: после объяснения, что D2 не использует marketing.yaml, но shared

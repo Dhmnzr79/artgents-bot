@@ -76,7 +76,8 @@ def test_demo_pack_loads_commercial_contract_through_snapshot(tmp_path: Path) ->
     assert caries.promo_refs == ()
     assert caries.price_booster_id is None
     assert caries.also_list_id is None
-    assert discount.short_text != discount.full_text
+    assert discount.fact_id == "implant_same_day_discount"
+    assert discount.model_dump() == {"fact_id": "implant_same_day_discount"}
     assert len(commercial.price_booster_packages) == 2
     assert len(commercial.also_list_packages) == 3
     assert any(item.service_id == "veneers" and item.promo_refs == () for item in commercial.service_profiles)
@@ -103,6 +104,48 @@ def test_empty_and_missing_packages_are_valid(tmp_path: Path) -> None:
     assert missing.commercial.promo_facts == ()
 
 
+def test_fact_only_edit_supplies_both_forms_from_captured_snapshot(tmp_path: Path, monkeypatch) -> None:
+    from contracts.response_plan import SessionKey
+    from core.d2_snapshot_sources import build_d2_snapshot_sources
+
+    root = _copy_named(tmp_path, "demo")
+    path = root / "demo" / "target_response" / "pricebook" / "facts.json"
+    facts = json.loads(path.read_text(encoding="utf-8"))
+    fact = facts["implant_same_day_discount"]
+    fact["microfact_text"] = "Проверочная короткая форма: до 15%."
+    fact["text_fact"] = "Проверочная полная форма: до 15% при оплате в день обращения."
+    path.write_text(json.dumps(facts, ensure_ascii=False), encoding="utf-8")
+    snapshot = load_d2_tenant_snapshot("demo", clients_root=root)
+    view = build_d2_model_view(snapshot)
+    # Later disk edits cannot replace the already captured authority.
+    fact["text_fact"] = "Не должна попасть в захваченный ответ."
+    path.write_text(json.dumps(facts, ensure_ascii=False), encoding="utf-8")
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("filesystem read after snapshot capture")
+
+    monkeypatch.setattr(Path, "read_text", forbidden)
+    monkeypatch.setattr(Path, "read_bytes", forbidden)
+    sources = build_d2_snapshot_sources(
+        snapshot, model_view=view, operations=(), session_key=SessionKey(client_id="demo", sid="kb1"),
+    )
+    assert [row.fact_id for row in sources.d2_commercial.promo_facts] == [
+        row.fact_id for row in view.commercial.promo_facts]
+    promo = next(row for row in sources.d2_commercial.promo_facts if row.fact_id == "implant_same_day_discount")
+    assert promo.short_text == "Проверочная короткая форма: до 15%."
+    assert promo.full_text == "Проверочная полная форма: до 15% при оплате в день обращения."
+
+
+@pytest.mark.parametrize("field", ["short_text", "full_text"])
+def test_promo_reference_rejects_legacy_text_fields(tmp_path: Path, field: str) -> None:
+    root = _copy_named(tmp_path, "demo")
+    payload = _read_commercial(root)
+    payload["promo_facts"][0][field] = "Второй источник текста запрещён."
+    _write_commercial(root, payload)
+    with pytest.raises(D2TenantSnapshotError, match="commercial_config_invalid"):
+        _load(root)
+
+
 @pytest.mark.parametrize(
     ("fault", "code"),
     (
@@ -110,7 +153,7 @@ def test_empty_and_missing_packages_are_valid(tmp_path: Path) -> None:
         ("foreign_tenant", "commercial_tenant_mismatch"),
         ("two_boosters", "commercial_package_not_single"),
         ("two_also", "commercial_package_not_single"),
-        ("conflicting_forms", "commercial_promo_forms_conflict"),
+        ("legacy_forms", "commercial_config_invalid"),
         ("promo_cap", "commercial_promo_ref_cap"),
         ("inapplicable", "commercial_promo_inapplicable"),
         ("unknown_package", "commercial_package_unavailable"),
@@ -132,7 +175,7 @@ def test_broken_commercial_contract_fails_closed(tmp_path: Path, fault: str, cod
         classic["price_booster_id"] = ["demo_payment_booster", "demo_warranty_booster"]
     elif fault == "two_also":
         classic["also_list_id"] = ["demo_also_diagnostics", "demo_also_followup"]
-    elif fault == "conflicting_forms":
+    elif fault == "legacy_forms":
         payload["promo_facts"][0]["short_text"] = "Другая короткая форма."
     elif fault == "promo_cap":
         classic["promo_refs"] = [
@@ -152,7 +195,8 @@ def test_broken_commercial_contract_fails_closed(tmp_path: Path, fault: str, cod
             "missing_offer",
         ]
     else:
-        payload["also_list_packages"][0]["body_text"] = payload["promo_facts"][0]["short_text"]
+        facts = json.loads((root / "demo" / "target_response" / "pricebook" / "facts.json").read_text(encoding="utf-8"))
+        payload["also_list_packages"][0]["body_text"] = facts[payload["promo_facts"][0]["fact_id"]]["microfact_text"]
     _write_commercial(root, payload)
 
     with pytest.raises(D2TenantSnapshotError, match=code):

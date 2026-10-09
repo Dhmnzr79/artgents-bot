@@ -378,8 +378,6 @@ def _commercial_contract(
             raise D2TenantSnapshotError("commercial_promo_kind_invalid")
         if fact.microfact_text is None:
             raise D2TenantSnapshotError("commercial_promo_short_missing")
-        if promo.short_text != fact.microfact_text or promo.full_text != fact.text_fact:
-            raise D2TenantSnapshotError("commercial_promo_forms_conflict")
     boosters = {item.package_id: item for item in pack.price_booster_packages}
     also_lists = {item.package_id: item for item in pack.also_list_packages}
     for profile in pack.service_profiles:
@@ -394,7 +392,7 @@ def _commercial_contract(
                 raise D2TenantSnapshotError("commercial_promo_forms_missing")
             if fact is None or profile.service_id not in fact.allowed_service_ids or profile.service_id in fact.excluded_service_ids:
                 raise D2TenantSnapshotError("commercial_promo_inapplicable")
-            owned.extend(_commercial_texts(promo.short_text, promo.full_text))
+            owned.extend(_commercial_texts(fact.microfact_text, fact.text_fact))
         if profile.price_booster_id is not None:
             package = boosters.get(profile.price_booster_id)
             if package is None:

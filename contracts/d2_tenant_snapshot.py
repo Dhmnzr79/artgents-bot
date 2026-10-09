@@ -54,12 +54,10 @@ def _require_non_blank(*values: str) -> None:
 
 class D2CommercialPromoFact(ResponsePlanModel):
     fact_id: str
-    short_text: str
-    full_text: str
 
     @model_validator(mode="after")
     def _validate_promo(self) -> Self:
-        _require_non_blank(self.fact_id, self.short_text, self.full_text)
+        _require_non_blank(self.fact_id)
         return self
 
 

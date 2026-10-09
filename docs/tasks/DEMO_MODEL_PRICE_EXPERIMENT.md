@@ -1,5 +1,64 @@
 # Эксперимент: ценовые ответы модели
 
+## Чистка коммерческой базы — checkpoint KB1, 2026-10-09
+
+Offline evidence: `kb1-targeted.xml` — 37 passed, 0 failed, 22.51s.
+Набор: commercial contract, 2B input projection, JSON/SSE price/discount
+compatibility, qualified free consultation + replay, unknown-fact strict guard.
+Новый тест меняет только facts.json, проверяет обе формы через реальный
+snapshot source builder и запрещает чтение диска после capture.
+`git diff --check` чист; facts.json и весь MD-корпус не изменены.
+Provider/live/SMTP: 0. Commit/push разрешены владельцем после PASS; результаты — в сообщении о checkpoint. Независимый Astra Checker:
+PASS KB1, blockers/test weakening нет. Все шесть удалённых строк точно совпадают
+с сохранёнными facts; старые поля отвергаются, authority/resolver/context traced.
+2B WIP и полная очистка базы в PASS не входят.
+
+Дополнительно перед коммитом: `kb1-staged.xml` — 32 passed, 0 failed, 19.23s.
+Общие модули загружены из Git index, provider — из HEAD: KB1 проверен без 2B.
+
+Owner GO после read-only аудита Astra: «не понимаю, где править акции/маркетинговые
+факты; давай сделаем чистку базы». Первый coherent checkpoint ограничен удалением
+ручных копий short/full текста между facts и D2 commercial. Ни даты, ни цифры,
+ни условия, ни промо-политика не меняются. Promo MD с уникальными объяснениями и
+legacy marketing/strategy/microfacts зависимости — следующие отдельные шаги;
+этот checkpoint не объявляет всю базу очищенной.
+
+Классификация: архитектурное упрощение. Before → after → removed dependency:
+тексты вручную записаны в facts.json и d2_commercial.json, загрузчик требует
+совпадения копий → в D2 commercial только упорядоченные fact_id, существующая
+authority материализует текст из captured facts → удалены второй редактируемый
+источник и обязательная синхронизация. Текст short/full принадлежит facts.json;
+выбор формы, порядка и применимости — прежним D2 resolver/evaluator по §3.
+Старые поля и чтения удаляются, старый формат не поддерживается. Нет адаптера,
+двух форматов, классификатора, состояния, памяти, retry или новых model calls.
+
+Preflight: C:/Cursor Projects/artgents-bot-active, codex/model-price-experiment,
+HEAD fadf71cc9ab332fb7c3aab0c86ae8373e12efb1b; origin/main и merge-base efa3f77.
+Staging пуст. Pre-existing WIP: пять файлов 2B выше/ниже; сохранить все hunks.
+Точный дополнительный allowlist: clients/demo/target_response/d2_commercial.json;
+contracts/d2_tenant_snapshot.py; core/d2_tenant_snapshot.py;
+core/d2_snapshot_sources.py; tests/test_d2_commercial_contract.py;
+tests/test_d2_price_catalog_input.py; этот документ. core/d2_live_provider.py —
+WIP 2B, в KB1 не изменять. facts.json и весь MD-корпус побайтно сохраняются.
+
+Для автора клиента после KB1:
+- text_fact / microfact_text, active и даты, allowed/excluded scope —
+  target_response/pricebook/facts.json;
+- ссылки/порядок promo_facts и service_profiles, пакеты дополнений и группы
+  несовместимости — target_response/d2_commercial.json;
+- цены/состав/этапы — target_response/pricebook/services/*.json;
+- marketing.yaml не редактировать для D2: это пока обязательный legacy-файл,
+  не действующая политика D2; снятие его зависимости ещё не выполнено;
+- promo MD пока остаются самостоятельными источниками дополнительных объяснений.
+  Их консолидация не разрешает потерять уникальные условия или ослабить обещания.
+
+Acceptance: одна правка только facts меняет обе формы ответа без синхронизации
+commercial; exact прежние ответы/order/CTA/replay/context; неизвестный, inactive,
+non-promo и foreign ID, отсутствие короткой формы, scope/exclusions, duplicate
+meaning и поддельные UI по-прежнему проверяются; старые text fields отвергаются;
+authority использует captured bundle без чтения диска после snapshot.
+Offline → independent Checker. Provider/live/SMTP budget 0; commit/push разрешены владельцем.
+
 ## Статус и сохранённая точка
 
 Owner GO — 2026-10-09: сохранить нынешнюю работу и подготовить отдельную ветку

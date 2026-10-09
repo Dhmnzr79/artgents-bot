@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 from contracts.d2_tenant_snapshot import D2ModelView, D2TenantSnapshot
+from contracts.response_schema import ResponseSchemaBundle
 from contracts.one_call_envelope import OneCallEnvelope
 from contracts.response_plan import (
     CodeOwnedTerminalCandidate,
@@ -274,11 +275,12 @@ def build_d2_snapshot_sources(
                              service_ids=item.service_ids, ordered_offer_ids=item.offer_ids)
         for item in model_view.direction_prices
     )
+    bundle = build_d2_bundle(snapshot)
     return ResponsePlanMaterializationSources(
         session_key=session_key,
         context_strategy="full_context",
         transport_kind=transport_kind,  # type: ignore[arg-type]
-        material_authority=PostComposerMaterialAuthority(source_client_id=snapshot.client_id, bundle=build_d2_bundle(snapshot)),
+        material_authority=PostComposerMaterialAuthority(source_client_id=snapshot.client_id, bundle=bundle),
         d2_published_terms_by_offer={term.offer_id: term for term in model_view.published_terms},
         ui_authority=ui_authority,
         d2_authored_content=snapshot.content,
@@ -307,7 +309,7 @@ def build_d2_snapshot_sources(
         shown_d2_secondary_ref_ids=shown_secondary_ref_ids,
         shown_promo_fact_ids=shown_promo_fact_ids,
         d2_snapshot_fingerprint=snapshot.fingerprint,
-        d2_commercial=_commercial_authority(snapshot.client_id, model_view),
+        d2_commercial=_commercial_authority(snapshot.client_id, model_view, bundle),
     )
 
 
@@ -339,13 +341,15 @@ def _volume_choices_for_topic(
     )
 
 
-def _commercial_authority(client_id: str, model_view: D2ModelView) -> D2CommercialAuthority:
+def _commercial_authority(client_id: str, model_view: D2ModelView, bundle: ResponseSchemaBundle) -> D2CommercialAuthority:
     pack = model_view.commercial
     return D2CommercialAuthority(
         source_client_id=client_id,
         promo_facts=tuple(
             D2CommercialPromoAuthority(
-                source_client_id=client_id, fact_id=item.fact_id, short_text=item.short_text, full_text=item.full_text,
+                source_client_id=client_id, fact_id=item.fact_id,
+                short_text=bundle.facts[item.fact_id].microfact_text,
+                full_text=bundle.facts[item.fact_id].text_fact,
             )
             for item in pack.promo_facts
         ),

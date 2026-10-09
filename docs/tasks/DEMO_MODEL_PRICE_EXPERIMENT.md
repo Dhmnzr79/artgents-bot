@@ -190,6 +190,101 @@ meaning и поддельные UI по-прежнему проверяются;
 authority использует captured bundle без чтения диска после snapshot.
 Offline → independent Checker. Provider/live/SMTP budget 0; commit/push разрешены владельцем.
 
+## Текущее продолжение — checkpoint 2B, 2026-10-09
+
+Owner GO: модель формулирует финансовый ответ; код сохраняет выбор допустимых
+предложений и структурные проверки. Непригодная финансовая часть не публикуется,
+независимые части сохраняются с честным спокойным пробелом. Без второго вызова,
+retry и автоматической подстановки кодовой прозы. Проверенные price/detail clicks
+получат один вызов вместо нуля. Эти изменения исполнения — следующий checkpoint;
+2B их ещё не включает и не меняет таблицу ответственности §3.
+
+2B — подготовка входа, не архитектурное упрощение и не включение модельных цен.
+Before: thin fact identity и direction IDs без полного offer price/package/stages.
+After: полная структурированная проекция того же captured tenant bundle до
+единственного вызова, без выбора по свободной реплике. Кодовый selector/auto-promo
+resolver остаются владельцами окончательного набора. Новых решений не удаляется;
+проекция не является памятью, кешем или вторым каталогом на диске.
+
+Preflight: C:/Cursor Projects/artgents-bot-active, codex/model-price-experiment,
+HEAD fadf71cc9ab332fb7c3aab0c86ae8373e12efb1b; origin/main и merge-base efa3f77.
+Working tree и staging чистые; foreign WIP нет.
+
+Exact allowlist: contracts/d2_tenant_snapshot.py; core/d2_tenant_snapshot.py;
+core/d2_live_provider.py; tests/test_d2_price_catalog_input.py; этот документ.
+База клиента, parser, selection, renderer, HTTP, storage и quotas не изменяются.
+
+Проекция содержит все offers без фильтрации (включая inactive и no_public_price),
+все price modes/amounts/currencies/units, package includes/excludes, stages,
+applicability/required conditions; services и options с активностью и selection;
+полные факты с прежними fact_id/labels, условиями, датами, exclusions;
+существующий commercial pack с профилями/пакетами/совместимостью. Null/defaults
+сохраняются. Thin COMMERCIAL_FACT_CATALOG в ordinary prompt заменяется полными
+fact rows с теми же identity fields; parser catalog не меняется. Directions,
+brand catalog, весь MD corpus и user context сохраняются. Known-task prompt
+побайтно прежний. Ввод не разрешает модели финансовую прозу до следующего
+checkpoint. Расширенный вход может изменить live-выбор операций; offline PASS
+не является аттестацией live-понимания. Provider/live/SMTP budget 0.
+
+### Продолжение 2B после KB2/C1 — 2026-10-09
+
+Owner GO: «Делаем» после плана фиксации 2B и последующего эксперимента.
+Repository/Git top: C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment;
+HEAD 39329895ded64688892ed372fa9473cca67aaaed; origin/main/merge-base efa3f77.
+Staging пуст. Только прежний 2B WIP (точный allowlist из пяти файлов выше); foreign WIP нет.
+Тип: подготовка входа, не включение ценовой прозы и не архитектурное упрощение.
+§3 owners неизменны; база клиента/known-task/renderer/selector остаются прежними.
+Повторить focused offline input + snapshot + provider проверки на базе KB2/C1,
+с изолированными БД/логами и заблокированной сетью, затем фиксация checkpoint.
+Предыдущий Checker PASS 2B относится к этому же runtime diff; новый review нужен
+при изменении механизма, а не при сохранении уже проверенных файлов.
+Provider/live/SMTP budget 0.
+
+### Evidence 2B
+
+В модель передаются 33 offers, 23 services и 10 facts. Offers сериализованы
+целиком, включая UI followups; уникальные клиник-approved поля не отбрасываются.
+В services опущены aliases/content_ref/roles/family/service_value_ref: названия и
+identity уже в существующих service/reference catalog; selection/options остаются
+точными, option aliases/content_ref не копируются. Никакой фильтрации по вопросу.
+Новый обязательный атрибут D2ModelView — производная captured projection,
+не поле ответа, wire или состояния сессии.
+
+`2b-current-http.xml`: 22 passed, 0 failed, 21.86s. Новый input/catalog guard,
+captured no-I/O, known-task byte equivalence, snapshot, цена+discount/installment,
+exclusions и verified document click/replay по JSON/SSE.
+`2b-input.xml`: 8 passed, 7 failed в старых fixtures price_modes/rec2 mixed.
+`2b-baseline.xml`: те же семь имён падают на исходных contracts/snapshot/provider
+из fadf71c, загруженных только в память; рабочие файлы не подменялись.
+Старые тесты не изменены и не ослаблены. Baseline failures не закрыты.
+
+System prompt: 154074 → 198419 символов (+44345); новый price block 37687 символов,
+остальной рост — полные коммерческие факты вместо thin identity. Остальные
+system-блоки и весь user prompt побайтно прежние. Это подготовка полного входа,
+не экономия токенов. Реальный tokenizer/provider usage не измерялся. Сокращение
+данных без потери условий и вопрос поддерживаемой strict schema остаются открытыми.
+JSON object transport не менялся. База клиента побайтно не менялась.
+Staging пуст, commit/push/merge/deploy не выполнялись; diff --check чист.
+
+Независимый Checker 2B: PASS, blockers/test weakening нет. Проверены реальный
+captured→model view→prompt путь, сохранность offer/fact fields, прежний known-task,
+неизменность parser/selector/renderer/memory/quota и оба JUnit/baseline. PASS только
+для подготовки входа; архитектурное упрощение, модельные цены, живой выбор и
+экономия токенов не аттестованы. Следующий checkpoint — модельный финансовый
+результат и согласованный локальный отказ части, затем verified price/detail call.
+
+### Evidence сохранения 2B на базе KB2/C1
+
+`2b-after-c1-guards.xml`: 50 passed, 0 failed, 41.46s (input, snapshot, C1 scope/UI/replay).
+`2b-after-c1-final.xml`: 14 passed, 3 failed; все три старых prompt assertions
+воспроизведены на HEAD-only runtime в памяти (`2b-after-c1-baseline.xml`: 2 passed, 3 failed).
+Ожидают v19/прежнюю content_ref phrase/старый D2_DIRECTION_PRICE header.
+Не изменены и не ослаблены. Новых regression failures не найдено.
+Independent Checker PASS на текущей базе: captured projection, полные facts/IDs,
+known-task byte path, selectors/parser/renderer/C1 pending/memory неизменны.
+Это preparation-only PASS, не включение модельных цен. `git diff --check` чист.
+Provider/live/SMTP 0; owner разрешил фиксацию 2B отдельным checkpoint.
+
 ## Статус и сохранённая точка
 
 Owner GO — 2026-10-09: сохранить нынешнюю работу и подготовить отдельную ветку

@@ -202,8 +202,31 @@ def build_d2_model_view(snapshot: D2TenantSnapshot) -> D2ModelView:
         clinic_policy_catalog_json=_clinic_policy_catalog_json(snapshot),
         brand_catalog=bundle.brands,
         published_terms=tuple(build_d2_published_offer_terms(offer=offer, source_client_id=snapshot.client_id) for offer in bundle.offers),
+        approved_price_catalog_json=_approved_price_catalog_json(bundle, snapshot.client_id),
         direction_prices=_direction_prices(snapshot.files, bundle),
         commercial=_commercial_contract(snapshot.files, bundle, snapshot.client_id),
+    )
+
+
+def _approved_price_catalog_json(bundle: ResponseDataCatalog, client_id: str) -> str:
+    """Full captured financial data, without semantic selection or filesystem reads."""
+    services = [
+        {"service_id": service_id, "name": service.name, "active": service.active,
+         "selection": service.selection.model_dump(mode="json"),
+         "options": [option.model_dump(mode="json", exclude={"aliases", "content_ref"})
+                     for option in service.options]}
+        for service_id, service in sorted(bundle.services.items())
+    ]
+    facts = []
+    for fact in sorted(bundle.facts.values(), key=lambda item: item.id):
+        row = fact.model_dump(mode="json", exclude={"id"})
+        row["fact_id"] = fact.id
+        facts.append(row)
+    return json.dumps(
+        {"client_id": client_id, "services": services,
+         "offers": [offer.model_dump(mode="json") for offer in bundle.offers],
+         "facts": facts},
+        ensure_ascii=False, separators=(",", ":"),
     )
 
 

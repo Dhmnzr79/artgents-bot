@@ -9,7 +9,7 @@ from contracts.d2_session_context import (
     D2SessionState, D2SessionActivity, D2SessionContextProjection,
 )
 from contracts.d2_tenant_snapshot import D2ModelView
-from contracts.d2_dialogue_result import D2DialogueResult
+from contracts.d2_dialogue_result import D2ExplanationTask
 from contracts.response_plan import ResponsePlanModel
 from contracts.response_plan_materialization import D2SelectedDocumentAction, MaterializedResponseOutcome
 from contracts.response_plan_session import D2SelectedUiRef
@@ -55,7 +55,7 @@ class D2ProviderInput:
     context: D2SessionContextProjection
     selected_ui_ref: D2SelectedUiRef | None = None
     selected_document_action: D2SelectedDocumentAction | None = None
-    known_task: D2DialogueResult | None = None
+    known_task: D2ExplanationTask | None = None
 
 
 class D2RawProvider(Protocol):

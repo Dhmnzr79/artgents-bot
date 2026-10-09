@@ -1624,3 +1624,17 @@ Owner widget smoke §24 — 2026-10-06: после предложенных сц
 сообщил «Вроде ок» и разрешил commit/push §23–24. Это owner smoke, не
 полная REC-5/live quality аттестация. Далее — внешний вид виджета без
 изменения архитектуры ответов. Foreign data/SIM0 в checkpoint не включать.
+
+§36 audit group 4 — 2026-10-09, implementation checkpoint in progress.
+Baseline 6381945. Ordinary contract excludes internal authorized explanation
+state; verified source task retains its existing
+explanation-only completion. Tests/Checker pending; provider/live/SMTP 0.
+No commit/push. Foreign widget HTML/CSS, data/SIM0 excluded. This is structural
+simplification, not proof of live model correctness or complete REC-5 acceptance.
+Direct-price required target deferred because a null target may already execute
+authored clinic policies; earlier rejection not approved. Price types/gate unchanged.
+Final focused offline recheck: 64 passed, 124.89s, no failures/skips.
+Preliminary wider selection: 93 passed, 330.64s, before price-scope correction.
+Final evidence contract-boundary-final/results.xml; independent Checker PASS
+for narrow §36, no blockers/test weakening; full group remains open.
+No full-CI or live/widget acceptance; residual model-output errors stay open.

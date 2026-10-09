@@ -95,11 +95,37 @@ def test_single_price_preserves_mode_unit_and_every_condition(mode, text, metada
     _render_compact_price_group((item,), parts, show_service_in_each_row=False)
     answer = "\n\n".join(parts)
     assert item.model_dump() == before
+    assert "\n" not in answer
     assert answer.startswith(f"**Услуга** — Вариант — {text if mode == 'no_public_price' else f'**{text}**'}")
     assert answer.count(text) == 1
     assert answer.count("Диагностика по показаниям — отдельно") == 1
     if mode != "no_public_price":
         assert answer.count("за одну челюсть") == 1
+
+
+@pytest.mark.parametrize("transport", ["json", "sse"])
+@pytest.mark.parametrize("service", ["aligners", "periodontitis"])
+def test_single_service_price_keeps_scope_and_conditions_in_one_paragraph(http_env, transport, service):
+    client, db, use, _ = http_env
+    use(FakeProvider(raw(price(service, "service"))))
+    send = post if transport == "json" else post_sse
+    body = _body(send(client, request_id="single-price", q="Сколько стоит лечение?"), transport)
+    with D2DialogueStore(db) as store:
+        saved = store.read_latest_completion(SessionKey(client_id="demo", sid="cp6a"))
+        rows = saved.response.resolved.d2_price_block.rows
+        assert len(rows) == 1
+        item = rows[0]
+        assert item.service_id == service and item.mode == "from"
+        assert item.min_amount == (195000 if service == "aligners" else 15000)
+        paragraph = next(p for p in body["answer"].split("\n\n") if item.price_display_text in p)
+        assert "\n" not in paragraph
+        assert item.scope_text in paragraph
+        for condition in item.condition_texts:
+            if condition != item.scope_text:
+                sentence = condition[:1].upper() + condition[1:]
+                assert sentence in paragraph
+                assert body["answer"].count(sentence) == 1
+        assert saved.response.rendered_text == body["answer"]
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])

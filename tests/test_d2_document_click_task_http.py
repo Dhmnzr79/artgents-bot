@@ -102,7 +102,7 @@ def test_current_document_question_is_explicit_before_provider_and_replays(
         pending = request.known_task.blocks[0]
         assert pending.request_id == "r1" and pending.kind == "content"
         assert pending.pending_question == title
-        assert pending.clarification is None
+        assert not hasattr(pending, "clarification")
         assert not hasattr(pending, "content_text")
         assert not hasattr(pending, "operation")
         system, user = fake.messages[-1]

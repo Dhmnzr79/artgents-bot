@@ -230,10 +230,15 @@ def _render_compact_price_group(
         if row.variant_label:
             name += f" — {row.variant_label}"
         scope = f" {row.scope_text}" if row.scope_text else ""
-        parts.append(f"{name} — {price_text(row)}{scope}")
+        paragraph = f"{name} — {price_text(row)}{scope}"
         conditions = tuple(text for text in common if text != row.scope_text)
         if conditions:
-            parts.append(" ".join(text if text.endswith((".", "!", "?")) else text + "." for text in conditions))
+            sentences = " ".join(
+                text[:1].upper() + text[1:] + ("" if text.endswith((".", "!", "?")) else ".")
+                for text in conditions
+            )
+            paragraph += (" " if paragraph.endswith((".", "!", "?")) else ". ") + sentences
+        parts.append(paragraph)
         return
 
     if not show_service_in_each_row:

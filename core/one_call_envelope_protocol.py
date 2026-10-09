@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 from contracts.request_understanding import RequestUnderstanding
-from contracts.d2_dialogue_result import D2DialogueResult
+from contracts.d2_dialogue_result import D2DialogueResult, D2ExplanationTask
 from contracts.one_call_envelope import (
     ENVELOPE_NORMALIZED_ANSWER_CLARIFY_FIELDS_CLEARED,
     ENVELOPE_NORMALIZED_DIRECT_FACT_ID_DEDUPED,
@@ -727,7 +727,7 @@ def parse_production_envelope_json(
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
     commercial_fact_catalog: CommercialFactCatalogSnapshot,
-    known_task: OneCallEnvelope | D2DialogueResult | None = None,
+    known_task: OneCallEnvelope | D2ExplanationTask | None = None,
     d2_contract: bool = False,
 ) -> OneCallEnvelope | D2DialogueResult:
     """One strict JSON decoder; validate the explicitly selected protocol."""

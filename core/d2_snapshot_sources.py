@@ -149,9 +149,9 @@ def resolve_d2_optional_content_claims(
 
 def build_d2_document_task(snapshot, action):
     """The verified source supplies a fixed explanation task, not a new route."""
-    from contracts.d2_dialogue_result import D2DialogueResult, PendingExplanationOperation, TopicTarget
+    from contracts.d2_dialogue_result import D2ExplanationTask, AuthorizedExplanationOperation, TopicTarget
     topic = _frontmatter(snapshot, action.content_ref).get("topic")
-    return D2DialogueResult(outcome="dialogue", blocks=(PendingExplanationOperation(
+    return D2ExplanationTask(blocks=(AuthorizedExplanationOperation(
         request_id="r1", kind="content",
         target=TopicTarget(type="topic", id=topic) if topic else None,
         pending_question=action.section_title, content_ref=action.content_ref,

@@ -982,3 +982,18 @@ Live/widget acceptance remains open: correct context was delivered, but whitenin
 includes produced invalid_envelope/unrelated prose and second-doctor follow-up
 selected the first doctor. See card for evidence. These model-output defects and
 historical suites are not closed by §35; group 4 remains next.
+
+## Audit group 4 — owner GO, 2026-10-09
+
+§35 checkpoint `6381945` pushed. Continue with Interface Task §36: remove
+server-only explanation states from ordinary model output and its compensating
+post-checks. Preserve price types, gaps, clarification, verified actions and §3 ownership.
+No model/provider calls or new memory/semantic rules. Structural offline evidence
+does not close whitening malformed JSON or second-doctor live understanding.
+Direct-price required target deferred: null target can already publish child /
+payment / brand policy before the late gate. Earlier rejection needs an owner
+decision; §36 does not close this remaining contract issue or the whole group.
+§36 final focused offline evidence: 64 passed, 124.89s, no failures/skips;
+preliminary wider run 93 passed before price-scope correction. No provider/live
+calls or whole-CI/widget acceptance. Independent Checker PASS for narrow §36;
+price-contract decision and live errors remain open, not whole-group closure.

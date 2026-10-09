@@ -614,7 +614,7 @@ def test_information_clarification_is_not_converted_to_price(http_env, reverse):
     known = fake.inputs[-1].known_task.blocks[0]
     assert known.request_id == pending.request_id
     assert known.pending_question == pending.pending_question
-    assert known.clarification is None and not hasattr(known, "content_text")
+    assert not hasattr(known, "clarification") and not hasattr(known, "content_text")
     assert len(fake.inputs) == 2
     assert "Независимый ответ об уходе." not in clicked.get_json()["answer"]
     with D2DialogueStore(db) as store:
@@ -698,6 +698,36 @@ def test_child_price_cannot_bypass_clinic_policy(http_env):
     assert "дет" in response.get_json()["answer"].lower()
     with D2DialogueStore(db) as store:
         assert store.read_latest_completion(SessionKey(client_id="demo", sid="cp6a")).response.resolved.d2_price_block is None
+
+
+@pytest.mark.parametrize("transport", ["json", "sse"])
+@pytest.mark.parametrize("extra,policy_id", [
+    ({"age_group": "child", "context": "current_care"}, "no_pediatric_dentistry"),
+    ({"payment_scheme": "oms", "payment_scheme_intent": "requested_payment"}, "no_oms"),
+    ({"payment_scheme": "dms", "payment_scheme_intent": "requested_payment"}, "no_dms"),
+    ({"brand_id": "unlisted_test_brand"}, None),
+])
+def test_null_price_target_retains_existing_policy_and_reference_paths(http_env, transport, extra, policy_id):
+    import yaml
+    client, db, use, tmp = http_env
+    fake = use(FakeProvider(raw({"kind": "price", "request_id": "r1", "target": None, **extra})))
+    send = post if transport == "json" else post_sse
+    args = dict(request_id="null-target", q="Вопрос об условиях клиники")
+    body = _body(send(client, **args), transport)
+    if policy_id is not None:
+        rules = yaml.safe_load((tmp / "clients/demo/clinic_policies.yaml").read_text(encoding="utf-8"))
+        assert rules["policies"][policy_id]["answer"].strip() in body["answer"]
+    else:
+        assert "недостаточно информации" in body["answer"].lower()
+    if policy_id == "no_pediatric_dentistry":
+        assert not any(button["action_kind"] == "cta" for button in body["ui"]["buttons"])
+    with D2DialogueStore(db) as store:
+        saved = store.read_latest_completion(SessionKey(client_id="demo", sid="cp6a"))
+        assert saved.response.resolved.d2_price_block is None
+        assert saved.response.resolved.d2_request_parts[0].kind == "price_reference"
+        assert saved.lead_effect.status == "not_requested"
+    assert _body(send(client, **args), transport) == body
+    assert len(fake.inputs) == 1
 
 
 def test_http_does_not_reconstruct_legacy_envelope(http_env, monkeypatch):

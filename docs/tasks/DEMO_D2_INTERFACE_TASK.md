@@ -2594,6 +2594,93 @@ Owner then explicitly authorized commit and push of the complete 12-file §34
 checkpoint, including the overlap fix. Widget HTML/CSS, data/ and SIM-0 remain
 excluded. Full CI, groups 3/4 and merge/deploy are not authorized or closed here.
 
+## §37 — single-offer price paragraph (owner GO, 2026-10-09)
+
+Owner requested fixing detached lower-case conditions in the aligners price
+answer. Classification: presentation bug fix, not architecture simplification.
+Baseline HEAD6381945 plus reviewed §36 WIP. Allowlist:
+`core/response_text_renderer.py`, `tests/test_d2_price_copy.py`, this card.
+Preserve §36 and foreign widget/data/SIM0 work; no commit/push/live/deploy.
+The existing renderer joins a single offer's name, price, billing scope and
+conditions into one paragraph. Conditions become sentences with initial upper
+case, preserving the remaining authored text, amount/mode/unit and order.
+No model routing, selection, frozen data, multi-offer grouping, UI or task
+contract changes. Natural wrapping at the widget width remains; no forced
+single-line CSS, phrase-specific template or model call.
+Acceptance: fixed/from/range/no-public-price retain every condition and amount;
+actual JSON/SSE aligners and periodontitis responses keep scope and conditions
+with their price paragraph, frozen data unchanged. Targeted offline and Checker.
+
+§37 evidence: **8 passed**, 15.29s, 0 failures/skips; isolated offline runner,
+dotenv disabled, network blocked, logs/SQLite outside repository data.
+JUnit: `C:/Users/denis/.codex/visualizations/2026/10/02/01a0fd5a-1bf9-7ed0-9738-a748f948637a/price-paragraph-check/results.xml`.
+Independent Checker **PASS**, no blockers; presentation bug fix only.
+`git diff --check` clean, provider/live/SMTP0. HEAD6381945, staging empty;
+no commit/push/merge/deploy. Prior §36 and foreign WIP preserved.
+
+## §36 — audit group 4: ordinary contract / authorized task boundary
+
+Owner GO 2026-10-09: proceed with the fourth agreed audit group after §35.
+Baseline `6381945762102a6934df45e2a6c1ccadfed2802c`, branch
+`codex/d2-stage1-contract`. Classification: architecture simplification.
+Before → after → removed dependency: ordinary output/schema allowed a
+server-only explanation without clarification, then the ordinary parser
+rejected it → ordinary pending content requires clarification, while verified
+explanation-only tasks live solely in the existing server task input → remove
+the ordinary schema's dependence on internal click state and its compensating
+post-checks. Sole owners remain Target Contract §3:
+model owns ordinary meaning; server owns verified UI task; price owner owns sums.
+
+Allowlist: `contracts/d2_dialogue_result.py`, `contracts/d2_dialogue.py`,
+`core/d2_dialogue.py`, `core/d2_snapshot_sources.py`,
+`core/one_call_envelope_protocol.py`, `core/one_call_prompt_contract.py`,
+`tests/test_d2_sim2_contract.py`, `tests/test_d2_sim2_dialogues.py`,
+`tests/test_d2_document_click_task_http.py`, this card, Roadmap, Checkpoint Ledger.
+Foreign widget HTML/CSS, `data/` and SIM-0 excluded. No live/commit/push/merge/deploy.
+
+The internal authorized explanation type replaces the broad result constructor;
+it is not an ordinary wire variant or a persisted state. Existing task fields,
+source/brand/volume/ID and explanation-only reply remain. All price types and
+their late target check remain unchanged. No semantic heuristics, adapters,
+retry, new wire fields,
+memory or provider calls. Schema continues to come from ordinary Pydantic types.
+Contract header advances to v41 solely for changed structural requirements.
+
+Acceptance: actual sent schema and parser agree on pending clarification;
+internal task cannot become ordinary output or persisted pending; authorized
+reply cannot mutate task/source and never publishes seed. JSON/SSE document,
+service and price/detail actions, independent siblings, replay, next context,
+tenant/UI/lead/privacy and medical protections remain. Targeted offline tests
+with isolated SQLite/network followed by independent Checker.
+
+Limits: provider still requests json_object, not enforced full schema. Whitening
+root-array error and second-doctor semantic mistake are not closed by this
+structural change. No phrase-specific prompt patch or server semantic repair.
+
+Scope correction before completion: requiring direct-price target is deferred.
+The late target gate follows child/payment/brand policy execution, so null target
+is not universally unexecutable: it can publish an authored clinic answer.
+Rejecting it earlier would hide that answer. No conditional exception, inferred
+target or new refusal is introduced. This unresolved price-contract aspect
+needs an owner decision; this checkpoint certifies only the independent
+ordinary/authorized explanation replacement, not closure of the whole group.
+
+§36 evidence: preliminary wider selection **93 passed**, 330.64s; its code
+preceded the price-scope correction, so it is not a final-tree attestation.
+Final focused recheck **64 passed**, 124.89s, zero failures/skips: full SIM-2
+contract suite, eight null-target child/payment/brand JSON/SSE cases, service
+clarification→explanation, and document task/click/replay through JSON/SSE.
+The wider selection also covered malformed task replies, UI authenticity,
+price/detail/volume clicks without model, siblings and pending lead privacy.
+Both runners disabled dotenv, blocked network and isolated logs/SQLite.
+Final JUnit: `C:/Users/denis/.codex/visualizations/2026/10/02/01a0fd5a-1bf9-7ed0-9738-a748f948637a/contract-boundary-final/results.xml`.
+No new baseline failure found in these selections; historical suites/full CI
+not attested. Existing datetime.utcnow warnings out of scope. Provider/live/SMTP
+0, staging empty, no commit/push/merge/deploy. Widget hashes unchanged.
+Independent Checker: **PASS** for narrow §36, no blockers/test weakening;
+independently read final JUnit and traced removal and preserved policy paths.
+This does not close the entire group, residual price decision or live errors.
+
 ## §35 — audit group 3: completed-result context (owner GO, 2026-10-09)
 
 Baseline: `49cf0b4d003abbba4e977e6851a2234690547835`, branch

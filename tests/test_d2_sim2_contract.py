@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from contracts.d2_dialogue_result import D2DialogueResult
+from contracts.d2_dialogue_result import D2DialogueResult, D2ExplanationTask
 from core.one_call_envelope_protocol import parse_production_envelope_json
 from tests.test_d2_live_provider_offline import _request
 
@@ -39,7 +39,7 @@ def test_duplicate_json_keys_and_foreign_choices_are_rejected():
 
 
 def test_known_explanation_cannot_replace_operation_or_target():
-    task = D2DialogueResult.model_validate({"outcome": "dialogue", "blocks": [
+    task = D2ExplanationTask.model_validate({"outcome": "dialogue", "blocks": [
         {"kind": "content", "request_id": "r1", "target": {"type": "service", "id": "classic"},
          "pending_question": "Explain this service"}]})
     with pytest.raises(ValueError, match="known_task_explanation_invalid"):
@@ -82,7 +82,7 @@ def test_doctors_requires_service_target():
 
 @pytest.mark.parametrize("replacement", [{}, {"content_text": None}, {"content_text": ""}, {"content_text": "   "}])
 def test_known_task_must_not_publish_seed_as_new_explanation(replacement):
-    task = D2DialogueResult.model_validate({"outcome": "dialogue", "blocks": [
+    task = D2ExplanationTask.model_validate({"outcome": "dialogue", "blocks": [
         {"kind": "content", "request_id": "r1", "pending_question": "SEED ONLY"}]})
     with pytest.raises(ValueError, match="known_task_explanation_text_required"):
         parse({"explanations": [{"request_id": "r1", **replacement}]}, task)
@@ -188,12 +188,46 @@ def test_actual_provider_schema_excludes_price_parameter_path():
     assert {tuple(k for k in ("content_text", "pending_question") if k in v["properties"]) for v in contents} == {
         ("content_text",), ("pending_question",)}
     assert all(next(k for k in ("content_text", "pending_question") if k in v["properties"]) in v["required"] for v in contents)
+    pending_content = next(v for v in contents if "pending_question" in v["properties"])
+    assert "clarification" in pending_content["required"]
+    assert "default" not in pending_content["properties"]["clarification"]
+    assert "AuthorizedExplanationOperation" not in definitions
+    assert "D2ExplanationTask" not in definitions
 
 
 def test_unidentified_price_term_still_has_a_pending_task():
     result = parse({"outcome": "dialogue", "blocks": [{"kind": "price", "request_id": "r1",
         "target": {"type": "unresolved"}, "clarification": {"missing": "term", "choices": []}}]})
     assert result.blocks[0].kind == "price"
+
+
+def test_unresolved_direct_price_remains_executable_input():
+    result = parse({"outcome": "dialogue", "blocks": [{"kind": "price", "request_id": "r1",
+        "target": {"type": "unresolved"}}]})
+    assert result.blocks[0].target.type == "unresolved"
+
+
+def test_authorized_explanation_is_not_ordinary_or_persisted_pending():
+    from pydantic import TypeAdapter
+    from contracts.d2_dialogue_result import ClarifiedOperation
+    from core.d2_live_provider import build_d2_d1r_messages
+    from dataclasses import replace
+
+    values = {"kind": "content", "request_id": "r1", "pending_question": "Explain the selected source",
+        "target": {"type": "service", "id": "classic"}, "brand_id": "nobel_biocare",
+        "volume": {"extent": "one_tooth"}, "content_ref": "implantation__faq__pain.md",
+        "content_section_refs": ["a:kakuyu-anesteziyu-ispolzuyut"]}
+    task = D2ExplanationTask(blocks=(values,))
+    with pytest.raises(ValueError):
+        D2DialogueResult.model_validate({"outcome": "dialogue", "blocks": [values]})
+    with pytest.raises(ValueError):
+        TypeAdapter(ClarifiedOperation).validate_python(values)
+    system, user = build_d2_d1r_messages(replace(_request(), known_task=task))
+    assert "=== D2_RESULT_SCHEMA ===" not in system["content"]
+    assert "=== KNOWN_TASK ===" in user["content"]
+    ready = parse({"explanations": [{"request_id": "r1", "content_text": "Grounded completed answer"}]}, task)
+    assert ready.blocks[0].model_dump(exclude={"content_text"}) == task.blocks[0].model_dump(exclude={"pending_question"})
+    assert ready.blocks[0].content_text == "Grounded completed answer"
 
 
 @pytest.mark.parametrize("kind", ["price", "content", "price_detail"])

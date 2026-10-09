@@ -24,7 +24,7 @@ from contracts.response_plan import D2PriceDetailUiAction, SessionKey
 from contracts.d2_dialogue_result import (
     DiscussionScope, DiscussionVolume, D2DialogueResult, PriceOperation, ExplanationOperation, DetailOperation,
     ContactOperation, DoctorsOperation, PolicyOperation, CommercialOperation,
-    ClarifiedOperation, PendingExplanationOperation,
+    ClarifiedOperation, PendingExplanationOperation, D2ExplanationTask,
     ServiceTarget, TopicTarget, UnresolvedTarget, ScopedOperation, OffTopicOperation,
 )
 from contracts.response_plan import (
@@ -662,7 +662,8 @@ def _run_reserved_d2_dialogue_turn(
             raise ValueError("d2_ui_service_selection_mismatch")
         # A verified click completes the task as a regular operation,
         # rather than retaining the narrower unresolved-price subtype.
-        known_task = D2DialogueResult.model_validate({"outcome": "dialogue", "blocks": [{
+        task_type = D2ExplanationTask if isinstance(pending, PendingExplanationOperation) else D2DialogueResult
+        known_task = task_type.model_validate({"outcome": "dialogue", "blocks": [{
             **pending.model_dump(exclude={"clarification"}),
             "target": {"type": "service", "id": selected_service_id},
         }]})
@@ -691,8 +692,8 @@ def _run_reserved_d2_dialogue_turn(
             descriptor = source_parts[0].discussion_scope
             # Execute the scope captured by the shown source, not a semantic carry.
             task = known_task.blocks[0].model_copy(update={"target": descriptor.target, "volume": descriptor.volume, "brand_id": descriptor.brand_id})
-            known_task = D2DialogueResult.model_validate({"outcome": "dialogue", "blocks": [task.model_dump()]})
-    needs_explanation = known_task is not None and any(isinstance(b, PendingExplanationOperation) for b in known_task.blocks)
+            known_task = type(known_task).model_validate({"outcome": "dialogue", "blocks": [task.model_dump()]})
+    needs_explanation = isinstance(known_task, D2ExplanationTask)
     if known_task is not None and not needs_explanation:
         result = known_task
     else:

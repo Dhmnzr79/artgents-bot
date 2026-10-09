@@ -98,10 +98,12 @@ def test_direct_promotion_after_previous_show_combines_with_final_offers(http_en
     client, db, use, root = http_env
     service = "all_on_4" if aspect else "pterygoid_implants"
     offer = "all_on_4.jaw.nobel" if aspect else "pterygoid_implants.default"
-    if aspect:
-        mutate(root, "d2_commercial.json", lambda data: data.update(incompatibility_groups=[{
-            "group_id": "fixture", "offer_or_fact_ids": ["implant_same_day_discount", offer],
-            "explanation_text": COMPAT}]))
+    # Explicit synthetic offer/fact rule tests final-set resolution; demo data
+    # itself only declares the real discount/installment fact pair.
+    fixture_compat = "Эти тестовые предложения не суммируются."
+    mutate(root, "d2_commercial.json", lambda data: data.update(incompatibility_groups=[{
+        "group_id": "fixture", "offer_or_fact_ids": ["implant_same_day_discount", offer],
+        "explanation_text": fixture_compat}]))
     promo = commercial(target=("service", "classic" if aspect else service), request_id="r2", promotion_scope="service")
     fake = use(FakeProvider(raw(promo)))
     send(client, transport, sid="commercial", request_id="promo", q="Какая акция?")
@@ -111,7 +113,7 @@ def test_direct_promotion_after_previous_show_combines_with_final_offers(http_en
         operation["brand_id"] = "nobel_biocare"
     fake.raw = raw(operation, promo)
     body = send(client, transport, sid="commercial", request_id="combined", q="Цена или этапы и акция?")
-    assert body["answer"].count(COMPAT) == 1
+    assert body["answer"].count(fixture_compat) == 1
     resolved = saved(db)
     assert len(resolved.d2_compatibility_blocks) == 1
     assert set(resolved.d2_compatibility_blocks[0].member_ids) == {
@@ -158,10 +160,7 @@ def test_expired_fact_preserves_independent_answer_and_neutral_doctor_cta(http_e
 @pytest.mark.parametrize("transport", ["json", "sse"])
 @pytest.mark.parametrize("excluded", [False, True])
 def test_only_published_positive_facts_trigger_compatibility(http_env, transport, excluded):
-    client, db, use, root = http_env
-    mutate(root, "d2_commercial.json", lambda data: data.update(incompatibility_groups=[{
-        "group_id": "fixture", "offer_or_fact_ids": ["installment_12", "implant_same_day_discount"],
-        "explanation_text": COMPAT}]))
+    client, db, use, _ = http_env
     fake = use(FakeProvider(raw(
         commercial("installment_12", target=("service", "caries" if excluded else "classic")),
         commercial("implant_same_day_discount", target=("service", "classic"), request_id="r2"),
@@ -169,6 +168,34 @@ def test_only_published_positive_facts_trigger_compatibility(http_env, transport
     body = send(client, transport, sid="commercial", q="Расскажите про рассрочку и скидку.")
     assert (COMPAT in body["answer"]) is (not excluded)
     assert bool(saved(db).d2_compatibility_blocks) is (not excluded)
+    assert len(fake.inputs) == 1
+
+
+@pytest.mark.parametrize("transport", ["json", "sse"])
+@pytest.mark.parametrize("with_installment", [False, True])
+def test_demo_price_discount_requires_actual_installment_for_compatibility(http_env, transport, with_installment):
+    client, db, use, _ = http_env
+    price = {"kind": "price", "request_id": "r1",
+             "target": {"type": "service", "id": "pterygoid_implants"}}
+    blocks = [price]
+    if with_installment:
+        blocks.append(commercial("installment_12", target=("service", "pterygoid_implants"), request_id="r2"))
+    fake = use(FakeProvider(raw(*blocks)))
+    args = dict(sid="commercial", request_id="price", q="Цена птеригоидного импланта и условия оплаты?")
+    body = send(client, transport, **args)
+    resolved = saved(db)
+    assert [(row.offer_id, row.min_amount) for row in resolved.d2_price_block.rows] == [
+        ("pterygoid_implants.default", 95_000)]
+    assert "до 15%" in body["answer"]
+    assert body["answer"].count(COMPAT) == int(with_installment)
+    assert bool(resolved.d2_compatibility_blocks) is with_installment
+    if with_installment:
+        assert "до 12 месяцев" in body["answer"]
+        assert resolved.d2_compatibility_blocks[0].member_ids == (
+            "implant_same_day_discount", "installment_12")
+    else:
+        assert "рассроч" not in body["answer"].casefold()
+    assert send(client, transport, **args) == body
     assert len(fake.inputs) == 1
 
 

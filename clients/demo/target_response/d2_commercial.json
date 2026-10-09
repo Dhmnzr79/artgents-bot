@@ -78,7 +78,7 @@
   "incompatibility_groups": [
     {
       "group_id": "demo_discount_or_installment",
-      "offer_or_fact_ids": ["implant_same_day_discount", "pterygoid_implants.default"],
+      "offer_or_fact_ids": ["implant_same_day_discount", "installment_12"],
       "explanation_text": "Скидка и рассрочка не суммируются: можно выбрать один вариант."
     }
   ]

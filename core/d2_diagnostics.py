@@ -43,6 +43,7 @@ _REASONS = frozenset({
 _PROSE_REVIEW_REASONS = frozenset({
     "d2_model_prose_money", "d2_model_prose_link",
 })
+_FINISH_REASONS = frozenset({"stop", "length", "content_filter", "tool_calls", "function_call"})
 _SOURCE_FILES = (
     "app.py", "core/d2_diagnostics.py", "core/d2_http_adapter.py",
     "core/d2_dialogue.py", "core/d2_live_provider.py",
@@ -85,7 +86,7 @@ def _write(fields):
 
 
 @_quiet
-def _event(attempt, event, *, reason="none", duration_ms=None):
+def _event(attempt, event, *, reason="none", duration_ms=None, provider_response=None):
     if attempt is None:
         return
     fields = dict(
@@ -96,6 +97,8 @@ def _event(attempt, event, *, reason="none", duration_ms=None):
     )
     if duration_ms is not None:
         fields["duration_ms"] = duration_ms
+    if provider_response is not None:
+        fields.update(_provider_metrics(provider_response) or {})
     _write(fields)
     from core.d2_full_audit import full_audit
     full_audit("diagnostic", trace_id=attempt.trace, diagnostic=fields)
@@ -306,19 +309,35 @@ def _provider_started():
 
 
 @_quiet
-def _provider_finished(observation):
+def _provider_finished(observation, response=None):
     if observation is not None:
         attempt, started = observation
-        _event(attempt, "provider_finished", duration_ms=max(0, int((monotonic() - started) * 1000)))
+        _event(attempt, "provider_finished", duration_ms=max(0, int((monotonic() - started) * 1000)),
+               provider_response=response)
+
+
+@_quiet
+def _provider_metrics(response):
+    """Closed, text-free fields only; absent/malformed metrics never gate a turn."""
+    choices = getattr(response, "choices", None) or ()
+    reason = getattr(choices[0], "finish_reason", None) if choices else None
+    fields = {"finish_reason": reason if type(reason) is str and reason in _FINISH_REASONS else "unknown"}
+    usage = getattr(response, "usage", None)
+    for name in ("prompt_tokens", "completion_tokens", "total_tokens"):
+        value = usage.get(name) if isinstance(usage, dict) else getattr(usage, name, None)
+        fields[name] = value if type(value) is int and value >= 0 else None
+    return fields
 
 
 def call_provider(transport, **kwargs):
     """Count this existing transport invocation, not hidden SDK network retries."""
     observation = _provider_started()
+    response = None
     try:
-        return transport(**kwargs)
+        response = transport(**kwargs)
+        return response
     except BaseException as exc:
         failure(exc)
         raise
     finally:
-        _provider_finished(observation)
+        _provider_finished(observation, response)

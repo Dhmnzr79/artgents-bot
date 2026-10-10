@@ -1,5 +1,77 @@
 # Эксперимент: ценовые ответы модели
 
+## Unified contract paired comparison — owner GO12, 2026-10-10
+
+Owner явно разрешил12 вызовов после предложения6 вопросов × JSON/strict.
+Baseline96eaaf4; same branch/root/main/merge-base. Pre-existing unstaged prompt43
+и его documentation fix включены во вход эксперимента; они не меняются в run.
+Repo allowlist — только этот раздел текущей карточки, runtime/KB не изменять.
+Изолированный harness C:/Users/denis/AppData/Local/Temp/d2-unified-pair12-sb0cd_bb/probe.py.
+Full actual messages/runtime schema; synthetic fresh context/emptyhistory;
+questions overview/Nobel/whitening+address/payment/planning/whiteningprocess.
+Pairs identical messages/schema/model/temperature0/1024, только format меняется;
+порядок JSON/strict чередуется между вопросами. Hardcap12 reservationsbeforecall,
+fresh exclusive report, noresume, SDK retries0, transport failure stops run,
+parse failure сохраняется без повторов; следующие независимые cases в пределах12.
+Actual parser и targeted assertions проверяются раздельно. Content source assertions
+выбирают существующие payment_terms/technology/teeth_whitening, не всю prose quality.
+Validation errors metadata loc/type, без input/message/provider prose; raw hash/usage
+сохраняются, сырые ответы/prompts/история не пишутся. DB/session/lead/browser0.
+Это одно наблюдение на question/mode, не доказательство стабильности/внутренней
+причины Qwen. Рабочий HTTP остаётся json_object независимо от результата;
+активация строгого формата этим GO не разрешена.
+
+Harness offline-final PASS: fake12 targeted accepted, reservations до вызова,
+resume отклонён, synthetic prose не записана; fake transport failure остановлен
+на первой reservation. Real provider0 в offline.
+Live12/12 завершён,SDK retries0,transport failures0,all finish stop,length0.
+Evidence C:/Users/denis/AppData/Local/Temp/d2-unified-pair12-sb0cd_bb/live/report.json.
+Все6 pairs совпадают по messages/schema hashes. Model qwen3.8-flash.
+Usage497964 prompt tokens/1407 completion tokens; стоимость не вычислялась.
+JSON:6/6 parser accepted и targeted checks. Strict:5/6 parser accepted,4/6
+targeted checks. Overview корректен в обоих. Strict Nobel вернул brand и
+service clarification classic/all_on_4/all_on_6 вместо topic implantation.
+Strict compound отклонён parser: OneCallEnvelopeProtocolError caused by
+ValidationError, loc blocks/0/price, type value_error. Exact error message/input
+не сохранялись, поэтому конкретное нарушенное условие price не установлено;
+нельзя называть это root-array, truncation или доказанной ошибкой JSON Schema.
+Payment/planning/whitening content:3/3 accepted expected refs в обоих режимах.
+Оплата не использовала clinic target, но два одиночных результата не гарантируют
+исправление прежнего сбоя; prose factual accuracy этим отчётом не аттестована.
+Вывод: оснований включать strict нет; current json_object сохранён.
+Это controlled mode comparison текущего unified+prompt43, не оценка отдельного
+вклада унификации и не статистическая частота. Не запускать новые calls сверх12.
+Никаких runtime/KB/session/lead/UI/transport edits в эксперименте; browser0.
+Report содержит metadata only, temp harness не включать в Git.
+Independent Astra evidence review PASS:12/12/pair hashes и пределы выводов
+подтверждены, recommendation оставить json_object; новых schema replacements
+не разрешено. Existing root-array/другие live риски остаются открытыми.
+Branch96eaaf4,staging пуст,experiment commit/push0; pre-existing prompt43 WIP
+и prototypes/ сохранены. Полный CI/материализация/UI не проверялись этим probe.
+
+## Общее пояснение optional content target — 2026-10-10
+
+Owner GO «Давай» после предложения сохранить унификацию и отдельно разобрать
+ошибку оплаты. Baseline96eaaf410ca66ae1601847bedeed856d5997e556; тот же root/branch,
+main/merge-base efa3f77. Staging пуст, foreign prototypes/ исключён.
+Тип: редакционный bug fix producer-инструкции, не architecture simplification.
+Allowed execution уже существует: content_ref/content_text без target либо
+topic clinic. Не добавлять ClinicTarget к content и не исправлять target сервером.
+Общее правило уточняет optional target для clinic-wide объяснений, ограничивает
+форму type clinic существующей commercial_fact операцией; не patch payment phrase.
+Exact allowlist: core/one_call_prompt_contract.py; этот документ.
+Никаких изменений KB/schema/parser/selection/context/one-call/HTTP format.
+Astra read-only consult: это producer optional-field ошибка; новый продуктовый
+scope не нужен. Поведение модели/внутренняя причина ошибки не доказаны.
+Проверить existing operation-unification/HTTP-format guards offline, Checker;
+новых live calls не делать. Strict test budget согласуется отдельно.
+Existing offline guards58PASS3.75s:
+C:/Users/denis/AppData/Local/Temp/d2-optional-target-j9qo8v4u/tests.xml.
+Independent Checker scoped PASS, XML прочитан независимо; инструкция согласуется
+с прежней схемой без payment-specific repair. Provider/live/browser0.
+Live payment reliability остаётся непроверенной. Изменены только два файла,
+staging пуст, commit/push этой инструкции ещё не выполнены; prototypes/ сохранён.
+
 ## Единая операция на kind — owner GO 2026-10-10
 
 Классификация: архитектурное упрощение, не исправление всех ошибок модели.

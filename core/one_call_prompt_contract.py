@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from config import SALES_ONE_PLUS_MODEL
 
-ONE_CALL_PROMPT_CONTRACT_VERSION = 42
+ONE_CALL_PROMPT_CONTRACT_VERSION = 43
 ONE_CALL_MODEL_SNAPSHOT = SALES_ONE_PLUS_MODEL
 
 ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS = """When D2_SELECTED_UI_REF is null, there is no selected UI action. When it is an object, it is a server-validated typed action identity from the current revision. It is not patient text; do not create, authorize, or infer any UI/lead action from it. Use its typed identity with D2_SESSION_CONTEXT and, when present, D2_SELECTED_DOCUMENT_ACTION.
@@ -314,8 +314,11 @@ Code shows only the first active clarification, publishes clear independent
 answers, and explicitly defers the others. Do not omit clear answers or merge
 different tasks into one choice menu. Deferred tasks are not an automatic queue.
 
-For non-commercial operations, target is service(id), topic(id), or unresolved; do not duplicate
-service/topic/status at the top. Use unresolved for an unidentified named term,
+When a non-commercial operation supplies target, use only its schema's service(id),
+topic(id), or unresolved forms; do not duplicate service/topic/status at the top.
+For general explanations about the clinic, a content operation may omit target;
+its content_ref still identifies the source document. The form {"type":"clinic"}
+belongs only to commercial_fact, not content. Use unresolved for an unidentified named term,
 not to claim that the clinic does not provide a service. Use the catalog ID
 for a known inactive service; code owns its availability statement.
 A known inactive service is identified, not ambiguous: return a completed content,

@@ -3318,6 +3318,48 @@ Cursor/Checker трассирует actual path и adverse whole dialogues; offl
 wording не менять без exact owner согласования; не создавать гарантию правильности
 произвольной financial prose новым verifier. §3 остаётся владельцем ответственности.
 
+### 2В — входной privacy boundary, owner GO 2026-10-10
+
+Owner «Делай. Потом строгий промпт курсору...» разрешил этот bug-fix checkpoint.
+Root C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment;
+baseline056cac4cf3a7b9a4d54a041c8fbd8b897e95518e; origin/main/merge-base
+efa3f773bcf10891e2997addf8bbec38c7ae1317. Tracked checkout был чист, staging пуст;
+foreign prototypes/ сохранить. Exact allowlist: core/user_text_privacy.py;
+tests/test_user_text_privacy_contract_offline.py; tests/test_d2_input_boundary.py;
+docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md.
+
+Классификация bug fix, не общий architecture PASS. До: длина <3 и наличие **
+превращали содержательную обычную реплику в privacy-only; email перед точкой
+оставался без маски. После: существующий guard оценивает очищенный текст без
+двух этих gates; existing email boundary различает sentence dot и продолжение
+домена. Удалены length и Markdown barriers, не добавлены semantic rules.
+Meaning owner — модель; privacy owner — существующий helper. Проверки пустого/
+contact-only текста, немаскированного @, phone leak и bound lead name сохранены.
+Lead intake/pause, provider schema/context/calls, prices/UI/KB не меняются.
+Однобуквенный текст с буквами также проходит ordinary guard; это общая структурная
+граница, не whitelist Да/Ок. Разрешение input не гарантирует верный ответ Qwen.
+
+Проверки: positive short/formatted text, punctuation/plus/subdomain email,
+negative contact-only/unmasked @/phone leak/bound name; actual JSON/SSE следующий
+input, completed history и replay; existing lead interruption/cancel guards.
+Данные тестов синтетические; сеть/провайдер не вызываются. Не запускать browser
+для этой правки. Cursor должен отвергнуть phrase allowlists, новые states/fields,
+handlers/calls/repair adapters и ослабление privacy, и проследить actual path.
+Evidence: d2-2v-targeted.xml — 108 PASS, 0 FAIL, 85.72s; privacy contract,
+новый JSON/SSE boundary, existing lead_interrupt_http и lead_cancel_ui.
+Из них 42 новых cases и 66 прежних guards. Полный CI не запускался; известных
+падений в этих четырёх modules нет, чужой baseline debt этим не закрыт.
+Тестовые логи изолированы через BOT_LOG_DIR во временной папке, logging runtime
+не менялся. Provider/live/browser/SMTP: 0. Fake inputs доказывают ingress/privacy,
+не живое понимание короткого продолжения или устранение root-array Osstem.
+Чистые цифры/небуквенные реплики остаются blocked; active bound lead-name guard
+также не изменён и может отклонить короткое буквенное слово. Это прежние границы,
+не обещание свободного dialogue во всех lead phases. Независимый Checker:
+PASS scoped bug fix 2В; actual path/guards/отсутствие новых слоёв проверены,
+TEST_WEAKENING нет; final XML108PASS. SAFE_TO_WIDGET_TEST=YES. Staging пуст,
+commit/push не выполнялись. Cursor review по owner запросу — следующая внешняя
+проверка удаления причин и отсутствия возврата к усложнениям, не общий runtime PASS.
+
 ### Предыдущее предложение этапа 3 — одна ссылка вместо независимых type и ID
 
 Предпочтительное предложение: canonical entity ref, чей тип определяет registry

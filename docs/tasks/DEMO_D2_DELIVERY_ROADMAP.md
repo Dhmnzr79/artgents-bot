@@ -136,6 +136,16 @@ runtime checkpoint назвать точный baseline и allowlist. Raw provid
 
 #### 2В. Исправить воспроизводимые дефекты входа
 
+Owner GO 2026-10-10: реализовать 2В, затем дать строгий Cursor prompt на отсутствие
+возврата к усложнениям. Baseline checkpoint 2Б+карта сохранён/pushed056cac4;
+исторические WIP статусы выше относятся к моменту подготовки. Exact five-file
+allowlist/проверки — Interface §38, «2В — входной privacy boundary».
+Это bug fix; новый model interface, KB и live calls не входят.
+Реализован locally: runtime один helper, удалены два gates и исправлена email
+boundary; targeted108PASS,0FAIL (42 new +66 old guards),85.72s. Independent
+review PASS по XML и actual path; widget/live acceptance отдельна. Не закрывает 3А–3В
+и смысловую/структурную ошибку Osstem. Commit/push пока не выполнялись.
+
 Bug fixes: обычные «Да»/«Ок» не должны отбрасываться только из-за длины;
 Markdown ** не должен делать содержательный вопрос privacy-only; email перед
 точкой корректно маскируется. Проверять очищенный вход, сохранять запрет отправки

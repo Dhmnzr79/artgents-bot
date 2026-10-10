@@ -8,7 +8,7 @@ PHONE_PLACEHOLDER = "[телефон скрыт]"
 EMAIL_PLACEHOLDER = "[email скрыт]"
 
 EMAIL_RX = re.compile(
-    r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![A-Za-z0-9._%+-])"
+    r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![A-Za-z0-9_%+-]|\.[A-Za-z0-9])"
 )
 PHONE_TEXT_RX = re.compile(r"(?<!\d)(?:\+?\d[\d\-\s().]{8,}\d)(?!\d)")
 
@@ -153,8 +153,6 @@ def provider_message_has_substance(
     s = _normalize_spaces(text)
     if not s:
         return False
-    if len(s) < 3:
-        return False
     if re.fullmatch(r"[\d+\s().\-]+", s):
         return False
     stripped = _PLACEHOLDER_RX.sub(" ", s)
@@ -164,8 +162,6 @@ def provider_message_has_substance(
     if not re.search(r"[\u0400-\u04FFa-zA-Z]", stripped):
         return False
     if "@" in stripped:
-        return False
-    if re.search(r"\*{2,}", stripped):
         return False
     if raw_source and _contains_leaked_phone_digits(stripped, raw_source):
         return False

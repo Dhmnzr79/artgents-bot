@@ -10,6 +10,7 @@ import pytest
 
 from core.user_text_privacy import (
     EMAIL_PLACEHOLDER,
+    mask_emails_in_text,
     PHONE_PLACEHOLDER,
     observability_safe_user_text,
     provider_message_has_substance,
@@ -24,6 +25,33 @@ _MARKER_PHONE = "+79991234001"
 _MARKER_EMAIL = "marker.pii.t5b@example.test"
 _MARKER_NAME = "Анна"
 _SUBSTANTIVE = "Сколько стоит имплантация?"
+
+
+@pytest.mark.parametrize("query", ["Да", "Ок", "А", "No", "Сколько **стоит** КТ?", "**Да**"])
+def test_substantive_text_has_no_length_or_markdown_gate(query):
+    safe = provider_safe_user_text(query)
+    assert safe == query
+    assert provider_message_has_substance(safe, raw_source=query)
+
+
+@pytest.mark.parametrize("suffix", [".", "...", ",", ";", "!", "?", ")", ". Следующий вопрос"])
+@pytest.mark.parametrize("email", ["person@example.com", "first.last+tag@sub.example.co.uk"])
+def test_email_sentence_boundary_preserves_punctuation(email, suffix):
+    assert mask_emails_in_text(email + suffix) == EMAIL_PLACEHOLDER + suffix
+    raw = f"{email}{suffix} Сколько стоит КТ?"
+    safe = provider_safe_user_text(raw)
+    assert email not in safe and "@" not in safe
+    assert provider_message_has_substance(safe, raw_source=raw)
+
+
+@pytest.mark.parametrize("raw", ["", " ", "**", "?", "123", "+79991234001", "person@example.com.", "a@b", "[email скрыт] [телефон скрыт]"])
+def test_empty_contact_only_and_unmasked_contact_stay_blocked(raw):
+    assert not provider_message_has_substance(provider_safe_user_text(raw), raw_source=raw)
+
+
+def test_bound_lead_name_and_phone_leak_guards_are_preserved():
+    assert not provider_message_has_substance("Анна", reject_lone_personal_name=True)
+    assert not provider_message_has_substance("Вопрос 34001", raw_source="Вопрос +79991234001")
 
 
 def test_provider_safe_strips_phone_email_and_self_intro() -> None:

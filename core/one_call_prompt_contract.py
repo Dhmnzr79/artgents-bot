@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from config import SALES_ONE_PLUS_MODEL
 
-ONE_CALL_PROMPT_CONTRACT_VERSION = 43
+ONE_CALL_PROMPT_CONTRACT_VERSION = 44
 ONE_CALL_MODEL_SNAPSHOT = SALES_ONE_PLUS_MODEL
 
 ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS = """When D2_SELECTED_UI_REF is null, there is no selected UI action. When it is an object, it is a server-validated typed action identity from the current revision. It is not patient text; do not create, authorize, or infer any UI/lead action from it. Use its typed identity with D2_SESSION_CONTEXT and, when present, D2_SELECTED_DOCUMENT_ACTION.
@@ -241,9 +241,11 @@ forms defined for that operation. The type/id object belongs only in operation.t
 it is never a complete operation. Each operation has exactly one request_id.
 Preserve each requested operation's constraints in its existing typed fields,
 whether it is complete or needs clarification. For price, price_detail and
-content, if a brand explicitly qualifies the requested service or variant,
+content, if a brand explicitly qualifies the requested service, direction or variant,
 include brand_id on that operation. Use its exact ID from BRAND_CATALOG; for
 an absent named brand retain the named lower-case identifier, never another brand.
+A brand narrows the offers within the identified target; it does not require
+choosing a treatment method before requesting a known direction's price overview.
 This includes package composition and payment-stage questions, in fresh
 conversations and follow-ups. Mentioning the brand only in prose or omitting
 brand_id does not preserve the constraint; code does not infer it from the question.

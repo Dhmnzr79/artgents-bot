@@ -1,10 +1,11 @@
 # D2 — интерфейс модели, контекст обсуждения и source UI
 
-Актуально: 2026-10-03. D2-119/120 и UI отмены на этапе телефона реализованы;
-scoped offline проверки и независимые review — §10.6–12. Полного live/widget
-PASS нет. Текущий шаг — сверка документов и разрешённые владельцем commit/push.
-§1–10.5 сохраняют историю прежних этапов и действовавших тогда разрешений.
-Новый runtime, live, merge/deploy и восстановление сессии в этот шаг не входят.
+Актуально: 2026-10-10. Текущий шаг — DOC-план пунктов 1–4 после независимого
+аудита, §38 ниже. Правило этапа 1 согласовано; форма нового wire и изменения базы
+ещё требуют указанного там согласования. Реализация, новые live calls,
+merge/deploy этим DOC не разрешены.
+Предыдущие разделы сохраняют историю checkpoint и действовавших разрешений.
+Scoped PASS относится к проверенному checkpoint, не ко всему боту.
 Единственный план работ — верх [Roadmap](DEMO_D2_DELIVERY_ROADMAP.md).
 Правила: [AGENTS](../../AGENTS.md), [Checker](../WORKFLOW_CHECKER.md),
 [контракт §3](DEMO_D2_TARGET_CONTRACT.md), [Acceptance](DEMO_D2_ACCEPTANCE.md).
@@ -2778,3 +2779,170 @@ therefore not closed. Group 4 must address model-contract reliability and test
 context use without treating schema compliance as proof of semantic correctness.
 Checkpoint preserves this known debt; it does not authorize merge/deploy.
 Foreign widget HTML/CSS, data/ and SIM-0 remain excluded and untouched.
+
+## §38. План пунктов 1–4 после независимого аудита — 2026-10-10
+
+### Статус и единственный план
+
+Владелец поручил составить чёткий план пунктов 1–4, проверить документы и Git.
+Это DOC-подготовка, не реализованное упрощение и не аттестация всего бота.
+Позднейшее явное согласие владельца «с этим согласен» утверждает правило
+этапа 1 ниже. Остальные конкретные изменения wire/данных не утверждаются
+самой записью в карточке. Постоянная ответственность — Target Contract §3.
+Подробности исполнения вести здесь; Roadmap ссылается сюда. Старые отчёты
+и Model Price Experiment остаются историей и evidence, не отдельным планом.
+
+Root/Git top: C:/Cursor Projects/artgents-bot-active; branch
+codex/model-price-experiment. HEAD и GitHub branch совпали read-only ls-remote:
+9bcdbe34110df273e5a3d3f05909aac967ec4bb5. origin/main, GitHub main и merge-base:
+efa3f773bcf10891e2997addf8bbec38c7ae1317. Непушенных коммитов нет; staging пуст.
+Продолжение существующей задачи в той же папке/ветке, не новая задача от main.
+Историческое имя ветки не включает модельные цены; менять/переименовывать ветку
+или создавать checkout не требуется. Main не трогать.
+
+На входе WIP: core/one_call_prompt_contract.py (prompt44, editorial brand/direction,
+58 offline PASS + независимый scoped Checker PASS) и DEMO_MODEL_PRICE_EXPERIMENT.md
+(запись этой правки и подготовка пунктов 1–4). Foreign untracked prototypes/
+сохранить и не stage. .env, ignored logs, data/DB, сырые provider payloads и
+пользовательские разговоры не читать/публиковать для Git checkpoint.
+Текущий DOC allowlist: эта карточка; DEMO_D2_DELIVERY_ROADMAP.md;
+DEMO_MODEL_PRICE_EXPERIMENT.md (все docs/tasks). Prompt44 сохранить без новых edits.
+Exact runtime allowlist каждого этапа определить по call-path перед его правками.
+
+### Этап 0 — чистая точка сохранения
+
+1. Завершить DOC-план и независимый scoped Checker; проверить ссылки и отсутствие
+   противоречий с текущими решениями. Отдельно учесть уже проверенный prompt44.
+2. До реализации сохранить prompt44 + согласованную DOC-подготовку одним именованным
+   checkpoint. Запрос проверки Git не считать отдельной командой commit/push:
+   если разрешение публикации не дано явно, получить его перед Git mutation.
+3. Stage только exact четыре пути: core/one_call_prompt_contract.py и три DOC пути
+   текущего allowlist. Проверить staged names/stat/full diff/diff --check; commit,
+   push текущей ветки, сверить remote SHA. В отчёте назвать фактический новый SHA.
+4. Tracked tree и staging после сохранения пусты; prototypes/ отдельно и неизменен.
+   Не обещать полностью пустой status при сохранённом untracked прототипе.
+
+### Этап 1 — ошибка обычной ссылки не уничтожает независимый ответ
+
+Тип: общий bug fix исполнения, не semantic repair. Правило утверждено владельцем.
+Если ordinary операция структурно прочитана, но её предмет нельзя подтвердить:
+проблемная часть получает спокойный gap по существующему approved failure text;
+независимые правильные parts сохраняются в исходном порядке. Не публиковать
+неподтверждённое объяснение как подтверждённое. Не выбирать другой target за модель.
+Настоящие tenant/source ownership, snapshot binding, UI authenticity и lead/privacy
+нарушения остаются строгими отказами. Неизвестный model ID сам по себе не доказывает
+foreign tenant. Пустой/обрезанный/непарсируемый общий ответ не позволяет выделить
+parts и не превращается в частичный успех. Новых retries/calls/classifiers нет.
+
+До → после: content с отсутствующим service/topic сейчас может обрывать весь turn
+и местами называется foreign_material; после ordinary reference failure локален,
+а trust violation отделён. Убирается ложная зависимость успешного адреса/цены
+от корректности unrelated informational target. Понимание остаётся у модели;
+код владеет проверкой ссылки и результатом исполнения. Не называть это удалением
+всего старого сборщика; точную классификацию checkpoint отразить по фактическому diff.
+
+Проверки: валидные content/service/topic; direction переданный как service;
+неизвестный service/topic; отдельно допустимое omission optional content_ref и
+неизвестный supplied document ref (не превращать omission в gap автоматически);
+content+address и content+price
+в обеих очередностях; honest gap/status/no bogus scope; finalized offers и следующий
+context; replay/один вызов; настоящие foreign source/snapshot/session/UI failures.
+Проверить /ask и /ask/stream на одном исполнителе, не только seam HTTP200.
+Объект проверки — весь класс неверных ordinary ссылок, без phrase-specific условий.
+
+### Этап 2 — один каталог сущностей и явных связей
+
+Сначала read-only карта существующих service/direction/material relationships:
+что задаётся явно, что выводится из frontmatter или имени файла, где есть дубли
+и неоднозначность. Охватить ссылки offers/brands/doctors/policies/commercial,
+не сводя разные предметные сущности в один тип и не меняя clinic selection policy.
+Показать владельцу конкретные изменения исходных файлов до KB edits.
+
+Цель: единый источник явных связей, из которого строятся code indexes и model
+projection. Filename не должен оставаться параллельным owner той же связи.
+Сначала использовать имеющиеся утверждённые данные; не начинать тотальный перенос
+всех JSON/YAML/MD. Форму authoritative registry и удаления прежних выводов определить
+на основании карты и отдельно согласовать, если нужны новые KB fields/files.
+Новый слой/параллельный registry, который повторяет старое решение, не цель этапа.
+
+Критерии: прежние canonical relationships/offer order/doctor links/applicability
+сохранены; новые indexes выводятся из одного owner; старые reachable способы
+получения заменённых связей удалены; ambiguity/битые связи обнаруживаются при
+проверке pack; tenant protections сохранены. Тексты, суммы и клинические утверждения
+не редактировать. До реализации exact allowlist и before/after/removal в этой карточке.
+
+### Этап 3 — модель выбирает одну ссылку, не независимые type и ID
+
+Предпочтительное предложение: canonical entity ref, чей тип определяет registry
+этапа 2. Представление, например direction:implantation/service:classic, — эскиз,
+не уже утверждённый новый wire. Перед кодом показать точный ordinary результат,
+завершённую операцию, уточнение и known-task reply; согласовать форму/границы.
+Не менять определение clinic-wide commercial scope, unknown brand, inactive
+service, volume/count, policy precedence, first-price/deferred или product limits.
+
+Цель: удалить возможность независимо прислать несовместимые type и ID.
+Не обещать устранения выбора неверной существующей сущности. Заменить старую
+wire форму и её reachable readers; не сохранять постоянный new-to-old converter,
+dual contracts или вторую память. Серверные actions/receipts/следующий context
+должны использовать один согласованный reference boundary.
+Один model call и ordinary json_object сохраняются; strict activation не входит.
+Существующие локальные DB не мигрировать/удалять автоматически; перед widget
+указать необходимость новой беседы, если локальные frozen receipts несовместимы.
+
+Проверки: все operation kinds/completed/clarification формы; known task identity;
+неверная/неизвестная ref и trust negatives; direction overview + brand, concrete
+service prices, volume, detail, promotions, doctors, policy, clinic contacts;
+mixed части, historical tabs после адреса, дальнейшие текстовые includes/stages;
+replay/context/один вызов и price click без модели. Не заменить их schema collection.
+
+### Этап 4 — компактное представление модели и оставшиеся aliases
+
+4A: из проверенной базы построить одно модельное представление с полезным
+содержанием и необходимыми IDs/связями. Убрать доказанные дубли каталогов и
+служебный MD шум из model input, не из исходной базы автоматически. Перед исключением
+frontmatter/aliases/comments проверить, не несут ли они единственную информацию
+для понимания; полезные сведения явно сохранить в projection. Сначала показать
+владельцу точный список исключаемых/сохраняемых/переносимых model-input данных
+и получить согласование до изменения его состава — даже без edits исходных MD.
+Не удалять clinical
+content по случайному top-k; не вводить RAG/второй вызов/новый semantic selector.
+Начальные измерения audit: system153454 chars, corpus112068; это диагностика,
+не доказанный причинный вклад в сбои. Сравнить размер и фактический content coverage.
+
+4B: report оставшихся Markdown alias дублей по DEMO_KB_EDITOR_AGENT.md, вместе
+проверить шапку, comments, headings и body. Пример: extraction__service__tooth_extraction.md,
+mozhno-li-srazu-implant — exact heading duplicate «можно ли сразу поставить имплант»,
+пересказ «удалить зуб и сразу имплант», широкое «имплантация после удаления».
+Предложить удаление комментария, не выполнять без согласования списка владельцем.
+Предыдущие 83 удалённых вхождения не означают полную чистку. Не переносить правило
+на aliases каталогов services/brands/doctors. Утверждённые удаления исходных MD —
+отдельный data checkpoint от изменения модельного представления.
+Сохранить видимый текст/цифры/факты/силу обещаний/медицинские формулировки, anchors,
+suggest_h3, CTA и ссылки. Никакого медицинского/юридического сглаживания.
+
+4A проверять на единой неизменной матрице вопросов с этапом 3, отдельно measurement
+и смысловую корректность; offline coverage, scoped model-input и runtime проверки.
+Для live сравнения заранее предложить owner бюджет и hard cap; все прошлые бюджеты
+исчерпаны. Не выдавать уменьшение chars или fake-provider PASS за live reliability.
+4B: exact deletion list и preservation guard; не запускать большой runtime CI ради
+комментариев. Fingerprint change явно сообщить, widget начать новой беседой.
+
+### Процесс каждого checkpoint и границы
+
+Порядок: exact preflight/allowlist → реализация в согласованных границах → минимальные
+offline проверки → один independent Checker → owner widget → явный commit/push GO
+→ exact staging и проверка → checkpoint commit/push + remote SHA. После REJECT —
+focused recheck, не новый полный аудит. Cursor — независимый review на существенных
+границах 1 и 3, вместо дублирующего полного Checker; если нужен второй, обосновать
+конкретную непокрытую границу. Мелкое UI проверяет владелец; browser automation
+только для сложного interaction/auth/context риска. Full CI перед merge, не каждым
+малым edit. Baseline failures сверять с чистой точкой, не скрывать/ослаблять tests.
+
+Отчёт этапа: что убрано/добавлено, owner, affected path, changed behavior, tests,
+baseline failures, live budget usage, staging/commit/push и foreign WIP. Каждый
+следующий baseline — сохранённый предыдущий checkpoint, проверенный на GitHub.
+При паузе named checkpoint должен быть сохранён и pushed по явной команде владельца.
+Новый чат/ветка/папка не нужны. Merge/deploy/destructive cleanup не разрешены.
+За рамками: новый выбор лечения/предложений, цены через model prose, содержание
+акций, redesign виджета, compiled pack/caching, тотальная legacy cleanup, новый
+summary/patient state/second memory. Эти audit предложения не добавлять попутно.

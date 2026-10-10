@@ -1,5 +1,47 @@
 # Эксперимент: ценовые ответы модели
 
+## Подготовка пунктов 1–4 после независимого аудита — 2026-10-10
+
+Подробный единый план перенесён в [Interface Task §38](DEMO_D2_INTERFACE_TASK.md#38-план-пунктов-14-после-независимого-аудита--2026-10-10);
+дорожная карта ссылается на него. Эта карточка сохраняет историю экспериментальных
+checkpoint, не вторую очередь работ. Владелец явно согласовал локальный gap
+проблемной ordinary части с сохранением независимых правильных parts;
+wire/registry и конкретные KB edits согласуются до зависимой реализации.
+Оставшиеся дубли Markdown aliases, включая раздел про имплант после удаления,
+включены в этап 4B с отчётом перед удалением и полным сохранением фактов/anchors.
+Это DOC-подготовка; новых runtime/KB/provider/commit/push действий в ней нет.
+
+## Brand constraint on a known direction — 2026-10-10
+
+Owner GO «Давай комит пуш и дальше»: предыдущие prompt43 и paired12 сохранены
+и опубликованы как 9bcdbe34110df273e5a3d3f05909aac967ec4bb5. Remote SHA сверён.
+Root C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment;
+main/merge-base efa3f773bcf10891e2997addf8bbec38c7ae1317; staging пуст.
+Allowlist: core/one_call_prompt_contract.py; этот документ. Foreign prototypes/
+сохранён и исключён. Тип: редакционное уточнение producer-инструкции, не
+архитектурное упрощение и не доказанное устранение semantic ошибки модели.
+
+Read-only Astra consult не нашёл противоречия overview rule с каталогом/кодом:
+known direction уже требует topic target; несколько методов не основание
+для service clarification. В paired12 текущий JSON дал правильные price tasks
+3/3; ошибочное Nobel clarification повторилось только в strict. Внутренняя
+причина выбора модели не установлена. Не менять сервер по этой гипотезе.
+Brand rule прежде называл service/variant, пропуская direction. Prompt44
+уточняет общую применимость бренда к direction и прежнее правило: бренд
+ограничивает offers известного target, не требует выбора метода для overview.
+Нет специальных Nobel примеров, новых правил выбора, KB/schema/parser/runtime
+веток, repair, retry, памяти или вызовов. Responsibility contract §3 неизменен.
+Offline guards и независимый scoped Checker проверяют согласованность правки,
+не живую надёжность. Provider calls этого шага 0; бюджет paired12 исчерпан.
+Offline: tests/test_d2_operation_unification.py + tests/test_d2_structured_output.py,
+58 passed, 0 failed, 3.97s; XML C:/Users/denis/AppData/Local/Temp/d2-brand-direction-44.xml.
+Первый sandbox run дал 58 setup errors из-за pytest numbered tmp directory;
+ни один test body не исполнялся. Повтор вне sandbox прошёл, не runtime regression.
+git diff --check чистый. Полный CI и live/widget этого изменения не проверены.
+Independent Checker PASS: final XML прочитан, два файла и existing responsibility
+проверены. Это scoped editorial PASS, не подтверждение semantic reliability.
+Prompt44 пока unstaged/uncommitted; опубликованный checkpoint остаётся 9bcdbe3.
+
 ## Unified contract paired comparison — owner GO12, 2026-10-10
 
 Owner явно разрешил12 вызовов после предложения6 вопросов × JSON/strict.

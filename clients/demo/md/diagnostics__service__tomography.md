@@ -1,7 +1,7 @@
 ---
 doc_id: diagnostics__service__tomography
 doc_type: service
-topic: clinic
+topic: diagnostics
 subtopic: tomography
 
 aliases:

@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
+from types import MappingProxyType
 
 import yaml
 
@@ -155,8 +156,9 @@ def load_d2_tenant_snapshot(client_id: str, *, clients_root: Path) -> D2TenantSn
         parsed_content.append((ref, metadata, body, sections))
     metadata_by_ref = {ref: metadata for ref, metadata, _, _ in parsed_content}
     service_topics = {
-        service_id: metadata_by_ref.get(service.content_ref, {}).get("topic")
+        service_id: metadata_by_ref[service.content_ref]["topic"]
         for service_id, service in bundle.services.items()
+        if isinstance(metadata_by_ref.get(service.content_ref, {}).get("topic"), str)
     }
     content: list[D2AuthoredContentAuthority] = []
     for ref, metadata, body, sections in parsed_content:
@@ -173,7 +175,7 @@ def load_d2_tenant_snapshot(client_id: str, *, clients_root: Path) -> D2TenantSn
             allowed_service_ids=direct or topical,
             sections=sections,
         ))
-    return D2TenantSnapshot(client_id=client_id, fingerprint=_fingerprint(client_id, first), bundle=bundle, files=first, content=tuple(content), diagnostics=tuple(diagnostics))
+    return D2TenantSnapshot(client_id=client_id, fingerprint=_fingerprint(client_id, first), bundle=bundle, files=first, content=tuple(content), service_topics=MappingProxyType(service_topics), diagnostics=tuple(diagnostics))
 
 
 def build_d2_bundle(snapshot: D2TenantSnapshot) -> ResponseDataCatalog:

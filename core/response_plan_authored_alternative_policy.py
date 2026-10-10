@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Mapping
 
 from contracts.response_schema import ResponseSchemaBundle
 from contracts.target_service_content_topic import parse_service_catalog_content_topic
@@ -48,13 +49,15 @@ def _validate_alternative_ids(
 def unambiguous_topic_for_service_ids(
     bundle: ResponseSchemaBundle,
     service_ids: tuple[str, ...],
+    *, service_topics: Mapping[str, str] | None = None,
 ) -> str | None:
     topics: list[str] = []
     for service_id in service_ids:
         service = bundle.services.get(service_id)
         if service is None or not service.active:
             return None
-        topic = parse_service_catalog_content_topic(service.content_ref)
+        topic = (service_topics.get(service_id) if service_topics is not None
+                 else parse_service_catalog_content_topic(service.content_ref))
         if topic is None:
             return None
         topics.append(topic)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal, Self
+from typing import Literal, Self, Mapping
 
 from pydantic import field_validator, model_validator
 
@@ -147,6 +147,7 @@ class D2TenantSnapshot:
     bundle: ResponseDataCatalog
     files: tuple[tuple[str, bytes], ...]
     content: tuple[D2AuthoredContentAuthority, ...]
+    service_topics: Mapping[str, str] = field(default_factory=dict)
     diagnostics: tuple[str, ...] = ()
 
 

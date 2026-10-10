@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Mapping
 
 from contracts.response_plan import CommercialFactCandidate, FactApplicability
 from contracts.response_plan_fact_policy import (
@@ -42,6 +42,7 @@ def evaluate_requested_fact_display(
     context: RequestedFactPolicyContext,
     bundle: ResponseDataCatalog | None = None,
     evaluation_purpose: FactEvaluationPurpose = "requested",
+    service_topics: Mapping[str, str] | None = None,
 ) -> RequestedFactDisplayOutcome:
     _ = bundle
     if isinstance(fact, CommercialFactCandidate):
@@ -57,7 +58,7 @@ def evaluate_requested_fact_display(
         applicability = _schema_applicability(fact)
         allowed_topic_ids = tuple(fact.allowed_topics)
         allowed_service_ids = tuple(fact.allowed_service_ids)
-        requires_implant_scope = _requires_implant_scope(fact, bundle)
+        requires_implant_scope = fact_requires_implant_scope(fact, bundle, service_topics=service_topics)
         display_policy = requested_display_policy_from_fact(fact)
         active = bool(fact.active)
 
@@ -167,9 +168,10 @@ def _schema_applicability(fact: TargetCommercialFact) -> FactApplicability:
     return "clinic_wide"
 
 
-def _requires_implant_scope(
+def fact_requires_implant_scope(
     fact: TargetCommercialFact,
     bundle: ResponseDataCatalog | None,
+    *, service_topics: Mapping[str, str] | None = None,
 ) -> bool:
     if fact.kind != "warranty":
         return False
@@ -182,7 +184,8 @@ def _requires_implant_scope(
         service = bundle.services.get(service_id)
         if service is None:
             continue
-        topic = parse_service_catalog_content_topic(service.content_ref)
+        topic = (service_topics.get(service_id) if service_topics is not None
+                 else parse_service_catalog_content_topic(service.content_ref))
         if topic is not None:
             topics.add(topic)
     return topics == {"implantation"}

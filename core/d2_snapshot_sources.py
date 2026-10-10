@@ -484,7 +484,7 @@ def resolve_d2_clarify_service_topic(
         service = snapshot.bundle.services.get(service_id)
         if service is None or not service.active or not service.content_ref:
             return None
-        topic = _frontmatter(snapshot, service.content_ref).get("topic")
+        topic = snapshot.service_topics.get(service_id)
         if not isinstance(topic, str) or not topic.strip():
             return None
         topics.add(topic)
@@ -734,21 +734,10 @@ def build_d2_unknown_brand_response(
         raise D2SnapshotBindingError("brand_client_mismatch")
     if brand_id in build_d2_bundle(snapshot).brands.brands:
         raise D2SnapshotBindingError("brand_is_known")
-    text = _INFO_GAP
-    rows = _clinic_policies_raw(snapshot).get("service_alternatives")
-    if isinstance(rows, list):
-        for row in rows:
-            if not isinstance(row, dict) or row.get("suggest_ref") != "implantation__info__implant_systems.md#korotko":
-                continue
-            keywords = row.get("match_keywords")
-            if isinstance(keywords, list) and brand_id.casefold() in {
-                str(item).strip().casefold() for item in keywords
-            }:
-                approved = row.get("note")
-                if isinstance(approved, str) and approved.strip():
-                    text = approved.strip()
-                break
-    return _d2_code_owned_answer(session_key=session_key, text=text, route="ANSWER")
+    policy = build_d2_brand_policy_response(snapshot, session_key=session_key, brand_id=brand_id)
+    if policy is not None:
+        return policy
+    return _d2_code_owned_answer(session_key=session_key, text=_INFO_GAP, route="ANSWER")
 
 
 def build_d2_unknown_reference_response(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Mapping
 
 from contracts.effective_scope import EffectiveScope
 from contracts.response_plan import CommercialFactCandidate, FactApplicability, FactRole
@@ -10,10 +11,10 @@ from contracts.response_plan_composer import RequestableFactDescriptor
 from contracts.response_plan_fact_policy import RequestedFactPolicyContext
 from contracts.response_plan_post_composer import PostComposerDiagnostic
 from contracts.response_schema import ResponseDataCatalog, TargetCommercialFact
-from contracts.target_service_content_topic import parse_service_catalog_content_topic
 from core.response_plan_fact_policy import (
     evaluate_requested_fact_display,
     requested_display_policy_from_fact,
+    fact_requires_implant_scope,
 )
 
 
@@ -27,6 +28,7 @@ def project_commercial_fact_candidate(
     *,
     source_client_id: str,
     allowed_roles: tuple[FactRole, ...],
+    service_topics: Mapping[str, str] | None = None,
 ) -> CommercialFactCandidate:
     applicability = _fact_applicability(fact)
     return CommercialFactCandidate(
@@ -41,7 +43,7 @@ def project_commercial_fact_candidate(
         requires_implant_scope=(
             False
             if applicability == "clinic_wide"
-            else _requires_implant_scope(bundle, fact)
+            else fact_requires_implant_scope(fact, bundle, service_topics=service_topics)
         ),
         requested_display_policy=requested_display_policy_from_fact(fact),
     )
@@ -68,35 +70,6 @@ def _fact_applicability(fact: TargetCommercialFact) -> FactApplicability:
     return "clinic_wide"
 
 
-def _topics_from_service_ids(
-    bundle: ResponseDataCatalog,
-    service_ids: tuple[str, ...],
-) -> frozenset[str]:
-    topics: set[str] = set()
-    for service_id in service_ids:
-        service = bundle.services.get(service_id)
-        if service is None:
-            continue
-        topic = parse_service_catalog_content_topic(service.content_ref)
-        if topic is not None:
-            topics.add(topic)
-    return frozenset(topics)
-
-
-def _requires_implant_scope(
-    bundle: ResponseDataCatalog,
-    fact: TargetCommercialFact,
-) -> bool:
-    if fact.kind != "warranty":
-        return False
-    if fact.allowed_topics:
-        return len(fact.allowed_topics) == 1 and fact.allowed_topics[0] == "implantation"
-    if not fact.allowed_service_ids:
-        return False
-    topics = _topics_from_service_ids(bundle, tuple(fact.allowed_service_ids))
-    return topics == frozenset({"implantation"})
-
-
 def build_requestable_fact_descriptors(
     bundle: ResponseDataCatalog,
     *,
@@ -111,7 +84,7 @@ def build_requestable_fact_descriptors(
         requires_implant_scope = (
             False
             if applicability == "clinic_wide"
-            else _requires_implant_scope(bundle, fact)
+            else fact_requires_implant_scope(fact, bundle)
         )
         common = {
             "fact_id": fact_id,

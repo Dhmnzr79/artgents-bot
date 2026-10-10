@@ -318,13 +318,20 @@ def resolve_d2_operations(
     client_id = sources.material_authority.source_client_id
     if client_id != sources.session_key.client_id:
         raise MaterializationOwnershipError("materialization_client_mismatch")
+    # This projection uses captured MD metadata, including an authoritative
+    # empty map. D2 never infers service membership from document filenames.
+    service_topics = {
+        service_id: sources.d2_content_topics_by_ref[service.content_ref]
+        for service_id, service in sources.material_authority.bundle.services.items()
+        if service.content_ref in sources.d2_content_topics_by_ref
+    }
     commercial_failures = []
     prepared_commercial = []
     for operation in commercial_operations:
         texts = []
         missing_fact = False
         topic = operation.topic_id or (unambiguous_topic_for_service_ids(
-            sources.material_authority.bundle, (operation.service_id,)
+            sources.material_authority.bundle, (operation.service_id,), service_topics=service_topics,
         ) if operation.service_id else None)
         fact_context = RequestedFactPolicyContext(
             response_scope="service" if operation.service_id else "topic" if topic else "clinic",
@@ -342,6 +349,7 @@ def resolve_d2_operations(
                 continue
             outcome = evaluate_requested_fact_display(
                 fact=fact, context=fact_context, bundle=bundle, evaluation_purpose="requested",
+                service_topics=service_topics,
             )
             if outcome == "allowed":
                 texts.append(fact.text_fact)
@@ -924,6 +932,7 @@ def resolve_d2_operations(
         sources=sources,
         client_id=client_id,
         as_of=as_of,
+        service_topics=service_topics,
     )
     published_price_rows = price_block.rows if price_block is not None else ()
     published_ids = frozenset((
@@ -1664,6 +1673,7 @@ def _d2_requested_fact_candidates(
     sources: ResponsePlanMaterializationSources,
     client_id: str,
     as_of: date,
+    service_topics,
 ) -> tuple:
     if not fact_ids:
         return ()
@@ -1679,6 +1689,7 @@ def _d2_requested_fact_candidates(
                 fact,
                 source_client_id=client_id,
                 allowed_roles=("requested_fact",),
+                service_topics=service_topics,
             )
         )
     return tuple(candidates)

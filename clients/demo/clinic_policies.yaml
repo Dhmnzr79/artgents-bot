@@ -72,20 +72,11 @@ service_alternatives:
       Мини-импланты не используем как основной протокол. Для постоянного результата обычно
       подбираем стандартные системы имплантов после осмотра и КТ.
 
-  - match_keywords:
-      - "osstem"
-      - "ossstem"
-      - "остем"
-    mention: "Implantium, Impro, Nobel Biocare"
-    suggest_ref: "implantation__info__implant_systems.md#korotko"
-    note: >-
-      Osstem в ассортименте нет. Работаем с Implantium, Impro и Nobel Biocare — могу рассказать
-      про отличия систем и ориентиры по стоимости «под ключ».
-
 brand_alternatives:
   - requested_brand_id: osstem
     approved_text: >-
-      Osstem в ассортименте нет. Работаем с Implantium, Impro и Nobel Biocare.
+      Osstem в ассортименте нет. Работаем с Implantium, Impro и Nobel Biocare — могу рассказать
+      про отличия систем и ориентиры по стоимости «под ключ».
 
 service_not_offered_template: >-
   К сожалению, услугу «{requested_service}» в нашей клинике не оказываем.

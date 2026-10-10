@@ -2931,6 +2931,185 @@ projection. Filename не должен оставаться параллельн
 проверке pack; tenant protections сохранены. Тексты, суммы и клинические утверждения
 не редактировать. До реализации exact allowlist и before/after/removal в этой карточке.
 
+#### Read-only карта этапа 2 — 2026-10-10
+
+Классификация checkpoint: documentation only, предложение до реализации.
+Owner «Делаем» разрешил продолжение этапа 2; изменения KB требуют отдельного
+согласования. Repository/Git top: C:/Cursor Projects/artgents-bot-active;
+branch codex/model-price-experiment; HEAD/origin branch baseline
+4fa440803d256a975414483d7b0013d670cff070 (этап 1 сохранён и pushed).
+origin/main и merge-base efa3f773bcf10891e2997addf8bbec38c7ae1317.
+Exact DOC allowlist: docs/tasks/DEMO_D2_INTERFACE_TASK.md.
+На входе tracked tree/staging пусты; foreign untracked prototypes/ сохранить.
+Runtime, wire, KB, суммы, тексты и выбор предложений не меняются этой записью.
+
+Карта владельцев существующих связей:
+
+| Связь | Текущий источник | Что обнаружено |
+| --- | --- | --- |
+| Услуга → основной документ | service_catalog.json: content_ref | Явная ссылка; сохранить |
+| Документ → направление | MD frontmatter: topic | Явное направление; subtopic не является canonical topic |
+| Услуга → направление | Topic основного MD в snapshot; префикс filename в commercial/CTA | Два способа получить один смысл |
+| Направление → услуги первого ценового обзора | d2_direction_prices.json: service_ids/offer_ids | Это выбор клиники для обзора, не полный состав направления |
+| Offer → услуга/вариант/бренд | target_response/pricebook/services/*.json | Явные типизированные ссылки |
+| Врач → услуги/профиль | doctor_catalog.json: service_ids/profile_ref | Явные связи; не заменять медицинским подбором модели |
+| Коммерческий факт → применимость/деталь | pricebook/facts.json | Явные ограничения и ссылки |
+| Автопоказ фактов/совместимость | d2_commercial.json | Другой предмет ответственности, не копия facts.json |
+| Политика услуги/бренда | clients/demo/clinic_policies.yaml | Для отсутствующего бренда есть конкурирующий legacy путь |
+| Название/страна бренда | brand_catalog.json | Явные данные; сохранить |
+
+Call-path evidence:
+- core/d2_tenant_snapshot.py строит service_topics через service.content_ref →
+  metadata.topic и allowed_service_ids документов. core/d2_snapshot_sources.py
+  повторно читает MD topic в resolve_d2_clarify_service_topic; build sources
+  заменяет состав d2_directions настроенным ценовым пулом для таких направлений.
+- contracts/target_service_content_topic.py выводит направление из filename.
+  Reachable потребители: core/response_plan_authored_alternative_policy.py →
+  response_plan_materialization.py (commercial scope); core/d2_contacts_cta.py;
+  response_plan_fact_policy.py и response_plan_fact_projection.py (warranty scope).
+  Перед реализацией повторно проследить каждый вызов; не чистить legacy код
+  только по текстовому совпадению.
+- core/d2_dialogue.py сначала направляет отсутствующий в brand_catalog бренд
+  в build_d2_unknown_brand_response. Эта функция в d2_snapshot_sources.py читает
+  legacy service_alternatives.match_keywords/note и привязана к конкретному
+  implant_systems document ref. Typed brand_alternatives.approved_text уже
+  передаётся модели, но другой reader используется позднее для известного бренда.
+
+Конкретные неоднозначности, не объявленные исправленными:
+1. tomography: content_ref diagnostics__service__tomography.md, MD topic=clinic,
+   filename-derived topic=diagnostics. Это доказанное расхождение источников,
+   не доказанный живой ошибочный ответ КТ. Не выбирать topic по family автоматически.
+2. implantation: 9 услуг с primary MD topic, в price overview — 4; prosthetics:
+   5 против 3. restoration содержит curated price overview classic +
+   removable_dentures, хотя их primary topics — implantation/prosthetics.
+   Не расширять обзор и не переносить primary topic из настроек обзора.
+   Разделение этих отношений не разрешает молча менять информационный охват
+   existing d2_directions или context carry; такие потребители проверить отдельно.
+3. Osstem: legacy note содержит «Osstem в ассортименте нет. Работаем с Implantium,
+   Impro и Nobel Biocare — могу рассказать про отличия систем и ориентиры по
+   стоимости «под ключ».» Typed approved_text заканчивается после Nobel Biocare.
+   Сведение к одному source требует согласовать, какой текст сохранить.
+
+Предлагаемый минимальный вариант (ещё не реализован):
+- Сохранить нынешние файлы владельцами своих данных. Не создавать editable
+  d2_entities.json и не дублировать в нём offers, doctors или commercial facts.
+- Sole owner primary topic услуги: topic её основного MD, найденного по явному
+  service_catalog.content_ref. Один проверенный производный индекс snapshot
+  используют потребители этой связи. До → после: разные MD/filename readers →
+  один MD owner через explicit content_ref → удалён вывод смысла из имени файла
+  и повторное самостоятельное чтение этой связи в runtime.
+  Это сохраняет зависимость primary topic от основного документа; не выдавать
+  вариант за независимый registry направлений. Отдельный topic_id в service_catalog
+  возможен, но означает новые KB/schema edits и сейчас не утверждён.
+- Настроенный ценовой обзор оставить отдельной явной связью и с прежним порядком.
+  Не добавлять новый selector, semantic repair, fallback или память.
+- Для отсутствующего бренда предложить один typed brand_alternatives owner,
+  удалив заменённый reachable legacy reader и его filename binding. Вариант
+  сохранения длинного нынешнего ответа: перенести legacy note дословно в typed
+  approved_text. Конкретные KB правки и удаление legacy записи — только после GO.
+
+Перед реализацией показать владельцу два решения: primary topic КТ (clinic либо
+diagnostics) и сохранение длинного Osstem текста в единственном typed источнике.
+После решений определить точный runtime/KB allowlist, cross-tenant coverage,
+before/after/removal и минимальную матрицу проверок. Не начинать этапы 3/4 попутно.
+
+Read-only evidence: demo содержит 23 услуги (22 active), 58 MD, 33 offers,
+3 бренда, 6 врачей, 10 коммерческих фактов. У всех active услуг основной MD найден;
+все MD имеют topic, doc_id совпадает с filename без расширения. Проверенные
+offer service/brand refs, doctor service/profile refs и fact service/detail refs
+существуют; broken links в этом проверенном наборе нет. Это статическая проверка
+названных связей, не полная аттестация pack, runtime или понимания моделью.
+Консультация Astra выполнена read-only; provider/live/browser/SMTP: 0.
+Bot tests не запускались ради документации. Independent DOC Checker: PASS;
+blockers нет, карта и reachable readers подтверждены. Это не аттестация
+реализованного архитектурного упрощения. Staging пуст; commit/push новой DOC
+записи пока не выполнялись.
+
+#### Реализация этапа 2 — согласование и preflight
+
+Owner «СОгласнен» утвердил primary topic КТ=diagnostics и перенос длинного
+Osstem текста дословно в typed brand_alternatives с удалением его legacy строки.
+Классификация: scoped architecture simplification + согласованные metadata edits.
+Root/Git top C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment;
+baseline HEAD/origin branch 4fa440803d256a975414483d7b0013d670cff070;
+main/base efa3f773bcf10891e2997addf8bbec38c7ae1317. На входе только DOC-карта
+этого этапа и foreign untracked prototypes/; staging пуст.
+Exact allowlist: contracts/d2_tenant_snapshot.py; core/d2_tenant_snapshot.py;
+core/d2_snapshot_sources.py; core/d2_contacts_cta.py;
+core/response_plan_authored_alternative_policy.py; core/response_plan_fact_policy.py;
+core/response_plan_fact_projection.py; core/response_plan_materialization.py;
+clients/demo/clinic_policies.yaml;
+clients/demo/md/diagnostics__service__tomography.md;
+tests/test_d2_primary_topic_links.py; docs/tasks/DEMO_D2_INTERFACE_TASK.md.
+
+До → после → удалённая зависимость: D2 commercial/CTA читают filename, content/context
+читают MD → primary topic принадлежит MD основного документа по content_ref →
+filename больше не определяет primary topic в D2. Snapshot хранит immutable derived
+service_topics; materialization использует существующую projection MD topics из sources.
+Общие helpers получают authoritative mapping, в том числе пустой; старое поведение
+None остаётся только для callers вне D2, не fallback D2. Wire/storage/model calls
+не меняются. Удаляется duplicate warranty derivation из fact projection, остаётся
+один fact-policy evaluator. Unknown brand reader больше не читает legacy keywords
+или фиксированное имя implant_systems; использует существующий typed policy reader.
+Price overview membership/order остаётся отдельным curated relation.
+Техническая консультация Astra выполнена; проверки и Checker записать по результатам.
+
+Результат реализации (2026-10-10):
+- Удалены filename-based primary topic на D2 commercial/CTA paths и повторное
+  чтение service topic в clarification/context helper; общий warranty policy
+  заменил дублированное вычисление в fact projection. Legacy callers вне D2
+  остаются вне этого checkpoint; отсутствие MD связи в D2 не вызывает их parser.
+- Snapshot index immutable; materialization projection строится из уже переданной
+  MD topic map по explicit content_ref. Новых KB fields, wire/storage fields,
+  semantic selectors, retries, provider calls и session memory нет.
+- КТ: только topic clinic → diagnostics. Osstem: длинный note перенесён дословно
+  в typed approved_text, legacy row и его runtime reader удалены. Unknown brand
+  без typed policy сохраняет прежний gap; другой brand price не подставляется.
+- Новые тесты намеренно расходят filename и MD topic и запрещают вызов parser:
+  commercial policy, warranty candidate, CTA, doctor completion, clarification
+  и следующий service context. Проверены empty authoritative map, JSON/SSE,
+  replay, exact typed Osstem text, отсутствие цены для отсутствующего бренда
+  и foreign session refusal. Price overview остаётся 4 services против 9
+  primary implantation members. Реальный model understanding не аттестуется.
+- d2-stage2-links-green.xml: 8 PASS, 13.48s. Коммерческие прежние сценарии:
+  38 PASS в d2-stage2-final.xml. Карточки и snapshot guards: 71 PASS в
+  d2-stage2-final-guards.xml (полный ранний XML: 79 cases, 77 PASS / 2 FAIL;
+  оба FAIL — новые неверные ожидания topic в service DiscussionScope, исправлены
+  и повторно проверены в links-green). Независимые guard suites не падали.
+  Итого 117 разных scoped cases PASS, не полный CI.
+- Ранний setup sandbox failure и промежуточные новые test/code failures не считаются
+  аттестацией; исправлены collision имени warranty helper и ошибки тестовой
+  contact operation/контекстных ожиданий. Существующие tests не ослаблены.
+  Полного baseline/CI прогона нет; прежний долг вне этих suites не закрыт.
+- Provider/live/browser/SMTP: 0; tests используют fake provider. Для widget нужна
+  новая беседа после изменения tenant fingerprint. Staging пуст; commit/push
+  не выполнялись. Foreign prototypes/ вне allowlist. Independent Checker: PASS;
+  blockers/test weakening/scope creep нет. SAFE_TO_WIDGET_TEST=YES для этого
+  scoped этапа 2; вся архитектура, этапы 3/4 и live understanding не аттестуются.
+  Checker прочитал XML, pytest повторно не запускал.
+
+Widget finding после этапа 2 (owner screenshot, 2026-10-10): КТ → свой КТ →
+Osstem availability → «Расскажите» возвращает описание КТ. В read-only последних
+логах (16:29 UTC) verified Osstem reply опубликован correctly, но следующий
+provider input содержит прежний discussion_scope service:tomography и пустой
+assistant_text для reference ответа про Osstem (brand_id в parts сохранён).
+Модель затем выбирает service:tomography. Это наблюдаемая ошибка whole dialogue,
+не неправильная сумма/карточка или потеря typed Osstem policy текста при публикации.
+Причина передачи: completion _project_pair не копирует этот authored reference,
+retain_discussion_reference сохраняет прежнюю тему при scope=clinic без descriptor.
+Этап 2 эти history/carry rules не менял. Scoped offline PASS не закрывает finding.
+Не исправлять phrase-specific prompt/regex на «Расскажите». Общий boundary для
+brand/service availability continuation, допустимой reference history и замены/
+очистки предыдущего scope предложить владельцу до изменения этих правил.
+Агент дополнительных provider calls не делал; сырые логи/разговоры не включены в Git.
+
+Сохранение checkpoint 2А: owner «Давай коим и пуш его» явно разрешил commit/push
+этого exact 12-file allowlist в текущую ветку. Этап 2А фиксируется в проверенных
+границах связей; выявленная ошибка продолжения остаётся открытой. Обсуждённый
+пункт 2Б про целостный контекст — предложение следующей работы, в этом checkpoint
+не реализован и не аттестован. Foreign prototypes/ не stage. Финальный SHA и
+совпадение remote сообщить после сохранения; merge/deploy не входят в команду.
+
 ### Этап 3 — модель выбирает одну ссылку, не независимые type и ID
 
 Предпочтительное предложение: canonical entity ref, чей тип определяет registry

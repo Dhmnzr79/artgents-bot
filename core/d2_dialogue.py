@@ -24,7 +24,7 @@ from contracts.response_plan import D2PriceDetailUiAction, D2PriceSelectUiAction
 from contracts.d2_dialogue_result import (
     DiscussionScope, DiscussionVolume, D2DialogueResult, PriceOperation, ExplanationOperation, DetailOperation,
     ContactOperation, DoctorsOperation, PolicyOperation, CommercialOperation,
-    ClarifiedOperation, PendingExplanationOperation, D2ExplanationTask,
+    ClarifiedOperation, D2ExplanationTask,
     ServiceTarget, TopicTarget, UnresolvedTarget, ScopedOperation, OffTopicOperation,
 )
 from contracts.response_plan import (
@@ -684,9 +684,8 @@ def _run_reserved_d2_dialogue_turn(
             raise ValueError("d2_ui_service_task_missing")
         if selected_service_id not in view.active_service_catalog.active_service_ids:
             raise ValueError("d2_ui_service_selection_mismatch")
-        # A verified click completes the task as a regular operation,
-        # rather than retaining the narrower unresolved-price subtype.
-        task_type = D2ExplanationTask if isinstance(pending, PendingExplanationOperation) else D2DialogueResult
+        # A verified click executes the saved kind with the selected service.
+        task_type = D2ExplanationTask if pending.kind == "content" else D2DialogueResult
         known_task = task_type.model_validate({"outcome": "dialogue", "blocks": [{
             **pending.model_dump(exclude={"clarification"}),
             "target": {"type": "service", "id": selected_service_id},

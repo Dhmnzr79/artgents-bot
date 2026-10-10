@@ -55,10 +55,10 @@ def test_sent_schema_requires_explicit_scope_and_storage_retains_pending_subject
     schema = json.JSONDecoder().raw_decode(text)[0]
     direct = schema["$defs"]["CommercialOperation"]
     assert "target" in direct["required"]
-    assert set(direct["properties"]["target"]["discriminator"]["mapping"]) == {"clinic", "service", "topic"}
-    unclear = schema["$defs"]["PendingCommercialOperation"]
-    assert {"target", "clarification"}.issubset(unclear["required"])
-    assert set(unclear["properties"]["clarification"]["discriminator"]["mapping"]) == {"service", "term"}
+    assert set(direct["properties"]["target"]["discriminator"]["mapping"]) == {"clinic", "service", "topic", "unresolved"}
+    assert "PendingCommercialOperation" not in schema["$defs"]
+    clarification = direct["properties"]["clarification"]["anyOf"][0]
+    assert set(clarification["discriminator"]["mapping"]) == {"service", "term"}
     assert TypeAdapter(ClarifiedOperation).validate_python(pending()).fact_ids == ("installment_12",)
 
 

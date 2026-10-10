@@ -84,6 +84,12 @@ Four repair groups are proposed only; no implementation GO or SIM4/SIM5/REC5 clo
 
 ## Актуальный порядок после независимого аудита — 2026-10-02
 
+Owner GO 2026-10-10 после checkpoint ef6894f: единый runtime тип на каждый
+kind вместо четырёх completed/pending пар, без нового adapter/schema layer.
+HTTP пока json_object, карточки/KB/семантические правила сохраняются.
+Scope, exact allowlist и acceptance — верх DEMO_MODEL_PRICE_EXPERIMENT.md.
+Новый strict live experiment требует отдельного бюджета; все старые исчерпаны.
+
 Owner GO 2026-10-10: после root-array live отказа подготовить strict provider
 format для ordinary и known-task explanation, не менять цену/KB/card selection.
 Offline checkpoint и hard4 capability script — [текущая карточка](DEMO_MODEL_PRICE_EXPERIMENT.md),

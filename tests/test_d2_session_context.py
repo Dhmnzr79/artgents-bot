@@ -7,7 +7,7 @@ from contracts.d2_session_context import (
     D2SessionContextError, empty_d2_session_snapshot, D2_SESSION_SCHEMA_VERSION,
 )
 from contracts.d2_dialogue_result import (
-    PendingExplanationOperation, ParameterClarification, ServiceTarget,
+    ExplanationOperation, ParameterClarification, ServiceTarget,
 )
 from contracts.response_plan import SessionKey
 from contracts.response_plan_session import PersistedShownCommercialIds, D2ShownPriceOfferRef
@@ -22,7 +22,7 @@ def snapshot():
         schema_version=D2_SESSION_SCHEMA_VERSION, session_key=KEY, revision=2, last_committed_turn_index=2,
         discussion_request_id="completed-price", terminal_state="clarify",
         accumulated_shown_ids=PersistedShownCommercialIds(promo_fact_ids=("promo",)),
-        clarify_pending=True, clarify_task=PendingExplanationOperation(
+        clarify_pending=True, clarify_task=ExplanationOperation(
             request_id="r1", kind="content", target=ServiceTarget(type="service", id="classic"),
             pending_question="How long?", clarification=ParameterClarification(missing="extent"),
         ),

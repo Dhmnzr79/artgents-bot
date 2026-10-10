@@ -171,26 +171,22 @@ def test_actual_provider_schema_excludes_price_parameter_path():
     schema = json.loads(system["content"].split("=== D2_RESULT_SCHEMA ===\n")[1].split("=== SERVICE_REFERENCE_CATALOG ===")[0])
     definitions = schema["$defs"]
     variants = [definitions[v["$ref"].split("/")[-1]]
-                for v in schema["properties"]["blocks"]["items"]["anyOf"]]
+                for v in schema["properties"]["blocks"]["items"]["oneOf"]]
     prices = [v for v in variants if v["properties"]["kind"].get("const") == "price"]
-    assert len(prices) == 2
-    direct = next(v for v in prices if "clarification" not in v["properties"])
-    pending = next(v for v in prices if "clarification" in v["properties"])
+    assert len(prices) == 1
+    direct = pending = prices[0]
     assert direct["additionalProperties"] is False
-    assert set(pending["properties"]["clarification"]["discriminator"]["mapping"]) == {"service", "term"}
-    target = pending["properties"]["target"]
-    assert target["anyOf"] == [{"$ref": "#/$defs/UnresolvedTarget"}, {"type": "null"}]
+    clarification = pending["properties"]["clarification"]["anyOf"][0]
+    assert set(clarification["discriminator"]["mapping"]) == {"service", "term"}
+    target = pending["properties"]["target"]["anyOf"][0]
+    assert set(target["discriminator"]["mapping"]) == {"service", "topic", "unresolved"}
     assert all(v["properties"]["kind"].get("const") != "clarification" for v in variants)
     assert all("operation" not in v["properties"] for v in variants)
     contents = [v for v in variants if v["properties"]["kind"].get("const") == "content"]
-    assert len(contents) == 2
+    assert len(contents) == 1
     assert all(v["additionalProperties"] is False for v in contents)
-    assert {tuple(k for k in ("content_text", "pending_question") if k in v["properties"]) for v in contents} == {
-        ("content_text",), ("pending_question",)}
-    assert all(next(k for k in ("content_text", "pending_question") if k in v["properties"]) in v["required"] for v in contents)
-    pending_content = next(v for v in contents if "pending_question" in v["properties"])
-    assert "clarification" in pending_content["required"]
-    assert "default" not in pending_content["properties"]["clarification"]
+    assert {"content_text", "pending_question", "clarification"}.issubset(contents[0]["properties"])
+    assert not any(name.startswith("Pending") for name in definitions)
     assert "AuthorizedExplanationOperation" not in definitions
     assert "D2ExplanationTask" not in definitions
 

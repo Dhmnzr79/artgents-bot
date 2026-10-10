@@ -90,7 +90,9 @@ def test_strict_format_is_generated_from_the_same_runtime_types(known):
         assert set(schema["$defs"]["D2ExplanationReplyItem"]["properties"]) == {"request_id", "content_text"}
     else:
         assert set(schema["properties"]) == {"outcome", "blocks"}
-        assert len(schema["properties"]["blocks"]["items"]["anyOf"]) == 13
+        items = schema["properties"]["blocks"]["items"]
+        assert len(items["oneOf"]) == 9
+        assert len(items["discriminator"]["mapping"]) == 9
 
 
 @pytest.mark.parametrize("known", [False, True])

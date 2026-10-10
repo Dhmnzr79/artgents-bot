@@ -605,7 +605,8 @@ def test_information_clarification_is_not_converted_to_price(http_env, reverse):
     with D2DialogueStore(db) as store:
         pending = store.read(SessionKey(client_id="demo", sid="cp6a")).state.clarify_task
         assert pending.pending_question == blocks[1 if reverse else 0]["pending_question"]
-        assert not hasattr(pending, "content_text")
+        assert pending.content_text is None
+        assert "content_text" not in pending.model_dump()
     fake.raw = json.dumps({"explanations": [{"request_id": "r1", "content_text": "Этапы выбранной процедуры."}]})
     clicked = post(client, request_id="click", q="", ref="service:classic", ui_revision=first.get_json()["revision"])
     assert clicked.status_code == 200, clicked.get_json()

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 class Closed(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -103,6 +103,15 @@ class PriceOperation(PolicyScope):
     brand_id: str | None = None
     payment_scheme: Literal["oms", "dms", "self_pay", "unspecified"] = "unspecified"
     payment_scheme_intent: Literal["eligibility_question", "requested_payment", "not_requested", "unspecified"] = "unspecified"
+    clarification: MeaningClarification | None = Field(default=None, exclude_if=lambda v: v is None)
+
+    @model_validator(mode="after")
+    def price_form(self):
+        if "clarification" in self.model_fields_set and self.clarification is None:
+            raise ValueError("clarification_required")
+        if self.clarification is not None and self.target is not None and not isinstance(self.target, UnresolvedTarget):
+            raise ValueError("clarify_price_already_known")
+        return self
 
 
 class ExplanationFields(ScopedOperation):
@@ -128,8 +137,19 @@ class ExplanationFields(ScopedOperation):
 
 
 class ExplanationOperation(ExplanationFields):
-    """Completed explanation; unfinished questions cannot occupy this field."""
-    content_text: str = Field(min_length=1, max_length=4000)
+    """One explanation operation, either completed or explicitly unfinished."""
+    content_text: str | None = Field(default=None, min_length=1, max_length=4000, exclude_if=lambda v: v is None)
+    pending_question: str | None = Field(default=None, min_length=1, max_length=4000, exclude_if=lambda v: v is None)
+    clarification: Clarification | None = Field(default=None, exclude_if=lambda v: v is None)
+
+    @model_validator(mode="after")
+    def explanation_form(self):
+        if self.clarification is None:
+            if self.content_text is None or {"pending_question", "clarification"} & self.model_fields_set:
+                raise ValueError("completed_explanation_text_required")
+        elif self.pending_question is None or "content_text" in self.model_fields_set:
+            raise ValueError("pending_explanation_question_required")
+        return self
 
 
 class DetailOperation(ScopedOperation):
@@ -138,9 +158,12 @@ class DetailOperation(ScopedOperation):
     price_detail_aspect: Literal["includes", "stages"]
     price_detail_offer_id: str | None = None
     price_detail_offer_ordinal: int | None = Field(default=None, ge=1, strict=True)
+    clarification: Clarification | None = Field(default=None, exclude_if=lambda v: v is None)
 
     @model_validator(mode="after")
     def selector(self):
+        if "clarification" in self.model_fields_set and self.clarification is None:
+            raise ValueError("clarification_required")
         if self.price_detail_offer_id is not None and self.price_detail_offer_ordinal is not None:
             raise ValueError("price_detail_selector_conflict")
         return self
@@ -188,10 +211,19 @@ class CommercialFields(ScopedOperation):
 
 
 class CommercialOperation(CommercialFields):
-    target: Annotated[Union[ServiceTarget, TopicTarget, ClinicTarget], Field(discriminator="type")]
+    target: Annotated[Union[ServiceTarget, TopicTarget, ClinicTarget, UnresolvedTarget], Field(discriminator="type")]
+    clarification: MeaningClarification | None = Field(default=None, exclude_if=lambda v: v is None)
 
     @model_validator(mode="after")
     def promotion_service_required(self):
+        if "clarification" in self.model_fields_set and self.clarification is None:
+            raise ValueError("clarification_required")
+        if self.clarification is not None:
+            if not isinstance(self.target, UnresolvedTarget):
+                raise ValueError("commercial_pending_unresolved_required")
+            return self
+        if isinstance(self.target, UnresolvedTarget):
+            raise ValueError("commercial_completed_scope_required")
         if self.promotion_scope == "service" and self.service_id is None:
             raise ValueError("d2_promotion_service_required")
         return self
@@ -227,38 +259,26 @@ MeaningClarification = Annotated[Union[ServiceClarification, TermClarification],
 Clarification = Annotated[Union[ServiceClarification, TermClarification, ParameterClarification], Field(discriminator="missing")]
 
 
-class PendingPriceOperation(PriceOperation):
-    target: UnresolvedTarget | None = None
-    clarification: MeaningClarification
+for _operation in (PriceOperation, ExplanationOperation, DetailOperation, CommercialOperation):
+    _operation.model_rebuild()
 
 
-class PendingExplanationOperation(ExplanationFields):
-    """An ordinary question that still requires clarification."""
-    pending_question: str = Field(min_length=1, max_length=4000)
-    clarification: Clarification
+def _require_pending_operation(operation):
+    """The existing storage slot holds an unfinished operation only."""
+    if operation.clarification is None:
+        raise ValueError("clarify_task_requires_clarification")
+    return operation
 
 
-class PendingDetailOperation(DetailOperation):
-    clarification: Clarification
+ClarifiedOperation = Annotated[
+    Union[PriceOperation, ExplanationOperation, DetailOperation, CommercialOperation],
+    Field(discriminator="kind"), AfterValidator(_require_pending_operation),
+]
 
 
-class PendingCommercialOperation(CommercialFields):
-    target: UnresolvedTarget
-    clarification: MeaningClarification
-
-
-PendingOperation = Annotated[Union[PendingPriceOperation, PendingExplanationOperation,
-    PendingDetailOperation, PendingCommercialOperation], Field(discriminator="kind")]
-
-
-# A storage boundary on the same operation types, not a persisted wrapper.
-ClarifiedOperation = PendingOperation
-
-
-Block = Union[PriceOperation, PendingPriceOperation, ExplanationOperation,
-    PendingExplanationOperation, DetailOperation, PendingDetailOperation,
-    ContactOperation, PolicyOperation, BookingOperation, CommercialOperation, PendingCommercialOperation,
-    OffTopicOperation, DoctorsOperation]
+Block = Annotated[Union[PriceOperation, ExplanationOperation, DetailOperation,
+    ContactOperation, PolicyOperation, BookingOperation, CommercialOperation,
+    OffTopicOperation, DoctorsOperation], Field(discriminator="kind")]
 
 
 class D2DialogueResult(Closed):

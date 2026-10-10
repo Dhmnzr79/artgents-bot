@@ -1,5 +1,75 @@
 # Эксперимент: ценовые ответы модели
 
+## Единая операция на kind — owner GO 2026-10-10
+
+Классификация: архитектурное упрощение, не исправление всех ошибок модели.
+Owner явно согласовал runtime replacement после объяснения примеров и этапов.
+Baseline ef6894fed3c1b8198fbb98b018ff24f2029d391c, branch codex/model-price-experiment,
+root/Git top C:/Cursor Projects/artgents-bot-active; main/merge-base efa3f77.
+Foreign untracked prototypes/ сохранить. Staging пуст на входе.
+До: четыре пары completed/pending классов конкурируют по одинаковому kind.
+После: один тип на price/content/price_detail/commercial_fact; существующая
+clarification определяет незавершённость. Удаляем четыре Pending-класса,
+дубли union и выбор по pending subtype. Единственный владелец допустимой формы —
+runtime тип операции; §3 Target Contract остаётся единственной таблицей владельцев.
+Один объект напрямую идёт parser → execution → pending storage/context;
+без adapter, parallel schema, новых wire fields, памяти, retry или вызовов.
+Канонический dump тех же типов не публикует неприменимые optional поля, сохраняя
+roundtrip и прежние строгие запреты готового/незавершённого content.
+Stored clarify slot требует clarification как раньше, без другого типа операции.
+Не менять default/подбор/цену/policy precedence/KB, JSON HTTP сохраняется.
+Allowlist: contracts/d2_dialogue_result.py; core/d2_dialogue.py;
+tests/test_d2_sim2_contract.py; tests/test_d2_commercial_scope.py;
+tests/test_d2_session_context.py; tests/test_d2_structured_output.py;
+tests/test_d2_operation_unification.py; этот документ;
+docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md.
+Allowlist уточнён до staging: tests/test_d2_sim2_dialogues.py только для
+миграции двух assertions о Pending content: content_text=None и отсутствие
+поля в dump вместо отсутствия Python атрибута. Остальные assertions неизменны.
+Acceptance: 9 уникальных kind в actual schema, прежние allowed/rejected комбинации
+четырёх операций, canonical nested roundtrip и storage pending-only, JSON/SSE
+clarification → authenticated click → reply, null-target authored policy paths,
+commercial scope, one-call/replay и source binding. Targeted offline + Checker;
+browser/live/provider0, новый live budget отдельно. Это не гарантирует live смысл.
+
+Отдельный read-only log finding: 2026-10-10 13:55:00 UTC, payment methods,
+trace 9c71d6e60b8146a9833b798fbae5dbc2. Root object/outcome/blocks правильные;
+kind content, source clinic__info__payment_terms.md, target type clinic,
+228 chars; finish stop,91 completion tokens. Explanation Target не допускает clinic;
+parse invalid_envelope, completion не создан. Не truncation/root-array/карточки.
+Этот checkpoint сохраняет reject; разрешение clinic target или смена prompt
+не входят в упрощение, точную причину выбора полей внутри модели лог не доказывает.
+
+Implementation evidence: удалены четыре Pending-класса и PendingOperation union;
+Block — discriminated union9 уникальных kind вместо13 конкурирующих ветвей.
+Service click выбирает server explanation task по сохранённому kind, не subtype.
+Добавлены условные validators того же типа вместо прежнего разделения классов,
+и Field exclude_if для неприменимых optional полей; это сохраняет прежние
+запреты null/двух content форм и канонический roundtrip. ClarifiedOperation —
+те же четыре типа плюс требование непустой clarification в прежнем storage slot.
+Новые wire keys/types/state/version/adapter/provider calls не добавлялись.
+Equivalence read-only сравнение git show ef6894f:150 combinations target/clarification
+и четырёх kind/двух content форм;52 accepted, acceptance/dump differences0.
+Contract/context/schema/probe suite146PASS14.84s:
+C:/Users/denis/AppData/Local/Temp/d2-unify-contract-edzkdojn/tests.xml.
+Route suite155 cases:138PASS17FAIL155.96s:
+C:/Users/denis/AppData/Local/Temp/d2-unify-route-h7gb1ujr/tests.xml.
+Чистый git archive ef6894f, focused17 nodes:15FAIL2PASS20.64s:
+C:/Users/denis/AppData/Local/Temp/d2-unify-baseline-ccrxir4j/failed-baseline.xml.
+15 совпавших baseline failures:2 mixed-doctor context,1 includes wording,
+10 overview action assertions,2 missing-authored source. Они вне изменения,
+не ослаблены/не объявляются закрытыми. Два remaining assertion касались
+hasattr Pending content; заменены сохранением None/отсутствия поля в dump.
+Финальный focused dialogue/policy/card recheck74PASS112.52s:
+C:/Users/denis/AppData/Local/Temp/d2-unify-final-wvtrfnhb/tests.xml.
+Это2 migrated dialogue cases,8 null-target policy JSON/SSE,64 price-card cases.
+Код старше этого прогона, затем менялась только evidence документация.
+Independent Checker scoped PASS:10 allowlisted files, actual removal/canonical
+roundtrip/ownership подтверждены; final XML прочитан независимо. Это не global
+PASS и не доказательство улучшения live-понимания. Staging пуст;
+commit/push/merge/deploy не сделаны. prototypes/ исключён и сохранён.
+Полный CI/live understanding не аттестованы. Provider/browser/SMTP0.
+
 ## Layered Qwen experiment — owner GO 2026-10-10
 
 Тип: изолированный диагностический эксперимент, не runtime replacement или

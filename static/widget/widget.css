@@ -1680,6 +1680,13 @@
 }
 .clinic-price-card__tab:disabled { cursor: default; }
 .clinic-price-card__tab:focus-visible { outline: 2px solid var(--clinic-brand); outline-offset: 2px; }
+.clinic-price-card__detail { border-top: 1px solid #e2e5ef; margin-top: 14px; padding-top: 12px; font-size: 16px; }
+.clinic-price-card__detail summary { cursor: pointer; color: var(--clinic-brand); font-weight: 500; }
+.clinic-price-card__detail summary:focus-visible { outline: 2px solid var(--clinic-brand); outline-offset: 3px; }
+.clinic-price-card__detail ul { margin: 12px 0; padding-left: 20px; }
+.clinic-price-card__detail li + li { margin-top: 8px; }
+.clinic-price-card__detail-heading { margin: 14px 0 8px; font-weight: 600; }
+.clinic-price-card__services { display: grid; gap: 6px; margin-bottom: 14px; }
 .clinic-price-card__variant {
   display: flex;
   flex-wrap: wrap;

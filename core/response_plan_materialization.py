@@ -860,28 +860,37 @@ def resolve_d2_operations(
         )
     if extra_ui:
         ui_candidates = ui_candidates.model_copy(update={"quick_replies": tuple(extra_ui), "price_detail_actions": ()})
-    if price_block is not None and scope_decision is None and not extra_ui:
+    if price_block is not None and not extra_ui:
         offers_by_id = {offer.offer_id: offer for offer in sources.material_authority.bundle.offers}
         replies, actions = [], []
+        if scope_decision is not None:
+            # Keep the configured overview's services/order/cap; prepare only
+            # their eligible exact-service variants before any UI selection.
+            price_tab_rows = tuple(row for service_id in dict.fromkeys(
+                row.service_id for row in price_block.rows
+            ) for row in _d2_price_block(bundle=sources.material_authority.bundle,
+                client_id=client_id, service_ids=(service_id,),
+                published_terms=sources.d2_published_terms_by_offer,
+                brand_id=price_part.brand_id, applied_extent=applied_extent,
+                direct_service_only=True)[0].rows)
         for row in price_tab_rows:
             offer = offers_by_id[row.offer_id]
             reply_id = f"price_select:{row.offer_id}"
             replies.append(UiQuickReplyCandidate(source_client_id=client_id,
                 reply_id=reply_id, label=row.variant_label or row.service_name))
             actions.append(D2PriceSelectUiAction(source_client_id=client_id,
-                reply_id=reply_id, offer_id=row.offer_id, service_id=row.service_id,
+                reply_id=reply_id, offer_id=row.offer_id, service_id=row.service_id, service_name=row.service_name,
                 discussion_scope=DiscussionScope(target=ServiceTarget(type="service", id=row.service_id),
                     volume=price_part.volume, brand_id=offer.brand_id)))
         if selected_price_select_actions:
             actions = list(selected_price_select_actions)
             replies = []
-            for action in actions:
+            for index, action in enumerate(actions):
                 offer = offers_by_id.get(action.offer_id)
                 service = sources.material_authority.bundle.services.get(action.service_id)
                 extent = action.discussion_scope.volume.extent if action.discussion_scope.volume else None
                 if (action.source_client_id != client_id or offer is None or not offer.active
                         or service is None or not service.active or offer.service_id != action.service_id
-                        or action.service_id != price_block.rows[0].service_id
                         or offer.brand_id != action.discussion_scope.brand_id
                         or action.offer_id not in sources.d2_published_terms_by_offer
                         or (offer.option_id is not None and not any(
@@ -889,9 +898,10 @@ def resolve_d2_operations(
                             for option in service.options))
                         or (extent not in {None, "unknown"} and not _d2_offer_applies(offer, service, extent))):
                     raise MaterializationOwnershipError("d2_price_select_offer_unavailable")
+                actions[index] = action.model_copy(update={"service_name":service.name})
                 replies.append(UiQuickReplyCandidate(source_client_id=client_id,
                     reply_id=action.reply_id, label=_offer_variant_label(sources.material_authority.bundle, offer) or service.name))
-        if len(actions) > 1:
+        if actions and (len(actions) > 1 or scope_decision is not None or selected_price_select_actions):
             ui_candidates = ui_candidates.model_copy(update={
                 "quick_replies": (*ui_candidates.quick_replies, *replies),
                 "price_select_actions": tuple(actions),
@@ -1171,11 +1181,7 @@ def _d2_price_detail_block(
         variant = _offer_variant_label(bundle, offer)
         label = f"{service.name} — {variant}" if variant else service.name
         available = _d2_price_detail_has_data(offer, part.price_detail_aspect)
-        stages = tuple(
-            f"{stage.label} — {_format_d2_amount(stage.amount)}\u00a0{_d2_currency(stage.currency)}"
-            + (f". {stage.timing_text}" if stage.timing_text else "")
-            for stage in (offer.payment_stages or ())
-        ) if available and part.price_detail_aspect == "stages" else ()
+        stages = _d2_payment_stage_texts(offer) if available and part.price_detail_aspect == "stages" else ()
         rows.append(D2FrozenPriceDetailRow(
             source_client_id=sources.session_key.client_id,
             offer_id=offer.offer_id, service_id=offer.service_id,
@@ -1571,6 +1577,9 @@ def _d2_frozen_price_row(
     service = bundle.services.get(offer.service_id)
     if service is None or not service.active:
         raise MaterializationOwnershipError("materialization_foreign_material")
+    detail_fields = dict(includes=tuple(offer.package.includes),
+                         excludes=tuple(offer.package.excludes),
+                         stages=_d2_payment_stage_texts(offer))
     variant = _offer_variant_label(bundle, offer)
     service_name = f"{service.name} — {variant}" if variant else service.name
     price = offer.price
@@ -1592,6 +1601,7 @@ def _d2_frozen_price_row(
         mode = "range"
     elif isinstance(price, TargetNoPublicPrice):
         return D2FrozenPriceRow(
+            **detail_fields,
             source_client_id=client_id,
             offer_id=offer.offer_id,
             service_id=offer.service_id,
@@ -1611,6 +1621,7 @@ def _d2_frozen_price_row(
     package_scope = terms.package_label.strip()
     scope_text = package_scope.split(";", 1)[0].strip() if package_scope else unit
     return D2FrozenPriceRow(
+        **detail_fields,
         source_client_id=client_id,
         offer_id=offer.offer_id,
         service_id=offer.service_id,
@@ -1632,6 +1643,15 @@ def _d2_frozen_price_row(
         condition_texts=_d2_brief_price_conditions(
             offer, package_label=package_scope, already_shown=scope_text,
         ),
+    )
+
+
+def _d2_payment_stage_texts(offer: TargetOffer) -> tuple[str, ...]:
+    """One formatter for frozen card details and written detail responses."""
+    return tuple(
+        f"{stage.label} — {_format_d2_amount(stage.amount)}\u00a0{_d2_currency(stage.currency)}"
+        + (f". {stage.timing_text}" if stage.timing_text else "")
+        for stage in (offer.payment_stages or ())
     )
 
 

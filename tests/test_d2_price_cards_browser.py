@@ -47,7 +47,7 @@ try {
   await page.evaluate(async fixtures => {
     const {mountWidget} = await import('/static/widget/widget.js');
     window.sent = [];
-    window.failedSelectionAttempts = 2;
+    window.failedSelectionAttempts = fixtures.responses ? 0 : 2;
     window.fetch = async (url, options) => {
       if (String(url).includes('video-catalog')) return new Response('{"videos":{}}');
       if (!String(url).endsWith('/ask/stream')) throw new Error('Unexpected request: '+url);
@@ -59,7 +59,7 @@ try {
       }
       if (body.ref) await new Promise(resolve => setTimeout(resolve,
         body.ref.endsWith('.nobel') ? 4000 : 300));
-      const selected = body.ref?.endsWith('.nobel') ? fixtures.nobel :
+      const selected = fixtures.responses ? fixtures.responses[body.ref || body.q] : body.ref?.endsWith('.nobel') ? fixtures.nobel :
         body.ref?.endsWith('.implantium') ? fixtures.back : body.ref ? fixtures.selected : body.q === 'Отбеливание' ? fixtures.whitening :
         body.q === 'Цена без суммы' ? fixtures.noPublic : body.q === 'Обычный ответ' ? fixtures.plain : fixtures.first;
       const payload = {...selected, sid:body.sid || selected.sid, request_id:body.request_id};
@@ -237,3 +237,61 @@ def test_real_card_fonts_selection_and_session_in_browser(http_env, tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
     assert '"passed":true' in result.stdout
     assert len(fake.inputs) == 4
+
+
+def test_overview_same_card_navigation_and_unknown_volume_in_browser(http_env, tmp_path):
+    client, _, use, _ = http_env
+    fake = use(FakeProvider(raw(price())))
+    first = post(client, q="Обзор").get_json()
+    fake.generate = forbidden
+    jaw = post(client, request_id="jaw", q="", ref="volume:implantation:full_arch",
+               ui_revision=first["revision"]).get_json()
+    selected = post(client, request_id="service", q="", ref="price_select:all_on_6.jaw.implantium",
+                    ui_revision=jaw["revision"]).get_json()
+    unknown = post(client, request_id="unknown", q="", ref="volume:implantation:unknown",
+                   ui_revision=first["revision"]).get_json()
+    assert unknown["revision"] > selected["revision"] and not unknown["ui"]["body_parts"]
+    responses = {"Обзор":first, "volume:implantation:full_arch":jaw,
+                 "price_select:all_on_6.jaw.implantium":selected, "volume:implantation:unknown":unknown}
+    payloads = tmp_path / "overview-payloads.json"
+    payloads.write_text(json.dumps({"responses":responses},ensure_ascii=False),encoding="utf-8")
+    # Reuse only the common isolated widget/API bootstrap, not the brand scenario.
+    runner = RUNNER.split("  await send('Классическая имплантация');", 1)[0] + r'''
+  await send('Обзор');
+  const cards = page.locator('.clinic-price-card');
+  await cards.waitFor();
+  if (await page.locator('.clinic-msg__volume-chip').count()) throw new Error('Duplicate external volume controls');
+  if (await cards.locator('.clinic-price-card__volumes button').count() !== 3) throw new Error('Missing volume navigation');
+  const originalIntro = fixtures.responses['Обзор'].ui.body_parts.filter(p=>p.kind==='text' && p.price_owned).map(p=>p.text);
+  await cards.locator('.clinic-price-card__volumes button').nth(1).click();
+  await page.waitForFunction(() => document.querySelector('.clinic-price-card')?.textContent.includes('All-on-6') &&
+    document.querySelectorAll('.clinic-price-card__services button').length === 2);
+  await cards.locator('.clinic-price-card__services button', {hasText:'All-on-6'}).click();
+  await page.waitForFunction(() => document.querySelectorAll('.clinic-price-card__tabs:not(.clinic-price-card__volumes) button').length === 3);
+  if (await cards.count() !== 1) throw new Error('Navigation appended card');
+  for (const intro of originalIntro) {
+    if ((await page.locator('.clinic-msg__body').allTextContents()).includes(intro)) throw new Error('Stale overview introduction');
+  }
+  if (!(await cards.locator('details').count())) throw new Error('Missing authored accordions');
+  const calls = await page.evaluate(()=>window.sent.length);
+  await cards.locator('details summary').first().click();
+  if (await page.evaluate(()=>window.sent.length) !== calls) throw new Error('Accordion sent request');
+  await cards.locator('.clinic-price-card__volumes button').nth(2).click();
+  await page.waitForFunction(() => document.querySelectorAll('.clinic-msg--bot').length === 2 &&
+    !document.querySelector('[data-live-bubble]'));
+  if (!(await page.locator('.clinic-msg--bot').last().textContent()).includes(fixtures.responses['volume:implantation:unknown'].answer))
+    throw new Error('Authored clarification changed');
+  if (await cards.count() !== 1 || await page.locator('[data-clinic-err]').count()) throw new Error('Accepted clarification became error');
+  if (await page.locator('.clinic-msg--bot').count() !== 2) throw new Error('Clarification not published once');
+  const sent = await page.evaluate(()=>window.sent);
+  if (sent[3].ui_revision !== fixtures.responses['Обзор'].revision) throw new Error('Lost original volume revision');
+  if (failures.length) throw new Error(failures.join('\n'));
+  console.log(JSON.stringify({passed:true,provider:0}));
+} finally { await browser.close(); await new Promise(r=>server.close(r)); }
+'''
+    result = subprocess.run(["node","--input-type=module","-"],input=runner,
+        cwd=Path(__file__).resolve().parents[1],
+        env={**os.environ,"CARDS_PAYLOADS":str(payloads)},text=True,encoding="utf-8",
+        capture_output=True,timeout=80,check=False)
+    assert result.returncode == 0, result.stdout+result.stderr
+    assert '"passed":true' in result.stdout and len(fake.inputs) == 1

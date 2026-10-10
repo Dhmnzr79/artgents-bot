@@ -18,7 +18,8 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
             texts.append(part.text)
         else:
             card_text = []
-            _render_compact_price_group(part.price.rows, card_text, show_service_in_each_row=False)
+            _render_compact_price_group(part.price.rows, card_text,
+                show_service_in_each_row=len({row.service_id for row in part.price.rows}) > 1)
             texts.extend(card_text)
     return _join_parts(texts)
 
@@ -80,14 +81,14 @@ def render_response_parts(plan: ResolvedResponsePlan) -> tuple:
                 block = content_by_request.get(part.request_id)
                 if block is not None:
                     parts.append(block.display_text.strip())
-        _append_price_texts(parts, _condition_display_texts(plan.required_offer_conditions))
+        _append_price_texts(parts, _condition_display_texts(plan.required_offer_conditions), "conditions")
         if plan.patient_text and plan.d2_price_block is None:
             parts.append(plan.patient_text.strip())
         parts.extend(block.display_text.strip() for block in plan.requested_fact_blocks)
-        _append_price_texts(parts, (block.display_text.strip() for block in plan.promo_blocks))
-        _append_price_texts(parts, _render_d2_commercial_packages(plan))
-        _append_price_texts(parts, _render_amplifier_list(plan))
-        _append_price_texts(parts, _render_textual_cta(plan))
+        _append_price_texts(parts, (block.display_text.strip() for block in plan.promo_blocks), "promotion")
+        _append_price_texts(parts, _render_d2_commercial_packages(plan), "compatibility")
+        _append_price_texts(parts, _render_amplifier_list(plan), "benefits")
+        _append_price_texts(parts, _render_textual_cta(plan), "consultation")
         parts.extend(exact_by_request[part.request_id].display_text.strip()
                      for part in plan.d2_request_parts[body_end:])
         return _body_parts(parts)
@@ -125,9 +126,10 @@ def render_response_parts(plan: ResolvedResponsePlan) -> tuple:
     return _body_parts(parts)
 
 
-def _append_price_texts(parts, texts):
+def _append_price_texts(parts, texts, section):
     price_owned = any(isinstance(part, D2FrozenPriceBlock) for part in parts)
-    parts.extend(ResponseTextPart(text=text, price_owned=price_owned) for text in texts if text)
+    parts.extend(ResponseTextPart(text=text, price_owned=price_owned,
+        price_section=section if price_owned else None) for text in texts if text)
 
 
 def _body_parts(parts) -> tuple[ResponseTextPart | ResponsePriceCardPart, ...]:
@@ -140,18 +142,15 @@ def _render_d2_price_parts(plan: ResolvedResponsePlan, parts: list[str | D2Froze
     scope = plan.d2_price_scope_decision
     if scope is not None:
         if scope.introduction_text is not None:
-            parts.append(scope.introduction_text.strip())
+            parts.append(ResponseTextPart(text=scope.introduction_text.strip(), price_owned=True))
         if scope.reason == "overview" and scope.unknown_extent_text is not None:
-            parts.append(scope.unknown_extent_text.strip())
+            parts.append(ResponseTextPart(text=scope.unknown_extent_text.strip(), price_owned=True))
     if plan.price_block is not None:
         parts.append(plan.price_block.display_text.strip())
         return
     assert plan.d2_price_block is not None
     rows = plan.d2_price_block.rows
-    if (scope is None and len({row.service_id for row in rows}) == 1
-            and any(part.kind == "price" and part.status == "answered"
-                    and part.scope == "service" for part in plan.d2_request_parts)
-            and all(row.service_name and row.price_display_text for row in rows)):
+    if all(row.service_name and row.price_display_text for row in rows):
         parts.append(plan.d2_price_block)
         return
     if any(row.service_name is None or row.price_display_text is None for row in rows):

@@ -1,8 +1,15 @@
 Owner GO 2026-10-10: прекратить свободные модельные финансовые ответы и
 перейти к интерактивным кодовым ценовым блокам после просмотра standalone mockup.
+Текущий C4–C6: функционал состава/этапов, overview/volume/service/brand и
+commercial sections реализован; 65 scoped offline/browser tests passed.
+Данные клиники не менялись. Далее owner widget review и UI оформление;
+live качество и полный CI этим checkpoint не подтверждены.
 C2 сохранён 29aef61. Следующий owner GO C3: исторические price tabs возвращают
 offer в текущий разговор и поддерживают текстовые уточнения; active/paused lead
 блокирует выбор, обычное незавершённое уточнение отменяется. Scope в C3 task.
+C3 сохранён d9cbe8a. Owner GO далее завершить функционал всех price cards:
+C4 local includes/stages; далее overview/volume/service и typed commercial
+presentation по исходному prototype. KB неизменна, дизайн проверяет owner.
 Следующий owner GO после сравнения макетов: C2 — первый бренд открыт сразу,
 переключение остальных внутри той же карточки, выбранный server offer для
 продолжения. Baseline 0391420; exact scope/acceptance в C2 addendum task.

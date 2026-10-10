@@ -13,6 +13,71 @@ def cards(body):
     return [part for part in body["ui"]["body_parts"] if part["kind"] == "price_card"]
 
 
+@pytest.mark.parametrize("service", ["classic", "all_on_4", "professional_whitening", "tooth_extraction"])
+def test_card_commercial_sections_keep_exact_frozen_text_and_contacts_separate(http_env, service):
+    from core.response_text_renderer import (
+        _condition_display_texts, _render_d2_commercial_packages,
+        _render_amplifier_list, _render_textual_cta,
+    )
+    client, db, use, _ = http_env
+    fake = use(FakeProvider(raw(price(service, "service"),
+        {"kind":"contact", "request_id":"r2", "contact_fields":["contact_address"]})))
+    body = post(client, q="Цена и адрес?").get_json()
+    assert len(cards(body)) == 1
+    with D2DialogueStore(db) as store:
+        plan = store.read_latest_completion(SessionKey(client_id="demo",sid="cp6a")).response.resolved
+    expected = {
+        "conditions": list(_condition_display_texts(plan.required_offer_conditions)),
+        "promotion": [b.display_text.strip() for b in plan.promo_blocks],
+        "compatibility": list(_render_d2_commercial_packages(plan)),
+        "benefits": list(_render_amplifier_list(plan)),
+        "consultation": list(_render_textual_cta(plan)),
+    }
+    parts = body["ui"]["body_parts"]
+    for section, texts in expected.items():
+        published = [p for p in parts if p.get("price_section") == section]
+        assert [p["text"] for p in published] == [text for text in texts if text]
+        assert all(p["price_owned"] for p in published)
+    address = next(p for p in parts if "Адрес:" in p.get("text", ""))
+    assert not address["price_owned"] and address.get("price_section") is None
+    assert sum("Адрес:" in p.get("text", "") for p in parts) == 1
+    assert bool(any(p.get("price_section") for p in parts)) == (service in {"classic", "professional_whitening"})
+    assert len(fake.inputs) == 1
+    fake.generate = forbidden
+    assert post(client, q="Цена и адрес?").get_json() == body
+
+
+@pytest.mark.parametrize("service,offer_id", [
+    ("classic", "classic.one_tooth.implantium"),
+    ("all_on_4", "all_on_4.jaw.implantium"),
+    ("professional_whitening", "professional_whitening.default"),
+    ("tooth_extraction", "tooth_extraction.default"),
+    ("pterygoid_implants", "pterygoid_implants.default"),
+])
+def test_card_details_are_exact_authored_offer_data_and_match_written_details(http_env, service, offer_id):
+    client, db, use, tmp = http_env
+    fake = use(FakeProvider(raw(price(service, "service"))))
+    first = post(client, q="Цена услуги?").get_json()
+    row = cards(first)[0]["price"]["rows"][0]
+    authored = json.loads((tmp / f"clients/demo/target_response/pricebook/services/{offer_id}.json").read_text(encoding="utf-8"))
+    assert row["offer_id"] == offer_id
+    assert row["includes"] == authored["package"].get("includes", [])
+    assert row["excludes"] == authored["package"].get("excludes", [])
+    assert len(row["stages"]) == len(authored.get("payment_stages", []))
+    for stage, text in zip(authored.get("payment_stages", []), row["stages"]):
+        assert stage["label"] in text
+        assert f'{stage["amount"]:,}'.replace(',', '\u00a0') in text
+        assert not stage.get("timing_text") or stage["timing_text"] in text
+    for aspect, data in [("includes", row["includes"]), ("stages", row["stages"])]:
+        if not data: continue
+        fake.raw = raw({"kind":"price_detail", "request_id":"r1", "price_detail_aspect":aspect})
+        response = post(client, request_id="detail-"+aspect, q="Уточните состав или оплату")
+        assert response.status_code == 200
+        with D2DialogueStore(db) as store:
+            detail = store.read_latest_completion(SessionKey(client_id="demo",sid="cp6a")).response.resolved.d2_price_detail_blocks[0]
+            assert list(getattr(detail.rows[0], aspect)) == data
+
+
 @pytest.mark.parametrize("transport", ["json", "sse"])
 def test_price_selection_exact_offer_context_detail_and_replay(http_env, transport):
     client, db, use, _ = http_env
@@ -108,10 +173,11 @@ def test_overview_keeps_original_volume_choices(http_env):
     client, _, use, _ = http_env
     use(FakeProvider(raw(price())))
     first = post(client).get_json()
-    assert not cards(first)
-    assert [r["reply_id"] for r in first["ui"]["quick_replies"]] == [
+    assert len(cards(first)) == 1
+    assert [r["reply_id"] for r in first["ui"]["quick_replies"] if r["reply_id"].startswith("volume:")] == [
         "volume:implantation:one_tooth", "volume:implantation:full_arch", "volume:implantation:unknown"]
     assert "76" in first["answer"]
+    assert [row["service_id"] for row in cards(first)[0]["price"]["rows"]] == ["classic", "all_on_4", "all_on_6"]
 
 
 def test_selection_binds_exact_offer_even_when_brand_has_two_offers(http_env):
@@ -398,17 +464,19 @@ def test_historical_tab_returns_scope_after_other_turns_and_supports_text(http_e
 
 
 @pytest.mark.parametrize("guard", ["unknown_revision", "non_card", "wrong_session", "foreign", "expired", "changed", "active_lead", "paused_lead"])
-def test_historical_tab_boundaries_do_not_commit_or_call_model(http_env, guard):
+@pytest.mark.parametrize("selection", ["brand", "volume"])
+def test_historical_tab_boundaries_do_not_commit_or_call_model(http_env, guard, selection):
     from datetime import timedelta
     from session import capture_lead_session_row, session_client_scope
     from tests.test_d2_lead_interrupt_http import envelope_adult_booking_only
     client, db, use, tmp = http_env
-    fake = use(FakeProvider(raw(price("classic", "service"))))
+    fake = use(FakeProvider(raw(price("classic", "service") if selection == "brand" else price())))
     first = post(client, q="Цена имплантации?").get_json()
     fake.raw = raw({"kind":"contact", "request_id":"r1", "contact_fields":["contact_address"]})
     later = post(client, request_id="address", q="Адрес?").get_json()
     key = SessionKey(client_id="demo", sid="cp6a")
-    args = dict(request_id="bad", q="", ref="price_select:classic.one_tooth.nobel", ui_revision=first["revision"])
+    ref = "price_select:classic.one_tooth.nobel" if selection == "brand" else "volume:implantation:full_arch"
+    args = dict(request_id="bad", q="", ref=ref, ui_revision=first["revision"])
     if guard == "unknown_revision": args["ui_revision"] = 999
     elif guard == "non_card": args["ui_revision"] = later["revision"]
     elif guard == "wrong_session": args["sid"] = "other"
@@ -464,3 +532,37 @@ def test_historical_receipt_reader_rejects_ambiguous_or_misbound_source(http_env
         store._connection.commit()
         with pytest.raises(ValueError, match="d2_completion_(revision_ambiguous|owner_mismatch)"):
             store.read_completion_at_revision(key, first["revision"])
+
+
+@pytest.mark.parametrize("transport", ["json", "sse"])
+def test_overview_volume_service_brand_navigation_uses_closed_pool_and_context(http_env, transport):
+    client, db, use, _ = http_env
+    send = post if transport == "json" else post_sse
+    fake = use(FakeProvider(raw(price())))
+    first = _body(send(client, q="Сколько стоит имплантация?"), transport)
+    key = SessionKey(client_id="demo",sid="cp6a")
+    assert [r["service_id"] for r in cards(first)[0]["price"]["rows"]] == ["classic","all_on_4","all_on_6"]
+    fake.generate = forbidden
+    args = dict(request_id="jaw", q="", ref="volume:implantation:full_arch", ui_revision=first["revision"])
+    jaw = _body(send(client, **args), transport)
+    assert _body(send(client, **args), transport) == jaw
+    assert [r["service_id"] for r in cards(jaw)[0]["price"]["rows"]] == ["all_on_4","all_on_6"]
+    with D2DialogueStore(db) as store:
+        pool = store.read_latest_completion(key).response.resolved.ui_plan.price_select_actions
+        assert {a.service_id for a in pool} == {"all_on_4","all_on_6"}
+        assert all(a.discussion_scope.volume.extent == "full_arch" for a in pool)
+    picked = _body(send(client, request_id="service", q="", ref="price_select:all_on_6.jaw.implantium", ui_revision=jaw["revision"]), transport)
+    assert cards(picked)[0]["price"]["rows"][0]["service_id"] == "all_on_6"
+    assert {c["reply_id"] for c in cards(picked)[0]["service_choices"]} == {"price_select:all_on_4.jaw.implantium","price_select:all_on_6.jaw.implantium"}
+    branded = _body(send(client, request_id="brand", q="", ref="price_select:all_on_6.jaw.nobel", ui_revision=picked["revision"]), transport)
+    assert cards(branded)[0]["price"]["rows"][0]["offer_id"] == "all_on_6.jaw.nobel"
+    with D2DialogueStore(db) as store:
+        assert store.read_latest_completion(key).response.resolved.ui_plan.price_select_actions == pool
+    # Original volume controls remain authentic after several other selections.
+    tooth = _body(send(client, request_id="tooth", q="", ref="volume:implantation:one_tooth", ui_revision=first["revision"]), transport)
+    assert {r["service_id"] for r in cards(tooth)[0]["price"]["rows"]} == {"classic","one_stage"}
+    fake.generate = FakeProvider.generate.__get__(fake)
+    fake.raw = raw(explanation("Уточняем выбранный объём."))
+    _body(send(client, request_id="text", q="А сколько длится лечение?"), transport)
+    assert fake.inputs[-1].context.ordinary.discussion_scope.volume.extent == "one_tooth"
+    assert len(fake.inputs) == 2

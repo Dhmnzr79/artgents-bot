@@ -1419,7 +1419,7 @@ export function mountWidget(root, config) {
 
     const commitFinalTurn = () => {
       if (turnFinalized) return;
-      const preserveScroll = state.priceUpdate?.requestId === body.request_id;
+      let preserveScroll = state.priceUpdate?.requestId === body.request_id;
       turnFinalized = true;
       clearStreamTimers();
       const streamedText = fullText.trim();
@@ -1434,10 +1434,19 @@ export function mountWidget(root, config) {
             const nextCardIndex = turn.bodyParts.findIndex((part) => part.kind === "price_card");
             const oldCard = old.bodyParts[cardIndex];
             const nextCard = turn.bodyParts[nextCardIndex];
-            if (!state.messages.includes(old) || !nextCard || !oldCard
-                || nextCard.price?.rows?.length !== 1
-                || nextCard.price.rows[0].service_id !== oldCard.price.rows[0].service_id
-                || body.ref !== `price_select:${nextCard.price.rows[0].offer_id}`) {
+            const volumeChange = String(body.ref).startsWith("volume:")
+              && old.volumeNavigation?.choices.some(choice => choice.reply_id === body.ref);
+            const offerChange = nextCard?.price?.rows?.length === 1
+              && body.ref === `price_select:${nextCard.price.rows[0].offer_id}`
+              && [...(oldCard?.choices || []), ...(oldCard?.service_choices || [])]
+                .some(choice => choice.reply_id === body.ref);
+            if (state.messages.includes(old) && oldCard && volumeChange && !nextCard) {
+              // A volume choice may legitimately ask for clarification instead
+              // of returning prices. Publish that accepted answer as a new turn.
+              state.messages.push(turn);
+              preserveScroll = false;
+            } else if (!state.messages.includes(old) || !nextCard || !oldCard
+                || (!volumeChange && !offerChange)) {
               setError("Не удалось отобразить ответ. Попробуйте ещё раз.");
             } else {
               // Replace price-owned content at its existing anchors. Independent
@@ -1691,7 +1700,15 @@ export function mountWidget(root, config) {
    */
   function renderInlineLinks(bubble, m, msgIndex) {
     if (m.linksDismissed || m.revision !== state.lastPayload?.revision) return;
-    const items = (m.quickReplies || []).filter((it) => !String(it.ref).startsWith("price_select:"));
+    const cardRows = (m.bodyParts || []).filter(part => part.kind === "price_card")
+      .flatMap(part => part.price?.rows || []);
+    const items = (m.quickReplies || []).filter((it) => {
+      if (String(it.ref).startsWith("price_select:")) return false;
+      if (String(it.ref).startsWith("volume:") && m.volumeNavigation) return false;
+      if (it.ref === "price_detail:includes" && cardRows.some(row => row.includes?.length)) return false;
+      if (it.ref === "price_detail:stages" && cardRows.some(row => row.stages?.length)) return false;
+      return true;
+    });
     if (!items.length) return;
 
     const box = getOrCreateLinksBox(bubble);
@@ -1907,6 +1924,8 @@ export function mountWidget(root, config) {
 
   function renderPriceBody(bubble, message) {
     let texts = [];
+    let financialCard = null;
+    const financialSections = new Map();
     const flushText = () => {
       if (!texts.length) return;
       const body = document.createElement("div");
@@ -1916,6 +1935,27 @@ export function mountWidget(root, config) {
       texts = [];
     };
     for (const part of message.bodyParts) {
+      if (part.kind === "text" && part.price_owned && part.price_section && financialCard) {
+        flushText();
+        let section = financialSections.get(part.price_section);
+        if (!section) {
+          const titles = {promotion:"Акции и предложения", compatibility:"Условия",
+            benefits:"Дополнительно", consultation:"Консультация", conditions:"Условия стоимости"};
+          section = document.createElement(part.price_section === "promotion" ? "details" : "section");
+          section.className = "clinic-price-card__detail clinic-price-card__commercial";
+          const heading = document.createElement(part.price_section === "promotion" ? "summary" : "p");
+          heading.className = "clinic-price-card__detail-heading";
+          heading.textContent = titles[part.price_section] || "Условия";
+          section.appendChild(heading);
+          financialCard.appendChild(section);
+          financialSections.set(part.price_section, section);
+        }
+        const text = document.createElement("div");
+        text.className = "clinic-msg__body";
+        setBotAnswerBody(text, part.text);
+        section.appendChild(text);
+        continue;
+      }
       if (part.kind === "text") { texts.push(part.text); continue; }
       if (part.kind !== "price_card" || part.price?.source_client_id !== clientId) continue;
       flushText();
@@ -1923,12 +1963,35 @@ export function mountWidget(root, config) {
       if (!rows.length || rows.some((row) => row.source_client_id !== clientId)) continue;
       const card = document.createElement("section");
       card.className = "clinic-price-card";
-      card.setAttribute("aria-label", rows[0].service_name);
+      card.setAttribute("aria-label", part.overview ? "Варианты лечения" : rows[0].service_name);
+      if (!message.volumeNavigation && part.overview?.volume_choices?.length) {
+        message.volumeNavigation = {revision:message.revision,
+          choices:part.overview.volume_choices.map(choice => choice.candidate)};
+      }
+      const appendNavigation = (choices, revision, className) => {
+        const nav = document.createElement("div");
+        nav.className = className;
+        for (const choice of choices) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "clinic-price-card__tab";
+          button.textContent = choice.label;
+          button.disabled = state.pending || Boolean(state.retryBody) || isActiveLeadFlowPayload(state.lastPayload);
+          button.addEventListener("click", () => void sendAsk({ref:choice.reply_id,
+            ui_revision:revision, q:"", priceMessage:message}));
+          nav.appendChild(button);
+        }
+        card.appendChild(nav);
+      };
+      if (message.volumeNavigation) appendNavigation(message.volumeNavigation.choices,
+        message.volumeNavigation.revision, "clinic-price-card__tabs clinic-price-card__volumes");
       const title = document.createElement("h3");
       title.className = "clinic-price-card__title";
-      title.textContent = rows[0].service_name;
+      title.textContent = part.overview ? "Варианты лечения" : rows[0].service_name;
       card.appendChild(title);
-      if ((part.choices || []).length > 1) {
+      if (part.service_choices?.length) appendNavigation(part.service_choices,
+        message.revision, "clinic-price-card__services");
+      if (!part.overview && (part.choices || []).length > 1) {
         const tabs = document.createElement("div");
         tabs.className = "clinic-price-card__tabs";
         tabs.setAttribute("role", "group");
@@ -1956,10 +2019,10 @@ export function mountWidget(root, config) {
         const row = rows[i];
         const item = document.createElement("div");
         item.className = "clinic-price-card__variant";
-        if (row.variant_label && !(part.choices || []).length) {
+        if (rows.length > 1 || (row.variant_label && !(part.choices || []).length)) {
           const label = document.createElement("span");
           label.className = "clinic-price-card__brand";
-          label.textContent = row.variant_label;
+          label.textContent = rows.length > 1 ? row.service_name : row.variant_label;
           item.appendChild(label);
         }
         const price = document.createElement("strong");
@@ -1982,7 +2045,39 @@ export function mountWidget(root, config) {
         note.textContent = term;
         card.appendChild(note);
       }
+      if (rows.length === 1) {
+        const row = rows[0];
+        const appendDetail = (title, sections) => {
+          const details = document.createElement("details");
+          details.className = "clinic-price-card__detail";
+          const summary = document.createElement("summary");
+          summary.textContent = title;
+          details.appendChild(summary);
+          for (const [heading, lines] of sections) {
+            if (!lines?.length) continue;
+            if (heading) {
+              const caption = document.createElement("p");
+              caption.className = "clinic-price-card__detail-heading";
+              caption.textContent = heading;
+              details.appendChild(caption);
+            }
+            const list = document.createElement("ul");
+            for (const line of lines) {
+              const li = document.createElement("li");
+              li.textContent = line;
+              list.appendChild(li);
+            }
+            details.appendChild(list);
+          }
+          card.appendChild(details);
+        };
+        if (row.includes?.length) appendDetail("Что входит в стоимость", [
+          ["", row.includes], ["Оплачивается отдельно", row.excludes]]);
+        if (row.stages?.length) appendDetail("Этапы оплаты", [["", row.stages]]);
+      }
       bubble.appendChild(card);
+      financialCard = card;
+      financialSections.clear();
     }
     flushText();
   }

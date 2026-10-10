@@ -1,5 +1,84 @@
 # Эксперимент: ценовые ответы модели
 
+## Текущий checkpoint C4–C6 — 2026-10-10
+
+Функционал кодовых карточек: exact offer состав/исключения/этапы; общий
+overview → volume → service → brand в одной карточке; исторический возврат
+и следующий текстовый вопрос; типизированные коммерческие разделы.
+База клиента неизменна. Не аттестуются live понимание, весь CI и глобальное
+архитектурное упрощение. Прототипные radio/compare и финансовые расчёты вне scope.
+Checker нашёл и исправлены три C5 дефекта: duplicate external volume controls,
+ложная ошибка вместо принятого non-card clarification, stale overview intro.
+Focused browser сравнивает authored clarification и отсутствие повторных
+controls/карточек, intro replacement и accordion без API.
+Evidence: d2-cards-verified-axixxn3p/tests.xml — 65 passed, 0 failed, 116.73s;
+64 scoped card tests + 1 focused browser. Node syntax PASS; diff --check clean.
+Independent Checker C4–C6: PASS после focused recheck трёх замечаний;
+финальный XML независимо прочитан, новых blockers/test weakening нет.
+Предварительные failures были неверными новыми fixture assertions: наличие
+commercial additions для услуг без них и угаданная фраза уточнения. Exact
+content/absence assertions сохранены. Известные 5 legacy price_modes failures
+не входили в прогон и не объявляются закрытыми. Provider/live/SMTP 0.
+User GO разрешает checkpoint commit/push в текущую ветку; 11 allowlisted files,
+prototypes/ остаётся foreign untracked. Owner widget/design review следующий.
+
+## C4 — состав и оплата внутри карточек, часть полного owner GO 2026-10-10
+
+Новая UI функция по первому prototype; базу/формулировки не менять.
+Baseline d9cbe8a, branch codex/model-price-experiment, root/Git top
+C:/Cursor Projects/artgents-bot-active, origin/main/merge-base efa3f77;
+tracked clean, prototypes/ foreign. Allowlist contracts/response_plan.py;
+core/response_plan_materialization.py; static/widget/widget.js/widget.css;
+tests/test_d2_price_cards.py; этот файл; DEMO_D2_DELIVERY_ROADMAP.md.
+Frozen price row получает presentation-only includes/excludes/stages из
+того же проверенного offer. Один formatter этапов для карточки и detail reply.
+Local details не вызывает API/provider и не меняет выбранный offer/контекст;
+серверные ссылки тех же данных скрываются только при наличии accordion.
+Условия остаются видимыми; empty data не создаёт accordion или обещаний.
+Ответы по текстовому includes/stages вопросу сохраняют существующий путь.
+Нет новых model schema, storage state, semantic classifiers, KB changes.
+Следующие части полного задания: overview/service/volume actions и typed
+commercial grouping. C4 сам по себе не закрывает всё задание.
+C4 evidence: d2-card-details-qjsogkgd/tests.xml — 16 passed, 32.71s;
+Independent Checker PASS. Browser/provider/live/SMTP 0. Owner проверяет
+внешний вид после функциональных частей полного задания.
+
+## C5 — единая overview карточка с объёмом, услугой и брендом
+
+Продолжение полного owner GO, новая UI возможность, не глобальное упрощение.
+Baseline d9cbe8a плюс проверенный C4 WIP, та же branch/root. Расширение allowlist:
+core/response_text_renderer.py; core/response_ui_projection.py; core/d2_dialogue.py;
+остальные C4 файлы и existing card/browser tests. Client KB неизменна.
+Начальный overview сохраняет прежние pool/order/cap и не выбирает первую
+услугу. Для услуг опубликованного обзора исходный eligible action pool
+формируется прежним exact-service selector с исходными brand/volume фильтрами.
+Клик использует этот закрытый pool, не расширяет каталог. Service choices
+и overview descriptor — presentation metadata исходного frozen результата.
+Исторические volume actions расширяют C3 только для выбора объёма внутри
+той же карточки: тот же exact receipt auth/lead/TTL/CAS, прежняя server task.
+Widget хранит исходные volume controls/revision как данные карточки, не
+отдельный semantic context. Выбор подтверждается completion, никаких
+optimistic prices, новых model calls или обычной модели на known click.
+
+## C6 — коммерческие разделы той же карточки
+
+Продолжение owner GO на полный функционал карточек, новая UI функция.
+Allowlist C5 неизменен; baseline d9cbe8a, root/Git top
+C:/Cursor Projects/artgents-bot-active, branch codex/model-price-experiment,
+origin/main/merge-base efa3f773bcf10891e2997addf8bbec38c7ae1317.
+Текущий WIP C4/C5/C6; foreign untracked prototypes/ исключён.
+Presentation-only price_section задаётся renderer по типу существующего
+проверенного источника: conditions/promotion/compatibility/benefits/consultation.
+Widget группирует эти точные тексты внутри карточки. Акции раскрываются
+локально; обязательные условия и compatibility видимы сразу. Контакты и
+независимые ответы остаются снаружи. Финансовые дополнения внутри карточки
+визуально предшествуют независимому ответу после карточки; wire-порядок
+request parts сохраняется. Это согласованная единая карточка, не новый
+семантический selector и не классификация по словам.
+Нет расчётов скидки/рассрочки, radio выбора финансового предложения,
+новых model calls, памяти, KB формулировок или payment semantics.
+Прототипные compare/radio controls не объявляются реализованными.
+
 ## C3 — возврат к историческим ценовым табам, owner GO 2026-10-10
 
 Новая UI возможность, не архитектурное упрощение. Baseline 29aef61,

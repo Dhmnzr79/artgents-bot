@@ -27,11 +27,22 @@ def project_response_ui(plan: ResolvedResponsePlan) -> ResponseUIProjection:
         raise ResponsePlanContractError("client_source_mismatch")
 
     actions = {action.reply_id: action for action in ui.price_select_actions}
-    body_parts = tuple(part.model_copy(update={"choices": tuple(
+    def card_metadata(part):
+        service_choices = []
+        seen = set()
+        for reply in ui.quick_replies:
+            action = actions.get(reply.reply_id)
+            if action is None or action.service_id in seen:
+                continue
+            seen.add(action.service_id)
+            service_choices.append(reply.model_copy(update={"label":action.service_name or reply.label}))
+        return part.model_copy(update={"choices": tuple(
         reply for reply in ui.quick_replies if reply.reply_id in actions
         and actions[reply.reply_id].service_id == part.price.rows[0].service_id
-    )}) if isinstance(part, ResponsePriceCardPart) else part
-        for part in render_response_parts(plan))
+        ), "service_choices": tuple(service_choices) if len(service_choices) > 1 else (),
+            "overview": plan.d2_price_scope_decision})
+    body_parts = tuple(card_metadata(part) if isinstance(part, ResponsePriceCardPart) else part
+                      for part in render_response_parts(plan))
     if not any(isinstance(part, ResponsePriceCardPart) for part in body_parts):
         body_parts = ()
     return ResponseUIProjection(

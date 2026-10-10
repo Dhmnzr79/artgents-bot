@@ -409,6 +409,9 @@ class D2FrozenPriceRow(ResponsePlanModel):
     billing_unit: NonBlankStr | None = None
     approved_text: NonBlankStr | None = None
     condition_texts: tuple[NonBlankStr, ...] = ()
+    includes: tuple[NonBlankStr, ...] = ()
+    excludes: tuple[NonBlankStr, ...] = ()
+    stages: tuple[NonBlankStr, ...] = ()
 
     @model_validator(mode="after")
     def _validate_mode_values(self) -> Self:
@@ -790,6 +793,7 @@ class D2PriceSelectUiAction(ResponsePlanModel):
     reply_id: NonBlankStr
     offer_id: NonBlankStr
     service_id: NonBlankStr
+    service_name: NonBlankStr | None = None
     discussion_scope: DiscussionScope
 
 
@@ -805,7 +809,7 @@ def _validate_price_select_ui_actions(*, actions, replies, price):
     if len({action.offer_id for action in actions}) != len(actions):
         raise ValueError("d2_price_select_duplicate_offer")
     services = {row.service_id for row in price.rows}
-    if len(services) != 1 or not set(rows).issubset({a.offer_id for a in actions}):
+    if not set(rows).issubset({a.offer_id for a in actions}):
         raise ValueError("d2_price_select_source_mismatch")
     volumes = {action.discussion_scope.volume.model_dump_json()
                if action.discussion_scope.volume is not None else None for action in actions}
@@ -814,7 +818,7 @@ def _validate_price_select_ui_actions(*, actions, replies, price):
     for action in actions:
         row = rows.get(action.offer_id)
         target = action.discussion_scope.target
-        if (action.service_id not in services or price.source_client_id != action.source_client_id
+        if (price.source_client_id != action.source_client_id
                 or (row is not None and (row.service_id != action.service_id
                     or row.source_client_id != action.source_client_id))
                 or target.type != "service" or target.id != action.service_id
@@ -1838,12 +1842,15 @@ class ResponseTextPart(ResponsePlanModel):
     kind: Literal["text"] = "text"
     text: NonBlankStr
     price_owned: bool = False
+    price_section: Literal["conditions", "promotion", "compatibility", "benefits", "consultation"] | None = None
 
 
 class ResponsePriceCardPart(ResponsePlanModel):
     kind: Literal["price_card"] = "price_card"
     price: D2FrozenPriceBlock
     choices: tuple[UiQuickReplyCandidate, ...] = ()
+    service_choices: tuple[UiQuickReplyCandidate, ...] = ()
+    overview: D2PriceScopeDecision | None = None
 
 
 class ResponsePlanContractError(ValueError):

@@ -7,7 +7,9 @@ from contracts.response_plan import (
     ResolvedResponsePlan,
     ResponsePlanContractError,
     ResponseUIProjection,
+    ResponsePriceCardPart,
 )
+from core.response_text_renderer import render_response_parts
 
 
 def project_response_ui(plan: ResolvedResponsePlan) -> ResponseUIProjection:
@@ -24,6 +26,14 @@ def project_response_ui(plan: ResolvedResponsePlan) -> ResponseUIProjection:
     if ui.contact is not None and ui.contact.source_client_id != client_id:
         raise ResponsePlanContractError("client_source_mismatch")
 
+    actions = {action.reply_id: action for action in ui.price_select_actions}
+    body_parts = tuple(part.model_copy(update={"choices": tuple(
+        reply for reply in ui.quick_replies if reply.reply_id in actions
+        and actions[reply.reply_id].offer_id in {row.offer_id for row in part.price.rows}
+    )}) if isinstance(part, ResponsePriceCardPart) else part
+        for part in render_response_parts(plan))
+    if not any(isinstance(part, ResponsePriceCardPart) for part in body_parts):
+        body_parts = ()
     return ResponseUIProjection(
         quick_replies=ui.quick_replies,
         buttons=ui.buttons,
@@ -32,6 +42,7 @@ def project_response_ui(plan: ResolvedResponsePlan) -> ResponseUIProjection:
         contact=ui.contact,
         projected_commercial_ids=plan.finalized_commercial_ids,
         transport_kind=plan.transport_kind,
+        body_parts=body_parts,
     )
 
 

@@ -1,3 +1,36 @@
+Owner GO 2026-10-10: прекратить свободные модельные финансовые ответы и
+перейти к интерактивным кодовым ценовым блокам после просмотра standalone mockup.
+Это актуальное направление вместо model-price 3A/3B. Existing branch/HEAD
+codex/model-price-experiment/c22845c; новых веток/commit/push/live нет.
+Позднейший pause GO 2026-10-10 разрешает checkpoint commit/push R1+C1 в той же
+ветке. Следующий UI шаг — три таба брендов в одной карточке без нового ответа;
+overview/лёгкие иконки/аккордеоны и маркетинговая компоновка остаются впереди.
+Прототип в checkpoint не включается. Merge/deploy/live не разрешены.
+1. R1: вернуть финансовый runtime к 3932989, убрать экспериментальный producer
+и полный финансовый prompt 2B, сохранить KB cleanup/C1/lead/privacy/UI fixes.
+Точная временная копия перед возвратом; tests действующего пути не ослаблять.
+2. Единый финансовый UI результат из проверенных кодом данных; заменить
+текстовую композицию в виджете, не добавить параллельный финансовый сборщик.
+Сумма/бренд/единица/условия остаются связаны с offer; обязательные исключения
+видимы, состав/stages раскрываются. Проверенные клики и следующий свободный
+вопрос должны видеть один согласованный server-owned выбор.
+3. Scoped offline + independent Checker + owner widget после каждого checkpoint.
+Не считать standalone макет доказательством runtime/auth/context готовности.
+Цены/акции/данные клиента не редактировать без отдельного согласования;
+калькулятор/автоматический расчёт скидки/новые clinic selection policies не входят.
+Подробности R1 и исторические model-price результаты — DEMO_MODEL_PRICE_EXPERIMENT.md.
+
+Карточки C1 — следующий owner GO «Давай», 2026-10-10: сначала конкретная
+услуга, видимые варианты/бренды и точный authenticated offer-select без модели.
+Выбранный completion публикует один offer для следующего вопроса; новой памяти
+нет. Карточка заменяет price-часть на её месте в mixed ответе. Обзоры, состав,
+stages и маркетинговый дизайн пока прежние; клиентские данные не менять.
+Allowlist/acceptance/preflight — текущий addendum Карточки C1 в existing task.
+C1 реализован offline: guards 192 PASS, targeted 16 PASS, final browser 1 PASS;
+independent Checker и focused UI recheck PASS. Owner widget acceptance pending.
+Branch/HEAD прежние, staging пуст, commit/push/provider 0. Клиентские данные
+не менялись. Это не закрывает overview/detail/marketing карточки следующего этапа.
+
 Owner GO 2026-10-09: Interface §34 — second audit repair group, commercial
 applicability and final published-set compatibility, including neutral data gap.
 Context/model-contract groups remain proposals; no live/commit/push/merge/deploy.

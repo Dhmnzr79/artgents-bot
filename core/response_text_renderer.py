@@ -2,20 +2,36 @@
 
 from __future__ import annotations
 
-from contracts.response_plan import D2FrozenPriceRow, ResolvedResponsePlan
+from contracts.response_plan import (
+    D2FrozenPriceRow, D2FrozenPriceBlock, ResolvedResponsePlan,
+    ResponseTextPart, ResponsePriceCardPart,
+)
 
 _AMPLIFIER_HEADER = "Также мы предлагаем:"
 
 
 def render_response_text(plan: ResolvedResponsePlan) -> str:
-    """Render visible text from a frozen resolved plan only."""
+    """Plain representation of the same ordered content used by the widget."""
+    texts = []
+    for part in render_response_parts(plan):
+        if isinstance(part, ResponseTextPart):
+            texts.append(part.text)
+        else:
+            card_text = []
+            _render_compact_price_group(part.price.rows, card_text, show_service_in_each_row=False)
+            texts.extend(card_text)
+    return _join_parts(texts)
+
+
+def render_response_parts(plan: ResolvedResponsePlan) -> tuple:
+    """Assemble ordered text/card content exclusively from the frozen result."""
 
     if plan.terminal_text is not None:
-        return plan.terminal_text.strip()
+        return _body_parts([plan.terminal_text.strip()])
     if plan.route == "CLARIFY":
-        return (plan.patient_text or "").strip()
+        return _body_parts([(plan.patient_text or "").strip()])
 
-    parts: list[str] = []
+    parts: list[str | D2FrozenPriceBlock] = []
     if plan.d2_request_parts:
         content_by_request = {
             block.request_id: block for block in plan.information_blocks
@@ -74,7 +90,7 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
         parts.extend(_render_textual_cta(plan))
         parts.extend(exact_by_request[part.request_id].display_text.strip()
                      for part in plan.d2_request_parts[body_end:])
-        return _join_parts(parts)
+        return _body_parts(parts)
 
     if plan.is_price_answer:
         if plan.d2_price_block is not None and plan.patient_text:
@@ -90,7 +106,7 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
         parts.extend(_render_d2_commercial_packages(plan))
         parts.extend(_render_amplifier_list(plan))
         parts.extend(_render_textual_cta(plan))
-        return _join_parts(parts)
+        return _body_parts(parts)
 
     if plan.patient_text:
         parts.append(plan.patient_text.strip())
@@ -106,10 +122,15 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
     parts.extend(_render_d2_commercial_packages(plan))
     parts.extend(_render_amplifier_list(plan))
     parts.extend(_render_textual_cta(plan))
-    return _join_parts(parts)
+    return _body_parts(parts)
 
 
-def _render_d2_price_parts(plan: ResolvedResponsePlan, parts: list[str]) -> None:
+def _body_parts(parts: list[str | D2FrozenPriceBlock]) -> tuple[ResponseTextPart | ResponsePriceCardPart, ...]:
+    return tuple(ResponsePriceCardPart(price=part) if isinstance(part, D2FrozenPriceBlock)
+                 else ResponseTextPart(text=part) for part in parts if part)
+
+
+def _render_d2_price_parts(plan: ResolvedResponsePlan, parts: list[str | D2FrozenPriceBlock]) -> None:
     scope = plan.d2_price_scope_decision
     if scope is not None:
         if scope.introduction_text is not None:
@@ -121,6 +142,12 @@ def _render_d2_price_parts(plan: ResolvedResponsePlan, parts: list[str]) -> None
         return
     assert plan.d2_price_block is not None
     rows = plan.d2_price_block.rows
+    if (scope is None and len({row.service_id for row in rows}) == 1
+            and any(part.kind == "price" and part.status == "answered"
+                    and part.scope == "service" for part in plan.d2_request_parts)
+            and all(row.service_name and row.price_display_text for row in rows)):
+        parts.append(plan.d2_price_block)
+        return
     if any(row.service_name is None or row.price_display_text is None for row in rows):
         # Older frozen plans retain their original display text on replay.
         for row in rows:

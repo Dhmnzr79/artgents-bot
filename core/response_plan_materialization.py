@@ -24,6 +24,7 @@ from contracts.response_plan import (
     D2FrozenPriceDetailRow,
     D2FrozenPriceRow,
     D2PriceDetailUiAction,
+    D2PriceSelectUiAction,
     D2PolicyFactBlock,
     D2PriceScopeDecision,
     D2PriceScopeChoice,
@@ -305,6 +306,7 @@ def resolve_d2_operations(
     exact_contact_blocks=(), exact_policy_blocks=(),
     exact_contact_button=None, exact_canonical_contact=None,
     d2_request_order=(), shown_price_offer_refs=(), selected_price_detail_action=None,
+    selected_price_offer_id=None,
     promotion_scope="none", requested_fact_ids=(), legacy_patient_text=None,
     exact_text_blocks=(), exact_parts=(), extra_ui=(), deferred_price_parts=(),
     exact_deferred_blocks=(),
@@ -523,6 +525,7 @@ def resolve_d2_operations(
                 applied_extent=applied_extent,
                 ordered_offer_ids=direction_order,
                 direct_service_only=direct_service_only,
+                selected_offer_id=selected_price_offer_id,
             )
         except MaterializationContractError as error:
             price_failure_reason = str(error)
@@ -843,6 +846,22 @@ def resolve_d2_operations(
         )
     if extra_ui:
         ui_candidates = ui_candidates.model_copy(update={"quick_replies": tuple(extra_ui), "price_detail_actions": ()})
+    if price_block is not None and scope_decision is None and len(price_block.rows) > 1 and not extra_ui:
+        offers_by_id = {offer.offer_id: offer for offer in sources.material_authority.bundle.offers}
+        replies, actions = [], []
+        for row in price_block.rows:
+            offer = offers_by_id[row.offer_id]
+            reply_id = f"price_select:{row.offer_id}"
+            replies.append(UiQuickReplyCandidate(source_client_id=client_id,
+                reply_id=reply_id, label=row.variant_label or row.service_name))
+            actions.append(D2PriceSelectUiAction(source_client_id=client_id,
+                reply_id=reply_id, offer_id=row.offer_id, service_id=row.service_id,
+                discussion_scope=DiscussionScope(target=ServiceTarget(type="service", id=row.service_id),
+                    volume=price_part.volume, brand_id=offer.brand_id)))
+        ui_candidates = ui_candidates.model_copy(update={
+            "quick_replies": (*ui_candidates.quick_replies, *replies),
+            "price_select_actions": tuple(actions),
+        })
     unavailable_count = sum(part.status == "unavailable" for part in request_parts)
     deferred_count = sum(part.status == "deferred" for part in request_parts)
     result_status = (
@@ -1363,6 +1382,7 @@ def _d2_price_block(
     applied_extent: str | None = None,
     ordered_offer_ids: tuple[str, ...] = (),
     direct_service_only: bool = False,
+    selected_offer_id: str | None = None,
 ) -> tuple[D2FrozenPriceBlock, MaterializationTrace]:
     if brand_id is not None and brand_id not in bundle.brands.brands:
         raise MaterializationContractError("d2_no_price_candidates")
@@ -1420,6 +1440,10 @@ def _d2_price_block(
         raise MaterializationContractError(
             "d2_no_scope_price_candidates" if applied_extent is not None else "d2_no_price_candidates"
         )
+    if selected_offer_id is not None:
+        offers = [offer for offer in offers if offer.offer_id == selected_offer_id]
+        if len(offers) != 1:
+            raise MaterializationOwnershipError("d2_price_select_offer_unavailable")
     rows = tuple(
         _d2_frozen_price_row(
             offer,

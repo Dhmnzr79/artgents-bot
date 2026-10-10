@@ -785,6 +785,33 @@ class D2PriceDetailUiAction(ResponsePlanModel):
         return self
 
 
+class D2PriceSelectUiAction(ResponsePlanModel):
+    source_client_id: NonBlankStr
+    reply_id: NonBlankStr
+    offer_id: NonBlankStr
+    service_id: NonBlankStr
+    discussion_scope: DiscussionScope
+
+
+def _validate_price_select_ui_actions(*, actions, replies, price):
+    if not actions:
+        return
+    if price is None:
+        raise ValueError("d2_price_select_without_price")
+    rows = {row.offer_id: row for row in price.rows}
+    reply_ids = {reply.reply_id for reply in replies}
+    if len({action.reply_id for action in actions}) != len(actions):
+        raise ValueError("d2_price_select_duplicate")
+    for action in actions:
+        row = rows.get(action.offer_id)
+        target = action.discussion_scope.target
+        if (row is None or row.service_id != action.service_id
+                or row.source_client_id != action.source_client_id
+                or target.type != "service" or target.id != action.service_id
+                or action.reply_id not in reply_ids):
+            raise ValueError("d2_price_select_source_mismatch")
+
+
 def _validate_price_detail_ui_actions(
     *, actions: tuple[D2PriceDetailUiAction, ...],
     replies: tuple[UiQuickReplyCandidate, ...],
@@ -811,7 +838,7 @@ def _validate_price_detail_ui_actions(
     if len(expected_services) != 1:
         raise ValueError("d2_price_detail_action_mixed_service")
     action_ids = [action.reply_id for action in actions]
-    reply_ids = [reply.reply_id for reply in replies]
+    reply_ids = [reply.reply_id for reply in replies if not reply.reply_id.startswith("price_select:")]
     if len(action_ids) != len(set(action_ids)) or set(action_ids) != set(reply_ids):
         raise ValueError("d2_price_detail_action_reply_mismatch")
     if any(
@@ -828,6 +855,7 @@ class UiPlanCandidates(ResponsePlanModel):
     video: UiVideoCandidate | None = None
     source_content_ref: NonBlankStr | None = None
     price_detail_actions: tuple[D2PriceDetailUiAction, ...] = ()
+    price_select_actions: tuple[D2PriceSelectUiAction, ...] = ()
 
 
 class D2PriceScopeDecision(ResponsePlanModel):
@@ -1139,6 +1167,8 @@ class PreComposerPlan(ResponsePlanModel):
             replies=self.ui_candidates.quick_replies,
             price=self.d2_price_block, details=self.d2_price_detail_blocks,
         )
+        _validate_price_select_ui_actions(actions=self.ui_candidates.price_select_actions,
+            replies=self.ui_candidates.quick_replies, price=self.d2_price_block)
         return self
 
     @property
@@ -1286,6 +1316,7 @@ class ResolvedUiPlan(ResponsePlanModel):
     contact: CanonicalContactCandidate | None = None
     source_content_ref: NonBlankStr | None = None
     price_detail_actions: tuple[D2PriceDetailUiAction, ...] = ()
+    price_select_actions: tuple[D2PriceSelectUiAction, ...] = ()
 
 
 class FinalizedCommercialIds(ResponsePlanModel):
@@ -1646,6 +1677,8 @@ def _validate_resolved_client_ownership(plan: ResolvedResponsePlan) -> None:
         _check(action)
         if action.reply_id not in {item.reply_id for item in ui.quick_replies}:
             raise ValueError("d2_price_detail_action_reply_missing")
+    for action in ui.price_select_actions:
+        _check(action)
     for item in ui.buttons:
         _check(item)
     if ui.widget is not None:
@@ -1774,6 +1807,8 @@ class ResolvedResponsePlan(ResponsePlanModel):
             replies=self.ui_plan.quick_replies,
             price=self.d2_price_block, details=self.d2_price_detail_blocks,
         )
+        _validate_price_select_ui_actions(actions=self.ui_plan.price_select_actions,
+            replies=self.ui_plan.quick_replies, price=self.d2_price_block)
         return self
 
 
@@ -1785,6 +1820,18 @@ class ResponseUIProjection(ResponsePlanModel):
     contact: CanonicalContactCandidate | None = None
     projected_commercial_ids: FinalizedCommercialIds
     transport_kind: TransportKind = "blocking"
+    body_parts: tuple["ResponseTextPart | ResponsePriceCardPart", ...] = ()
+
+
+class ResponseTextPart(ResponsePlanModel):
+    kind: Literal["text"] = "text"
+    text: NonBlankStr
+
+
+class ResponsePriceCardPart(ResponsePlanModel):
+    kind: Literal["price_card"] = "price_card"
+    price: D2FrozenPriceBlock
+    choices: tuple[UiQuickReplyCandidate, ...] = ()
 
 
 class ResponsePlanContractError(ValueError):

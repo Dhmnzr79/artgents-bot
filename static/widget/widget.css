@@ -1639,3 +1639,43 @@
   box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(var(--clinic-action-rgb), 0.38);
 }
 
+.clinic-price-card {
+  margin: 12px 0 16px;
+  padding: 18px;
+  border: 1px solid #e2e5ef;
+  border-radius: 18px;
+  background: #fff;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.clinic-price-card__title {
+  margin: 0 0 16px;
+  font-size: 18px;
+  line-height: 1.35;
+  font-weight: 600;
+}
+.clinic-price-card__variant {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+}
+.clinic-price-card__brand {
+  display: inline-block;
+  padding: 6px 12px;
+  border: 1px solid var(--clinic-brand);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--clinic-brand);
+  font-size: 14px;
+  line-height: 1.35;
+}
+button.clinic-price-card__brand { cursor: pointer; }
+button.clinic-price-card__brand:disabled { cursor: default; border-color: #dce0ec; }
+button.clinic-price-card__brand:focus-visible { outline: 2px solid var(--clinic-brand); outline-offset: 3px; }
+.clinic-price-card__amount { font-size: 22px; line-height: 1.3; font-weight: 600; }
+.clinic-price-card__amount--single { font-size: 30px; }
+.clinic-price-card__amount--description { font-size: 16px; font-weight: 400; }
+.clinic-price-card__condition { margin: 10px 0 0; font-size: 14px; line-height: 1.5; }

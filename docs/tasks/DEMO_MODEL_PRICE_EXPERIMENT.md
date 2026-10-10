@@ -1,5 +1,312 @@
 # Эксперимент: ценовые ответы модели
 
+## Pause checkpoint — owner commit/push GO 2026-10-10
+
+Владелец завершает работу на сегодня и разрешил commit/push: «Делай».
+Название checkpoint: `checkpoint(widget): restore code prices and price cards C1`.
+Сохраняется R1 + проверенный C1 + presentation fix без промежуточного typed текста.
+Это не завершение всех карточек. Следующий согласованный UI шаг — переключать
+три бренда внутри одной карточки без нового пузыря; затем overview, лёгкие
+иконки, состав/оплата в аккордеонах и маркетинговая компоновка. Пока эти шаги
+не реализованы. Клиентскую базу можно менять только по отдельному согласованию.
+
+Preflight root/Git top C:/Cursor Projects/artgents-bot-active; branch
+codex/model-price-experiment, HEAD c22845c; origin/main/merge-base efa3f77.
+Baseline checkpoint — текущий проверенный R1+C1 working tree. Staging пуст.
+Точный staging allowlist (включая R1 пути без substantive diff):
+contracts/d2_dialogue.py; contracts/d2_dialogue_result.py;
+contracts/d2_tenant_snapshot.py; contracts/response_plan.py;
+core/d2_dialogue.py; core/d2_live_provider.py; core/d2_tenant_snapshot.py;
+core/one_call_prompt_contract.py; core/response_plan_materialization.py;
+core/response_plan_resolver.py; core/response_text_renderer.py;
+core/response_ui_projection.py; static/widget/widget.js; static/widget/widget.css;
+tests/test_d2_price_catalog_input.py (удаление experimental-only test);
+tests/test_d2_price_cards.py; tests/test_d2_price_cards_browser.py;
+docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md; этот файл.
+prototypes/price-chat/index.html остаётся local untracked и не включается.
+Никаких secrets/.env/logs/DB/raw provider conversations/данных клиентов в commit.
+Проверки и независимые Checker PASS приведены ниже; пять старых legacy failures
+R1 остаются baseline debt. Full CI не запускался, live/provider/SMTP 0.
+
+## Карточки C1 — owner GO 2026-10-10
+
+Владелец «Давай»: первый checkpoint в реальном виджете — цена конкретной
+услуги и проверенный выбор предложения/бренда, шрифт 16/14. Тип: новая UI
+функция, не глобальное архитектурное упрощение. Один frozen финансовый
+результат материализатора → упорядоченные text/card части → widget. Цена
+карточки не дублируется видимым текстовым форматтером; plain answer остаётся
+текстовым представлением тех же частей для транспорта/receipt. Никакого
+разбора строки answer, второго выбора прайса или отдельной памяти бренда.
+Выбор опубликованного offer через существующие ref/revision создаёт известную
+price-задачу без модели; только выбранный offer публикуется в новом completion.
+Первоначально все варианты видны, без неявного выбора первого. После выбора
+карточка одного варианта; прежние кнопки устаревают по обычной revision.
+Обзоры остаются прежними. Аккордеоны/новая компоновка маркетинга — следующий этап.
+Клиентские строки/данные не менять. Astra consult выполнен, §3 сохраняется.
+
+Preflight: C:/Cursor Projects/artgents-bot-active, branch codex/model-price-experiment,
+HEAD c22845c; origin/main/merge-base efa3f77. Baseline — проверенный R1 runtime
+3932989 в текущем working tree. Staging пуст. R1 docs и prototypes/ сохраняются.
+Exact allowlist C1: contracts/response_plan.py; core/response_plan_materialization.py;
+core/response_plan_resolver.py; core/response_ui_projection.py;
+core/response_text_renderer.py; core/d2_dialogue.py; static/widget/widget.js;
+static/widget/widget.css; tests/test_d2_price_cards.py;
+tests/test_d2_price_cards_browser.py; этот документ; DEMO_D2_DELIVERY_ROADMAP.md.
+Resolver добавлен к рекомендованному списку: он переносит авторизованные UI
+действия из materialized в resolved plan. Другие R1 файлы не менять.
+Acceptance: точные frozen цены/условия, порядок mixed ответа, выбор точного
+offer и следующий detail/context, zero-provider click/replay, forged/stale/foreign
+отказ, child/policy boundaries, мобильный DOM и шрифт. Offline → Checker → widget.
+Provider/live/SMTP 0, commit/push/merge/deploy запрещены в этом checkpoint.
+
+C1 implementation/evidence — 2026-10-10:
+- C1 presentation follow-up: owner увидел typed plain price перед карточкой.
+  Bug fix, не архитектурное упрощение: готовый price_card пропускает старую
+  pseudo-typing анимацию текста answer и сразу commit/render карточки. Обычная
+  prose сохраняет прежнюю анимацию. Actual D2 SSE публикует готовый UI без deltas.
+  Allowlist только static/widget/widget.js, tests/test_d2_price_cards_browser.py
+  и этот report; baseline — C1 working tree после scoped Checker PASS.
+  MutationObserver проверяет отсутствие transient live bubble у карточек и
+  сохранение такой bubble у обычного текста. Backend/KB не менять.
+  Final browser XML d2-cards-direct-display-final-5s5p36g8/tests.xml — 1 PASS,
+  7.47s, provider/live/SMTP 0. Mismatch guard текста сохранён. Node syntax и
+  diff --check clean; independent focused Checker подтверждает scoped fix.
+  Один ранний fixture run получил Chrome ERR_UNSAFE_PORT на случайном порту:
+  harness разрешает только свой локальный ephemeral port, runtime не меняет.
+  Branch/HEAD/staging/push и весь foreign WIP прежние; commit/push не делались.
+- Добавлены ordered text/card projection и private authorized offer-select map.
+  Видимый price-text для direct service заменён card, plain answer сериализует
+  те же части. Карточка не выбирает источники и не разбирает строку answer.
+  Порядок mixed сохранён; no-card ответы не дублируются в body_parts.
+- Подтверждённый клик использует frozen scope + exact offer ID внутри прежнего
+  materializer selector. Завершённый результат содержит один row. Independent
+  brand state/новых schema для ordinary model/новых model calls нет.
+  Lead pause убирает обе private финансовые action maps до projection.
+- Eight runtime/UI files плюс два новых теста и два existing docs; точный
+  allowlist выше. Клиентский каталог не менялся, prototype и R1 сохранены.
+  Числовая цена крупная; no_public authored текст 16px; основные данные 16px,
+  условия/brand controls 14px. Overview/detail/marketing пока прежние.
+- guards-k3vl4jel/tests.xml: 192 passed, 0 failed/skipped, 198.68s;
+  final-ljp79rix/tests.xml: 16 passed, 0 failed/skipped, 20.43s;
+  browser-final-216a_y_4/tests.xml: 1 passed, 0 failed/skipped, 10.69s.
+  Все каталоги с префиксом d2-cards-c1- в C:/Users/denis/AppData/Local/Temp.
+  Earlier browser-current-79w5rfmp: 11 passed incl real DOM/browser.
+  Первая ошибка запуска — sandbox temp permission; ранние mixed fixtures имели
+  invalid operation request IDs/contact_fields. Исправлены сами новые fixtures,
+  substantive assertions сохранены. No runtime failures в final scoped sets.
+- Independent Astra Checker PASS C1, без weakening/blockers; финальный focused
+  recheck no_public font/browser delta тоже PASS. git diff --check и node --check
+  clean. Full CI не запускался. R1 пять legacy content_realization failures из
+  test_d2_price_modes.py остаются известным baseline debt вне этих наборов.
+- Branch codex/model-price-experiment, HEAD c22845c unchanged, staging пуст;
+  commit/push/PR/merge/deploy не делались. Provider/live/SMTP 0. Сохранённый R1
+  rollback и prototypes/ — оставшаяся отдельная работа, не объявлена committed.
+  Owner widget acceptance ещё предстоит после restart + новой беседы.
+
+## Owner decision — 2026-10-10: эксперимент прекращён, кодовые финансовые блоки
+
+Владелец: «Однозначно откат от модельных ответов и делаем вот это» — после
+просмотра отдельного интерактивного прототипа. Это замена направления, не
+разрешение оставить model financial prose как fallback или параллельный режим.
+
+Checkpoint R1: технический откат эксперимента, не внедрение нового интерфейса.
+Root/Git top C:/Cursor Projects/artgents-bot-active; существующая ветка
+codex/model-price-experiment, HEAD c22845c; origin/main и merge-base efa3f77.
+Восстановление только финансового runtime к 3932989. Ранее согласованные
+чистка KB, commercial scope, privacy/lead и спокойное оформление ошибок остаются.
+Новых веток, commit/push, live/provider/SMTP, merge/deploy нет.
+
+Exact allowlist R1: contracts/d2_dialogue.py; contracts/d2_dialogue_result.py;
+contracts/response_plan.py; contracts/d2_tenant_snapshot.py; core/d2_dialogue.py;
+core/d2_live_provider.py; core/d2_tenant_snapshot.py; core/one_call_prompt_contract.py;
+core/response_plan_materialization.py; core/response_text_renderer.py;
+tests/test_d2_model_financial_prose.py; tests/test_d2_price_catalog_input.py;
+этот документ; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md.
+Перед изменением сохранена точная копия этих 14 файлов с SHA256 manifest во
+временной папке C:/Users/denis/AppData/Local/Temp/d2-model-price-archive-r301bn5i.
+Два тестовых файла относятся только к удаляемому экспериментальному контракту;
+проверки действующих цен/политик/tenant/pending/replay не изменяются и не ослабляются.
+prototypes/price-chat/index.html — отдельный пользовательский макет вне allowlist.
+Клиентские данные, runtime UI/HTTP, квоты, заявки и состояние Git не изменяются.
+
+Удаляются financial_text, D2FinancialTask, source declarations/free financial
+prose admission/numeric gate и полная передача финансового каталога в prompt.
+Возвращается прежний единственный владелец финансового результата — код,
+понимание обычного вопроса и объяснения по базе остаются у модели (§3).
+Текстовая сборка временно прежняя; новый интерактивный финансовый результат
+ещё не внедрён. Исторические 3A/3B PASS ниже не подтверждают новый этап.
+
+Следующий checkpoint — единый кодовый финансовый результат для виджета:
+цена/бренд/единица/«от»/обязательные исключения связаны с конкретным offer;
+обзор, состав, stages и условия оплаты отображаются готовыми компонентами.
+Один вызов для свободного вопроса; проверенные финансовые UI действия не
+должны повторно классифицироваться моделью. Нет произвольной арифметики,
+скидка «до 15%» не превращается в гарантированные 15%, рассрочка не даёт
+выдуманный месячный платёж. Клиентский каталог меняется только после отдельного
+согласования. Выбор бренда/метода должен сохранять server-authorized identity
+для следующего вопроса; нельзя просто переключить цену локально и оставить
+серверу прежний контекст. Реализация следующего checkpoint фиксируется отдельно.
+
+R1 verification: все 10 runtime-файлов побайтово восстановлены из 3932989;
+git diff 3932989 по ним пуст. Поиск в contracts/core не обнаружил FinancialText,
+D2FinancialTask, approved_price_catalog_json или _d2_financial_text. Действующие
+тесты не менялись. rollback.xml: 157 passed, 5 failed, 152.25s; пять падений
+test_d2_price_modes.py воспроизведены в отдельной чистой копии 3932989
+(baseline.xml: те же 5 failed, 2.84s). Старая fixture передаёт удалённое поле
+content_realization; это baseline debt, не новый runtime отказ. Новых failures
+нет. Проверены tenant snapshot/KB2, compact price copy, known actions, локальные
+price gaps, commercial applicability/compatibility/replay, completion context
+и stale/foreign/forged UI/CTA. Проверки сети заблокированы, provider/live/SMTP 0.
+Артефакты в временной папке архивирования; git diff --check чист. Full CI не
+запускался, widget/live качество не аттестовано. Старые сессии не мигрировались
+и не удалялись: после restart для проверки нужна «Новая беседа».
+
+
+## Один выбор финансовых источников — checkpoint 3B, owner GO 2026-10-10
+
+Owner «Делай» после независимого аудита Astra варианта B. Baseline c22845c
++ сохранённый незакоммиченный 3A (10 файлов); root/branch/main/merge-base
+совпадают с 3A; staging пуст, foreign WIP нет. Exact allowlist прежние 10
+файлов 3A. Данные клиентов, автоматические promo/packages/compatibility,
+HTTP/widget/lead/privacy и новые поля памяти не менять. Provider/live/SMTP 0.
+
+Тип: архитектурное упрощение + согласование producer-контракта. Before → after
+→ removed dependency: модель предугадывает code-selected ordered subset →
+модель выбирает источники и порядок ordinary финансовой речи, код проверяет
+каждый источник по captured pool/brand/volume/activity/applicability → удалить
+ordinary sort/first-per-service/top-three selection и необходимость равенства
+двух независимо выбранных списков. Владелец relevance/coverage/order — модель,
+owner точных данных/допустимости/UI/compatibility — код. Полнота обзора больше
+не гарантируется прежним алгоритмом. Условия/единицы/смысл prose остаются
+экспериментальным риском; exact monetary literal gate сохраняется.
+
+Known financial click: существующая серверная задача получает refs до call
+в своём ephemeral financial_text draft (пустой text); это не ordinary ответ
+и не запись состояния. Model reply меняет только текст; parser bind refs
+из исходной задачи. Старый selection разрешён только для server-owned known
+price scope, не для ordinary. Проверенный detail action сохраняет exact IDs.
+Новая схема/память/второй вызов/repair/fallback не вводятся.
+
+Согласовать ВСЕ финансовые инструкции, completed/pending примеры и отправляемую
+producer schema; убрать старые обещания code-written price/detail prose.
+Runtime missing/empty financial part остаётся local gap, не whole-turn reject.
+Подготовка known sources не является новым ранним policy/reference gate.
+Acceptance: arbitrary eligible subset/order, brand/extent/inactive/foreign,
+known price/detail/service source binding before call, refs optional in known
+reply, current detail vs stale source, direct/negative/promotion applicability,
+JSON/SSE, compound/gap, exact amount, next projection, replay и single call.
+Offline → независимый Checker → owner widget. 3A PASS не доказывает 3B.
+
+Из реализации: ordinary _d2_price_block только проверяет объявленные IDs в
+eligible pool и материализует их в модельном порядке. Старый selector доступен
+только prepare known price до provider. Detail identity общий для подготовки
+known и последующего допустимого model subset; commercial active/applicability
+pool общий, negative source не становится показанной положительной выгодой.
+Новых wire/state полей нет: known-task draft используется только в этом call,
+parser берет из reply text и связывает с серверными refs, не с модельными.
+Producer schema требует completed financial key и поля text/offer_ids/fact_ids,
+но runtime defaults оставлены ради local gap; transport JSON_object не строгая
+schema enforcement и не гарантия live-compliance. Prompt v44 удаляет старые
+completed price/detail examples без текста и code-written overview instruction.
+
+Checker первоначально REJECT: known detail-service binding использовал price
+selector вместо detail identity; known commercial включал unavailable fact.
+Обе причины удалены общими identity/eligibility helper, а не сценарным catch.
+3b-checker-fixes.xml: 11 passed (15.97s), focused independent recheck подтвердил
+закрытие P1. 3b-final.xml: 109 passed ДО этих extraction-правок; это промежуточное
+свидетельство. Финальный coherent прогон и итоговый Checker ниже после завершения.
+Новый inactive fixture сначала нарушил authored direction: loader корректно
+отказал до provider; это дополнительно проверено как strict snapshot fault,
+а eligibility inactive source проверяется отдельно на captured catalog.
+
+Финальное дерево: 3b-final-verified.xml — 130 passed, 0 failed, 2 deselected,
+119.70s. Включены 99 финансовых tests, 5 captured input, 10 clinic policy и
+16 guard tests. Две deselected старые tenant fake-envelope проверки без
+financial_text уже несовместимы с 3A; это contract migration, не baseline
+failure. Их содержательные гарантии отдельно покрыты новыми-format тестами
+legacy policy edit, exact price, replay, unchanged view, next scope/refs.
+Все runtime/tests старше финального прогона. Provider/live/SMTP 0; полного CI
+не было; git diff --check чист. Staging пуст; client data/foreign WIP нет;
+commit/push/PR/merge/deploy в 3B не выполнялись. Живое качество не аттестовано.
+Independent Checker Astra focused recheck: PASS 3B, 2026-10-10. Оба P1
+закрыты общими identity/eligibility helper; финальный XML независимо прочитан,
+сам Checker tests не запускал. SAFE_TO_WIDGET_TEST=YES. Смысловая точность
+prose, live compliance и автоматические дополнения этим PASS не закрываются.
+
+
+## Модельная финансовая речь — checkpoint 3A, owner GO 2026-10-09
+
+Owner GO: «Давай» после сохранения 2B и предложения подключить модельные цены.
+Baseline c22845cb5599d4b3b21edb62e90b025795d933e5; repository/Git top
+C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment;
+origin/main/merge-base efa3f77. Working tree/staging пусты, foreign WIP нет.
+Точный allowlist: contracts/d2_dialogue_result.py; contracts/response_plan.py;
+contracts/d2_dialogue.py; core/one_call_prompt_contract.py;
+core/response_plan_materialization.py; core/response_text_renderer.py;
+core/d2_dialogue.py; core/d2_live_provider.py;
+tests/test_d2_model_financial_prose.py; этот документ.
+Клиентские данные, selection policy, HTTP/widget, lead/privacy и новая память
+не входят. Provider/live/SMTP budget 0; commit/push после самостоятельного PASS.
+
+Тип: смена владельца финансовой формулировки в эксперименте с удалением
+кодовой сборки прямой financial prose. Before → after → removed dependency:
+price/detail/direct commercial описывает formatter/approved text → единственный
+model call возвращает prose + source declaration → D2 renderer больше не
+собирает эти ответы по строкам/стадиям и не подставляет кодовый текст при отказе.
+§3 code-owned selection/applicability/точные данные неизменны; experimental
+owner формулировки — модель. Ее refs не выбирают окончательные offers/facts.
+Сверка происходит после code selection и до final UI/compatibility/shown IDs.
+
+Combined ordinary + verified financial clicks, по консультации Astra: не вводить
+временный mode discriminator для старого formatter. Проверенный клик передаёт
+серверную задачу и exact selected detail identity единственному known-task call;
+reply меняет только финансовую речь/декларацию источников, не задачу. Document
+known-task по-прежнему explanation-only. Replay без provider.
+
+Непустая prose с точными ordered source refs сохраняется в прежних frozen
+price/detail blocks и commercial exact block; не patient_text/ordinary prose.
+Нет второго вызова, retry, code-prose fallback, semantic regex/classifier.
+Пустая/слишком длинная речь либо mismatched refs дают существующий calm gap
+для этой части; независимые части сохраняются. JSON/operation/security shape
+по-прежнему strict. Candidates для detail привязываются до publication gate,
+чтобы отказ price не заставлял detail взять чужую старую цену.
+Узкий scanner денежных литералов сверяет выбранные суммы/валюту, требует цены
+и запрошенные payment-stage суммы; неподдерживаемая запись даёт local gap.
+Не переиспользует legacy semantic verifier. Структурная и числовая сверка
+НЕ доказывает правильность единицы/слов «от»,
+отрицаний и условий в произвольной речи; это явно принятый экспериментальный
+риск, а не гарантия смыслового verifier. Проверять такой риск живыми сценариями
+после отдельного бюджета. Client-approved факты не сглаживать.
+
+Полный финансовый переход НЕ закрывается 3A: автоматические promo additions,
+booster/also packages и compatibility пояснения пока сохраняют прежнюю кодовую
+формулировку и selection. Следующий участок охватывает их, включая content-only
+ходы. Не отключать их молча и не объявлять весь answer полностью модельным.
+
+Acceptance: JSON/SSE точная модельная формулировка, code-selected IDs/порядок,
+цена/detail/direct/negative commercial, compound + gap, без ложных shown/UI,
+next context без financial prose, replay, verified detail/volume/service click
+один call и запрет изменения задачи, forged/stale/foreign UI до provider.
+Adverse correct refs + wrong amount даёт local gap; correct amount + wrong
+unit остаётся явно непокрытым смысловым риском. Старые runtime financial assertions сравнивать с baseline;
+не превращать их в status-only. Offline → independent Checker → owner widget.
+Финальный 3a-final-verified.xml: 75 passed, 0 failed (69.00s), включая input.
+3a-policy.xml: 10 passed. Guards: 16 passed; два старых fake-envelope без
+financial_text ожидают кодовую цену и падают — это migration текущего contract,
+не baseline failure и не регрессия tenant isolation. Их смысл отдельно покрыт
+двумя новым-format JSON/SSE тестами legacy policy edit/replay/next context.
+3a-clicks.xml: 17 passed. Provider/live/SMTP 0; full CI не запускался.
+Foreign-currency markers USD/$ и основные валюты отвергаются, поскольку
+канонический scanner поддерживает RUB. Все нестандартные денежные записи и
+смысловые условия не считаются гарантированно распознаваемыми.
+Для widget нужна новая беседа: старый frozen result не содержит model_text.
+Commit/push пока не выполнялись; 3A не закрывает автоматические дополнения.
+Independent Checker Astra: PASS только 3A, 2026-10-10. Проверены все 10
+файлов, фактический call path, удаления formatter и adverse outputs.
+USD/$ finding исправлен и закрыт; blocking findings нет. Checker прочитал
+финальные XML, сам pytest не запускал. SAFE_TO_WIDGET_TEST=YES; живое
+качество, весь этап и полный financial switch этим PASS не аттестуются.
+
 ## Явная область коммерческого вопроса — checkpoint C1, 2026-10-09
 
 Owner GO после обсуждения: различать общий/scoped/неясный коммерческий вопрос.

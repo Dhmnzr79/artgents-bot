@@ -87,9 +87,6 @@ def build_d2_d1r_messages(request: D2ProviderInput) -> tuple[dict[str, str], dic
             "=== USER_MESSAGE ===\n" + request.user_message,
         ))
         return {"role": "system", "content": system}, {"role": "user", "content": user}
-    price_catalog = json.loads(request.model_view.approved_price_catalog_json)
-    facts = price_catalog.pop("facts")
-    price_catalog["commercial"] = request.model_view.commercial.model_dump(mode="json")
     system = "\n\n".join((
         one_call_contract_header(),
         "=== D2_OPERATIONS_INSTRUCTIONS ===\n" + D2_OPERATIONS_INSTRUCTIONS,
@@ -98,12 +95,7 @@ def build_d2_d1r_messages(request: D2ProviderInput) -> tuple[dict[str, str], dic
         ),
         request.model_view.service_reference_catalog.block_text(),
         request.model_view.active_service_catalog.block_text(),
-        "=== COMMERCIAL_FACT_CATALOG ===\n" + json.dumps(
-            {"facts": facts}, ensure_ascii=False, separators=(",", ":"),
-        ),
-        "=== D2_APPROVED_PRICE_CATALOG ===\n" + json.dumps(
-            price_catalog, ensure_ascii=False, separators=(",", ":"),
-        ),
+        request.model_view.commercial_fact_catalog.block_text(),
         _clinic_business_policies_block(request),
         "=== D2_DIRECTION_PRICES ===\n" + json.dumps(
             directions, ensure_ascii=False, separators=(",", ":"),

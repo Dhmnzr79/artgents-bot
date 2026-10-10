@@ -162,6 +162,5 @@ class D2ModelView:
     clinic_policy_catalog_json: str
     brand_catalog: TargetBrandCatalog
     published_terms: tuple[D2PublishedOfferTerms, ...]
-    approved_price_catalog_json: str
     direction_prices: tuple[D2DirectionPriceConfig, ...] = ()
     commercial: D2CommercialPack = field(default_factory=lambda: D2CommercialPack(version=1))

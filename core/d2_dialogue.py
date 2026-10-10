@@ -20,7 +20,7 @@ from contracts.d2_session_context import (
     D2SessionActivity, D2SessionTtlPolicy, D2SessionState, D2SessionSnapshot,
     D2_SESSION_SCHEMA_VERSION, empty_d2_session_snapshot,
 )
-from contracts.response_plan import D2PriceDetailUiAction, SessionKey
+from contracts.response_plan import D2PriceDetailUiAction, D2PriceSelectUiAction, SessionKey
 from contracts.d2_dialogue_result import (
     DiscussionScope, DiscussionVolume, D2DialogueResult, PriceOperation, ExplanationOperation, DetailOperation,
     ContactOperation, DoctorsOperation, PolicyOperation, CommercialOperation,
@@ -108,7 +108,8 @@ def _turn_from_completion(completion: D2CompletedTurn, *, idempotent_replay: boo
 def _shown_secondary_ref_ids(response) -> tuple[str, ...]:
     ui = response.ui_projection
     shown = [ui.video.video_id] if ui.video is not None else []
-    price_refs = {item.reply_id for item in response.resolved.ui_plan.price_detail_actions}
+    price_refs = {item.reply_id for item in (*response.resolved.ui_plan.price_detail_actions,
+                                           *response.resolved.ui_plan.price_select_actions)}
     shown.extend(item.reply_id for item in ui.quick_replies if item.reply_id not in price_refs)
     return tuple(shown)
 
@@ -122,9 +123,9 @@ def _apply_lead_pause_without_detail_actions(response):
     # Lead resume/cancel owns the sole navigation channel while paused.
     # Drop the private action map together with the visible detail replies.
     ui = response.resolved.ui_plan
-    if ui.price_detail_actions:
+    if ui.price_detail_actions or ui.price_select_actions:
         resolved = response.resolved.model_copy(update={
-            "ui_plan": ui.model_copy(update={"price_detail_actions": ()}),
+            "ui_plan": ui.model_copy(update={"price_detail_actions": (), "price_select_actions": ()}),
         })
         response = replace(response, resolved=resolved)
     return apply_d2_lead_pause_ui(response)
@@ -231,6 +232,7 @@ def run_d2_dialogue_turn(
         selected_ui_ref: D2SelectedUiRef | None = None
         selected_document_action: D2SelectedDocumentAction | None = None
         selected_price_detail_action: D2PriceDetailUiAction | None = None
+        selected_price_select_action: D2PriceSelectUiAction | None = None
         selected_volume_price_task: _SelectedVolumePriceTask | None = None
         if lead_ui_ref and ui_revision is not None:
             shown = store.read_latest_completion(session_key)
@@ -260,13 +262,17 @@ def run_d2_dialogue_turn(
                         (item for item in shown.response.resolved.ui_plan.price_detail_actions
                          if item.reply_id == reply.reply_id), None,
                     )
-                    if selected_price_detail_action is None:
+                    selected_price_select_action = next((item
+                        for item in shown.response.resolved.ui_plan.price_select_actions
+                        if item.reply_id == reply.reply_id), None)
+                    if selected_price_detail_action is None and selected_price_select_action is None:
                         selected_document_action = resolve_d2_selected_document_action(
                             tenant, reply_id=reply.reply_id,
                             source_revision=ui_revision,
                             shown_source_content_ref=shown.response.resolved.ui_plan.source_content_ref,
                         )
-                    if selected_document_action is None and selected_price_detail_action is None:
+                    if (selected_document_action is None and selected_price_detail_action is None
+                            and selected_price_select_action is None):
                         source = shown.response.resolved.d2_price_scope_decision
                         if source is not None:
                             choice = next((
@@ -408,6 +414,7 @@ def run_d2_dialogue_turn(
             selected_ui_ref=selected_ui_ref,
             selected_document_action=selected_document_action,
             selected_price_detail_action=selected_price_detail_action,
+            selected_price_select_action=selected_price_select_action,
             selected_volume_price_task=selected_volume_price_task,
             selected_service_id=(
                 lead_ui_ref.removeprefix("service:")
@@ -631,6 +638,7 @@ def _run_reserved_d2_dialogue_turn(
     selected_ui_ref: D2SelectedUiRef | None = None,
     selected_document_action: D2SelectedDocumentAction | None = None,
     selected_price_detail_action: D2PriceDetailUiAction | None = None,
+    selected_price_select_action: D2PriceSelectUiAction | None = None,
     selected_volume_price_task: _SelectedVolumePriceTask | None = None,
     selected_service_id: str | None = None,
 ) -> D2DialogueTurn:
@@ -667,6 +675,12 @@ def _run_reserved_d2_dialogue_turn(
             **pending.model_dump(exclude={"clarification"}),
             "target": {"type": "service", "id": selected_service_id},
         }]})
+    elif selected_price_select_action is not None:
+        descriptor = selected_price_select_action.discussion_scope
+        known_task = D2DialogueResult(outcome="dialogue", blocks=(PriceOperation(
+            request_id="r1", kind="price", target=descriptor.target,
+            volume=descriptor.volume, brand_id=descriptor.brand_id,
+        ),))
     elif selected_volume_price_task is not None:
         known_task = _volume_price_task(selected_volume_price_task)
     elif selected_document_action is not None:
@@ -915,6 +929,8 @@ def _run_reserved_d2_dialogue_turn(
         d2_request_order=render_order,
         shown_price_offer_refs=context.ordinary.d2_shown_price_offer_refs,
         selected_price_detail_action=selected_price_detail_action,
+        selected_price_offer_id=(selected_price_select_action.offer_id
+                                if selected_price_select_action is not None else None),
         commercial_operations=tuple(commercial_operations),
         directory_cta=directory_cta,
         suppress_forbidden_booking_cta=(suppress_forbidden_booking_cta

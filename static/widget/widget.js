@@ -250,6 +250,7 @@ function botTurnFromPayload(data, expectedClientId) {
   return {
     role: "bot",
     text: String(data.answer || "").trim(),
+    bodyParts: Array.isArray(ui.body_parts) ? ui.body_parts : [],
     followups: [],
     quickReplies,
     revision: data.revision,
@@ -1505,6 +1506,12 @@ export function mountWidget(root, config) {
       }
       const turn = botTurnFromPayload(uiData, clientId);
       const finalText = turn ? String(turn.text || "") : "";
+      // A card is complete structured content, not prose to type and replace.
+      if (turn?.bodyParts.some((part) => part.kind === "price_card")) {
+        if (fullText.trim() && !finalText.startsWith(fullText.trim())) commitStreamMismatch();
+        else commitFinalTurn();
+        return;
+      }
       if (!finalText) {
         commitFinalTurn();
         return;
@@ -1647,7 +1654,7 @@ export function mountWidget(root, config) {
    */
   function renderInlineLinks(bubble, m, msgIndex) {
     if (m.linksDismissed || m.revision !== state.lastPayload?.revision) return;
-    const items = m.quickReplies || [];
+    const items = (m.quickReplies || []).filter((it) => !String(it.ref).startsWith("price_select:"));
     if (!items.length) return;
 
     const box = getOrCreateLinksBox(bubble);
@@ -1817,7 +1824,9 @@ export function mountWidget(root, config) {
       const bubble = document.createElement("div");
       bubble.className = "clinic-msg clinic-msg--bot";
       const text = String(m.text || "").trim();
-      if (text) {
+      if (m.bodyParts?.some((part) => part.kind === "price_card")) {
+        renderPriceBody(bubble, m);
+      } else if (text) {
         const body = document.createElement("div");
         body.className = "clinic-msg__body";
         setBotAnswerBody(body, text);
@@ -1851,6 +1860,77 @@ export function mountWidget(root, config) {
     }
     syncComposerLeadUi();
     syncSendState();
+  }
+
+  function renderPriceBody(bubble, message) {
+    let texts = [];
+    const flushText = () => {
+      if (!texts.length) return;
+      const body = document.createElement("div");
+      body.className = "clinic-msg__body";
+      setBotAnswerBody(body, texts.join("\n\n"));
+      bubble.appendChild(body);
+      texts = [];
+    };
+    for (const part of message.bodyParts) {
+      if (part.kind === "text") { texts.push(part.text); continue; }
+      if (part.kind !== "price_card" || part.price?.source_client_id !== clientId) continue;
+      flushText();
+      const rows = part.price.rows || [];
+      if (!rows.length || rows.some((row) => row.source_client_id !== clientId)) continue;
+      const card = document.createElement("section");
+      card.className = "clinic-price-card";
+      card.setAttribute("aria-label", rows[0].service_name);
+      const title = document.createElement("h3");
+      title.className = "clinic-price-card__title";
+      title.textContent = rows[0].service_name;
+      card.appendChild(title);
+      const terms = rows.map((row) => [...new Set([row.scope_text, ...(row.condition_texts || [])].filter(Boolean))]);
+      const common = terms[0].filter((term) => terms.every((list) => list.includes(term)));
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const choice = (part.choices || []).find((it) => it.reply_id === `price_select:${row.offer_id}`);
+        const item = document.createElement("div");
+        item.className = "clinic-price-card__variant";
+        if (row.variant_label) {
+          const label = document.createElement(choice ? "button" : "span");
+          label.className = "clinic-price-card__brand";
+          label.textContent = row.variant_label;
+          if (choice) {
+            label.type = "button";
+            label.disabled = state.pending || message.linksDismissed || message.revision !== state.lastPayload?.revision;
+            label.setAttribute("aria-label", `Выбрать ${row.variant_label}: ${row.price_display_text}`);
+            label.addEventListener("click", () => {
+              dismissTrailingsAll(state.messages);
+              dismissLinksAll(state.messages);
+              void sendAsk({ref: choice.reply_id, ui_revision: message.revision, q: "", userEcho: choice.label});
+            });
+          }
+          item.appendChild(label);
+        }
+        const price = document.createElement("strong");
+        price.className = "clinic-price-card__amount";
+        if (row.mode === "no_public_price") price.classList.add("clinic-price-card__amount--description");
+        else if (rows.length === 1) price.classList.add("clinic-price-card__amount--single");
+        price.textContent = row.price_display_text;
+        item.appendChild(price);
+        card.appendChild(item);
+        for (const term of terms[i].filter((text) => !common.includes(text))) {
+          const note = document.createElement("p");
+          note.className = "clinic-price-card__condition";
+          note.textContent = term;
+          card.appendChild(note);
+        }
+      }
+      for (const term of common) {
+        const note = document.createElement("p");
+        note.className = "clinic-price-card__condition";
+        note.textContent = term;
+        card.appendChild(note);
+      }
+      bubble.appendChild(card);
+    }
+    flushText();
   }
 
   /**

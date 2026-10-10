@@ -722,6 +722,7 @@ def _resolve_commerce_ui(plan: PreComposerPlan) -> ResolvedUiPlan:
         contact=plan.d2_canonical_contact,
         source_content_ref=plan.ui_candidates.source_content_ref,
         price_detail_actions=plan.ui_candidates.price_detail_actions,
+        price_select_actions=plan.ui_candidates.price_select_actions,
     )
 
 

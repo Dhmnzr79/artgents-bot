@@ -905,6 +905,19 @@ class D2PriceScopeChoice(ResponsePlanModel):
     candidate: UiQuickReplyCandidate
 
 
+class D2SourceResult(ResponsePlanModel):
+    """Tenant source actually used by an executor, never a model instruction."""
+    source_ref: NonBlankStr
+    outcome: Literal["answered", "excluded", "unavailable"]
+
+    @model_validator(mode="after")
+    def validate_source(self) -> Self:
+        namespace, separator, identifier = self.source_ref.partition(":")
+        if namespace not in {"brand_policy", "service_alternative", "policy", "fact"} or not separator or not identifier.strip() or identifier != identifier.strip():
+            raise ValueError("d2_source_result_ref_invalid")
+        return self
+
+
 class D2ResolvedRequestPart(ResponsePlanModel):
     request_id: NonBlankStr
     kind: Literal["price", "price_detail", "content", "contact", "clinic_policy", "doctors", "clarification", "reference", "commercial_fact", "price_clarification", "price_reference"]
@@ -919,6 +932,7 @@ class D2ResolvedRequestPart(ResponsePlanModel):
     content_section_refs: tuple[NonBlankStr, ...] = ()
     content_publication: D2ContentPublication | None = None
     snapshot_fingerprint: NonBlankStr | None = None
+    source_results: tuple[D2SourceResult, ...] = ()
 
     @model_validator(mode="after")
     def _validate_d2_part(self) -> Self:

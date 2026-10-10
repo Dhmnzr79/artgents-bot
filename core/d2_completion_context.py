@@ -34,14 +34,12 @@ def _project_pair(ref, result, limit):
     safe_prose = lambda text: mask_emails_in_text(mask_phones_in_text(text))
     by_request = {b.request_id: safe_prose(b.display_text)
         for b in resolved.information_blocks if b.publication == "model_prose"}
-    # Authored reference text can contain amounts, so keep its typed identity only.
-    # This fixed policy clarification has known nonfinancial provenance.
-    from core.d2_snapshot_sources import _POLICY_CLARIFY
+    # Authored answers retain source/outcome in parts, never financial prose.
+    # Clarification questions are executor-owned questions, not fact answers.
     reference_ids = {p.request_id for p in resolved.d2_request_parts
-        if p.kind == "clarification"}
+        if p.kind in {"clarification", "price_clarification"} and p.status == "answered"}
     by_request.update({b.request_id: safe_prose(b.display_text)
         for b in resolved.d2_exact_text_blocks if b.request_id in reference_ids
-        and b.display_text == _POLICY_CLARIFY
         and not (b.policy_ids or b.requested_fact_ids or b.promo_fact_ids)})
     by_request.update({b.request_id: b.display_text for b in resolved.d2_contact_blocks})
     doctor_ids = {p.request_id for p in resolved.d2_request_parts if p.kind == "doctors"}
@@ -148,8 +146,12 @@ def retain_discussion_reference(state, previous, context, resolved, request_id):
     scope = discussion_scope(resolved)
     if scope is not None:
         reference = request_id
-    elif resolved.response_scope != "clinic" or any(p.discussion_scope is not None for p in resolved.d2_request_parts):
-        reference = None
-    else:
+    elif resolved.d2_request_parts and all(
+        p.kind in {"contact", "clinic_policy", "clarification", "price_clarification"}
+        or (p.source_results and all(s.source_ref.startswith("policy:") for s in p.source_results))
+        for p in resolved.d2_request_parts
+    ) and not any(p.discussion_scope is not None for p in resolved.d2_request_parts):
         reference = previous.discussion_request_id if context.freshness == "fresh" else None
+    else:
+        reference = None
     return state.model_copy(update={"discussion_request_id": reference})

@@ -14,6 +14,9 @@ from contracts.response_plan import (
     ComposerResult,
     ComposerSelectedRouteAuthority,
     D2PolicyFactBlock,
+    D2ResolvedRequestPart,
+    D2SourceResult,
+    D2ExactTextBlock,
     PreComposerPlan,
     PricePlan,
     RouteModePair,
@@ -773,7 +776,8 @@ def build_d2_brand_policy_response(
             continue
         text = row.get("approved_text")
         if isinstance(text, str) and text.strip():
-            return _d2_code_owned_answer(session_key=session_key, text=text.strip(), route="ANSWER")
+            return _d2_code_owned_answer(session_key=session_key, text=text.strip(), route="ANSWER",
+                source_results=(D2SourceResult(source_ref=f"brand_policy:{brand_id}", outcome="answered"),))
     return None
 
 
@@ -833,6 +837,13 @@ def build_d2_service_availability_response(
         code_owned_answer=True,
     )
     resolved = resolve_response_plan(plan, composer)
+    published_text = render_response_text(resolved)
+    resolved = resolved.model_copy(update={"patient_text": None,
+        "d2_exact_text_blocks": (D2ExactTextBlock(request_id="r1", source_client_id=snapshot.client_id, display_text=published_text),),
+        "d2_request_parts": (D2ResolvedRequestPart(
+        request_id="r1", kind="reference", status="answered", scope="service", service_id=service_id,
+        source_results=(D2SourceResult(source_ref=f"service_alternative:{service_id}", outcome="answered"),),
+    ),)})
     return MaterializedResponseOutcome(
         resolved=resolved,
         rendered_text=render_response_text(resolved),
@@ -850,6 +861,7 @@ def _d2_code_owned_answer(
     session_key: SessionKey,
     text: str,
     route: str,
+    source_results: tuple[D2SourceResult, ...] = (),
 ) -> MaterializedResponseOutcome:
     plan = PreComposerPlan(
         session_key=session_key,
@@ -873,6 +885,13 @@ def _d2_code_owned_answer(
         code_owned_answer=(route == "ANSWER"),
     )
     resolved = resolve_response_plan(plan, composer)
+    if source_results:
+        resolved = resolved.model_copy(update={"patient_text": None,
+            "d2_exact_text_blocks": (D2ExactTextBlock(request_id="r1", source_client_id=session_key.client_id, display_text=text),),
+            "d2_request_parts": (D2ResolvedRequestPart(
+            request_id="r1", kind="reference", status="answered", scope="clinic",
+            source_results=source_results,
+        ),)})
     return MaterializedResponseOutcome(
         resolved=resolved,
         rendered_text=render_response_text(resolved),

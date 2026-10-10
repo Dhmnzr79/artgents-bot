@@ -92,8 +92,8 @@ def test_real_d2_fact_cta_context_follow_md_not_filename(http_env, monkeypatch, 
     assert len(fake.inputs) == 1
     fake.raw = raw({'kind':'contact', 'request_id':'r1', 'contact_fields':['contact_address']})
     send(client, transport, sid='links', request_id='next', q='Где вы находитесь?')
-    # Commercial facts do not establish a new treatment discussion scope.
-    assert fake.inputs[-1].context.ordinary.discussion_scope is None
+    # 2B retains the explicitly scoped completed commercial subject.
+    assert fake.inputs[-1].context.ordinary.discussion_scope.service_id == 'classic'
     fake.raw = raw({'kind':'doctors', 'request_id':'r1', 'target':{'type':'service','id':'classic'}})
     send(client, transport, sid='links', request_id='doctors', q='Кто проводит классическую имплантацию?')
     with D2DialogueStore(db) as store:

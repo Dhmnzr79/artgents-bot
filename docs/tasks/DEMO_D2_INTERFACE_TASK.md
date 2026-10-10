@@ -3110,7 +3110,215 @@ brand/service availability continuation, допустимой reference history 
 не реализован и не аттестован. Foreign prototypes/ не stage. Финальный SHA и
 совпадение remote сообщить после сохранения; merge/deploy не входят в команду.
 
-### Этап 3 — модель выбирает одну ссылку, не независимые type и ID
+#### Подготовка 2Б — целостный контекст, 2026-10-10
+
+Классификация текущего checkpoint: documentation only. Owner «Давай дальше»
+разрешил подготовку следующего пункта после сохранённого 2А. Runtime и новые
+carry/product rules ещё не реализованы; ниже предложение для согласования.
+Root/Git top C:/Cursor Projects/artgents-bot-active; branch
+codex/model-price-experiment; baseline HEAD/origin branch
+723e6aaa203d1286898b22d3ad8ab634012c4dd6; origin/main/merge-base
+efa3f773bcf10891e2997addf8bbec38c7ae1317. На входе tracked/staging чисты,
+foreign untracked prototypes/ сохранить. Exact DOC allowlist:
+docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md.
+
+Read-only консультация Astra: существующий receipt/store остаётся sole memory
+owner по Target Contract §3. Причина шире пропуска текста: generic reference
+и commercial parts теряют source identity/исходный предмет; history исключает
+authored text и допускает policy clarification по точному совпадению строки;
+retain_discussion_reference удерживает прошлую тему для любого clinic scope.
+Нельзя восстанавливать пропущенный смысл анализом пользовательской фразы,
+rendered_text, отдельным summary, regex или дополнительным model call.
+
+Предлагаемая цель: producers сохраняют существенный завершённый результат
+в существующем completion; один projector передаёт предмет, опубликованный
+исход и проверенные источники в порядке частей. Цены/финансовые условия
+остаются через offer/fact references, не копируются в ordinary prose.
+До → после → удалённая зависимость: выборочная передача текста и generic
+результаты → projection завершённых частей с их происхождением и исходом →
+нет зависимости от происхождения текста модель/код, одной policy строки
+и broad clinic scope как универсального keep. Это цель будущей реализации,
+не доказанное упрощение текущего DOC checkpoint.
+
+Правила для owner agreement перед runtime:
+- Контакты/часы работы сохраняют обсуждаемую услугу в пределах прежнего TTL.
+- Однозначная новая scoped задача заменяет прежнюю; mixed/неоднозначность
+  не выбирает услугу по позиции. Существующие правила не расширяются молча.
+- Самостоятельный ответ о новом бренде/недоступной услуге не оставляет старую
+  КТ активным предметом. Если нового предмета нет в DiscussionScope, прежний
+  scope очищается, а предмет/результат остаются в history. Availability той же
+  услуги не считать автоматически новой темой только из-за наличия brand_id.
+- Scoped commercial результат сохраняет исходный service/topic; согласовать
+  его влияние на активный scope. Отрицательная применимость остаётся отдельным
+  исходом, не positive published fact ID. Отказ по недоступной услуге не означает
+  автоматический выбор предложенной альтернативы.
+- Смысл короткого продолжения определяет модель по переданному разговору.
+  При нескольких возможных предметах она уточняет, а не выбирает за человека.
+
+Граница полноты: Osstem approved answer уже есть в policy model catalog;
+source identity позволит связать его с опубликованным ответом. Service
+alternatives передают IDs без произвольного authored текста, который может
+содержать суммы. Нельзя обещать понимание любого приглашения из такого текста
+по одним IDs. Если для общей цели недостаточно существующих полей, предложить
+точную форму provenance/outcome/continuation в том же completion владельцу
+до реализации. Новые поля, KB правки и отдельный clear_context flag этой записью
+не разрешены; не обходить финансовый запрет другой секцией provider input.
+
+Будущие проверки: JSON/SSE completed turn → next provider input для смены
+предмета и availability той же услуги, альтернатив без автоматического выбора,
+commercial positive/negative/gap, policy/clarification, card → contacts → detail,
+mixed, TTL, foreign receipt, длинного ответа и authored текста с суммой/ПД.
+Лимиты 3 пары/1000 символов/30 минут сохранить. Fake provider проверяет передачу,
+не живое понимание. Live calls требуют отдельного hard budget; текущие старые
+бюджеты исчерпаны. Runtime allowlist определить после согласования границ.
+В подготовке tests/provider/browser/SMTP: 0; commit/push пока не выполнялись.
+
+Дополнение после owner «Ну окей тогда следующий давай. 2B тогда.»:
+общая работа 2Б согласована; точное расширение контракта ниже предложено,
+но отдельно ещё не согласовано. Astra подтвердила, что existing content_ref,
+brand_id и positive fact IDs не выражают provenance/outcome без искажения.
+Предлагается одно поле source_results на D2ResolvedRequestPart: tuple записей
+source_ref и outcome answered/excluded/unavailable. Код создаёт ссылку только
+на действительно использованный tenant источник: brand_policy, service_alternative,
+policy или fact. answered означает публикацию ответа источника, не доступность
+услуги и не разрешение политики. Отказ commercial не попадает в positive fact IDs.
+История уже передаёт parts, отдельная projection-копия не добавляется.
+Меняются форма сохранённого completion и provider input; model output schema,
+отдельный session state и KB не меняются. Исторические уточнения не маскировать
+под искусственный source namespace; текущая clarify_task сохраняется.
+Это не гарантирует восстановление любого authored приглашения service alternative:
+такое обещание потребовало бы отдельной согласованной KB identity продолжения.
+Runtime заблокирован только на согласование этого нового поля и точных carry
+границ, не на повторный аудит. Tests/provider calls: 0 в подготовке.
+
+Реализация 2Б: owner «Ок» согласовал source_results и продолжение работы.
+Классификация: scoped architecture simplification плюс исправление потерь
+provenance/outcome. Baseline/root/branch/main остаются указанными выше.
+Exact runtime/test/DOC allowlist: contracts/response_plan.py;
+core/d2_snapshot_sources.py; core/d2_dialogue.py;
+core/response_plan_materialization.py; core/d2_completion_context.py;
+core/d2_live_provider.py; tests/test_d2_completed_source_context.py;
+docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md.
+Pre-existing WIP — два DOC этой подготовки; prototypes/ foreign, не трогать.
+Before/after/removal и sole owner — предыдущая карточка 2Б. Model output,
+отдельная память, KB и дополнительные provider calls не меняются; completion
+и provider input расширяются ровно согласованным source_results.
+
+Allowlist дополнен tests/test_d2_primary_topic_links.py: утверждённый 2Б меняет
+ровно прежнее ожидание «commercial не устанавливает scope» на явный service
+classic после scoped commercial и контакта. Filename/topic/tenant guards
+этого теста сохраняются; это миграция согласованного поведения, не ослабление.
+
+Результат реализации 2Б перед Checker:
+- Удалено сравнение history с буквальной _POLICY_CLARIFY; отвеченное уточнение
+  проецируется по типу completed part, при отсутствии financial fact/policy IDs.
+  Code-owned answers не копируются в ordinary prose. Source/outcome остаются
+  в существующих ordered parts, отдельной памяти и projected копии нет.
+- Удалено universal keep по response_scope=clinic: contacts, policy и clarification
+  сохраняют прежний scope, новая scoped часть заменяет его; неоднозначный результат
+  без descriptor очищает. Availability нового предмета не оставляет КТ активной;
+  same-target availability сохраняет existing descriptor без выбора альтернативы.
+- Brand/service producers замораживают использованный источник с exact block.
+  Policy IDs связаны с частью; commercial сохраняет исходный service/topic и
+  answered/excluded/unavailable по факту. Scoped commercial той же услуги без
+  нового volume сохраняет проверенный brand/volume descriptor. Отрицательные
+  результаты не учитываются как published positive facts.
+- source_results добавлен только в completion/provider input; model output schema,
+  KB, финансовый selector, цена/CTA, lead store и отдельный session state не менялись.
+  Краткая provider инструкция описывает значение metadata, не исправляет route.
+- Финальные текущие scoped cases: 110 PASS в d2-2b-card-guards.xml; 46 PASS и
+  4 FAIL новых fixture assertions в d2-2b-final-source-policy.xml; исправленные
+  четыре случая 4 PASS в d2-2b-focused.xml. Итого 160 разных scoped cases green
+  для текущего runtime, не полный CI и не live. Новых cases в сумме 24.
+- Ранний run d2-2b-final.xml: 131 PASS/14 FAIL. Причина runtime failures —
+  producer добавил reference part без matching exact block (исправлено);
+  новый detail fixture использовал неверное поле aspect (исправлено).
+  Ранний green не заменяет финальную аттестацию. Setup sandbox temp failures
+  не являются runtime evidence. Test с inactive=false нарушал snapshot pack;
+  для unavailable fact используется валидный истёкший active_until.
+- New bounded-history test использует email с разделителем ';'. Прежний,
+  неизменённый mask_emails helper не маскирует email перед точкой; это отдельное
+  обнаруженное ограничение baseline, не исправление/гарантия этого checkpoint.
+  Телефон и email с указанным разделителем проверены; лимит 1000 сохраняется.
+- Старые completion без provenance задним числом не восстанавливаются. Для
+  widget начать новую беседу. Не гарантируется восстановление любых authored
+  service invitations, отсутствующих в допустимом model catalog/typed данных.
+  Clarify pending использует прежнюю задачу; новая незавершённая память не создана.
+- Provider/live/browser/SMTP: 0. Staging пуст; commit/push/merge/deploy не выполнялись.
+  Foreign prototypes/ сохранён. Independent Checker: PASS для checkpoint 2Б.
+
+Focused Checker findings исправлены в том же checkpoint:
+- Повтор fully-covered promo response сохраняет source_results каждой части;
+  used_promo_ids отражает реально показанный источник, promo_ids остаются
+  единственным deduplicated positive ledger. Recheck8PASS.
+- Известный факт не подтверждает неизвестную service/topic. Commercial descriptor
+  создаётся только по active tenant service или d2_canonical_topic_ids; price
+  direction membership не является registry всех тем. Foreign direction fatal.
+  Wrong namespace и clinic-wide fact с unknown service не дают active scope;
+  canonical clinic без price direction допустим. Membership recheck8PASS.
+- В составном price+commercial same-target ответе descriptor коммерческой части
+  берётся из matching опубликованной цены текущего completion, прежде прежнего
+  input. Разные descriptors не выбираются по позиции. Explicit volume не заменяется.
+  Новый composition fixture исправлен с ошибочного brand substring на exact
+  tenant offer_id classic.one_tooth.nobel; runtime selection не менялась.
+- Новый test module содержит 38 cases. Итоговый coherent run после всех code
+  исправлений — d2-2b-final-checkpoint.xml (new context, commercial, primary-topic),
+  итог: 84 PASS, 0 FAIL. Предыдущие 160 cases — промежуточные
+  scoped guards до focused findings; не заменяют аттестацию финального дерева.
+  KB/model calls/staging/foreign WIP не менялись. Checker focused recheck: PASS.
+
+Финальный runtime checkpoint 2Б: d2-2b-final-checkpoint.xml — 84 PASS,
+0 FAIL, pytest 108.14s: new context38 + commercial38 + primary-topic8.
+Код и tests старше этого прогона; предыдущие policy26/card64/session38 guards
+записаны отдельно, их не называть повторным полным CI финального дерева.
+Во время final run были неблокирующие Windows logging rotation errors:
+существующий app.jsonl занят локальным процессом (WinError32). Runtime tests
+не падали; logging setup не изменён этим этапом. Не выводить из scoped PASS
+полную аттестацию diagnostics/logging или живого понимания Qwen.
+Staging пуст, HEAD723e6aa, новая работа не committed/pushed; prototypes/ untouched.
+Independent Checker: PASS для checkpoint 2Б, включая focused recheck трёх
+findings. TEST_WEAKENING: нет. SAFE_TO_WIDGET_TEST=YES — новая беседа.
+Полный CI и живое понимание Qwen не аттестуются; provider/live/browser/SMTP0.
+
+### Актуализация §38 после аудита свободного диалога — 2026-10-10
+
+Owner поручил полную дорожную карту с учётом 2Б и внешних разборов. Классификация
+этого изменения: documentation only. Текущий порядок и acceptance записаны в
+[Roadmap](DEMO_D2_DELIVERY_ROADMAP.md), подраздел «Единый план после аудита свободного
+диалога — 2026-10-10» внутри канонического раздела 2026-10-02. Он уточняет будущие
+этапы 3/4 ниже; прежние идеи не автоматически approved implementation.
+
+2А committed/pushed723e6aa; 2Б implemented WIP, final84PASS и Checker PASS,
+live-open, не committed/pushed. Root-array Osstem failure не является доказательством
+неработающего 2Б: execution не начался. Одновременно целый живой диалог не принят.
+Точка отсчёта, существующий exact allowlist и чужой prototypes/ сохраняются.
+
+Новый порядок: сохранить честный checkpoint → 2В воспроизводимые input/privacy
+bug fixes → 3А согласованный design model wire + existing completion projection →
+3Б ограниченное факторное исследование Qwen → 3В replacement с удалением старого
+reachable boundary → 4 whole-dialogue/cards acceptance → 5 отдельная owner-approved
+KB cleanup → 6 integration/legacy/diagnostic debt. Никаких новых provider budgets
+этим документом не выдано. Exact schema/input/history limits и состав KB изменений
+показать владельцу до dependent edits. No new memory/secondcall/adapter/repair.
+
+Аудит read-only подтвердил: short <3 gate блокирует ordinary Да/Ок; ** gate
+блокирует содержательную разметку; email перед точкой не маскируется (user input
+затем блокируется @guard, assistant projection без такого guard); content_text
+обязателен до замены code-owned availability; structural validation атомарна;
+clarification до reference; technical snapshot в model input; bounded history
+1000chars/3pairs; output1024tokens при text4000chars. Причина последнего Osstem
+не доказана объёмом42000tokens. Не объявлять nine kinds или every validator лишними.
+Mixed booking потеря опровергнута: actual поздняя ветка966+ сохраняет запись.
+pending_question хранит unfinished task, не просто показанное уточнение.
+
+Результат упрощения проверяется снятыми независимыми решениями и удалёнными
+call paths, а не renamed parts, shorter JSON, prompt patch или tests count.
+Cursor/Checker трассирует actual path и adverse whole dialogues; offline и live
+статусы отдельно. Два полных одинаковых review не нужны. KB facts/numbers/medical
+wording не менять без exact owner согласования; не создавать гарантию правильности
+произвольной financial prose новым verifier. §3 остаётся владельцем ответственности.
+
+### Предыдущее предложение этапа 3 — одна ссылка вместо независимых type и ID
 
 Предпочтительное предложение: canonical entity ref, чей тип определяет registry
 этапа 2. Представление, например direction:implantation/service:classic, — эскиз,

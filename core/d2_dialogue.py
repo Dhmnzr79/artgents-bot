@@ -28,7 +28,7 @@ from contracts.d2_dialogue_result import (
     ServiceTarget, TopicTarget, UnresolvedTarget, ScopedOperation, OffTopicOperation,
 )
 from contracts.response_plan import (
-    D2ExactTextBlock, D2ResolvedRequestPart, D2PartDeferredBlock,
+    D2ExactTextBlock, D2ResolvedRequestPart, D2PartDeferredBlock, D2SourceResult,
     D2_CLARIFICATION_DEFERRAL_TEXT,
 )
 from contracts.response_plan_materialization import D2SelectedDocumentAction
@@ -856,7 +856,9 @@ def _run_reserved_d2_dialogue_turn(
                     if d.outcome == "allowed_by_known_rules" and d.policy_key))))
             exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
                 kind="clarification" if answer.resolved.route == "CLARIFY" else "reference",
-                status="answered", scope="clinic"))
+                status="answered", scope="clinic",
+                source_results=tuple(D2SourceResult(source_ref=f"policy:{policy_id}", outcome="answered")
+                    for policy_id in exact_text[-1].policy_ids)))
             continue
         if isinstance(block, CommercialOperation):
             commercial_operations.append(block)
@@ -877,6 +879,8 @@ def _run_reserved_d2_dialogue_turn(
                 exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
                     kind="price_reference", status="answered",
                     scope="clinic",
+                    source_results=tuple(D2SourceResult(source_ref=f"policy:{policy_id}", outcome="answered")
+                        for policy_id in blocked),
                     discussion_scope=DiscussionScope(target=block.target, volume=block.volume, brand_id=block.brand_id)
                         if isinstance(block.target, (ServiceTarget, TopicTarget)) else None))
                 continue
@@ -910,7 +914,13 @@ def _run_reserved_d2_dialogue_turn(
                 kind="price_reference" if is_price else "reference", status="answered",
                 scope="service" if isinstance(target, ServiceTarget) else "clinic",
                 service_id=target.id if isinstance(target, ServiceTarget) else None,
-                brand_id=brand))
+                topic_id=target.id if isinstance(target, TopicTarget) else None,
+                brand_id=brand,
+                source_results=tuple(s for part in reference_response.resolved.d2_request_parts for s in part.source_results),
+                discussion_scope=(context.ordinary.discussion_scope
+                    if isinstance(target, (ServiceTarget, TopicTarget))
+                    and context.ordinary.discussion_scope is not None
+                    and target == context.ordinary.discussion_scope.target else None)))
             # These producers publish an exact availability/reference fact,
             # with no service-choice UI. Only explicit clarification owns a task.
             continue
@@ -1004,6 +1014,20 @@ def _run_reserved_d2_dialogue_turn(
     captured_details = {b.request_id for b in response.resolved.d2_price_detail_blocks
         if b.request_id in contextual_details and b.rows and all(
             (r.source_client_id, r.offer_id, r.service_id) in input_refs for r in b.rows)}
+    commercial_by_id = {p.request_id: p for p in commercial_operations}
+    completed_parts = []
+    for part in parts:
+        operation = commercial_by_id.get(part.request_id)
+        if operation is not None and operation.volume is None:
+            displayed = [p.discussion_scope for p in parts if p.kind == "price"
+                and p.status == "answered" and p.discussion_scope is not None
+                and p.discussion_scope.target == operation.target]
+            descriptor = (displayed[0] if displayed and all(s == displayed[0] for s in displayed)
+                else scope if not displayed and scope is not None and scope.target == operation.target else None)
+            if descriptor is not None:
+                part = part.model_copy(update={"discussion_scope": descriptor, "brand_id": descriptor.brand_id})
+        completed_parts.append(part)
+    parts = tuple(completed_parts)
     if scope is not None:
         parts = tuple(part.model_copy(update={"discussion_scope": scope,
             "brand_id": scope.brand_id, "topic_id": scope.topic_id or part.topic_id})

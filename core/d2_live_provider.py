@@ -88,10 +88,18 @@ def _clinic_business_policies_block(request: D2ProviderInput) -> str:
 def build_d2_d1r_messages(request: D2ProviderInput) -> tuple[dict[str, str], dict[str, str]]:
     """Reuse the sole production D1R contract with the captured D2 input."""
     directions = [item.model_dump(mode="json") for item in request.model_view.direction_prices]
+    history_contract = (
+        "Completed history parts retain source_results for code-owned answers. "
+        "source_ref identifies the tenant policy/alternative/fact actually used; answered means its answer was published, "
+        "not that treatment is available or a policy permits it. excluded means that fact did not apply; unavailable means no usable answer. "
+        "Read these results together with the ordered dialogue and matching catalog source to understand continuation; "
+        "an empty assistant_text is not an unanswered turn. Do not infer an invitation absent from the source."
+    )
     if request.known_task is not None:
         system = "\n\n".join((
             one_call_contract_header(),
             ONE_CALL_KNOWN_TASK_INSTRUCTIONS,
+            history_contract,
             "=== CLINIC_BUSINESS_POLICIES ===\n" + request.model_view.clinic_policy_catalog_json,
             _approved_md_corpus_block(request),
         ))
@@ -108,6 +116,7 @@ def build_d2_d1r_messages(request: D2ProviderInput) -> tuple[dict[str, str], dic
     system = "\n\n".join((
         one_call_contract_header(),
         "=== D2_OPERATIONS_INSTRUCTIONS ===\n" + D2_OPERATIONS_INSTRUCTIONS,
+        history_contract,
         "=== D2_RESULT_SCHEMA ===\n" + json.dumps(
             D2DialogueResult.model_json_schema(), ensure_ascii=False, separators=(",", ":"),
         ),

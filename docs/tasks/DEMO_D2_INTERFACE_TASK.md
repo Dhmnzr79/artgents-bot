@@ -2824,6 +2824,66 @@ Exact runtime allowlist каждого этапа определить по call
 
 ### Этап 1 — ошибка обычной ссылки не уничтожает независимый ответ
 
+Runtime preflight 2026-10-10: owner «Давай» разрешил реализацию этапа 1.
+Repository/Git top: C:/Cursor Projects/artgents-bot-active;
+branch codex/model-price-experiment; baseline HEAD/origin branch
+4e9bb7686b65789d6b2c84cd69ff322229b525a8; origin/main/merge-base
+efa3f773bcf10891e2997addf8bbec38c7ae1317. Tracked/staging пусты;
+foreign untracked prototypes/ вне задачи. Exact allowlist:
+core/response_plan_materialization.py; tests/test_d2_content_reference_gaps.py;
+tests/test_d2_multi_request.py; tests/test_d2_independent_request_parts.py;
+docs/tasks/DEMO_D2_INTERFACE_TASK.md.
+Классификация: bug fix, не аттестация упрощения всего бота.
+Единственный owner подтверждения ordinary content target — материализация;
+модель остаётся owner смысла. Удалить повторный _d2_content_scope и повторные
+membership checks; подтверждённый scope использовать в parts/detail filter.
+Неподтверждённый target получает existing unavailable/source_missing, scope mixed
+без descriptor/IDs/source, чтобы существующий completion reader не сохранял
+предыдущую тему как после clinic address. Context carry rules не менять.
+Existing source association и optional provenance behavior сохраняются.
+Provider/browser calls: 0; commit этого runtime после Checker/widget отдельно.
+
+Реализация этапа 1 (2026-10-10, checkpoint относительно 4e9bb76):
+- Удалены _d2_content_scope и его повторные вызовы/membership проверки.
+  _d2_typed_content_scope_from_part подтверждает предмет один раз; результат
+  используется для publication, part identity, descriptor и detail narrowing.
+- Unknown service/topic (включая направление в service namespace) получает
+  existing d2_content_source_missing + approved gap. Неподтверждённая prose,
+  IDs, source UI и discussion descriptor не публикуются. Existing mixed scope
+  очищает предыдущую discussion reference через прежний completion reader.
+- Valid optional/missing document provenance сохраняет model prose без source UI;
+  proven foreign source/direction остаются fatal раньше локального gap.
+  Независимые address/price/detail сохраняются в исходном порядке. Новых wire,
+  storage/context fields, memory, классификаторов, retry и model calls нет.
+- Новая HTTP JSON/SSE матрица: 54 PASS (unknown targets × source presence,
+  обе очередности address/price, replay, previous price → gap → next context,
+  independent detail, optional prose, foreign source/direction).
+- Итоговый d2-stage1-final-f.xml: 81 cases, 77 PASS / 4 FAIL, 186.17s.
+  Все четыре failures совпали по именам с чистым checkpoint 4e9bb76
+  (d2-stage1-baseline-g.xml: 33 cases, 11 PASS / 22 FAIL). Это прежние price
+  fixtures без подходящего overview/part-failure authority; новые регрессии
+  не обнаружены. Изменённые assertions unknown service/topic и foreign-source
+  guard исполняются на действующем wire. Два legacy content_realization поля
+  убраны только из тестовых payloads, assertions не ослаблены.
+- Ранний guards-d: 8 PASS / 10 FAIL; все десять старых wire-fixture failures
+  воспроизведены на чистом baseline. Setup-only baseline-e и первый прогон
+  новых тестов с ошибочными r-ID не считаются аттестацией runtime.
+- XML вне Git в Local/Temp. Provider/live/browser/SMTP: 0. CI целиком не запускался;
+  это offline execution evidence, не гарантия живого понимания моделью.
+  Independent Checker: PASS, blockers/test weakening/scope creep нет;
+  SAFE_TO_WIDGET_TEST=YES только для stage 1 bug fix. Checker прочитал XML,
+  pytest повторно не запускал. Владелец проверил widget; логи подтверждают
+  сохранение контактов и точной classic/Implantium цены при неподтверждённой
+  content-теме, а также корректный следующий includes по показанному offer.
+  Первоначальная root-array ошибка произошла до материализации и остаётся
+  открытой; неверный выбор topic моделью также не исправлен этим этапом.
+  Это ограниченный live результат защиты независимых частей, не полный
+  live PASS составных вопросов. Этап 1 принят владельцем в этих границах.
+  Widget: 6 provider attempts владельца; агент дополнительных live calls не делал.
+  Owner «Делай комит пуш» разрешил сохранение exact пяти файлов.
+  Staging перед сохранением пуст; предыдущий remote checkpoint 4e9bb76;
+  prototypes/ вне checkpoint. Фактический SHA/push проверить после commit.
+
 Тип: общий bug fix исполнения, не semantic repair. Правило утверждено владельцем.
 Если ordinary операция структурно прочитана, но её предмет нельзя подтвердить:
 проблемная часть получает спокойный gap по существующему approved failure text;

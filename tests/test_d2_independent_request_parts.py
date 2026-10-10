@@ -169,7 +169,6 @@ def test_clinic_wide_content_is_independent_beside_price() -> None:
 def test_missing_content_ref_keeps_model_prose_without_borrowed_source() -> None:
     content = {
         **_part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="missing.md"),
-        "content_realization": "model_prose",
     }
     outcome = resolve_d2_operations((_envelope([
         _part("r1", "price", service_id="service_one", topic_id="implantation"),
@@ -187,10 +186,15 @@ def test_missing_content_ref_does_not_authorize_unknown_typed_topic() -> None:
         "r1", "content", service_id=None,
         topic_id="not_in_this_tenant", content_ref="missing.md",
     )
-    with pytest.raises(MaterializationOwnershipError, match="materialization_foreign_material"):
-        resolve_d2_operations(
-            (_envelope([content])).blocks, _sources_ab(), as_of=date(2026, 9, 18),
-        )
+    outcome = resolve_d2_operations(
+        (_envelope([content])).blocks, _sources_ab(), as_of=date(2026, 9, 18),
+    )
+    part = outcome.resolved.d2_request_parts[0]
+    assert (part.status, part.failure_reason) == ("unavailable", "d2_content_source_missing")
+    assert part.topic_id is None and part.discussion_scope is None
+    assert part.content_ref is None and not outcome.resolved.information_blocks
+    assert outcome.resolved.response_scope == "mixed"
+    assert "approved meaning" not in outcome.rendered_text
 
 
 def test_proven_foreign_content_owner_fails_closed() -> None:
@@ -206,7 +210,6 @@ def test_proven_foreign_content_owner_fails_closed() -> None:
     })
     content = {
         **_part("r2", "content", service_id="service_two", topic_id="therapy", content_ref="foreign.md"),
-        "content_realization": "model_prose",
     }
     with pytest.raises(MaterializationOwnershipError, match="materialization_foreign_material"):
         resolve_d2_operations((_envelope([

@@ -91,19 +91,25 @@ def test_price_plus_content_uses_one_d1r_envelope_and_frozen_plan() -> None:
     )
 
 
-def test_content_for_another_service_is_rejected() -> None:
-    envelope = _envelope().model_copy(
-        update={'blocks': (_envelope().blocks[0], _envelope().blocks[1].model_copy(update={'target': ServiceTarget(type='service', id='other_service')}))}
+def test_unknown_content_service_is_a_part_gap() -> None:
+    from contracts.d2_dialogue_result import D2DialogueResult
+    envelope = D2DialogueResult.model_validate({"outcome": "dialogue", "blocks": [
+        {"kind": "price", "request_id": "r1", "target": {"type": "service", "id": "service_one"}},
+        {"kind": "content", "request_id": "r2", "target": {"type": "service", "id": "other_service"},
+         "content_ref": "pain.md", "content_text": "Неподтверждённый текст."},
+    ]})
+
+    outcome = resolve_d2_operations(envelope.blocks, _sources(_bundle()), as_of=date(2026, 9, 18))
+    assert outcome.resolved.d2_price_block is not None
+    assert outcome.resolved.finalized_commercial_ids.price_offer_ids == tuple(
+        row.offer_id for row in outcome.resolved.d2_price_block.rows
     )
-
-    from contracts.response_plan_materialization import MaterializationContractError
-
-    try:
-        resolve_d2_operations((envelope).blocks, _sources(_bundle()), as_of=date(2026, 9, 18))
-    except MaterializationContractError as error:
-        assert str(error) == "d2_content_service_mismatch"
-    else:  # pragma: no cover - assertion helper
-        raise AssertionError("foreign content service was accepted")
+    part = outcome.resolved.d2_request_parts[1]
+    assert (part.status, part.failure_reason) == ("unavailable", "d2_content_source_missing")
+    assert part.service_id is None and part.discussion_scope is None
+    assert not outcome.resolved.information_blocks
+    assert outcome.resolved.d2_result_status == "degraded"
+    assert "Одобренный текст клиники о боли." not in outcome.rendered_text
 
 
 def test_model_content_text_cannot_replace_bound_authored_source() -> None:

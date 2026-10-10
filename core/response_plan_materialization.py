@@ -448,31 +448,13 @@ def resolve_d2_operations(
     # FullContext prose is the ordinary answer path.  A content_ref remains
     # useful provenance for source UI, but it does not decide whether the user
     # asked an informational question or whether the prose may be published.
-    allow_missing_content_ref = True
-    information_blocks, content_realizations = _d2_information_blocks(
+    information_blocks, content_realizations, content_scopes_by_id = _d2_information_blocks(
         content_parts=content_parts,
         client_id=client_id,
         sources=sources,
-        allow_missing_content_ref=allow_missing_content_ref,
         code_owned_null_content=code_owned_null_content,
     )
     content_blocks_by_id = {block.request_id: block for block in information_blocks}
-    content_part_scopes = tuple(
-        _d2_content_scope(
-            part,
-            client_id=client_id,
-            sources=sources,
-            allow_missing_content_ref=allow_missing_content_ref,
-            allow_missing_content_authority=(
-                part.content_ref is not None
-                and (
-                    part.request_id not in content_blocks_by_id
-                    or content_blocks_by_id[part.request_id].content_ref is None
-                )
-            ),
-        )
-        for part in content_parts
-    )
 
     price_block: D2FrozenPriceBlock | None = None
     price_tab_rows = ()
@@ -575,18 +557,8 @@ def resolve_d2_operations(
     else:
         if content_parts:
             first = content_parts[0]
-            service_ids, response_scope, selected_topic_id = _d2_content_scope(
-                first,
-                client_id=client_id,
-                sources=sources,
-                allow_missing_content_ref=allow_missing_content_ref,
-                allow_missing_content_authority=(
-                    first.content_ref is not None
-                    and (
-                        first.request_id not in content_blocks_by_id
-                        or content_blocks_by_id[first.request_id].content_ref is None
-                    )
-                ),
+            service_ids, response_scope, selected_topic_id = (
+                content_scopes_by_id[first.request_id] or ((), "mixed", None)
             )
         else:
             service_ids, response_scope, selected_topic_id = (), "clinic", None
@@ -608,7 +580,8 @@ def resolve_d2_operations(
             if price_block is not None else shown_price_offer_refs
         )
         named_content_services = {
-            part.service_id for part in content_parts if part.service_id is not None
+            part.service_id for part in content_parts
+            if part.service_id is not None and content_scopes_by_id[part.request_id] is not None
         }
         if (
             (named_content_services and (
@@ -660,7 +633,13 @@ def resolve_d2_operations(
                             price_scopes_by_id[item.request_id][2])
             for item in (*price_parts, *deferred_price_parts)
         )
-    part_identities.extend(_scope_identity(scope, part.service_id, topic) for part, (_, scope, topic) in zip(content_parts, content_part_scopes))
+    for part in content_parts:
+        verified_scope = content_scopes_by_id[part.request_id]
+        if verified_scope is None:
+            part_identities.append(("mixed", None))
+        else:
+            _, scope, topic = verified_scope
+            part_identities.append(_scope_identity(scope, part.service_id, topic))
     for detail_block in detail_blocks:
         detail_services = {row.service_id for row in detail_block.rows}
         detail_service = next(iter(detail_services)) if len(detail_services) == 1 else None
@@ -680,7 +659,6 @@ def resolve_d2_operations(
         scope=price_scopes_by_id[p.request_id][1], service_id=p.service_id,
         topic_id=price_scopes_by_id[p.request_id][2], discussion_scope=_discussion_descriptor(p),
     ) for p in deferred_price_parts]
-    content_scopes_by_id = {part.request_id: scope for part, scope in zip(content_parts, content_part_scopes)}
     for part in operations:
         if part.kind == "price":
             _, part_scope, part_topic_id = price_scopes_by_id[part.request_id]
@@ -700,7 +678,8 @@ def resolve_d2_operations(
                 topic_id=part_topic_id,
             ))
         elif part.kind == "content":
-            _, scope, topic = content_scopes_by_id[part.request_id]
+            verified_scope = content_scopes_by_id[part.request_id]
+            _, scope, topic = verified_scope or ((), "mixed", None)
             realization = content_realizations[part.request_id]
             if realization.outcome == "unavailable":
                 assert realization.reason is not None
@@ -716,13 +695,13 @@ def resolve_d2_operations(
                 kind="content",
                 status=realization.outcome,
                 failure_reason=realization.reason,
-                discussion_scope=_discussion_descriptor(part),
+                discussion_scope=_discussion_descriptor(part) if verified_scope is not None else None,
                 scope=scope,
-                service_id=part.service_id,
+                service_id=part.service_id if verified_scope is not None else None,
                 topic_id=topic,
                 content_ref=(
                     content_blocks_by_id[part.request_id].content_ref
-                    if part.request_id in content_blocks_by_id else part.content_ref
+                    if part.request_id in content_blocks_by_id else (part.content_ref if verified_scope is not None else None)
                 ),
                 content_section_refs=realization.section_refs,
                 content_publication=realization.publication,
@@ -1329,68 +1308,25 @@ def _d2_typed_content_scope_from_part(
     *,
     client_id: str,
     sources: ResponsePlanMaterializationSources,
-) -> tuple[tuple[str, ...], str, str | None]:
-    """Scope for a recoverable content gap — only typed IDs, never invented cards."""
+) -> tuple[tuple[str, ...], str, str | None] | None:
+    """Confirm the ordinary subject once; an absent ID is not foreign ownership."""
     if part.service_id is not None:
         if part.service_id not in sources.material_authority.bundle.services:
+            return None
+        return (part.service_id,), "service", part.topic_id
+    if part.topic_id is not None:
+        direction = next((item for item in sources.d2_directions
+                          if item.topic_id == part.topic_id), None)
+        if direction is not None and direction.source_client_id != client_id:
             raise MaterializationOwnershipError("materialization_foreign_material")
-        return (part.service_id,), "service", part.topic_id
-    if part.topic_id is not None:
-        for direction in sources.d2_directions:
-            if direction.topic_id == part.topic_id and direction.source_client_id == client_id:
-                return direction.service_ids, "topic", part.topic_id
-        return (), "topic", part.topic_id
-    return (), "clinic", None
-
-
-def _d2_content_scope(
-    part: RequestUnderstandingRequest,
-    *,
-    client_id: str,
-    sources: ResponsePlanMaterializationSources,
-    allow_missing_content_ref: bool = False,
-    allow_missing_content_authority: bool = False,
-) -> tuple[tuple[str, ...], str, str | None]:
-    canonical_topics = (
-        set(sources.d2_canonical_topic_ids)
-        if sources.d2_canonical_topic_ids
-        else {item.topic_id for item in sources.d2_directions if item.source_client_id == client_id}
-    )
-    if part.topic_id is not None and part.topic_id not in canonical_topics:
-        # Optional source provenance cannot authorize an unknown typed topic.
-        raise MaterializationOwnershipError("materialization_foreign_material")
-    if part.content_ref is None:
-        if not allow_missing_content_ref:
-            raise MaterializationContractError("d2_content_ref_required")
-        return _d2_typed_content_scope_from_part(
-            part, client_id=client_id, sources=sources
+        canonical_topics = (
+            set(sources.d2_canonical_topic_ids) if sources.d2_canonical_topic_ids
+            else {item.topic_id for item in sources.d2_directions
+                  if item.source_client_id == client_id}
         )
-    if allow_missing_content_authority:
-        # Recoverable content gap: never invent cards; scope only from typed IDs.
-        return _d2_typed_content_scope_from_part(
-            part, client_id=client_id, sources=sources
-        )
-    authority = next(
-        (item for item in sources.d2_authored_content if item.content_ref == part.content_ref),
-        None,
-    )
-    if authority is None or authority.source_client_id != client_id:
-        raise MaterializationOwnershipError("materialization_foreign_material")
-    if part.service_id is not None:
-        if part.service_id not in sources.material_authority.bundle.services:
-            raise MaterializationContractError("d2_content_service_mismatch")
-        if part.service_id not in authority.allowed_service_ids:
-            raise MaterializationContractError("d2_content_service_mismatch")
-        return (part.service_id,), "service", part.topic_id
-    if part.topic_id is not None:
-        for direction in sources.d2_directions:
-            if direction.topic_id == part.topic_id and direction.source_client_id == client_id:
-                return direction.service_ids, "topic", part.topic_id
-        if sources.d2_content_topics_by_ref.get(authority.content_ref) == part.topic_id:
-            return (), "topic", part.topic_id
-        if not authority.allowed_service_ids and not sources.d2_content_topics_by_ref:
-            return (), "topic", part.topic_id
-    # Provenance supports prose/UI without inventing a service focus.
+        if part.topic_id not in canonical_topics:
+            return None
+        return (direction.service_ids if direction is not None else ()), "topic", part.topic_id
     return (), "clinic", None
 
 
@@ -1753,12 +1689,15 @@ def _d2_information_blocks(
     content_parts: tuple[RequestUnderstandingRequest, ...],
     client_id: str,
     sources: ResponsePlanMaterializationSources,
-    allow_missing_content_ref: bool = False,
     code_owned_null_content: bool = False,
-) -> tuple[tuple[InformationSourceBlock, ...], dict[str, D2ContentRealization]]:
+) -> tuple[
+    tuple[InformationSourceBlock, ...], dict[str, D2ContentRealization],
+    dict[str, tuple[tuple[str, ...], str, str | None] | None],
+]:
     by_ref = {item.content_ref: item for item in sources.d2_authored_content}
     blocks: list[InformationSourceBlock] = []
     realizations: dict[str, D2ContentRealization] = {}
+    scopes: dict[str, tuple[tuple[str, ...], str, str | None] | None] = {}
 
     def unverified_source(part: RequestUnderstandingRequest) -> None:
         """Keep FullContext prose but grant no source citation or UI authority."""
@@ -1783,6 +1722,19 @@ def _d2_information_blocks(
             )
 
     for part in content_parts:
+        authority = by_ref.get(part.content_ref)
+        if authority is not None and authority.source_client_id != client_id:
+            raise MaterializationOwnershipError("materialization_foreign_material")
+        verified_scope = _d2_typed_content_scope_from_part(
+            part, client_id=client_id, sources=sources,
+        )
+        scopes[part.request_id] = verified_scope
+        if verified_scope is None:
+            realizations[part.request_id] = D2ContentRealization(
+                outcome="unavailable", publication=None, display_text=None,
+                section_refs=(), reason="d2_content_source_missing",
+            )
+            continue
         if part.content_ref is None:
             if code_owned_null_content:
                 realizations[part.request_id] = D2ContentRealization(
@@ -1816,15 +1768,10 @@ def _d2_information_blocks(
                         replacement_reason=None,
                     ))
             continue
-        authority = by_ref.get(part.content_ref)
         if authority is None:
             # A name absent from this snapshot does not prove foreign ownership.
             unverified_source(part)
             continue
-        if authority.source_client_id != client_id:
-            raise MaterializationOwnershipError("materialization_foreign_material")
-        if part.service_id is not None and part.service_id not in sources.material_authority.bundle.services:
-            raise MaterializationContractError("d2_content_service_mismatch")
         section_by_ref = {section.section_ref: section for section in authority.sections}
         if any(ref not in section_by_ref for ref in part.content_section_refs):
             unverified_source(part)
@@ -1842,24 +1789,11 @@ def _d2_information_blocks(
             if content_topics and part.topic_id not in content_topics:
                 unverified_source(part)
                 continue
-            known_topics = (
-                set(sources.d2_canonical_topic_ids)
-                if sources.d2_canonical_topic_ids
-                else {item.topic_id for item in sources.d2_directions if item.source_client_id == client_id}
-            )
-            if part.topic_id not in known_topics:
-                unverified_source(part)
-                continue
         source_topic = sources.d2_content_topics_by_ref.get(authority.content_ref)
         if part.topic_id is not None and source_topic is not None and part.topic_id != source_topic:
             unverified_source(part)
             continue
-        part_service_ids, _, part_topic_id = _d2_content_scope(
-            part,
-            client_id=client_id,
-            sources=sources,
-            allow_missing_content_ref=allow_missing_content_ref,
-        )
+        part_service_ids, _, part_topic_id = verified_scope
         if part_service_ids and authority.allowed_service_ids and not set(part_service_ids).intersection(authority.allowed_service_ids):
             unverified_source(part)
             continue
@@ -1899,7 +1833,7 @@ def _d2_information_blocks(
                 replacement_reason=realization.reason,
             )
         )
-    return tuple(blocks), realizations
+    return tuple(blocks), realizations, scopes
 
 
 def _d2_source_ui(

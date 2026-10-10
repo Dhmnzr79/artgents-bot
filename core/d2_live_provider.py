@@ -11,7 +11,7 @@ from config import DEFAULT_LLM_MODEL
 from core import d2_diagnostics as diagnostics
 from core.d2_full_audit import full_audit
 from contracts.d2_dialogue import D2ProviderInput
-from contracts.d2_dialogue_result import D2DialogueResult
+from contracts.d2_dialogue_result import D2DialogueResult, D2ExplanationReply
 from core.one_call_prompt_contract import (
     ONE_CALL_KNOWN_TASK_INSTRUCTIONS,
     D2_OPERATIONS_INSTRUCTIONS,
@@ -21,6 +21,24 @@ from llm import LLM_REQUEST_TIMEOUT_SEC, chat_completions_create
 
 
 CP3_MAX_PROVIDER_CALLS = 2
+
+
+def d2_strict_response_format(request: D2ProviderInput) -> dict:
+    """Provider schema shared with runtime structural validation.
+
+    Keep optional fields and unions exactly as the runtime declares them. No
+    provider-output repair or separately maintained semantic schema is involved.
+    """
+    reply_type = D2ExplanationReply if request.known_task is not None else D2DialogueResult
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "d2_explanations" if request.known_task is not None else "d2_dialogue",
+            "strict": True,
+            "schema": reply_type.model_json_schema(),
+        },
+    }
+
 
 class D2LiveProviderError(RuntimeError):
     pass

@@ -273,6 +273,18 @@ fixtures и посторонние baseline failures массово не пер�
 
 ## 4. Строгая схема: отдельная проверка возможности
 
+Owner GO 2026-10-10: подготовить typed ordinary/known-task provider schemas и
+bounded capability script, проверить offline. Последующий owner GO разрешил
+4 live calls: все schemas приняты/parser accepted, бюджет исчерпан. HTTP
+был переключён на runtime json_schema strict. Allowlist, acceptance и evidence —
+раздел «Строгий формат D2» в [текущей карточке](DEMO_MODEL_PRICE_EXPERIMENT.md).
+Это format bug fix, не закрытие всего этапа: compound price/address в probe
+вернул только price; полнота смысла и публикация карточек не аттестованы live.
+Позднее owner GO paired6/layered48: rich schema strict ухудшает targeted decisions
+уже без full KB. По conditional approval HTTP возвращён к json_object, final39
+offline PASS/Checker focused PASS. Strict helper/types сохранены; root-array риск
+открыт. Текущий результат и пределы — верхний layered раздел указанной карточки.
+
 Фактически: Frankfurt MaaS compatible-mode/v1, qwen3.8-flash, thinking off,
 json_object, схема только текстом. Документация перечисляет модель как
 поддерживающую json_schema, но наша схема/регион не проверены:

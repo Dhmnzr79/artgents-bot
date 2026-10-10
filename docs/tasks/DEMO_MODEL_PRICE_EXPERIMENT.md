@@ -1,5 +1,253 @@
 # Эксперимент: ценовые ответы модели
 
+## Layered Qwen experiment — owner GO 2026-10-10
+
+Тип: изолированный диагностический эксперимент, не runtime replacement или
+архитектурное упрощение. Owner разрешил подготовку тестов и provider calls;
+объявлен hard cap48: 4layers × 3questions × 2formats × 2repeats.
+Root/Git top C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment;
+HEAD/baseline4be01719c8b05bff8f4496eb7607136ea2d3aec9; origin/main/merge-base efa3f773bcf10891e2997addf8bbec38c7ae1317.
+Initial allowlist: scripts/check_d2_format_layers.py; tests/test_d2_format_layers.py;
+этот раздел карточки. После live evidence, на основании ранее явного owner GO
+«Если нужно вернуться к старому формату, то окей», объявлен минимальный возврат:
+добавлены core/d2_live_provider.py и tests/test_d2_structured_output.py только для
+HTTP response_format и соответствующего assertion. Также объявлены updates
+DEMO_D2_INTERFACE_TASK.md/DEMO_D2_DELIVERY_ROADMAP.md только current-status pointers.
+Остальной WIP, prototypes/,
+KB и карточки сохранены. Возврат — bug-fix/reversion, не simplification.
+Small experimental wire/schema нигде не подключаются к HTTP или storage;
+ответы сравниваются только в диагностике, не конвертируются в production pipeline.
+
+Четыре profiles: small typed schema + short instruction/catalog;
+full runtime schema + short instruction/catalog;
+full schema + current D2 instructions + short instruction/catalog;
+full actual prompt/catalogs/corpus/context. Три synthetic fresh вопроса:
+implantation overview, Nobel overview, whitening+address. В каждой паре
+messages/schema/model/temperature0/1024 одинаковы, меняется только format.
+Порядок formats во втором repeat противоположный. Нет SDK retries, fallback,
+resume, автоматической допокупки budget, DB/session/lead effects или browser.
+Transport failure останавливает весь run, parse failure фиксируется и не
+повторяется; следующие независимые cases продолжаются в пределах48.
+Metadata report сохраняет hashes, typed operation fields и usage, не prose/
+raw prompts/provider bodies. Exact raw response остаётся только в памяти.
+
+Acceptance: отдельные format и targeted semantic checks, expected price target,
+brand, отсутствие manufactured clarification, наличие address, отсутствие
+invented brand/volume/unexpected operations. Broad contacts counts as address
+coverage, не минимальный ответ. Policy defaults/весь диалог не аттестуются.
+Limits: small→full_schema меняет wire representation; последний шаг меняет
+corpus/catalog/context и убирает short instruction одновременно. Это сравнение
+пакетов факторов, не доказательство конкретного schema keyword. Два repeats
+не дают надёжной частоты ошибок. Никакое экспериментальное упрощение не
+авторизует изменение runtime Target Contract §3 или данных клиники.
+Astra before-live consultation: design пригоден, guard blockers нет; limitations
+выше сохранены. Full schema name совпадает с runtime d2_dialogue.
+Offline8PASS2.47s: C:/Users/denis/AppData/Local/Temp/d2-layers-offline-final-5z0_wjpl/tests.xml.
+Initial offline выявил отсутствующий jsonschema dependency; заменён одним
+typed SmallReply источником schema/validation без установки зависимостей.
+Provider calls в offline0.
+
+Live completed48/48, без повторов/fallback/transport failures.
+Evidence: C:/Users/denis/AppData/Local/Temp/d2-format-layers-live-65877eb8730d4bb2856f4318d577ad58/report.json.
+Все24 pairs совпали по messages hash; schema одинаковая внутри каждого pair.
+Все48 finish stop, length0. Input656716/output3846 tokens; стоимость не вычислялась.
+
+| Profile | JSON targeted checks | Strict targeted checks | Strict parser accepted |
+|---|---|---|---|
+| small | 6/6 | 6/6 | 6/6 |
+| full_schema + short instruction/catalog | 6/6 | 0/6 | 4/6 |
+| full_instructions + short instruction/catalog | 6/6 | 0/6 | 3/6 |
+| full actual context | 6/6 | 0/6 | 6/6 |
+
+Итого JSON24/24 targeted checks, strict6/24; parser43/48.
+Все13 parser-accepted strict replies в full-schema profiles выбирали ненужную
+service clarification, без правильного target. В full_context compound один
+repeat дополнительно пропустил contact. Ещё5 full-schema strict replies
+отклонены OneCallEnvelopeProtocolError; exact contract code/raw тела в отчёт
+не сохранялись, поэтому конкретное нарушение этих5 не установлено.
+Нельзя объявлять все5 ошибками JSON Schema: Python semantic validators также
+выдают этот класс. Все ответы короткие stop, truncation исключена в этом run.
+
+Вывод: отрицательный эффект воспроизводится уже на полном runtime schema с
+маленькой инструкцией/catalog, до добавления полной базы. Большая KB не является
+необходимым условием воспроизведения. Сам strict format на small wire работает.
+Это локализует несовместимость к комбинации текущего rich schema/wire и strict
+режима Qwen, не доказывает конкретный union/default/keyword/provider bug.
+24/24 JSON в этой маленькой выборке не гарантирует отсутствие исторических
+root-array failures, неверных policy/defaults или ошибок остальных классов.
+Полная база сохранена; менять её ради этого результата оснований нет.
+Эксперимент не чинит runtime, а готовит основание для возврата HTTP json_object
+и отдельного исследования меньшего producer contract. Ни переименование полей,
+ни adapters, retries или новый classifier автоматически не разрешены.
+HTTP response_format возвращён к json_object на основании этого эксперимента
+и conditional owner approval. Ordinary/known-task HTTP используют прежний формат;
+typed reply, strict helper и diagnostic evidence сохранены. Новых полей/handler/
+classifier/retry/fallback/calls нет; бюджеты/model/one-call/prompt/KB прежние.
+Root-array риск не объявляется устранённым. Новых live calls поверх48 не делаем.
+Final offline39PASS4.55s (layer guards8 + existing structured-output31):
+C:/Users/denis/AppData/Local/Temp/d2-layers-reversion-440tspu0/tests.xml.
+Independent Checker: scoped PASS diagnostics, затем focused PASS HTTP reversion;
+reports/XML прочитаны независимо. Full CI/все dialogue paths не аттестованы.
+Staging пуст, git diff --check clean; commit/push/merge/deploy0; foreign WIP сохранён.
+
+## Paired format comparison — owner GO 2026-10-10, 6 calls (история до layered run)
+
+Тип: диагностический эксперимент/documentation only, не runtime bug fix.
+Root/Git top C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment;
+HEAD/baseline 4be01719c8b05bff8f4496eb7607136ea2d3aec9;
+origin/main/merge-base efa3f773bcf10891e2997addf8bbec38c7ae1317; staging пуст.
+Allowlist этого сравнения: только этот раздел текущей карточки. Pre-existing
+strict-format, four-price, panel/launcher WIP и prototypes/ сохранены.
+Runtime, KB, schemas, prompts, model и активный HTTP режим не менялись.
+
+Owner явно разрешил 6 дополнительных provider calls: 3 synthetic fresh вопроса,
+каждый один раз json_object и один раз текущий json_schema strict. Snapshot/view
+загружен один раз; одинаковые system/user/context в каждой паре подтверждены SHA256.
+История пустая, freshness unknown, revision/turn 0; модель qwen3.8-flash,
+temperature0, max_completion_tokens1024, timeout20, SDK retries0.
+Порядок: overview JSON→strict; Nobel strict→JSON; compound JSON→strict.
+Временный harness: C:/Users/denis/AppData/Local/Temp/d2-format-paired-981l6zm0/probe.py.
+Offline fake run6: проверки сценариев/пар/budget прошли, provider0.
+Live metadata: C:/Users/denis/AppData/Local/Temp/d2-format-paired-_u8x5nsp/report.json.
+Hard budget6/6 исчерпан; reservations до transport; retries/fallback0.
+Report содержит только hashes, operation fields и usage, без prose/raw prompts,
+provider bodies, secrets или пользовательских разговоров. HTTP/session/lead/
+materialization отсутствуют; browser0; commit/push/merge/deploy не выполнялись.
+
+| Вопрос | json_object | json_schema strict |
+|---|---|---|
+| Сколько стоит имплантация? | price topic implantation | price clarification service classic/all_on_4/all_on_6 |
+| Сколько стоит имплантация Nobel Biocare? | price topic implantation, brand nobel_biocare | price brand nobel_biocare, target отсутствует, clarification отсутствует |
+| Сколько стоит отбеливание и где вы находитесь? | price service professional_whitening + contact contacts | price clarification service professional_whitening/veneers + contact contacts |
+
+Все6 parser_accepted/finish stop, completion_tokens31/83/35/40/48/59:
+не truncation. В JSON режиме3/3 ожидаемых ценовых targets; strict0/3.
+Адрес в этой паре НЕ потерян: оба режима вернули общий contacts (не узкий address).
+Это целевые assertions, не полная проверка смысла: лишние параметры/defaults,
+точность prose, финансовая публикация и end-to-end UI в probe не аттестуются.
+Strict Nobel демонстрирует существующую structural дыру PriceOperation.target=None;
+по текущему коду такой блок может достигнуть d2_price_target_required после policy/
+brand paths. Runtime последствия здесь не проверялись через /ask.
+
+Вывод: controlled comparison даёт сильный сигнал ухудшения выбора ценовой задачи
+при strict configuration. Один sample на режим не доказывает стабильную частоту,
+детерминизм или внутреннюю причину provider/schema decoding. Не доказано, какой
+keyword/union/default виноват, что увеличение prompt является причиной или что
+JSON режим надёжен вообще: исторические root-array failures остаются известны.
+Independent Astra review: hashes/result fields подтверждены; диагностический
+вывод согласован, причинная уверенность и semantic scoring ограничены как выше.
+Моих дополнительных provider calls0. git diff --check clean; staging пуст.
+Рабочий strict HTTP остаётся включённым; проблема OPEN, исправление не выполнено.
+Следующий предлагаемый шаг: отдельно согласовать возврат HTTP json_object для
+виджета, затем упрощение producer contract с сохранением Target Contract §3;
+не добавлять repair arrays, phrase heuristics, второй смысловой слой или retry.
+
+## Строгий формат D2 — HTTP activation, owner GO 2026-10-10 (история, позднее отменена)
+
+Тип: bug fix формата, не выполненное архитектурное упрощение.
+Owner согласовал типизированные схемы ordinary/known-task, offline проверку и
+подготовку отдельной capability проверки, затем явно разрешил максимум 4 live calls.
+Бюджет исчерпан: 4/4, без повторов. HTTP теперь использует json_schema strict.
+Root/Git top C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment;
+HEAD/baseline 4be01719c8b05bff8f4496eb7607136ea2d3aec9;
+origin/main и merge-base efa3f773bcf10891e2997addf8bbec38c7ae1317; staging пуст.
+Allowlist: contracts/d2_dialogue_result.py; core/d2_live_provider.py;
+scripts/check_d2_structured_output.py; tests/test_d2_structured_output.py;
+этот файл; DEMO_D2_INTERFACE_TASK.md; DEMO_D2_DELIVERY_ROADMAP.md.
+Pre-existing four-price fix, panel/launcher и untracked prototypes/ сохранить.
+Накопленный diff этого документа содержит также ранее проверенный four-price fix.
+Действует единственная таблица ответственности Target Contract §3.
+
+Acceptance: typed known-task reply — один источник schema и structural validation;
+сохранить exact count/order/request IDs, прежние contract codes и server-owned
+target/source/brand/volume. Strict helper генерирует ordinary schema из текущих
+runtime типов, known-task schema из typed wire reply; без semantic adapter,
+преобразования ответов, изменения optional fields/unions или weakening.
+HTTP использует strict helper; messages/model/1024/one-call прежние.
+Исторический CP3 harness вне HTTP остаётся без изменений.
+Python/context/tenant validators остаются. Не изменять KB, storage, UI или quotas.
+
+Probe script по умолчанию готовит schemas/messages offline, 0 calls. Live требует
+--live --max-calls 4 --output <fresh external directory>, SDK retries=0;
+hard4 reservations записываются до transport, повторный запуск/возобновление
+запрещены, первый отказ завершает run, fallback отсутствует. Cases: adversarial
+simple schema, ordinary Nobel price, compound price/address, known explanation.
+Builder/parser реальные; контекст synthetic, без DB/lead/диалогов пользователя.
+Report только metadata и parser outcome, без raw provider body, prompt или secrets.
+Этот probe проверяет capability/parser, не точность ответа/публикацию/весь D2.
+
+Astra before-code consultation (историческое состояние до probe): границы подтверждены; поддержка нашего
+$defs/anyOf/oneOf/discriminator/default dialect ещё не доказана. Автоматически
+делать все optional fields required нельзя. Правила Python не полностью выражены
+в JSON Schema; strict generation не гарантирует смысл или отсутствие truncation.
+Planned tests: new focused schema/parser/probe tests и existing SIM2/known-task
+HTTP suites, isolated temp DB/logs/tenant, network/provider/SMTP forbidden.
+Ledger draft до probe: подготовка strict format; HTTP activation и live acceptance были открыты;
+commit/push/merge/deploy не выполняются.
+Final evidence: C:/Users/denis/AppData/Local/Temp/d2-strict-final-yq051xx6/tests.xml
+— 112 cases, 108 passed / 4 failures, 61.80s: новые schema/parser/probe31,
+SIM2 contract50 и source-followup HTTP27 прошли. Четыре старых REC2 optional-ref
+кейса падают на первом ordinary ответе до changed known-task path. Все четыре
+имени и first-step assertion воспроизведены на чистом git archive HEAD4be0171:
+C:/Users/denis/AppData/Local/Temp/d2-strict-baseline-bxip3sf9/baseline.xml,
+4 failed, 6.76s. Они не объявляются исправленными; полный CI не запускался.
+Initial73/4 выявил ошибка выбора code из derivative tuple-length; исправлена,
+adverse wire-order/identity/text проверки добавлены, входят в финальные31PASS.
+Network/provider/live/SMTP0; browser0. git diff --check clean. Staging пуст.
+Independent Checker: PASS offline preparation после focused recheck; оба XML
+прочитаны независимо, four baseline failures совпали, test weakening нет.
+Эта строка evidence относится к offline preparation до последующего live GO.
+
+Live capability evidence: C:/Users/denis/AppData/Local/Temp/d2-strict-live-7a379256fb104c4791a5d27e3b7ff514/report.json.
+Все четыре ответа parser_accepted, finish_reason stop: adversarial simple schema,
+ordinary price, compound price/address, known explanation. Фактический endpoint
+qwen3.8-flash принял неизменённые runtime schemas, включая unions/$defs/defaults.
+Это проверка транспорта/schema/parser, без materialization и session commit.
+Составной вопрос вернул только price, без contact: смысловой пробел НЕ закрыт.
+Нельзя считать четыре результата доказательством полноты диалога или гарантией
+отсутствия будущих отказов. Новые provider calls требуют отдельного бюджета.
+HTTP activation удаляет json_object из рабочего пути; schema берётся из тех же
+типов, что parser. Нет repair/fallback/retry, дополнительных model calls, KB edits
+или изменения владельца цен. Python/context/tenant проверки сохранены.
+Activation offline evidence: C:/Users/denis/AppData/Local/Temp/d2-strict-active-jt89y_m7/tests.xml,
+108 passed, 49.97s (schema/parser/probe31, SIM2 contract50, source-followup HTTP27).
+Provider/live в этом offline run0; суммарный live budget4/4. Browser0.
+git diff --check clean; staging пуст; commit/push/merge/deploy не выполнялись.
+Independent Checker activation: scoped PASS; final XML и live metadata прочитаны
+независимо. PASS только для format fix, не для полноты смысла/всего D2.
+
+## Четыре ценовых ситуации — owner GO
+
+Bug fix отображения, не архитектурное упрощение. Baseline 4be0171,
+root/Git top C:/Cursor Projects/artgents-bot-active, branch
+codex/model-price-experiment, origin/main/merge-base efa3f77.
+Allowlist: core/response_text_renderer.py; core/response_ui_projection.py;
+static/widget/widget.js; tests/test_d2_price_cards.py;
+tests/test_d2_price_cards_browser.py; этот файл.
+Pre-existing panel/launcher WIP и prototypes/ сохранить вне scope.
+1. Опубликованная fixed/from/range цена — карточка.
+2. Не оказываемая услуга — прежний authored policy text, без чужой цены.
+3. Активная услуга без прайса — прежний gap text, не отказ в услуге.
+4. no_public_price — утверждённый текст без отдельной ценовой карточки.
+В mixed overview сохраняется один ordered навигационный контейнер: numeric
+rows оформляются ценой, no_public row обычным абзацем на прежней позиции.
+Frozen rows/action pool/selection/applicability/context не меняются. Typed
+price ownership сохраняется и без numeric card. Accepted exact offer click
+может публиковать текст вместо nextCard, без ложной ошибки; старый ответ
+остаётся историческим. Нет новых схем модели, storage, KB, семантических
+эвристик, retry, provider calls или новых missing-data policies.
+Astra консультация: минимальное разделение presentation rows, не фильтрация
+canonical pool. Проверки существующими offline cases четырёх ситуаций;
+новые вопросы в панели и новые test-case группы не добавлять.
+Evidence: C:/Users/denis/AppData/Local/Temp/d2-four-price-cases-vsq7m5gh/tests.xml
+— 41 passed, 0 failed/errors/skips, 57.162s; existing numeric/no-public,
+missing service/price, mixed/order/replay и focused browser text-selection cases.
+Node syntax PASS; git diff --check clean. Independent Checker: PASS,
+финальный JUnit прочитан независимо; selection/auth/lead/privacy и содержательные
+assertions сохранены. Provider/live/SMTP 0. Full CI и известные пять legacy
+price_modes failures вне scope, не объявляются закрытыми. Staging пуст;
+commit/push не сделаны. Panel/launcher WIP и prototypes/ сохранены.
+
 ## Текущий checkpoint C4–C6 — 2026-10-10
 
 Функционал кодовых карточек: exact offer состав/исключения/этапы; общий

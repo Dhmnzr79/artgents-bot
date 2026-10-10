@@ -3,91 +3,118 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-  <title>Виджет — локальный тест</title>
+  <title>Локальный бот · Панель тестирования</title>
   <link rel="stylesheet" href="widget/widget.css">
   <style>
-    body {
-      margin: 0;
-      background: #10142b;
-      color: #e8eaf0;
+    .panel, .panel * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100svh; background: #10142b; color: #e8eaf0; font: 15px/1.45 system-ui, sans-serif; }
+    .panel { width: min(680px, 100%); padding: 28px; }
+    .panel header { margin-bottom: 20px; }
+    .panel .eyebrow { color: #929ab9; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; }
+    .panel h1 { margin: 6px 0; font-size: 26px; font-weight: 600; }
+    .panel h2 { margin: 0 0 12px; font-size: 16px; font-weight: 600; }
+    .panel p { margin: 8px 0 0; }
+    .panel .muted { color: #aeb5ce; font-size: 13px; }
+    .panel .card { padding: 18px; border: 1px solid #343c5a; border-radius: 14px; background: #191f3a; margin-bottom: 12px; }
+    .panel .status-row, .panel .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .panel .status-row { justify-content: space-between; }
+    .panel .status { display: inline-flex; gap: 9px; align-items: center; font-weight: 600; }
+    .panel .dot { width: 9px; height: 9px; border-radius: 50%; background: #e6b95b; flex: 0 0 auto; }
+    .panel [data-state="ready"] .dot { background: #4dd6a0; }
+    .panel [data-state="offline"] .dot { background: #f58c8c; }
+    .panel button { padding: 10px 14px; min-height: 40px; border: 1px solid #454f73; border-radius: 9px; background: #252d4c; color: #f2f4ff; font: inherit; cursor: pointer; }
+    .panel button:hover { background: #303a60; }
+    .panel button:focus-visible, .panel a:focus-visible { outline: 2px solid #a8b9ff; outline-offset: 3px; }
+    .panel button:disabled { opacity: .5; cursor: default; }
+    .panel button.primary { background: #0c2fe0; border-color: #0c2fe0; }
+    .panel button.primary:hover { background: #2449f2; }
+    .panel .command { display: flex; align-items: center; gap: 12px; }
+    .panel .command code { flex: 1; min-width: 0; font: 13px/1.5 ui-monospace, Consolas, monospace; overflow-wrap: anywhere; color: #e2e7ff; user-select: all; }
+    .panel .notice { min-height: 19px; font-size: 13px; color: #aeb5ce; }
+    .panel .themes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+    .panel .themes button { font-size: 13px; padding: 8px 10px; text-align: left; }
+    .panel .footer { display: flex; gap: 16px; font-size: 12px; color: #929ab9; }
+    .panel .footer a { color: #b5c4ff; }
+    /* The reset action now lives in this panel; its keyboard shortcut remains. */
+    .clinic-dev-reset { display: none; }
+    @media (max-width: 580px) {
+      .panel { padding: 16px; }
+      .panel header { margin-bottom: 14px; }
+      .panel h1 { font-size: 22px; }
+      .panel .card { padding: 14px; }
+      .panel .command { flex-wrap: wrap; }
+      .panel .command code { flex-basis: 100%; }
+      .panel header p, .panel #connection-heading,
+      .panel [aria-labelledby="controls-heading"] h2,
+      .panel [aria-labelledby="controls-heading"] p,
+      .panel #view-questions > p { display: none; }
     }
-
-    .page-host {
-      min-height: 120vh;
-      padding: 24px;
-      max-width: 720px;
-      margin: 0 auto;
-      font-family: system-ui, sans-serif;
-      line-height: 1.5;
+    @media (max-height: 800px), (max-width: 580px) {
+      .panel { padding: 16px; }
+      .panel header { margin-bottom: 12px; }
+      .panel .eyebrow, .panel .footer { display: none; }
+      .panel h1 { font-size: 22px; }
+      .panel h2 { margin-bottom: 8px; }
+      .panel .card { padding: 12px; margin-bottom: 8px; }
+      .panel button { min-height: 36px; padding: 8px 12px; }
+      .panel .themes button { padding: 8px; }
+      .panel p { margin-top: 6px; }
+      .panel .muted { font-size: 12px; }
     }
-
-    .page-host a {
-      color: #c4c9e8;
-    }
-
-    .page-host code {
-      font-size: 0.9em;
-      color: #f0f2ff;
-    }
-
-    .topic-section {
-      margin-top: 24px;
-      padding: 20px;
-      border: 1px solid #444a68;
-    }
-
-    .topic-button {
-      padding: 12px 18px;
-      border: 0;
-      border-radius: 0;
-      background: #0C2FE0;
-      color: #fff;
-      font: inherit;
-      cursor: pointer;
-    }
-
-    .topic-button:focus-visible {
-      outline: 2px solid #fff;
-      outline-offset: 3px;
-    }
+    .panel .view-tabs, .panel .question-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .panel .question-tabs button { min-height: 32px; padding: 6px 9px; font-size: 12px; }
+    .panel button[role="tab"][aria-selected="true"] { background: #0c2fe0; border-color: #4969ff; }
+    .panel .themes button:hover { border-color: #8297df; }
+    .panel .question-group[hidden], .panel [role="tabpanel"][hidden] { display: none; }
   </style>
 </head>
 <body>
-  <main class="page-host">
-    <h1>Тестовая страница виджета</h1>
-    <p>
-      Запусти демо-бота: <code>python app.py</code> (в этой демо-папке порт задан в <code>.env</code>: <strong>9001</strong>).
-      Открой эту страницу с того же хоста, например
-      <strong>http://127.0.0.1:9001/static/widget-test.html</strong>
-      — тогда <code>POST /ask</code> пойдёт на тот же origin (поле <code>apiBase</code> в конфиге пустое).
-    </p>
-    <p>
-      <strong>Разработка:</strong> сброс сессии — кнопка <strong>DEV · сброс sid</strong> слева сверху или
-      <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd>.
-    </p>
-    <p>
-      В <code>#clinic-widget-config</code> задан явный <code>clientId</code> (сейчас <code>demo</code>).
-      Для другого tenant укажи свой <code>clientId</code> из <code>ALLOWED_CLIENTS</code> и согласуй <code>apiBase</code>.
-    </p>
-    <p>
-      Для наглядного <strong>сырого JSON</strong> и <strong>кандидатов retrieval</strong> (как в старом тестере) открой отдельную dev-страницу:
-      <a href="debug/ask-inspector.html"><code>/static/debug/ask-inspector.html</code></a>
-      — её можно целиком удалить вместе с папкой <code>static/debug/</code>, на виджет она не влияет.
-    </p>
-    <section class="topic-section">
-      <h2>Страх боли</h2>
-      <p>Спросите консультанта, как проходит имплантация и что помогает уменьшить дискомфорт.</p>
-      <button type="button" class="topic-button" data-widget-question="Я боюсь боли при имплантации. Расскажите, как проходит обезболивание и что я буду чувствовать.">Обсудить страх боли</button>
+  <main class="panel">
+    <header>
+      <div class="eyebrow">Artgents · Local demo</div>
+      <h1>Панель тестирования бота</h1>
+      <p class="muted">Запустите один раз — тестируйте здесь.</p>
+    </header>
+    <section class="card" aria-labelledby="connection-heading">
+      <div class="status-row">
+        <div id="bot-state" class="status" data-state="checking" role="status" aria-live="polite">
+          <span class="dot" aria-hidden="true"></span><span id="bot-state-label">Проверяем связь…</span>
+        </div>
+        <span id="checked-at" class="muted">localhost:9001</span>
+      </div>
+      <p id="connection-heading" class="muted">Статус показывает доступность сервера.</p>
     </section>
-    <section class="topic-section">
-      <h2>Приживаемость имплантов</h2>
-      <p>Узнайте о приживлении и гарантиях клиники.</p>
-      <button type="button" class="topic-button" data-widget-question="От чего зависит приживаемость имплантов и что будет, если имплант не приживётся?">Узнать о приживаемости</button>
+    <section class="card" aria-labelledby="controls-heading">
+      <h2 id="controls-heading">Чат</h2>
+      <div class="actions">
+        <button type="button" class="primary" id="open-chat">Открыть чат</button>
+        <button type="button" id="reset-chat">Новая беседа</button>
+        <button type="button" id="refresh-page">Обновить страницу</button>
+      </div>
+      <p class="muted">После правок интерфейса нажмите «Обновить страницу».</p>
     </section>
-    <p>Обе кнопки продолжают тот же чат. Для проверки сначала поговорите через кнопку внизу, сверните чат и выберите тему здесь. Не сбрасывайте SID.</p>
-    <p id="topic-status" role="status" aria-live="polite"></p>
+    <div class="view-tabs" role="tablist" aria-label="Раздел панели">
+      <button type="button" role="tab" id="view-questions-tab" aria-controls="view-questions" aria-selected="true">Вопросы · 50</button>
+      <button type="button" role="tab" id="view-management-tab" aria-controls="view-management" aria-selected="false" tabindex="-1">Управление</button>
+    </div>
+    <section id="view-questions" class="card" role="tabpanel" aria-labelledby="view-questions-tab">
+      <div id="question-tabs" class="question-tabs" role="tablist" aria-label="Темы вопросов"></div>
+      <div id="question-groups"></div>
+      <p class="muted">Нажатие отправляет вопрос в текущий чат. Уточнения задавайте после цены или услуги.</p>
+    </section>
+    <div id="view-management" role="tabpanel" aria-labelledby="view-management-tab" hidden>
+    <section class="card" aria-labelledby="launch-heading">
+      <h2 id="launch-heading">1. Запустить перед работой</h2>
+      <div class="command">
+        <code id="launch-command">&amp; "C:\Cursor Projects\artgents-bot-active\scripts\start_local_widget.ps1"</code>
+        <button type="button" id="copy-launch-command">Копировать</button>
+      </div>
+      <p class="muted">Терминал не закрывайте. Автоперезапуск Python. Остановка — Ctrl+C.</p>
+    </section>
+    </div>
+    <p id="panel-notice" class="notice" role="status" aria-live="polite"></p>
+    <div class="footer"><span>Demo · 127.0.0.1:9001</span><a href="debug/ask-inspector.html">Диагностика</a></div>
   </main>
-
   <script type="application/json" id="clinic-widget-config">
   {
     "apiBase": "",
@@ -118,45 +145,95 @@
     ]
   }
   </script>
-
-  <script type="module">
-    import { mountWidget } from "./widget/widget.js";
-
-    const cfgEl = document.getElementById("clinic-widget-config");
-    const config = JSON.parse(cfgEl.textContent);
-    const mount = document.createElement("div");
-    document.body.appendChild(mount);
-    mountWidget(mount, config);
-
-    const topicStatus = document.getElementById("topic-status");
-    const launcher = mount.querySelector("[data-clinic-launcher-open], [data-clinic-launcher]");
-    const input = mount.querySelector("[data-clinic-input]");
-    const form = mount.querySelector("[data-clinic-composer-form]");
-    const send = mount.querySelector("[data-clinic-send]");
-
-    for (const button of document.querySelectorAll("[data-widget-question]")) {
-      button.addEventListener("click", () => {
-        if (launcher.getAttribute("aria-expanded") !== "true") launcher.click();
-        if (input.inputMode === "numeric") {
-          topicStatus.textContent = "Сначала завершите или отмените ввод телефона в чате, затем выберите тему.";
-          return;
-        }
-        if (input.value.trim() || mount.querySelector(".clinic-shell__welcome-screen.is-leaving")) {
-          topicStatus.textContent = "Сначала отправьте текущий вопрос или дождитесь начала ответа.";
-          return;
-        }
-        input.value = button.dataset.widgetQuestion;
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-        if (send.disabled) {
-          input.value = "";
-          input.dispatchEvent(new Event("input", { bubbles: true }));
-          topicStatus.textContent = "Дождитесь ответа или завершите повторную отправку в чате, затем выберите тему.";
-          return;
-        }
-        topicStatus.textContent = "";
-        form.requestSubmit(send);
-      });
-    }
+  <script type="application/json" id="test-questions">
+[
+  {
+    "title": "Цены",
+    "questions": [
+      "Сколько стоит имплантация?",
+      "Сколько стоит один зуб под ключ?",
+      "Сколько стоит All-on-4?",
+      "Сколько стоит All-on-6?",
+      "Сколько стоит имплантация Nobel Biocare?",
+      "Сколько стоит протезирование?",
+      "Сколько стоит отбеливание?",
+      "Сколько стоит удаление зуба?",
+      "Сколько стоит имплантация и есть ли рассрочка?",
+      "Сколько стоит отбеливание и где вы находитесь?"
+    ]
+  },
+  {
+    "title": "Имплантация",
+    "questions": [
+      "Чем All-on-4 отличается от All-on-6?",
+      "Можно поставить имплант сразу после удаления?",
+      "Мне не хватает кости. Какие есть варианты?",
+      "Что такое птеригоидные импланты?",
+      "Когда нужны скуловые импланты?",
+      "Сколько приживается имплант?",
+      "Что будет, если имплант не приживётся?",
+      "Больно ли ставить имплант и какая анестезия?"
+    ]
+  },
+  {
+    "title": "Услуги",
+    "questions": [
+      "Вы устанавливаете брекеты?",
+      "Что такое элайнеры?",
+      "Как проходит профессиональное отбеливание?",
+      "Как лечат кариес?",
+      "Что делать, если нужен сложный вариант удаления зуба?",
+      "В каких случаях нужны виниры?",
+      "Какие бывают съёмные протезы?",
+      "Можно прийти со своим КТ?"
+    ]
+  },
+  {
+    "title": "Клиника",
+    "questions": [
+      "Где вы находитесь?",
+      "Какой у вас график работы?",
+      "Как с вами связаться?",
+      "Консультация бесплатная?",
+      "Вы принимаете детей?",
+      "Как записаться на консультацию?"
+    ]
+  },
+  {
+    "title": "Врачи",
+    "questions": [
+      "Кто у вас занимается имплантацией?",
+      "Кто занимается протезированием?",
+      "Кто лечит кариес?",
+      "Расскажите о Кузнецове Дмитрии Андреевиче.",
+      "Расскажите об Орлове Никите Владимировиче.",
+      "Кто у вас главный врач?"
+    ]
+  },
+  {
+    "title": "ОМС / ДМС",
+    "questions": [
+      "Можно лечиться у вас по ОМС?",
+      "Вы принимаете по ДМС?",
+      "Можно поставить имплант по ДМС?",
+      "Лечение кариеса по ДМС у вас доступно?",
+      "Какие способы оплаты вы принимаете?",
+      "Какие условия рассрочки?"
+    ]
+  },
+  {
+    "title": "Уточнения",
+    "questions": [
+      "А что входит в стоимость?",
+      "А что оплачивается отдельно?",
+      "Как проходит оплата по этапам?",
+      "А консультация для этого варианта бесплатная?",
+      "Расскажите о втором враче из списка.",
+      "А какие акции есть на эту услугу?"
+    ]
+  }
+]
   </script>
+  <script type="module" src="./widget-test-panel.js"></script>
 </body>
 </html>

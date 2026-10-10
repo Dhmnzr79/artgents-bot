@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 class Closed(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -290,21 +290,54 @@ class D2ExplanationTask(Closed):
     blocks: tuple[AuthorizedExplanationOperation, ...] = Field(min_length=1)
 
 
+class D2ExplanationReplyItem(Operation):
+    """Only the text of an already authorized operation crosses this wire."""
+    content_text: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def nonblank_text(self):
+        if not self.content_text.strip():
+            raise ValueError("known_task_explanation_text_required")
+        return self
+
+
+class D2ExplanationReply(Closed):
+    """Existing known-task reply, shared by schema generation and parsing."""
+    explanations: tuple[D2ExplanationReplyItem, ...] = Field(min_length=1)
+
+
 def validate_d2_payload(payload: dict, *, active_service_ids: frozenset[str], known_task=None):
     if known_task is not None:
         expected = known_task.blocks
         items = payload.get("explanations")
         if set(payload) != {"explanations"} or not isinstance(items, list) or len(items) != len(expected):
             raise ValueError("known_task_explanations_required")
-        completed = []
-        for original, item in zip(expected, items):
-            if not isinstance(item, dict) or set(item) - {"request_id", "content_text"} or item.get("request_id") != original.request_id:
+        errors = ()
+        reply = None
+        try:
+            reply = D2ExplanationReply.model_validate(payload)
+        except ValidationError as exc:
+            errors = exc.errors()
+        # Select the former first error in wire order: shape/identity before
+        # text for each item. Structural evidence comes from the single typed
+        # validator, not another hand-written schema. Ignore tuple-length
+        # errors caused by invalid children; input count was checked above.
+        for index, (original, raw_item) in enumerate(zip(expected, items)):
+            item_errors = [e for e in errors if e["loc"][:2] == ("explanations", index)]
+            if any(e["type"] in {"model_type", "extra_forbidden"}
+                   or "request_id" in e["loc"] for e in item_errors):
                 raise ValueError("known_task_explanation_invalid")
-            if not isinstance(item.get("content_text"), str) or not item["content_text"].strip():
+            if raw_item.get("request_id") != original.request_id:
+                raise ValueError("known_task_explanation_invalid")
+            if item_errors:
                 raise ValueError("known_task_explanation_text_required")
+        if reply is None:
+            raise ValueError("known_task_explanation_invalid")
+        completed = []
+        for original, item in zip(expected, reply.explanations):
             values = original.model_dump()
             values.pop("pending_question")
-            values.update(item)
+            values.update(item.model_dump())
             completed.append(ExplanationOperation.model_validate(values))
         result = D2DialogueResult.model_validate({
             "outcome": known_task.outcome,

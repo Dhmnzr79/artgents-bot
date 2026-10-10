@@ -84,6 +84,17 @@ Four repair groups are proposed only; no implementation GO or SIM4/SIM5/REC5 clo
 
 ## Актуальный порядок после независимого аудита — 2026-10-02
 
+Owner GO 2026-10-10: после root-array live отказа подготовить strict provider
+format для ordinary и known-task explanation, не менять цену/KB/card selection.
+Offline checkpoint и hard4 capability script — [текущая карточка](DEMO_MODEL_PRICE_EXPERIMENT.md),
+раздел «Строгий формат D2». Последующий owner GO: 4/4 live calls, schemas приняты;
+HTTP был активирован на json_schema strict, затем после paired6 и layered48
+возвращён к json_object по conditional owner GO. Layered targeted checks:
+JSON24/24, strict small6/6 и все rich profiles0/6; полный контракт воспроизводит
+сбой без большой KB. Root-array риск открыт. Final offline39PASS и Checker
+focused PASS. Budget48/48 исчерпан, новых provider calls нет. Это диагностика
+и узкий возврат, не global PASS; evidence в верхнем разделе текущей карточки.
+
 Текущее дополнение owner GO 2026-10-06 — Interface §23: безопасные bug fixes
 кодовой подачи и исполнения перед дальнейшим model-price experiment.
 Baseline9179cbb; цены остаются у price owner, свободное понимание у модели.

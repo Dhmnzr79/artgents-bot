@@ -258,9 +258,18 @@ def test_card_uses_frozen_mode_and_scope_without_recomputing(http_env, mode, fin
     use(FakeProvider(raw(price("professional_whitening", "service"))))
     response = post(client, q="Цена отбеливания?")
     assert response.status_code == 200, response.get_json()
-    projected = cards(response.get_json())[0]["price"]["rows"][0]
+    body = response.get_json()
     with D2DialogueStore(db) as store:
         frozen = store.read_latest_completion(SessionKey(client_id="demo", sid="cp6a")).response.resolved.d2_price_block.rows[0]
+    if mode == "no_public_price":
+        assert not cards(body)
+        assert expected in body["answer"] and "₽" not in body["answer"]
+        assert frozen.mode == mode and frozen.approved_text == financial["approved_text"]
+        assert body["ui"]["projected_commercial_ids"]["price_offer_ids"] == [frozen.offer_id]
+        assert any(p["price_owned"] and expected in p["text"] for p in body["ui"]["body_parts"])
+        assert post(client, q="Цена отбеливания?").get_json() == body
+        return
+    projected = cards(body)[0]["price"]["rows"][0]
     assert projected == frozen.model_dump(mode="json")
     assert projected["mode"] == mode and expected in projected["price_display_text"]
     assert projected["scope_text"] == frozen.scope_text

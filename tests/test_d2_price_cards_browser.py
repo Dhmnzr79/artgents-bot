@@ -59,7 +59,7 @@ try {
       }
       if (body.ref) await new Promise(resolve => setTimeout(resolve,
         body.ref.endsWith('.nobel') ? 4000 : 300));
-      const selected = fixtures.responses ? fixtures.responses[body.ref || body.q] : body.ref?.endsWith('.nobel') ? fixtures.nobel :
+      const selected = window.returnTextSelection && body.ref ? fixtures.textSelected : fixtures.responses ? fixtures.responses[body.ref || body.q] : body.ref?.endsWith('.nobel') ? fixtures.nobel :
         body.ref?.endsWith('.implantium') ? fixtures.back : body.ref ? fixtures.selected : body.q === 'Отбеливание' ? fixtures.whitening :
         body.q === 'Цена без суммы' ? fixtures.noPublic : body.q === 'Обычный ответ' ? fixtures.plain : fixtures.first;
       const payload = {...selected, sid:body.sid || selected.sid, request_id:body.request_id};
@@ -179,19 +179,26 @@ try {
   const whitening = cards.last();
   if (!(await whitening.textContent()).includes('от 18')) throw new Error('From qualifier missing');
   if (await whitening.locator('button').count()) throw new Error('Invented brand choice');
-  await send('Цена без суммы');
-  await page.waitForFunction(() => document.querySelectorAll('.clinic-price-card').length === 3);
-  const noPublic = cards.last();
-  if (!(await noPublic.textContent()).includes('Стоимость определяют после осмотра.')) throw new Error('Approved text lost');
-  if (await noPublic.locator('.clinic-price-card__amount').evaluate(el => getComputedStyle(el).fontSize) !== '16px')
-    throw new Error('Approved description has giant numeric font');
   if (await page.evaluate(() => window.streamedBubbles) !== 0)
-    throw new Error('Card was preceded by transient typed prose');
+    throw new Error('Numeric card was preceded by transient typed prose');
+  await send('Цена без суммы');
+  await page.waitForFunction(() => document.querySelector('#root').textContent.includes('Стоимость определяют после осмотра.') &&
+    !document.querySelector('[data-live-bubble]'));
+  if (await cards.count() !== 2) throw new Error('Text-only price created a card');
+  if (await page.locator('.clinic-msg--bot').last().locator('.clinic-price-card__amount').count())
+    throw new Error('Approved description has numeric price styling');
+  const previousStreams = await page.evaluate(() => window.streamedBubbles);
   await send('Обычный ответ');
-  await page.waitForFunction(() => window.streamedBubbles > 0);
+  await page.waitForFunction(n => window.streamedBubbles > n, previousStreams);
   await page.waitForFunction(() => !document.querySelector('[data-live-bubble]') &&
     document.querySelector('#root').textContent.includes('Обычный текстовый ответ сохраняет постепенное появление текста.'));
-  if (await cards.count() !== 3) throw new Error('Ordinary prose created a card');
+  if (await cards.count() !== 2) throw new Error('Ordinary prose created a card');
+  await page.evaluate(() => { window.returnTextSelection = true; });
+  await cards.first().locator('button', {hasText:'Nobel Biocare'}).click();
+  await page.waitForFunction(() => document.querySelector('.clinic-msg--bot:last-child')?.textContent.includes('Стоимость Nobel определяют после осмотра.') ||
+    [...document.querySelectorAll('.clinic-msg--bot')].at(-1)?.textContent.includes('Стоимость Nobel определяют после осмотра.'));
+  if (await cards.count() !== 2 || await page.locator('[data-clinic-err]').count())
+    throw new Error('Accepted text selection created an error or an empty card');
   if (failures.length) throw new Error(failures.join('\n'));
   console.log(JSON.stringify({passed:true,widths:[390,360],provider:0}));
 } finally { await browser.close(); await new Promise(r=>server.close(r)); }
@@ -224,11 +231,24 @@ def test_real_card_fonts_selection_and_session_in_browser(http_env, tmp_path):
     assert no_public_response.status_code == 200
     fake.raw = raw(explanation("Обычный текстовый ответ сохраняет постепенное появление текста."))
     plain = post(client, sid="no-public-card", request_id="plain", q="Обычный ответ").get_json()
+    # Isolated active brand without a published number remains an authenticated
+    # exact offer; its accepted selection must render text without a UI error.
+    nobel_path = tmp / "clients/demo/target_response/pricebook/services/classic.one_tooth.nobel.json"
+    nobel_offer = json.loads(nobel_path.read_text(encoding="utf-8"))
+    nobel_offer["price"] = {"mode":"no_public_price", "approved_text":"Стоимость Nobel определяют после осмотра."}
+    nobel_path.write_text(json.dumps(nobel_offer,ensure_ascii=False),encoding="utf-8")
+    fake.raw = raw(price("classic", "service"))
+    text_source = post(client, sid="text-selection", request_id="source").get_json()
+    fake.generate = forbidden
+    text_selected = post(client, sid="text-selection", request_id="text-selection", q="",
+        ref="price_select:classic.one_tooth.nobel", ui_revision=text_source["revision"])
+    assert text_selected.status_code == 200
+    assert not any(p["kind"] == "price_card" for p in text_selected.get_json()["ui"]["body_parts"])
     payloads = tmp_path / "payloads.json"
     payloads.write_text(json.dumps({"first":first,"selected":selected_response.get_json(),
                                    "nobel":nobel.get_json(),"back":back.get_json(),
                                    "whitening":whitening,"noPublic":no_public_response.get_json(),
-                                   "plain":plain},ensure_ascii=False),encoding="utf-8")
+                                   "plain":plain,"textSelected":text_selected.get_json()},ensure_ascii=False),encoding="utf-8")
     screenshot = os.environ.get("D2_CARDS_SCREENSHOT", str(tmp_path / "price-cards.png"))
     env = {**os.environ, "CARDS_PAYLOADS":str(payloads), "CARDS_SCREENSHOT":screenshot}
     result = subprocess.run(["node", "--input-type=module", "-"], input=RUNNER,
@@ -236,7 +256,7 @@ def test_real_card_fonts_selection_and_session_in_browser(http_env, tmp_path):
         capture_output=True,timeout=80,check=False)
     assert result.returncode == 0, result.stdout + result.stderr
     assert '"passed":true' in result.stdout
-    assert len(fake.inputs) == 4
+    assert len(fake.inputs) == 5
 
 
 def test_overview_same_card_navigation_and_unknown_volume_in_browser(http_env, tmp_path):

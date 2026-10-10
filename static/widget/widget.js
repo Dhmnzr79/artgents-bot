@@ -1436,13 +1436,17 @@ export function mountWidget(root, config) {
             const nextCard = turn.bodyParts[nextCardIndex];
             const volumeChange = String(body.ref).startsWith("volume:")
               && old.volumeNavigation?.choices.some(choice => choice.reply_id === body.ref);
+            const publishedOfferChoice = [...(oldCard?.choices || []), ...(oldCard?.service_choices || [])]
+              .some(choice => choice.reply_id === body.ref);
             const offerChange = nextCard?.price?.rows?.length === 1
               && body.ref === `price_select:${nextCard.price.rows[0].offer_id}`
-              && [...(oldCard?.choices || []), ...(oldCard?.service_choices || [])]
-                .some(choice => choice.reply_id === body.ref);
-            if (state.messages.includes(old) && oldCard && volumeChange && !nextCard) {
-              // A volume choice may legitimately ask for clarification instead
-              // of returning prices. Publish that accepted answer as a new turn.
+              && publishedOfferChoice;
+            const textOfferChange = publishedOfferChoice && String(body.ref).startsWith("price_select:")
+              && uiData.ui?.projected_commercial_ids?.price_offer_ids
+                ?.includes(body.ref.slice("price_select:".length));
+            if (state.messages.includes(old) && oldCard && !nextCard && (volumeChange || textOfferChange)) {
+              // Accepted choices may return clarification or approved text
+              // without a numeric price. Publish that response as a normal turn.
               state.messages.push(turn);
               preserveScroll = false;
             } else if (!state.messages.includes(old) || !nextCard || !oldCard
@@ -1703,7 +1707,7 @@ export function mountWidget(root, config) {
     const cardRows = (m.bodyParts || []).filter(part => part.kind === "price_card")
       .flatMap(part => part.price?.rows || []);
     const items = (m.quickReplies || []).filter((it) => {
-      if (String(it.ref).startsWith("price_select:")) return false;
+      if (String(it.ref).startsWith("price_select:") && cardRows.length) return false;
       if (String(it.ref).startsWith("volume:") && m.volumeNavigation) return false;
       if (it.ref === "price_detail:includes" && cardRows.some(row => row.includes?.length)) return false;
       if (it.ref === "price_detail:stages" && cardRows.some(row => row.stages?.length)) return false;
@@ -2017,6 +2021,19 @@ export function mountWidget(root, config) {
       const common = terms[0].filter((term) => terms.every((list) => list.includes(term)));
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
+        if (row.mode === "no_public_price") {
+          const description = document.createElement("div");
+          description.className = "clinic-msg__body";
+          setBotAnswerBody(description, row.display_text);
+          card.appendChild(description);
+          for (const term of terms[i].filter(text => !common.includes(text))) {
+            const note = document.createElement("p");
+            note.className = "clinic-price-card__condition";
+            note.textContent = term;
+            card.appendChild(note);
+          }
+          continue;
+        }
         const item = document.createElement("div");
         item.className = "clinic-price-card__variant";
         if (rows.length > 1 || (row.variant_label && !(part.choices || []).length)) {

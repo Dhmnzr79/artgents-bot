@@ -127,7 +127,8 @@ def render_response_parts(plan: ResolvedResponsePlan) -> tuple:
 
 
 def _append_price_texts(parts, texts, section):
-    price_owned = any(isinstance(part, D2FrozenPriceBlock) for part in parts)
+    price_owned = any(isinstance(part, D2FrozenPriceBlock)
+        or (isinstance(part, ResponseTextPart) and part.price_owned) for part in parts)
     parts.extend(ResponseTextPart(text=text, price_owned=price_owned,
         price_section=section if price_owned else None) for text in texts if text)
 
@@ -150,6 +151,12 @@ def _render_d2_price_parts(plan: ResolvedResponsePlan, parts: list[str | D2Froze
         return
     assert plan.d2_price_block is not None
     rows = plan.d2_price_block.rows
+    if all(row.mode == "no_public_price" for row in rows):
+        for row in rows:
+            parts.append(ResponseTextPart(text=row.display_text.strip(), price_owned=True))
+            parts.extend(ResponseTextPart(text=text.strip(), price_owned=True)
+                         for text in row.condition_texts)
+        return
     if all(row.service_name and row.price_display_text for row in rows):
         parts.append(plan.d2_price_block)
         return

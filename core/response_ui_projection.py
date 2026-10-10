@@ -43,7 +43,7 @@ def project_response_ui(plan: ResolvedResponsePlan) -> ResponseUIProjection:
             "overview": plan.d2_price_scope_decision})
     body_parts = tuple(card_metadata(part) if isinstance(part, ResponsePriceCardPart) else part
                       for part in render_response_parts(plan))
-    if not any(isinstance(part, ResponsePriceCardPart) for part in body_parts):
+    if not any(isinstance(part, ResponsePriceCardPart) or part.price_owned for part in body_parts):
         body_parts = ()
     return ResponseUIProjection(
         quick_replies=ui.quick_replies,

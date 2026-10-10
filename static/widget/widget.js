@@ -1940,9 +1940,10 @@ export function mountWidget(root, config) {
           tab.className = "clinic-price-card__tab";
           tab.textContent = choice.label;
           tab.setAttribute("aria-pressed", String(active));
-          tab.disabled = state.pending || message.linksDismissed || message.revision !== state.lastPayload?.revision;
+          tab.disabled = state.pending || Boolean(state.retryBody) || isActiveLeadFlowPayload(state.lastPayload);
           tab.addEventListener("click", () => {
-            if (!active) void sendAsk({ref: choice.reply_id, ui_revision: message.revision,
+            if (!active || message.revision !== state.lastPayload?.revision)
+              void sendAsk({ref: choice.reply_id, ui_revision: message.revision,
               q: "", priceMessage: message});
           });
           tabs.appendChild(tab);

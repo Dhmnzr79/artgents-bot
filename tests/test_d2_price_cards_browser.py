@@ -175,7 +175,7 @@ try {
   await page.screenshot({path:process.env.CARDS_SCREENSHOT,fullPage:true});
   await send('Отбеливание');
   await page.waitForFunction(() => document.querySelectorAll('.clinic-price-card').length === 2);
-  if (await cards.first().locator('button:disabled').count() !== 3) throw new Error('Historical tabs still active');
+  if (await cards.first().locator('button:enabled').count() !== 3) throw new Error('Historical tabs unavailable');
   const whitening = cards.last();
   if (!(await whitening.textContent()).includes('от 18')) throw new Error('From qualifier missing');
   if (await whitening.locator('button').count()) throw new Error('Invented brand choice');

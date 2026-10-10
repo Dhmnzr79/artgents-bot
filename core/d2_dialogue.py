@@ -236,10 +236,16 @@ def run_d2_dialogue_turn(
         selected_price_select_actions = ()
         selected_volume_price_task: _SelectedVolumePriceTask | None = None
         if lead_ui_ref and ui_revision is not None:
-            shown = store.read_latest_completion(session_key)
+            price_selection = lead_ui_ref.startswith("price_select:")
+            if price_selection and ((d2_lead_session_client_matches(session_key)
+                    and peek_lead_paused(session_key.sid)) or d2_lead_needs_pre_provider(
+                    session_key=session_key, lead_ui_ref=None, user_message="")):
+                raise ValueError("d2_stale_ui_action")
+            shown = (store.read_completion_at_revision(session_key, ui_revision)
+                     if price_selection else store.read_latest_completion(session_key))
             if (
                 previous is None or shown is None or early_context.freshness != "fresh"
-                or previous.state.revision != ui_revision
+                or (not price_selection and previous.state.revision != ui_revision)
                 or shown.committed_revision != ui_revision
             ):
                 raise ValueError("d2_stale_ui_action")
@@ -266,6 +272,8 @@ def run_d2_dialogue_turn(
                     selected_price_select_action = next((item
                         for item in shown.response.resolved.ui_plan.price_select_actions
                         if item.reply_id == reply.reply_id), None)
+                    if price_selection and selected_price_select_action is None:
+                        raise ValueError("d2_unauthorized_ui_action")
                     if selected_price_select_action is not None:
                         selected_price_select_actions = shown.response.resolved.ui_plan.price_select_actions
                     if selected_price_detail_action is None and selected_price_select_action is None:

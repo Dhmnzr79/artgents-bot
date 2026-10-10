@@ -1,5 +1,44 @@
 # Эксперимент: ценовые ответы модели
 
+## C3 — возврат к историческим ценовым табам, owner GO 2026-10-10
+
+Новая UI возможность, не архитектурное упрощение. Baseline 29aef61,
+codex/model-price-experiment, C:/Cursor Projects/artgents-bot-active;
+origin/main/merge-base efa3f77, tracked clean; foreign prototypes/ сохраняется.
+Allowlist: core/d2_dialogue_store.py; core/d2_dialogue.py;
+static/widget/widget.js; tests/test_d2_price_cards.py;
+tests/test_d2_price_cards_browser.py; этот файл; DEMO_D2_DELIVERY_ROADMAP.md.
+Owner согласовал: только price_select может использовать ранее опубликованный
+receipt; после выбора следующий текстовый вопрос относится к выбранному offer.
+Активная и paused заявка блокируют выбор без изменения заявки. Обычное
+незавершённое уточнение отменяется при явном возврате к offer.
+Точный источник — существующий ui_revision в tenant/sid; нет новых API полей,
+storage schema, отдельной памяти/кэша, классификации или provider вызова клика.
+Проверяются единственность receipt, owner/revision/linkage, опубликованный ref
+и private action map. Все остальные UI actions сохраняют latest-only gate.
+Исполнение использует текущий snapshot и прежний CAS/current revision;
+idle TTL и fingerprint клиники прежние, новый возраст карточки не вводится.
+Widget сохраняет цену до commit, положение, отсутствие ожидания и новый
+контекст через completion. Даже активный таб старой карточки возвращает тему.
+Проверки: JSON/SSE history→click→typed includes/stages/consultation/replay;
+поддельные источники, tenant/session, latest-only detail, TTL/fingerprint,
+active/paused lead без потери ПД, pending clear. Provider/live/SMTP budget 0.
+Owner вручную проверяет виджет; browser suite assertion мигрирует под C3,
+автоматический browser run сейчас не требуется. Commit/push не разрешены.
+
+C3 evidence: d2-history-y7ni6rvc/tests.xml — 41 passed, 1 старое ожидание
+отказа историческому price_select failed, 73.38s. Runtime после прогона не
+менялся; ожидание мигрировано в проверку точного возврата к classic/Impro.
+d2-history-final-otmdmjug/tests.xml — 5 passed, 7.95s: мигрированный случай,
+3 проверки reader identity/duplicate/linkage и усиленный historical closed-pool
+guard. Всего 45 distinct scoped cases, не полный CI. JSON/SSE continuation
+через fake provider, не подтверждение живого понимания. Старые 5 failures
+price_modes этим этапом не закрыты. Node syntax PASS, diff --check clean;
+browser/provider/live/SMTP 0; staging пуст; prototypes/ сохранён.
+Independent Checker C3 PASS: семь файлов allowlist и оба XML прочитаны;
+historical source/auth, current CAS/TTL/fingerprint, lead/pending и continuation
+подтверждены в scoped offline границах. Owner-widget остаётся следующим шагом.
+
 ## Карточки C2 — первый вариант и переключение на месте, owner GO 2026-10-10
 
 Owner выбрал первый вариант после сравнения двух макетов: карточка сразу

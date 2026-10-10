@@ -87,16 +87,21 @@ def test_unpublished_offer_is_rejected_before_provider(http_env, ref):
     assert len(fake.inputs) == 1
 
 
-def test_stale_selection_cannot_replace_new_topic(http_env):
-    client, _, use, _ = http_env
+def test_historical_selection_explicitly_returns_from_new_topic(http_env):
+    client, db, use, _ = http_env
     fake = use(FakeProvider(raw(price("classic", "service"))))
     first = post(client).get_json()
     fake.raw = raw(price("professional_whitening", "service"))
     post(client, request_id="second")
     fake.generate = forbidden
-    rejected = post(client, request_id="stale", q="", ref="price_select:classic.one_tooth.impro",
+    selected = post(client, request_id="return", q="", ref="price_select:classic.one_tooth.impro",
                     ui_revision=first["revision"])
-    assert rejected.status_code == 400 and len(fake.inputs) == 2
+    assert selected.status_code == 200 and len(fake.inputs) == 2
+    assert cards(selected.get_json())[0]["price"]["rows"][0]["offer_id"] == "classic.one_tooth.impro"
+    with D2DialogueStore(db) as store:
+        saved = store.read_latest_completion(SessionKey(client_id="demo",sid="cp6a"))
+        assert saved.response.resolved.finalized_commercial_ids.price_offer_ids == ("classic.one_tooth.impro",)
+        assert saved.response.resolved.d2_request_parts[0].discussion_scope.target.id == "classic"
 
 
 def test_overview_keeps_original_volume_choices(http_env):
@@ -238,7 +243,7 @@ def test_tabs_switch_back_and_forth_and_only_selected_offer_enters_context(http_
             assert saved.response.resolved.finalized_commercial_ids.price_offer_ids == (offer,)
             assert saved.response.resolved.d2_request_parts[0].discussion_scope.brand_id == brand
         denied = send(client, request_id=f"stale-{index}", q="",
-                      ref=f"price_select:{offer}", ui_revision=previous["revision"])
+                      ref="price_detail:includes", ui_revision=previous["revision"])
         if transport == "json":
             assert denied.status_code == 400
         else:
@@ -296,9 +301,13 @@ def test_explicit_brand_pool_does_not_expand_during_switch(http_env):
     fake.generate = forbidden
     current = post(client, request_id="choose", q="", ref=expected[1], ui_revision=first["revision"]).get_json()
     assert [c["reply_id"] for c in cards(current)[0]["choices"]] == expected
+    fake.generate = FakeProvider.generate.__get__(fake)
+    fake.raw = raw({"kind":"contact", "request_id":"r1", "contact_fields":["contact_address"]})
+    assert post(client, request_id="address-after-choice", q="Адрес?").status_code == 200
+    fake.generate = forbidden
     denied = post(client, request_id="not-authorized", q="", ref="price_select:classic.one_tooth.implantium",
-                  ui_revision=current["revision"])
-    assert denied.status_code == 400 and len(fake.inputs) == 1
+                  ui_revision=first["revision"])
+    assert denied.status_code == 400 and len(fake.inputs) == 2
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
@@ -338,3 +347,120 @@ def test_free_text_can_repeat_information_after_card_selection(http_env, transpo
     assert fake.inputs[1].context.ordinary.discussion_scope.brand_id == "impro"
     assert [ref.offer_id for ref in fake.inputs[1].context.ordinary.d2_shown_price_offer_refs] == ["classic.one_tooth.impro"]
     assert len(fake.inputs) == 3  # Initial ordinary price + two written follow-ups; click/replays cost zero.
+
+
+@pytest.mark.parametrize("transport", ["json", "sse"])
+@pytest.mark.parametrize("aspect", ["includes", "stages", "consultation"])
+def test_historical_tab_returns_scope_after_other_turns_and_supports_text(http_env, transport, aspect):
+    from tests.test_d2_sim2_dialogues import clarify
+    client, db, use, _ = http_env
+    send = post if transport == "json" else post_sse
+    fake = use(FakeProvider(raw(price("classic", "service"))))
+    first = _body(send(client, q="Цена имплантации?"), transport)
+    fake.raw = raw({"kind":"contact", "request_id":"r1", "contact_fields":["contact_address"]})
+    address = _body(send(client, request_id="address", q="Где вы находитесь?"), transport)
+    assert "Адрес" in address["answer"]
+    fake.raw = raw(clarify())
+    _body(send(client, request_id="clarify", q="А сколько стоит лечение?"), transport)
+    key = SessionKey(client_id="demo",sid="cp6a")
+    with D2DialogueStore(db) as store:
+        assert store.read(key).state.clarify_pending
+    fake.generate = forbidden
+    args = dict(request_id="return", q="", ref="price_select:classic.one_tooth.nobel",
+                ui_revision=first["revision"])
+    selected = _body(send(client, **args), transport)
+    assert selected["revision"] == address["revision"] + 2
+    assert cards(selected)[0]["price"]["rows"][0]["offer_id"] == "classic.one_tooth.nobel"
+    assert cards(selected)[0]["price"]["rows"][0]["amount"] == 101200
+    assert cards(selected)[0]["choices"] == cards(first)[0]["choices"]
+    assert _body(send(client, **args), transport) == selected
+    with D2DialogueStore(db) as store:
+        state = store.read(key).state
+        assert not state.clarify_pending and state.clarify_task is None
+        assert store.read_latest_completion(key).response.resolved.finalized_commercial_ids.price_offer_ids == ("classic.one_tooth.nobel",)
+    fake.generate = FakeProvider.generate.__get__(fake)
+    fake.raw = (raw({"kind":"commercial_fact", "request_id":"r1", "fact_ids":["free_implant_consult"],
+                     "promotion_scope":"none", "target":{"type":"service","id":"classic"}})
+                if aspect == "consultation" else raw({"kind":"price_detail", "request_id":"r1", "price_detail_aspect":aspect}))
+    for i in range(2):
+        question = dict(request_id=f"follow-{i}", q="А консультация бесплатная?" if aspect == "consultation" else "А что входит в этот вариант?" if aspect == "includes" else "А как оплачивается?")
+        answer = _body(send(client, **question), transport)
+        assert not cards(answer)
+        assert _body(send(client, **question), transport) == answer
+        if aspect == "consultation":
+            assert "по имплантации и протезированию" in answer["answer"]
+            assert "КТ при необходимости оплачивается отдельно" in answer["answer"]
+        else:
+            assert "Nobel" in answer["answer"] and "Impro" not in answer["answer"] and "Implantium" not in answer["answer"]
+    assert fake.inputs[3].context.ordinary.discussion_scope.brand_id == "nobel_biocare"
+    assert [r.offer_id for r in fake.inputs[3].context.ordinary.d2_shown_price_offer_refs] == ["classic.one_tooth.nobel"]
+    assert len(fake.inputs) == 5
+
+
+@pytest.mark.parametrize("guard", ["unknown_revision", "non_card", "wrong_session", "foreign", "expired", "changed", "active_lead", "paused_lead"])
+def test_historical_tab_boundaries_do_not_commit_or_call_model(http_env, guard):
+    from datetime import timedelta
+    from session import capture_lead_session_row, session_client_scope
+    from tests.test_d2_lead_interrupt_http import envelope_adult_booking_only
+    client, db, use, tmp = http_env
+    fake = use(FakeProvider(raw(price("classic", "service"))))
+    first = post(client, q="Цена имплантации?").get_json()
+    fake.raw = raw({"kind":"contact", "request_id":"r1", "contact_fields":["contact_address"]})
+    later = post(client, request_id="address", q="Адрес?").get_json()
+    key = SessionKey(client_id="demo", sid="cp6a")
+    args = dict(request_id="bad", q="", ref="price_select:classic.one_tooth.nobel", ui_revision=first["revision"])
+    if guard == "unknown_revision": args["ui_revision"] = 999
+    elif guard == "non_card": args["ui_revision"] = later["revision"]
+    elif guard == "wrong_session": args["sid"] = "other"
+    elif guard == "foreign": args["client_id"] = "nikadent"
+    elif guard == "changed":
+        filename = tmp / "clients/demo/target_response/pricebook/services/classic.one_tooth.nobel.json"
+        filename.write_text(filename.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    elif guard == "expired":
+        with D2DialogueStore(db) as store:
+            record = store.read(key)
+            record = record.model_copy(update={"activity":record.activity.model_copy(update={
+                "last_user_turn_at":record.activity.last_user_turn_at-timedelta(hours=1)})})
+            store._connection.execute("UPDATE d2_dialogue SET payload=? WHERE client_id=? AND sid=?", (record.model_dump_json(),key.client_id,key.sid))
+            store._connection.commit()
+    elif guard in {"active_lead", "paused_lead"}:
+        fake.raw = envelope_adult_booking_only()
+        assert post(client, request_id="book", q="Хочу записаться").status_code == 200
+        if guard == "paused_lead":
+            assert post(client, request_id="interrupt", q="А сколько длится лечение?").status_code == 200
+    with session_client_scope("demo"):
+        lead_before = capture_lead_session_row("cp6a")
+    with D2DialogueStore(db) as store:
+        before = store.read(key).model_dump_json()
+    calls = len(fake.inputs)
+    fake.generate = forbidden
+    denied = post(client, **args)
+    assert denied.status_code == 400, denied.get_json()
+    assert len(fake.inputs) == calls
+    with D2DialogueStore(db) as store:
+        assert store.read(key).model_dump_json() == before
+    with session_client_scope("demo"):
+        assert capture_lead_session_row("cp6a") == lead_before
+
+
+@pytest.mark.parametrize("corruption", ["duplicate", "owner", "linkage"])
+def test_historical_receipt_reader_rejects_ambiguous_or_misbound_source(http_env, corruption):
+    client, db, use, _ = http_env
+    use(FakeProvider(raw(price("classic", "service"))))
+    first = post(client).get_json()
+    key = SessionKey(client_id="demo",sid="cp6a")
+    with D2DialogueStore(db) as store:
+        saved = store.read_completion_at_revision(key, first["revision"])
+        assert saved.request_id == first["request_id"]
+        payload = saved.model_dump(mode="json")
+        if corruption == "duplicate":
+            store._connection.execute("INSERT INTO d2_turn_request VALUES(?,?,?,?,?,?)",
+                (key.client_id,key.sid,"duplicate","different","complete",json.dumps(payload)))
+        else:
+            if corruption == "owner": payload["context"]["session_key"]["sid"] = "other"
+            else: payload["context"]["source_revision"] += 1
+            store._connection.execute("UPDATE d2_turn_request SET payload=? WHERE client_id=? AND sid=?",
+                (json.dumps(payload),key.client_id,key.sid))
+        store._connection.commit()
+        with pytest.raises(ValueError, match="d2_completion_(revision_ambiguous|owner_mismatch)"):
+            store.read_completion_at_revision(key, first["revision"])

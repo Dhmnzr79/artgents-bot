@@ -1654,6 +1654,32 @@
   line-height: 1.35;
   font-weight: 600;
 }
+.clinic-price-card__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+.clinic-price-card__tab {
+  flex: 1 1 75px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 9px 4px;
+  border: 1px solid #e2e5ef;
+  border-radius: 9px;
+  background: #fff;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+.clinic-price-card__tab[aria-pressed="true"] {
+  border-color: var(--clinic-brand);
+  color: var(--clinic-brand);
+  font-weight: 600;
+}
+.clinic-price-card__tab:disabled { cursor: default; }
+.clinic-price-card__tab:focus-visible { outline: 2px solid var(--clinic-brand); outline-offset: 2px; }
 .clinic-price-card__variant {
   display: flex;
   flex-wrap: wrap;

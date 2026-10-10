@@ -1,5 +1,9 @@
 Owner GO 2026-10-10: прекратить свободные модельные финансовые ответы и
 перейти к интерактивным кодовым ценовым блокам после просмотра standalone mockup.
+Следующий owner GO после сравнения макетов: C2 — первый бренд открыт сразу,
+переключение остальных внутри той же карточки, выбранный server offer для
+продолжения. Baseline 0391420; exact scope/acceptance в C2 addendum task.
+Клиентская база, overview, аккордеоны и новый marketing design не меняются.
 Это актуальное направление вместо model-price 3A/3B. Existing branch/HEAD
 codex/model-price-experiment/c22845c; новых веток/commit/push/live нет.
 Позднейший pause GO 2026-10-10 разрешает checkpoint commit/push R1+C1 в той же

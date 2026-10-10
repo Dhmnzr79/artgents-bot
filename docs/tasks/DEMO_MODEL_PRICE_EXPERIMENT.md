@@ -1,5 +1,118 @@
 # Эксперимент: ценовые ответы модели
 
+## Карточки C2 — первый вариант и переключение на месте, owner GO 2026-10-10
+
+Owner выбрал первый вариант после сравнения двух макетов: карточка сразу
+открывает первый конкретный offer в существующем порядке каталога. Этот offer
+становится опубликованным и текущим для уточнений. Цена/brand/volume и
+коммерческая финализация вычисляются по нему, альтернативы — только UI actions.
+Это новая UI функция, не глобальное архитектурное упрощение. §3 не меняется.
+Runtime baseline HEAD 0391420, branch codex/model-price-experiment;
+root/Git top C:/Cursor Projects/artgents-bot-active;
+origin/main/merge-base efa3f77; tracked tree/staging были чистыми.
+Foreign WIP prototypes/ сохраняется, макеты в Git не добавляются.
+
+Exact allowlist: contracts/response_plan.py; core/response_plan_materialization.py;
+core/d2_dialogue.py; core/response_text_renderer.py; core/response_ui_projection.py;
+static/widget/widget.js; static/widget/widget.css; tests/test_d2_price_cards.py;
+tests/test_d2_price_cards_browser.py; этот файл; DEMO_D2_DELIVERY_ROADMAP.md.
+Необходимое расширение после guard run: tests/test_d2_demo_audit_fixes.py,
+только expectation price→detail click: initial-first означает один открытый
+offer. Прямой detail без предшествующей цены продолжает проверять все три.
+Добавлены точный finalized ID и наличие исходных трёх authenticated choices.
+
+Точный исходный eligible pool живёт в прежнем ui_plan.price_select_actions
+latest completion. При клике наследуется только этот закрытый набор с повторной
+проверкой источников; явный brand/volume не расширяется каталогом. Новый результат
+публикует только выбранный offer, без отдельной selected-offer памяти, новых
+ordinary-model полей, provider calls или retry. Detail относится к этому offer.
+Автоматические финансовые дополнения пересчитываются прежним resolver для
+обновляемой карточки; подавление повторного показа по истории здесь не скрывает
+части этой же карточки. Обычные ходы сохраняют прежнее подавление.
+
+Presentation-only price_owned на text part обозначает принадлежность ценовому
+фрагменту по typed renderer источнику. При замене карточки widget обновляет этот
+фрагмент и controls/revision, сохраняет независимый адрес/прозу на их местах.
+Клик не добавляет bubbles; до server commit старый вариант остаётся видимым.
+Временная UI привязка request_id к исходному message переживает manual retry,
+не уходит в API и не хранит финансовый выбор. Reset очищает её.
+Серверный replay, TTL, forged/stale/foreign и lead/privacy остаются обязательными.
+
+Acceptance: initial-first context/detail; A→B→A без модели; точный ID при двух
+offers одного brand; фильтры не расширяются; JSON/SSE/replay; mixed price/address
+в обоих порядках и замена финансовых дополнений; error/manual retry без нового
+пузыря или optimistic цены; 360/390 layout, шрифты 16/14/30, stale/lead guards.
+Клиентские цены/данные/формулировки не менять. Overview и новый marketing/detail
+дизайн сюда не входят. Offline → независимый Checker → owner widget.
+Provider/live/SMTP 0; commit/push/merge/deploy не разрешены.
+
+### C2 evidence — 2026-10-10
+
+Owner widget follow-up: brand switch caused an up/down scroll jump. This is a
+presentation bug fix, not architecture simplification. Follow-up allowlist:
+static/widget/widget.js, tests/test_d2_price_cards_browser.py, this task.
+Preserve the current scroll position while the existing priceUpdate request is
+pending and when its confirmed result/error replaces the card. New ordinary
+turns keep their existing scrolling. No backend/KB/action contract changes.
+Browser regression samples card position each animation frame across a delayed
+offline selection response, rather than checking only the final position.
+Offline browser: d2-tabs-scroll-97bcr0xc/tests.xml — 1 passed, 11.22s;
+node --check PASS, git diff --check clean. Provider/live/SMTP 0.
+Independent focused Checker PASS: pending/final/error preserve viewport;
+ordinary turns retain auto-scroll. XML independently read, no blockers.
+
+Owner follow-up: no loading text or indicator during brand switches; retain
+only the shared answer attribution above the card. Presentation bug fix in
+the same three-file follow-up allowlist. Existing server-authenticated selection
+and next-turn scope stay unchanged, no preloading/new cache. The existing
+priceUpdate binding suppresses the ordinary typing display and cosmetic timers
+only during in-place selection (including manual retry). Ordinary questions
+retain waiting labels. Browser observes a four-second fake response across
+all three cosmetic phase deadlines, requiring no visible waiting indicator.
+Evidence: d2-tabs-silent-ql2ri23c/tests.xml — 1 passed, 13.35s; node syntax
+PASS, diff --check clean; provider/live/SMTP 0. No commit or push.
+Independent focused Checker PASS for silent switching/manual retry; ordinary
+waiting behavior unchanged. Owner confirmed widget behavior and authorized
+checkpoint commit/push of C2 before historical-card work, 2026-10-10.
+Owner verification preference: do not run browser tests for routine minor
+visual changes; owner checks those in widget. Reserve automated browser runs
+for complex interaction behavior, use only necessary internal checks.
+
+- C2 заменяет brand click→новый user/bot bubble на обновление финансового
+  фрагмента исходного message после подтверждения. Default-first применяется
+  до detail/compatibility/finalized IDs; нет скрытых published offers.
+- Добавлены candidate validation, сохранение существующей private action map,
+  presentation-only text ownership, transient request→message binding и табы.
+  Ordinary model schema, provider/prompt, KB, storage schema и backend replay
+  не менялись. Client не вычисляет цены и не хранит отдельный selected offer.
+- `d2-tabs-final-hn1_sa75/tests.xml`: **23 passed**, 35.864s — JSON/SSE,
+  exact offer/replay/next context, закрытый explicit-brand pool, оба порядка
+  price/address, real browser 360/390, A→B→A без bubbles, failed transport
+  (оба прежних attempts)→manual retry same ID, no optimistic price, отсутствие
+  transient typed price и неактивные исторические вкладки.
+- `d2-tabs-guards-mvidov2_/tests.xml`: **58 passed, 2 failed**, 76.78s —
+  UI authenticity/volume/doc actions, child/payment policy, limits, lead/privacy,
+  CTA replay. Два failures — ожидание всех brands в price→detail из прошлого
+  UI; изменён только этот expectation с сохранением direct detail all-offers.
+- `d2-tabs-repeat-xz7axwlp/tests.xml`: **8 passed**, 17.14s — два migrated
+  guards JSON/SSE + шесть новых owner-requested free-text continuation tests:
+  includes/stages/consultation после выбора Impro и повтор вопроса новым ID.
+  Ответ текстовый; targetless details используют receipt exact offer, direct
+  free-consult повторяет утверждённые квалифицированные условия. Replay бесплатен.
+  Это offline fake provider, не доказательство live языкового распознавания.
+- Совокупно **89 scoped cases прошли** на неизменённом финальном runtime;
+  три XML — раздельные прогоны, не единый full CI. Ранний runtime `model_copy`
+  на dataclass trace исправлен на существующий dataclasses.replace. Ранние
+  fixture ожидания HTTP400 для SSE и одной сетевой попытки исправлены под
+  штатные error frames и ранее существовавший двухпопытный transport.
+- Independent Checker PASS C2 по runtime и первому final XML; focused recheck
+  новых continuation tests и миграции guard тоже PASS, XML 8 PASS прочитан
+  независимо. Node syntax и git diff --check чисты.
+- HEAD 0391420, staging пуст, 12 changed tracked files с описанным расширением;
+  prototypes/ остаётся untracked. Provider/live/SMTP 0. Commit/push/merge/deploy
+  не делались. Пять legacy failures test_d2_price_modes.py из R1 не проверялись
+  повторно и здесь не закрываются. Full CI и owner widget acceptance впереди.
+
 ## Pause checkpoint — owner commit/push GO 2026-10-10
 
 Владелец завершает работу на сегодня и разрешил commit/push: «Делай».

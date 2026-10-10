@@ -306,7 +306,7 @@ def resolve_d2_operations(
     exact_contact_blocks=(), exact_policy_blocks=(),
     exact_contact_button=None, exact_canonical_contact=None,
     d2_request_order=(), shown_price_offer_refs=(), selected_price_detail_action=None,
-    selected_price_offer_id=None,
+    selected_price_offer_id=None, selected_price_select_actions=(),
     promotion_scope="none", requested_fact_ids=(), legacy_patient_text=None,
     exact_text_blocks=(), exact_parts=(), extra_ui=(), deferred_price_parts=(),
     exact_deferred_blocks=(),
@@ -475,6 +475,8 @@ def resolve_d2_operations(
     )
 
     price_block: D2FrozenPriceBlock | None = None
+    price_tab_rows = ()
+    price_selected_scope = None
     failure_blocks: list[D2PartFailureBlock] = list(commercial_failures)
     deferred_blocks: list[D2PartDeferredBlock] = [D2PartDeferredBlock(request_id=p.request_id, source_client_id=client_id) for p in deferred_price_parts]
     price_failure_reason: str | None = None
@@ -551,6 +553,17 @@ def resolve_d2_operations(
             scope_decision = None
             volume_choices = ()
         else:
+            if direct_service_only:
+                # The first eligible offer is the initially opened tab. Keep
+                # alternatives as UI actions, not as published financial refs.
+                price_tab_rows = price_block.rows
+                selected_row = price_block.rows[0]
+                price_block = price_block.model_copy(update={"rows": (selected_row,)})
+                trace = replace(trace, selected_offers=trace.selected_offers[:1])
+                offer = next(item for item in sources.material_authority.bundle.offers
+                             if item.offer_id == selected_row.offer_id)
+                price_selected_scope = DiscussionScope(target=price_part.target,
+                    volume=price_part.volume, brand_id=offer.brand_id)
             scope_decision, volume_choices = _d2_price_scope_decision(
                 part=price_part,
                 client_id=client_id,
@@ -680,7 +693,8 @@ def resolve_d2_operations(
                 failure_reason=(
                     price_failure_reason if part.request_id == price_part.request_id else None
                 ),
-                discussion_scope=_discussion_descriptor(part),
+                discussion_scope=(price_selected_scope if part.request_id == price_part.request_id
+                                  and price_selected_scope is not None else _discussion_descriptor(part)),
                 scope=part_scope,
                 service_id=part.service_id,
                 topic_id=part_topic_id,
@@ -846,10 +860,10 @@ def resolve_d2_operations(
         )
     if extra_ui:
         ui_candidates = ui_candidates.model_copy(update={"quick_replies": tuple(extra_ui), "price_detail_actions": ()})
-    if price_block is not None and scope_decision is None and len(price_block.rows) > 1 and not extra_ui:
+    if price_block is not None and scope_decision is None and not extra_ui:
         offers_by_id = {offer.offer_id: offer for offer in sources.material_authority.bundle.offers}
         replies, actions = [], []
-        for row in price_block.rows:
+        for row in price_tab_rows:
             offer = offers_by_id[row.offer_id]
             reply_id = f"price_select:{row.offer_id}"
             replies.append(UiQuickReplyCandidate(source_client_id=client_id,
@@ -858,10 +872,30 @@ def resolve_d2_operations(
                 reply_id=reply_id, offer_id=row.offer_id, service_id=row.service_id,
                 discussion_scope=DiscussionScope(target=ServiceTarget(type="service", id=row.service_id),
                     volume=price_part.volume, brand_id=offer.brand_id)))
-        ui_candidates = ui_candidates.model_copy(update={
-            "quick_replies": (*ui_candidates.quick_replies, *replies),
-            "price_select_actions": tuple(actions),
-        })
+        if selected_price_select_actions:
+            actions = list(selected_price_select_actions)
+            replies = []
+            for action in actions:
+                offer = offers_by_id.get(action.offer_id)
+                service = sources.material_authority.bundle.services.get(action.service_id)
+                extent = action.discussion_scope.volume.extent if action.discussion_scope.volume else None
+                if (action.source_client_id != client_id or offer is None or not offer.active
+                        or service is None or not service.active or offer.service_id != action.service_id
+                        or action.service_id != price_block.rows[0].service_id
+                        or offer.brand_id != action.discussion_scope.brand_id
+                        or action.offer_id not in sources.d2_published_terms_by_offer
+                        or (offer.option_id is not None and not any(
+                            option.option_id == offer.option_id and option.active is not False
+                            for option in service.options))
+                        or (extent not in {None, "unknown"} and not _d2_offer_applies(offer, service, extent))):
+                    raise MaterializationOwnershipError("d2_price_select_offer_unavailable")
+                replies.append(UiQuickReplyCandidate(source_client_id=client_id,
+                    reply_id=action.reply_id, label=_offer_variant_label(sources.material_authority.bundle, offer) or service.name))
+        if len(actions) > 1:
+            ui_candidates = ui_candidates.model_copy(update={
+                "quick_replies": (*ui_candidates.quick_replies, *replies),
+                "price_select_actions": tuple(actions),
+            })
     unavailable_count = sum(part.status == "unavailable" for part in request_parts)
     deferred_count = sum(part.status == "deferred" for part in request_parts)
     result_status = (

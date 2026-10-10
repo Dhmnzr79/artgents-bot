@@ -802,12 +802,23 @@ def _validate_price_select_ui_actions(*, actions, replies, price):
     reply_ids = {reply.reply_id for reply in replies}
     if len({action.reply_id for action in actions}) != len(actions):
         raise ValueError("d2_price_select_duplicate")
+    if len({action.offer_id for action in actions}) != len(actions):
+        raise ValueError("d2_price_select_duplicate_offer")
+    services = {row.service_id for row in price.rows}
+    if len(services) != 1 or not set(rows).issubset({a.offer_id for a in actions}):
+        raise ValueError("d2_price_select_source_mismatch")
+    volumes = {action.discussion_scope.volume.model_dump_json()
+               if action.discussion_scope.volume is not None else None for action in actions}
+    if len(volumes) != 1:
+        raise ValueError("d2_price_select_scope_mismatch")
     for action in actions:
         row = rows.get(action.offer_id)
         target = action.discussion_scope.target
-        if (row is None or row.service_id != action.service_id
-                or row.source_client_id != action.source_client_id
+        if (action.service_id not in services or price.source_client_id != action.source_client_id
+                or (row is not None and (row.service_id != action.service_id
+                    or row.source_client_id != action.source_client_id))
                 or target.type != "service" or target.id != action.service_id
+                or action.reply_id != f"price_select:{action.offer_id}"
                 or action.reply_id not in reply_ids):
             raise ValueError("d2_price_select_source_mismatch")
 
@@ -1826,6 +1837,7 @@ class ResponseUIProjection(ResponsePlanModel):
 class ResponseTextPart(ResponsePlanModel):
     kind: Literal["text"] = "text"
     text: NonBlankStr
+    price_owned: bool = False
 
 
 class ResponsePriceCardPart(ResponsePlanModel):

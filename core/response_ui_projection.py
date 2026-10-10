@@ -29,7 +29,7 @@ def project_response_ui(plan: ResolvedResponsePlan) -> ResponseUIProjection:
     actions = {action.reply_id: action for action in ui.price_select_actions}
     body_parts = tuple(part.model_copy(update={"choices": tuple(
         reply for reply in ui.quick_replies if reply.reply_id in actions
-        and actions[reply.reply_id].offer_id in {row.offer_id for row in part.price.rows}
+        and actions[reply.reply_id].service_id == part.price.rows[0].service_id
     )}) if isinstance(part, ResponsePriceCardPart) else part
         for part in render_response_parts(plan))
     if not any(isinstance(part, ResponsePriceCardPart) for part in body_parts):

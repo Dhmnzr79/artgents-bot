@@ -686,6 +686,7 @@ export function mountWidget(root, config) {
     messages: [],
     lastPayload: null,
     retryBody: null,
+    priceUpdate: null,
     pending: false,
     /** @type {"searching"|"writing"} */
     typingPhase: "searching",
@@ -1130,6 +1131,7 @@ export function mountWidget(root, config) {
     state.messages = [];
     state.lastPayload = null;
     state.retryBody = null;
+    state.priceUpdate = null;
     state.typingPhase = "searching";
     state.started = false;
     state.unread = false;
@@ -1301,7 +1303,7 @@ export function mountWidget(root, config) {
     state.statusMessage = null;
     renderFeed();
     updateTypingIndicatorText();
-    if (!leadRequest) {
+    if (!leadRequest && !state.priceUpdate) {
       // Cosmetic waiting sequence, not backend stages or a second model check.
       for (const [delay, phase] of [[1500, "checking"], [3500, "writing"]]) {
         waitingLabelTimers.push(window.setTimeout(() => {
@@ -1417,6 +1419,7 @@ export function mountWidget(root, config) {
 
     const commitFinalTurn = () => {
       if (turnFinalized) return;
+      const preserveScroll = state.priceUpdate?.requestId === body.request_id;
       turnFinalized = true;
       clearStreamTimers();
       const streamedText = fullText.trim();
@@ -1424,8 +1427,40 @@ export function mountWidget(root, config) {
         if (uiData.sid) setSid(uiData.sid);
         const turn = botTurnFromPayload(uiData, clientId);
         if (turn) {
-          state.messages.push(turn);
+          const update = state.priceUpdate;
+          if (update?.requestId === body.request_id) {
+            const old = update.message;
+            const cardIndex = old.bodyParts.findIndex((part) => part.kind === "price_card");
+            const nextCardIndex = turn.bodyParts.findIndex((part) => part.kind === "price_card");
+            const oldCard = old.bodyParts[cardIndex];
+            const nextCard = turn.bodyParts[nextCardIndex];
+            if (!state.messages.includes(old) || !nextCard || !oldCard
+                || nextCard.price?.rows?.length !== 1
+                || nextCard.price.rows[0].service_id !== oldCard.price.rows[0].service_id
+                || body.ref !== `price_select:${nextCard.price.rows[0].offer_id}`) {
+              setError("Не удалось отобразить ответ. Попробуйте ещё раз.");
+            } else {
+              // Replace price-owned content at its existing anchors. Independent
+              // text (e.g. an address between price and promotion) stays in place.
+              const before = turn.bodyParts.slice(0, nextCardIndex).filter(p => p.price_owned);
+              const after = turn.bodyParts.slice(nextCardIndex + 1).filter(p => p.price_owned);
+              const merged = [];
+              let beforeInserted = false, afterInserted = false;
+              old.bodyParts.forEach((part, index) => {
+                if (part.price_owned) {
+                  if (index < cardIndex && !beforeInserted) { merged.push(...before); beforeInserted = true; }
+                  if (index > cardIndex && !afterInserted) { merged.push(...after); afterInserted = true; }
+                } else if (index === cardIndex) {
+                  if (!beforeInserted) { merged.push(...before); beforeInserted = true; }
+                  merged.push(nextCard);
+                } else merged.push(part);
+              });
+              if (!afterInserted) merged.push(...after);
+              Object.assign(old, turn, {bodyParts: merged});
+            }
+          } else state.messages.push(turn);
         }
+        state.priceUpdate = null;
         state.lastPayload = uiData;
         state.retryBody = null;
         if (!state.isOpen) state.unread = true;
@@ -1449,7 +1484,7 @@ export function mountWidget(root, config) {
       liveBubble = null;
       endPendingRequest();
       if (state.unread && !state.isOpen) unreadDot?.classList.add("is-visible");
-      renderFeed();
+      renderFeed({preserveScroll});
       syncSendState();
     };
 
@@ -1590,12 +1625,14 @@ export function mountWidget(root, config) {
       },
       onError(msg, retryable) {
         if (turnFinalized) return;
+        const preserveScroll = state.priceUpdate?.requestId === body.request_id;
         streamAborted = true;
         clearStreamTimers();
         state.retryBody = retryable ? body : null;
+        if (!retryable) state.priceUpdate = null;
         setError(msg);
         endPendingRequest();
-        renderFeed();
+        renderFeed({preserveScroll});
         syncSendState();
       },
     });
@@ -1716,7 +1753,11 @@ export function mountWidget(root, config) {
     if (trail.children.length) wrap.appendChild(trail);
   }
 
-  function renderFeed() {
+  function renderFeed({preserveScroll = Boolean(state.priceUpdate)} = {}) {
+    // Updating an existing card is not a new turn. Keep the reader's viewport
+    // through both the pending render and the confirmed replacement.
+    const scroller = preserveScroll ? getChatScroller(feed) : null;
+    const scrollTop = scroller?.scrollTop;
     const prevWelcome = feed.querySelector(".clinic-shell__welcome-screen");
     const keepWelcome = prevWelcome && !state.started;
 
@@ -1847,13 +1888,15 @@ export function mountWidget(root, config) {
       state.typingPhase === "writing" ? WRITE_SVG
       : state.typingPhase === "checking" ? CHECK_DOCUMENT_SVG : SEARCH_SVG;
     typingWrap.appendChild(typing);
-    typingWrap.classList.toggle("is-visible", state.pending);
+    typingWrap.classList.toggle("is-visible", state.pending && !state.priceUpdate);
     feed.appendChild(typingWrap);
 
     const lastMsg = state.messages.length
       ? state.messages[state.messages.length - 1]
       : null;
-    if (lastMsg && lastMsg.role === "bot") {
+    if (scroller) {
+      scroller.scrollTo({top: scrollTop, behavior: "instant"});
+    } else if (lastMsg && lastMsg.role === "bot") {
       requestAnimationFrame(() => scrollToLastTurnStart(feed));
     } else {
       scrollChatPaneToEnd(feed, { force: state.messages.length > 0 });
@@ -1885,27 +1928,37 @@ export function mountWidget(root, config) {
       title.className = "clinic-price-card__title";
       title.textContent = rows[0].service_name;
       card.appendChild(title);
+      if ((part.choices || []).length > 1) {
+        const tabs = document.createElement("div");
+        tabs.className = "clinic-price-card__tabs";
+        tabs.setAttribute("role", "group");
+        tabs.setAttribute("aria-label", "Вариант");
+        for (const choice of part.choices) {
+          const active = choice.reply_id === `price_select:${rows[0].offer_id}`;
+          const tab = document.createElement("button");
+          tab.type = "button";
+          tab.className = "clinic-price-card__tab";
+          tab.textContent = choice.label;
+          tab.setAttribute("aria-pressed", String(active));
+          tab.disabled = state.pending || message.linksDismissed || message.revision !== state.lastPayload?.revision;
+          tab.addEventListener("click", () => {
+            if (!active) void sendAsk({ref: choice.reply_id, ui_revision: message.revision,
+              q: "", priceMessage: message});
+          });
+          tabs.appendChild(tab);
+        }
+        card.appendChild(tabs);
+      }
       const terms = rows.map((row) => [...new Set([row.scope_text, ...(row.condition_texts || [])].filter(Boolean))]);
       const common = terms[0].filter((term) => terms.every((list) => list.includes(term)));
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        const choice = (part.choices || []).find((it) => it.reply_id === `price_select:${row.offer_id}`);
         const item = document.createElement("div");
         item.className = "clinic-price-card__variant";
-        if (row.variant_label) {
-          const label = document.createElement(choice ? "button" : "span");
+        if (row.variant_label && !(part.choices || []).length) {
+          const label = document.createElement("span");
           label.className = "clinic-price-card__brand";
           label.textContent = row.variant_label;
-          if (choice) {
-            label.type = "button";
-            label.disabled = state.pending || message.linksDismissed || message.revision !== state.lastPayload?.revision;
-            label.setAttribute("aria-label", `Выбрать ${row.variant_label}: ${row.price_display_text}`);
-            label.addEventListener("click", () => {
-              dismissTrailingsAll(state.messages);
-              dismissLinksAll(state.messages);
-              void sendAsk({ref: choice.reply_id, ui_revision: message.revision, q: "", userEcho: choice.label});
-            });
-          }
           item.appendChild(label);
         }
         const price = document.createElement("strong");
@@ -1955,6 +2008,7 @@ export function mountWidget(root, config) {
       typeof extra.userEcho === "string" ? extra.userEcho.trim() : "";
     const apiFields = { ...extra };
     delete apiFields.userEcho;
+    delete apiFields.priceMessage;
 
     if (userEcho) {
       const applyUserEcho = () => {
@@ -1988,6 +2042,7 @@ export function mountWidget(root, config) {
       ...apiFields,
     };
     if (body.q === undefined) body.q = "";
+    state.priceUpdate = extra.priceMessage ? {message: extra.priceMessage, requestId: body.request_id} : null;
 
     setError("");
     beginPendingRequest(body);

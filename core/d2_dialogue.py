@@ -233,6 +233,7 @@ def run_d2_dialogue_turn(
         selected_document_action: D2SelectedDocumentAction | None = None
         selected_price_detail_action: D2PriceDetailUiAction | None = None
         selected_price_select_action: D2PriceSelectUiAction | None = None
+        selected_price_select_actions = ()
         selected_volume_price_task: _SelectedVolumePriceTask | None = None
         if lead_ui_ref and ui_revision is not None:
             shown = store.read_latest_completion(session_key)
@@ -265,6 +266,8 @@ def run_d2_dialogue_turn(
                     selected_price_select_action = next((item
                         for item in shown.response.resolved.ui_plan.price_select_actions
                         if item.reply_id == reply.reply_id), None)
+                    if selected_price_select_action is not None:
+                        selected_price_select_actions = shown.response.resolved.ui_plan.price_select_actions
                     if selected_price_detail_action is None and selected_price_select_action is None:
                         selected_document_action = resolve_d2_selected_document_action(
                             tenant, reply_id=reply.reply_id,
@@ -415,6 +418,7 @@ def run_d2_dialogue_turn(
             selected_document_action=selected_document_action,
             selected_price_detail_action=selected_price_detail_action,
             selected_price_select_action=selected_price_select_action,
+            selected_price_select_actions=selected_price_select_actions,
             selected_volume_price_task=selected_volume_price_task,
             selected_service_id=(
                 lead_ui_ref.removeprefix("service:")
@@ -639,6 +643,7 @@ def _run_reserved_d2_dialogue_turn(
     selected_document_action: D2SelectedDocumentAction | None = None,
     selected_price_detail_action: D2PriceDetailUiAction | None = None,
     selected_price_select_action: D2PriceSelectUiAction | None = None,
+    selected_price_select_actions=(),
     selected_volume_price_task: _SelectedVolumePriceTask | None = None,
     selected_service_id: str | None = None,
 ) -> D2DialogueTurn:
@@ -914,7 +919,8 @@ def _run_reserved_d2_dialogue_turn(
         operations.append(block)
     sources = build_d2_snapshot_sources(
         tenant, model_view=view, operations=tuple(operations), session_key=session_key,
-        shown_promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
+        shown_promo_fact_ids=(() if selected_price_select_action is not None
+                              else context.retained_shown_ids.promo_fact_ids),
         shown_secondary_ref_ids=context.retained_shown_ids.secondary_ref_ids,
     )
     render_order = tuple(b.request_id for b in result.blocks if b.kind != "booking")
@@ -931,6 +937,7 @@ def _run_reserved_d2_dialogue_turn(
         selected_price_detail_action=selected_price_detail_action,
         selected_price_offer_id=(selected_price_select_action.offer_id
                                 if selected_price_select_action is not None else None),
+        selected_price_select_actions=selected_price_select_actions,
         commercial_operations=tuple(commercial_operations),
         directory_cta=directory_cta,
         suppress_forbidden_booking_cta=(suppress_forbidden_booking_cta

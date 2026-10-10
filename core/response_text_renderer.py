@@ -67,7 +67,7 @@ def render_response_parts(plan: ResolvedResponsePlan) -> tuple:
                 parts.append(exact_by_request[part.request_id].display_text.strip())
             elif part.kind == "price":
                 if plan.d2_price_block is not None and plan.patient_text:
-                    parts.append(plan.patient_text.strip())
+                    parts.append(ResponseTextPart(text=plan.patient_text.strip(), price_owned=True))
                 _render_d2_price_parts(plan, parts)
             elif part.kind == "price_detail":
                 _render_d2_price_detail(next(block for block in plan.d2_price_detail_blocks
@@ -80,14 +80,14 @@ def render_response_parts(plan: ResolvedResponsePlan) -> tuple:
                 block = content_by_request.get(part.request_id)
                 if block is not None:
                     parts.append(block.display_text.strip())
-        parts.extend(_condition_display_texts(plan.required_offer_conditions))
+        _append_price_texts(parts, _condition_display_texts(plan.required_offer_conditions))
         if plan.patient_text and plan.d2_price_block is None:
             parts.append(plan.patient_text.strip())
         parts.extend(block.display_text.strip() for block in plan.requested_fact_blocks)
-        parts.extend(block.display_text.strip() for block in plan.promo_blocks)
-        parts.extend(_render_d2_commercial_packages(plan))
-        parts.extend(_render_amplifier_list(plan))
-        parts.extend(_render_textual_cta(plan))
+        _append_price_texts(parts, (block.display_text.strip() for block in plan.promo_blocks))
+        _append_price_texts(parts, _render_d2_commercial_packages(plan))
+        _append_price_texts(parts, _render_amplifier_list(plan))
+        _append_price_texts(parts, _render_textual_cta(plan))
         parts.extend(exact_by_request[part.request_id].display_text.strip()
                      for part in plan.d2_request_parts[body_end:])
         return _body_parts(parts)
@@ -125,8 +125,14 @@ def render_response_parts(plan: ResolvedResponsePlan) -> tuple:
     return _body_parts(parts)
 
 
-def _body_parts(parts: list[str | D2FrozenPriceBlock]) -> tuple[ResponseTextPart | ResponsePriceCardPart, ...]:
+def _append_price_texts(parts, texts):
+    price_owned = any(isinstance(part, D2FrozenPriceBlock) for part in parts)
+    parts.extend(ResponseTextPart(text=text, price_owned=price_owned) for text in texts if text)
+
+
+def _body_parts(parts) -> tuple[ResponseTextPart | ResponsePriceCardPart, ...]:
     return tuple(ResponsePriceCardPart(price=part) if isinstance(part, D2FrozenPriceBlock)
+                 else part if isinstance(part, ResponseTextPart)
                  else ResponseTextPart(text=part) for part in parts if part)
 
 

@@ -427,6 +427,7 @@ def resolve_d2_operations(
                 ordered_offer_ids=direction_order,
                 direct_service_only=direct_service_only,
                 selected_offer_id=selected_price_offer_id,
+                selected_option_id=price_part.option_id,
             )
         except MaterializationContractError as error:
             price_failure_reason = str(error)
@@ -453,12 +454,16 @@ def resolve_d2_operations(
             volume_choices = ()
         else:
             if direct_service_only:
-                # The first eligible offer is the initially opened tab. Keep
+                # A named variant selects its eligible row; otherwise open the first. Keep
                 # alternatives as UI actions, not as published financial refs.
                 price_tab_rows = price_block.rows
-                selected_row = price_block.rows[0]
+                selected_row = next(row for row in price_block.rows if any(
+                    offer.offer_id == row.offer_id and offer.option_id == price_part.option_id
+                    for offer in sources.material_authority.bundle.offers
+                )) if price_part.option_id is not None else price_block.rows[0]
                 price_block = price_block.model_copy(update={"rows": (selected_row,)})
-                trace = replace(trace, selected_offers=trace.selected_offers[:1])
+                trace = replace(trace, selected_offers=tuple(
+                    offer for offer in trace.selected_offers if offer.offer_id == selected_row.offer_id))
                 offer = next(item for item in sources.material_authority.bundle.offers
                              if item.offer_id == selected_row.offer_id)
                 price_selected_scope = DiscussionScope(target=price_part.target,
@@ -1279,6 +1284,7 @@ def _d2_price_block(
     ordered_offer_ids: tuple[str, ...] = (),
     direct_service_only: bool = False,
     selected_offer_id: str | None = None,
+    selected_option_id: str | None = None,
 ) -> tuple[D2FrozenPriceBlock, MaterializationTrace]:
     if brand_id is not None and brand_id not in bundle.brands.brands:
         raise MaterializationContractError("d2_no_price_candidates")
@@ -1340,6 +1346,8 @@ def _d2_price_block(
         offers = [offer for offer in offers if offer.offer_id == selected_offer_id]
         if len(offers) != 1:
             raise MaterializationOwnershipError("d2_price_select_offer_unavailable")
+    if selected_option_id is not None and not any(offer.option_id == selected_option_id for offer in offers):
+        raise MaterializationContractError("d2_no_price_candidates")
     rows = tuple(
         _d2_frozen_price_row(
             offer,

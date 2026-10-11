@@ -40,7 +40,7 @@ class ActiveServiceCatalogSnapshot:
 
     @classmethod
     def from_bundle(cls, bundle: ResponseDataCatalog) -> ActiveServiceCatalogSnapshot:
-        rows: list[dict[str, str]] = []
+        rows: list[dict[str, object]] = []
         active_ids: list[str] = []
         for service_id in sorted(bundle.services):
             service = bundle.services[service_id]
@@ -49,7 +49,12 @@ class ActiveServiceCatalogSnapshot:
             token = str(service_id)
             active_ids.append(token)
             title = str(service.name or service_id).strip()
-            rows.append({"service_id": token, "title": title})
+            row = {"service_id": token, "title": title}
+            options = [{"option_id": option.option_id, "name": option.name}
+                       for option in service.options if _option_is_active(option)]
+            if options:
+                row["options"] = options
+            rows.append(row)
         allowed_stages = _collect_allowed_patient_stages(bundle)
         canonical = {
             "services": rows,

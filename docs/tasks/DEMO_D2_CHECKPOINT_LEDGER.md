@@ -1660,3 +1660,9 @@ no test weakening/repair/fallback/new model wire/state/memory/call. Cursor/widge
 still pending; branch/HEAD1975eb3 unchanged, staging empty, provider/live0.
 
 §49 accepted: Cursor PASS only A1–A2; owner widget OK. Cursor reports232PASS/3existing-expectationFAIL plus guards50PASS/1existing-wordingFAIL; see Interface49.4. Independent Checker PASS already recorded. Prepare exact10-file checkpoint from1975eb3; no provider/live/browser/SMTP calls by agents. §46 and foreign WIP excluded. StageII variant representation still requires owner agreement before implementation.
+
+§50/A4: owner approved named catalog option→selected tab, generic→existing initial tab. Baseline211ef55, branchcodex/model-price-experiment. Bug fix, not global architecture simplification. Optional PriceOperation.option_id and existing active catalog option ID/name projection; no session state/UI action fields/model calls. Three runtime files plus new test and three documents; §46 foreign WIP excluded. Initial20targetedPASS, expanded checks and independent Checker pending. No commit/push/provider/browser/SMTP. A3 still open.
+
+§50 final offline:139PASS/4baselineFAIL plus3catalogPASS; four failures reproduced in clean211ef55. Independent Astra Checker PASS A4 only:29tests+15probes. Cursor/widget pending, no commit/push, stagingempty, provider/browser/SMTP0. A3 remains open. Evidence Interface50.3.
+
+§50 accepted by Cursor (141PASS/4confirmed baselineFAIL) and owner widget. Separate seven-file checkpoint from211ef55; no new provider calls. Duplicate sinus exclusion recorded in50.4 for card/text stage. A3 remains open, §46/foreignWIP excluded.

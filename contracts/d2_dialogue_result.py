@@ -97,12 +97,15 @@ class PolicyScope(ScopedOperation):
 class PriceOperation(PolicyScope):
     kind: Literal["price"]
     brand_id: str | None = None
+    option_id: str | None = Field(default=None, strict=True, min_length=1, description="Named variant ID from this service's catalog; omit when no variant is specified.")
     payment_scheme: Literal["oms", "dms", "self_pay", "unspecified"] = "unspecified"
     payment_scheme_intent: Literal["eligibility_question", "requested_payment", "not_requested", "unspecified"] = "unspecified"
     clarification: MeaningClarification | None = Field(default=None, exclude_if=lambda v: v is None)
 
     @model_validator(mode="after")
     def price_form(self):
+        if self.option_id is not None and not isinstance(self.target, ServiceTarget):
+            raise ValueError("price_option_service_required")
         if "clarification" in self.model_fields_set and self.clarification is None:
             raise ValueError("clarification_required")
         if self.clarification is not None and self.target is not None and not isinstance(self.target, UnresolvedTarget):

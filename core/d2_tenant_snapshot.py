@@ -10,6 +10,8 @@ from types import MappingProxyType
 
 import yaml
 
+from core.clinic_policies_loader import validate_policy_text_refs
+
 from contracts.d2_tenant_snapshot import (
     D2CommercialPack,
     D2DirectionPriceConfig,
@@ -231,7 +233,7 @@ def _approved_md_corpus(snapshot: D2TenantSnapshot) -> str:
 
 
 def _clinic_policy_catalog_json(snapshot: D2TenantSnapshot) -> str:
-    """Expose policy IDs and authored answers from the captured tenant pack only."""
+    """Expose policy IDs and MD references from the captured tenant pack only."""
     raw = dict(snapshot.files).get("clinic_policies.yaml")
     if raw is None:
         return json.dumps(
@@ -242,13 +244,14 @@ def _clinic_policy_catalog_json(snapshot: D2TenantSnapshot) -> str:
         parsed = yaml.safe_load(raw.decode("utf-8"))
     except (UnicodeDecodeError, yaml.YAMLError) as exc:
         raise D2TenantSnapshotError("clinic_policy_catalog_invalid") from exc
+    validate_policy_text_refs(parsed, lambda name: dict(snapshot.files)["md/" + name].decode("utf-8"))
     policies = parsed.get("policies") if isinstance(parsed, dict) else None
     rows: list[dict[str, str]] = []
     if isinstance(policies, dict):
         for policy_id, body in sorted(policies.items()):
-            answer = body.get("answer") if isinstance(body, dict) else None
-            if isinstance(policy_id, str) and policy_id.strip() and isinstance(answer, str) and answer.strip():
-                rows.append({"policy_id": policy_id, "answer": answer.strip()})
+            ref = body.get("text_ref") if isinstance(body, dict) else None
+            if isinstance(policy_id, str) and policy_id.strip() and isinstance(ref, str) and ref.strip():
+                rows.append({"policy_id": policy_id, "text_ref": ref})
     brand_rows: list[dict[str, str]] = []
     raw_brands = parsed.get("brand_alternatives") if isinstance(parsed, dict) else None
     if isinstance(raw_brands, list):
@@ -256,9 +259,9 @@ def _clinic_policy_catalog_json(snapshot: D2TenantSnapshot) -> str:
             if not isinstance(body, dict):
                 continue
             brand_id = body.get("requested_brand_id")
-            answer = body.get("approved_text")
-            if isinstance(brand_id, str) and brand_id.strip() and isinstance(answer, str) and answer.strip():
-                brand_rows.append({"brand_id": brand_id.strip(), "answer": answer.strip()})
+            ref = body.get("text_ref")
+            if isinstance(brand_id, str) and brand_id.strip() and isinstance(ref, str) and ref.strip():
+                brand_rows.append({"brand_id": brand_id.strip(), "text_ref": ref})
     service_rows: list[dict[str, object]] = []
     raw_services = parsed.get("service_alternatives") if isinstance(parsed, dict) else None
     if isinstance(raw_services, list):
@@ -271,8 +274,8 @@ def _clinic_policy_catalog_json(snapshot: D2TenantSnapshot) -> str:
                 continue
             ids = list(dict.fromkeys(item.strip() for item in alternatives
                 if isinstance(item, str) and item.strip() and item.strip() != requested.strip()))[:2]
-            answer = body.get("approved_text")
-            if ids and isinstance(answer, str) and answer.strip():
+            ref = body.get("text_ref")
+            if ids and isinstance(ref, str) and ref.strip():
                 service_rows.append({"requested_service_id": requested.strip(), "alternative_service_ids": ids})
     contact = parsed.get("contact") if isinstance(parsed, dict) else None
     branch_rows: list[dict[str, object]] = []

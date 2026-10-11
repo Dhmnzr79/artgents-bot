@@ -7,6 +7,7 @@ import yaml
 from contracts.d2_dialogue_result import D2DialogueResult, BookingOperation
 from tests.d2_ci_http import FakeProvider, http_env, send, raw, explanation
 from core.d2_live_provider import build_d2_d1r_messages
+from core.clinic_policies_loader import resolve_policy_text
 
 
 def update_rules(tmp, mutate):
@@ -37,7 +38,8 @@ def test_captured_child_rule_owns_text_ui_and_memory(http_env, monkeypatch, tran
         block["target"] = {"type": "service", "id": "caries"}
     fake = use(FakeProvider(raw(block)))
     first = send(client, transport, request_id="first", q="Лечение ребёнка")
-    approved = rules["policies"]["no_pediatric_dentistry"]["answer"].strip()
+    approved = resolve_policy_text(rules["policies"]["no_pediatric_dentistry"],
+        lambda name: (tmp / "clients/demo/md" / name).read_text(encoding="utf-8"))
     assert first["answer"].count(approved) == 1
     assert not any(b["action_kind"] == "cta" for b in first["ui"]["buttons"])
     assert send(client, transport, request_id="first", q="Лечение ребёнка") == first
@@ -140,8 +142,11 @@ def test_price_and_commercial_text_included_in_ordinary_history(http_env, transp
 @pytest.mark.parametrize("transport", ["json", "sse"])
 def test_authored_availability_cannot_replace_ordinary_prose(http_env, transport):
     client, _, use, tmp = http_env
-    update_rules(tmp, lambda rules: rules["service_alternatives"][0].update(
-        approved_text="Брекеты не устанавливаем. Элайнеры — 123456 рублей."))
+    path = tmp / "clients/demo/md/clinic__info__policies.md"
+    text = path.read_text(encoding="utf-8")
+    rules = update_rules(tmp, lambda rules: None)
+    approved = resolve_policy_text(rules["service_alternatives"][0], lambda name: text)
+    path.write_text(text.replace(approved, "Брекеты не устанавливаем. Элайнеры — 123456 рублей."), encoding="utf-8")
     fake = use(FakeProvider(raw({"kind": "content", "request_id": "r1",
         "target": {"type": "service", "id": "braces"}, "content_text": "ignored"})))
     first = send(client, transport, request_id="first", q="Хочу брекеты")

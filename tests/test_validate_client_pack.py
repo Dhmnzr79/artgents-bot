@@ -51,3 +51,30 @@ def test_validator_reports_missing_target(tmp_path: Path) -> None:
     (pack / "md" / "x.md").write_text("# x\n", encoding="utf-8")
     errors = validate_client_pack(pack)
     assert any("target_response" in err for err in errors)
+
+
+def test_demo_doctors_use_md_without_parallel_catalog():
+    assert not (_DEMO / "doctor_catalog.json").exists()
+    for name in ("fedorova", "grigoriev", "kuznetsov", "morozova", "orlov", "volkov"):
+        profile = _DEMO / "md" / f"doctors__doctor__{name}.md"
+        text = profile.read_text(encoding="utf-8")
+        assert "{#korotko}" in text
+        assert len(text) > 200
+    # Known independent contact duplication is not removed to make this stage green.
+    assert validate_client_pack(_DEMO) == ["md/clinic__info__contacts.md: duplicate_contact_facts_forbidden"]
+
+
+@pytest.mark.parametrize("reference", ["doctor:doctors__doctor__ghost", "kb:doctors__doctor__missing.md#korotko"])
+def test_validator_still_rejects_unavailable_sources_without_doctor_index(tmp_path, reference):
+    import shutil
+    import yaml
+    pack = tmp_path / "demo"
+    shutil.copytree(_DEMO, pack)
+    baseline = validate_client_pack(pack)
+    path = pack / "target_response" / "marketing.yaml"
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data["scenario_rules"]["doctor_trust"]["ordered_amplifier_refs"].append(reference)
+    path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+    errors = validate_client_pack(pack)
+    assert len(errors) == len(baseline) + 1
+    assert any("external_ref_invalid" in error for error in errors)

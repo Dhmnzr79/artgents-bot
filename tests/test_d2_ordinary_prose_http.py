@@ -112,3 +112,17 @@ def test_automatic_promo_once_then_direct_question_can_repeat(http_env, transpor
     third = send(client, transport, request_id="three", q="Повторите условия акции")
     assert third["answer"] == direct
     assert len(fake.inputs) == 3
+
+
+@pytest.mark.parametrize("transport", ["json", "sse"])
+def test_doctor_fullcontext_needs_only_md_profiles(http_env, transport):
+    client, _, use, tmp = http_env
+    assert not (tmp / "clients/demo/doctor_catalog.json").exists()
+    text = "Орлов — имплантолог. Кузнецов занимается ортопедией."
+    fake = use(FakeProvider(raw(explanation(text, content_ref="doctors__doctor__overview.md"))))
+    body = send(client, transport, q="Расскажите о врачах")
+    assert text in body["answer"]
+    system = build_d2_d1r_messages(fake.inputs[0])[0]["content"]
+    for name in ("fedorova", "grigoriev", "kuznetsov", "morozova", "orlov", "volkov"):
+        assert f"---BEGIN APPROVED MD:doctors__doctor__{name}.md---" in system
+    assert len(fake.inputs) == 1

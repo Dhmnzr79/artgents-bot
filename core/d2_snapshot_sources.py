@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core.clinic_policies_loader import resolve_policy_text
+
 from pathlib import Path
 
 import yaml
@@ -595,7 +597,7 @@ def d2_authored_policy_answers(snapshot: D2TenantSnapshot) -> dict[str, str]:
     for key, body in raw.items():
         if not isinstance(key, str) or not isinstance(body, dict):
             continue
-        answer = body.get("answer")
+        answer = resolve_policy_text(body, lambda name: dict(snapshot.files)["md/" + name].decode("utf-8"))
         if isinstance(answer, str) and answer.strip():
             out[key] = answer.strip()
     return out
@@ -615,7 +617,7 @@ def _authored_service_alternative(
         requested = str(row.get("requested_service_id") or "").strip()
         if requested != service_id:
             continue
-        approved = str(row.get("approved_text") or "").strip()
+        approved = resolve_policy_text(row, lambda name: dict(snapshot.files)["md/" + name].decode("utf-8"))
         alt_raw = row.get("alternative_service_ids")
         alts = (
             [str(item).strip() for item in alt_raw if str(item).strip()]
@@ -774,7 +776,7 @@ def build_d2_brand_policy_response(
     for row in raw:
         if not isinstance(row, dict) or row.get("requested_brand_id") != brand_id:
             continue
-        text = row.get("approved_text")
+        text = resolve_policy_text(row, lambda name: dict(snapshot.files)["md/" + name].decode("utf-8"))
         if isinstance(text, str) and text.strip():
             return _d2_code_owned_answer(session_key=session_key, text=text.strip(), route="ANSWER",
                 source_results=(D2SourceResult(source_ref=f"brand_policy:{brand_id}", outcome="answered"),))

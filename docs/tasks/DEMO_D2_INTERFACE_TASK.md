@@ -4219,3 +4219,58 @@ Cursor: read-only проверить рабочий diff против 5f47ee6, A
 ### 43.3 Приёмка владельцем
 
 Cursor PASS получен: 186 PASS/10 legacy FAIL (8 старых directory/offtopic envelope и 2 ранее воспроизведённых authored-source), весь бот этим не аттестуется. После перезапуска текущего локального сервера владелец проверил виджет и подтвердил: «Все ок. Давай дальше». Checkpoint §43 принят для commit/push; разрешено продолжение актуальной дорожной карты. Исполнитель новых provider-вызовов не делал; ручные диалоги владельца не считаются проведённым автоматическим сравнением моделей.
+
+## 44. Этап 2: единый источник врачей и политики
+
+Preflight: root/top C:/Cursor Projects/artgents-bot-active, branch codex/model-price-experiment, HEAD/baseline/upstream0b9d26c, origin/main/merge-base efa3f77. Staging пуст; прежний foreign WIP неизменен. §43 опубликован после Cursor/виджета. Astra consult выполнен. Маркетинг3–4 не начинается, пока не разобран оставшийся этап2.
+
+44А — архитектурное упрощение источника врачей, уже разрешённое владельцем. До: D2 читает MD, но штатный pack validator требует параллельный doctor JSON, а legacy marketing ссылается на doctor IDs. После: профили только MD, валидатор проверяет KB-ссылки без doctor index; старые doctor refs удалены. Единственный источник врачебных фактов — MD. Удалить Demo JSON и его обязанность в валидаторе, без MD→catalog adapter. Старый target_runtime_client_context и его инструменты не являются поддерживаемым normal-dialogue runtime; их невозможность загрузить Demo после удаления JSON не обходится fallback. Другие tenant JSON не удаляются.
+
+Exact allowlist44А: clients/demo/doctor_catalog.json; clients/demo/target_response/marketing.yaml; scripts/validate_client_pack.py; tests/test_validate_client_pack.py; tests/test_d2_ordinary_prose_http.py; docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md. MD-профили сохраняются без изменения. Нет новых runtime fields/states/model calls.
+
+Baseline перед правкой: tests/test_validate_client_pack.py —3PASS/2FAIL, оба FAIL из-за md/clinic__info__contacts.md:duplicate_contact_facts_forbidden. Это существующий отдельный долг, проверки не ослаблять.
+
+44Б — пока предложение, не runtime GO: единственный policy MD с отдельными разделами и явное новое поле text_ref в существующих YAML-правилах вместо answer/approved_text. Существующие машинные правила цены/записи сохраняются, код берёт утверждённый текст из указанного раздела captured MD. Неверная ссылка — ошибка базы, без YAML fallback/поиска по словам/скрытой таблицы. Контакты, spam/offtopic, medical handoff вне этой замены. Новая связь требует отдельного решения владельца по AGENTS.md; зависимая реализация остановлена. Удаление physician JSON от этого решения не зависит.
+
+44А allowlist дополнен core/target_client_data.py: тест HTTP выявил обязательное чтение doctor JSON на реальном startup_check→load_target_client_data→_validate_external_refs, до входа в D2. Удаляется этот read/index, общая проверка KB-ссылок сохраняется. Первые два HTTP setup ERROR отражали найденную зависимость и требуют успешного повторного прогона; это не baseline.
+
+
+44А targeted recheck: **8 PASS/2 baseline FAIL**, setup ERROR устранены удалением реальной startup-зависимости. Старые assertions не ослаблены. Новые проверки: шесть MD-профилей без JSON, нормальный HTTP JSON/SSE и полный корпус, отклонение отсутствующих doctor/KB refs без doctor index. Startup зависит от MD/KB, не от скрытого адаптера. Изменения 44А ещё не staged/committed/pushed; код политики 44Б не тронут; provider/live calls — 0. Маркетинг ещё не начат. Локальный сервер, остановившийся при обнаруженной startup-ошибке, повторно запущен после исправления через штатный launcher.
+
+Независимый Checker 44А выполнил **5 PASS**: три проверки MD/reference в валидаторе и два HTTP startup/fullcontext случая JSON/SSE. Достижимый путь startup_check → load_target_client_data → KB-only index проверен. Неверные doctor/KB refs по-прежнему отклоняются; содержательных изменений MD нет. Итоговый verdict Checker — PASS только 44А после сверки документов; блокирующих замечаний нет. Следующую внешнюю проверку Cursor можно объединить с политикой после решения владельца; этот результат не разрешает добавление text_ref без согласования.
+
+### 44Б — owner GO для text_ref
+
+Владелец подтвердил явную ссылку text_ref в существующих правилах. До: MD/YAML содержат копии текста, lead отдельно читает YAML answer. После: единственный текст в MD, правила указывают точный раздел, все потребители читают его; YAML answer/approved_text и отдельный lead reader удалены. Единственный источник текста — MD; запретом действия владеет прежний resolver. Не добавляются модельные команды, состояния, fallback или поиск по словам.
+
+Preflight root/top/branch/HEAD прежние: C:/Cursor Projects/artgents-bot-active, codex/model-price-experiment,0b9d26c; origin/main/merge-base efa3f77. WIP44А и чужие файлы сохранены. Exact дополнительный allowlist: clients/demo/clinic_policies.yaml; clients/demo/md/clinic__info__policies.md; clients/nikadent/clinic_policies.yaml; clients/nikadent/md/clinic__info__policies.md (новый, дословный перенос существующего правила для общего reader); core/clinic_policies_loader.py; core/d2_snapshot_sources.py; core/d2_tenant_snapshot.py; core/d2_lead_bridge.py; scripts/validate_client_pack.py; tests/test_d2_policy_route_fixes.py; tests/test_clinic_policies_loader.py; tests/test_validate_client_pack.py; tests/test_d2_live_provider_offline.py; tests/test_d2_policy_text_refs.py (новый); три текущих документа Interface/Roadmap/Target. Поля/данные контактов и медицинского handoff не меняются. Неверная ссылка — ошибка данных, без старого текстового fallback.
+
+
+### 44Б. Реализация и границы проверки
+
+Классификация — архитектурное упрощение источников, без изменения владельца смыслового решения. Удалены YAML answer/approved_text/legacy keyword note в Demo, отдельный lead _authored_policy_answer, повторный текст из provider policy catalog. Полный текст читается из captured MD через точный text_ref. Старые keyword alternative rows больше не являются источником Demo; их сведения о базальных/мини-имплантах остаются в MD. Legacy helper без Demo-строк больше не выдаёт эти заготовки; normal D2 их не вызывает. Старые тесты этого поведения заменены явными проверками отсутствия параллельных строк, остальные assertions сохранены.
+
+Добавлен один согласованный text_ref и его проверка: корректный файл/единственный непустой H3; нет inline fallback и перехода к другому tenant. Никadent: дословно перенесено одно существующее правило, нового поведения нет. Служебные output dataclasses по-прежнему содержат разрешённый текст (answer/approved_text); это результат чтения, не второй редактируемый источник.
+
+Предварительный targeted результат: 67 PASS, 2 старых FAIL контактов в validate_client_pack. Дополнительные негативные HTTP проверки сначала имели ошибку тестовой привязки session_client_scope; поправлена только fixture-подобная обвязка, assertions не ослаблены. Итоговый набор в работе. Live/provider/SMTP вызовов — 0. Новых model states/команд/вызовов/слоёв памяти нет. Свободное понимание живой моделью и маркетинг этим этапом не аттестуются.
+
+
+### 44В. Итоговый checkpoint и внешняя проверка
+
+Основной targeted набор из пяти файлов (policy_text_refs, policy_route_fixes, clinic_policies_loader, validate_client_pack, ordinary_prose_http): **119 PASS / 2 baseline FAIL**. Только прежние test_demo_pack_passes_validator и test_validator_cli_demo_exit_zero: duplicate_contact_facts_forbidden в clinic__info__contacts.md. До изменения44А эти же два теста падали по той же причине. Вне этого набора исторические тесты старых informational kinds/doctor JSON не объявляются мигрированными; общий CI нужен перед merge.
+
+Дополнительные четыре HTTP JSON/SSE теста меняют только MD-текст отсутствующего бренда/услуги и требуют его точного показа без ценового offer. Первое ожидание для braces не учитывало прежний суффикс названия разрешённой альтернативы; тест скорректирован на точный полный ответ с этим суффиксом, runtime не менялся. Никadent перенесён дословно; сведения Demo о диагностике, оплате и применимости бренда сохранены отдельным общим разделом.
+
+Изменённые paths — объединение точных allowlist44А/Б выше (core/target_client_data.py включён пояснением44А). tests/test_d2_live_provider_offline.py фактически не менялся. Риски: модель по-прежнему может ошибиться в обычном ответе; этот checkpoint убирает дубли источников, не обещает безошибочную модель. Битая ссылка — диагностируемая ошибка базы до model call, а не разрешение цены/записи. Отдельные template/contact/medical тексты не переносились. Marketing/card-поведение не менялось.
+
+Git: codex/model-price-experiment, HEAD/baseline/pushed0b9d26c; текущие44А/Б не staged/committed/pushed, PR/merge/deploy нет. Foreign WIP: prototypes/, scripts/d2_context_candidate_protocol.py, scripts/experiment_d2_interface_comparison.py, tests/test_d2_interface_comparison_offline.py;14 прежних MD line-ending-only сохранены. Provider/live/SMTP вызовы исполнителя и Checker:0. Static виджет вернул HTTP200; это доступность страницы, не живой функциональный прогон.
+
+**Промпт Cursor:** проведи read-only проверку объединённого рабочего diff44А/Б против0b9d26c в codex/model-price-experiment. Прочти AGENTS.md, WORKFLOW_CHECKER.md, актуальный Roadmap, Interface§44 и единственную таблицу Target§3. Exact allowlist44А/Б указан выше, включая пояснение startup consumer. Сначала changed tests, затем trace startup→/ask и /ask/stream→capturedMD/modelview→policy/brand/service price guards→lead→receipt/history. Убедись, что Demo doctorJSON/index и двеdoctor refs удалены, шестьMD доступны, KB validation сохранена. У политики единственный полный текст MD; YAMLtext_ref явно согласован владельцем. Нет inline answer/approved_text fallback, скрытой карты, нового классификатора/команды/modelcall/memory. Неверныеrefs и tenantescape отвергаются. Обычную прозу не подменяет код; цены/booking child/ОМС/ДМС сохраняют прежнюю защиту, Osstem/braces не создают offer. Проверь что nikadent-текст дословно перенесён. Запусти пропорциональные offline tests выше, отдели известные2contactFAIL. Не ослабляй tests, не читай .env/rawconversations, не делайprovidercalls/commit/push. Дай PASS/REJECT с конкретными расхождениями, сохрани границы evidence: свободный диалог и маркетинг целиком не аттестуются.
+
+**После Cursor — новая беседа в виджете:** ценаAll-on-4 → «А кто делает?» → «Расскажите об Орлове»; «Принимаете детей?» → «Запишите ребёнка»; «Работаете по ОМС?» → «Сколько стоит лечение по ОМС?»; «У вас есть Osstem?» → «Сколько он стоит?»; «Ставите брекеты?» → «Сколько стоят?»; обычная услуга → follow-up. Проверить разговорный текст, отсутствие неподходящей цены/записи и сохранение follow-up. Маркетинговые дубли и обязательные акции каждой карточки — следующий этап3–4, не объявлять закрытыми. Commit/push после принятия checkpoint.
+
+Независимый Checker: **PASS объединённого checkpoint44А/44Б**, блокирующих замечаний нет. Самостоятельно34PASS, дополнительные4price-ref tests прочитаны и4PASS подтверждены. Итог исполнителя **123PASS/2baselineFAIL**. Старые источники/lead-reader удалены, capturedMD и прежние price/booking guards проверены. Полный этап2, live/widget и маркетинг этим не аттестуются. git diff --check прошёл, staging пуст; HEAD/upstream0b9d26c. Следующая остановка — Cursor и виджет по44В выше.
+
+### 44Г. Приёмка владельцем
+
+Cursor PASS получен:123PASS/2прежних contactFAIL. Владелец подтвердил виджет: «Идем дальше, ответы в боте вроде нормально пока». Checkpoint44А/Б принят для commit/push и перехода к этапам3–4. Это не аттестация всех будущих карточек/маркетинга. Исполнитель provider calls не делал.

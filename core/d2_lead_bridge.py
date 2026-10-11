@@ -243,7 +243,7 @@ def resolve_d2_booking_lead_entry(
     ))
     if blocked_keys:
         text = "\n\n".join(filter(None, (
-            _authored_policy_answer(snapshot, key) for key in blocked_keys
+            d2_authored_policy_answers(snapshot).get(key) for key in blocked_keys
         ))) or "У меня пока недостаточно информации об условиях такой записи."
         return D2LeadBridgeResult(
             kind="booking_blocked",
@@ -425,25 +425,6 @@ def resolve_d2_lead_pre_provider(
         kind="unclear",
         response=_name_prompt_response(snapshot, session_key=session_key),
     )
-
-
-def _authored_policy_answer(snapshot: D2TenantSnapshot, policy_key: str) -> str | None:
-    import yaml
-
-    raw_bytes = dict(snapshot.files).get("clinic_policies.yaml")
-    if raw_bytes is None:
-        return None
-    raw = yaml.safe_load(raw_bytes.decode("utf-8"))
-    if not isinstance(raw, dict):
-        return None
-    policies = raw.get("policies")
-    if not isinstance(policies, dict):
-        return None
-    body = policies.get(policy_key)
-    if not isinstance(body, dict):
-        return None
-    answer = body.get("answer")
-    return answer.strip() if isinstance(answer, str) and answer.strip() else None
 
 
 def _lead_slot_quick_replies(client_id: str) -> tuple[UiQuickReplyCandidate, ...]:

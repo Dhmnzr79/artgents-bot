@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+
 import re
 import sys
 from pathlib import Path
@@ -12,16 +13,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from contracts.doctor_schema_refs import (  # noqa: E402
-    DoctorCatalogExternalIndex,
-    build_doctor_source_refs,
-    validate_doctor_catalog_external_refs,
-)
+from core.clinic_policies_loader import validate_policy_text_refs  # noqa: E402
 from contracts.response_schema_refs import (  # noqa: E402
     ResponseSchemaExternalIndex,
     validate_response_schema_external_refs,
 )
-from core.doctor_schema_loader import load_doctor_catalog  # noqa: E402
 from core.response_schema_kb_index import build_response_schema_kb_refs  # noqa: E402
 from core.response_schema_loader import (  # noqa: E402
     DuplicateKeyError,
@@ -118,10 +114,6 @@ def validate_client_pack(
     elif not list(services_dir.glob("*.json")) and not scaffold:
         errors.append("target_response/pricebook/services/: no_offer_files")
 
-    doctor_path = rel("doctor_catalog.json")
-    if not doctor_path.is_file():
-        errors.append("doctor_catalog.json: file_missing")
-
     for operational in (
         "brand.yaml",
         "clinic_policies.yaml",
@@ -175,26 +167,8 @@ def validate_client_pack(
     if not bundle.offers and not scaffold:
         errors.append("target_response/pricebook/services/: empty_offers")
 
-    try:
-        doctors = load_doctor_catalog(doctor_path)
-    except Exception as exc:
-        errors.append(f"doctor_catalog.json: schema_invalid:{exc}")
-        return errors
-
     kb_refs = build_response_schema_kb_refs(md_root) if md_root.is_dir() else frozenset()
-    doctor_index = DoctorCatalogExternalIndex(
-        service_ids=tuple(bundle.services),
-        kb_refs=kb_refs,
-    )
-    try:
-        validate_doctor_catalog_external_refs(doctors, doctor_index)
-    except Exception as exc:
-        errors.append(f"doctor_catalog.json: external_ref_invalid:{exc}")
-
-    external_index = ResponseSchemaExternalIndex(
-        kb_refs=kb_refs,
-        doctor_refs=build_doctor_source_refs(doctors),
-    )
+    external_index = ResponseSchemaExternalIndex(kb_refs=kb_refs)
     try:
         validate_response_schema_external_refs(bundle, external_index)
     except Exception as exc:
@@ -212,6 +186,10 @@ def validate_client_pack(
         import yaml
 
         raw = yaml.safe_load(policies_path.read_text(encoding="utf-8")) or {}
+        try:
+            validate_policy_text_refs(raw, lambda name: (md_root / name).read_text(encoding="utf-8"))
+        except ValueError as exc:
+            errors.append(f"clinic_policies.yaml: {exc}")
         contact = raw.get("contact") if isinstance(raw.get("contact"), dict) else {}
         errors.extend(
             validate_clinic_contact_section(
@@ -228,11 +206,6 @@ def validate_client_pack(
                 requested = str(row.get("requested_service_id") or "").strip()
                 if not requested:
                     continue
-                approved_text = str(row.get("approved_text") or "").strip()
-                if not approved_text:
-                    errors.append(
-                        f"clinic_policies.yaml: service_alternatives[{idx}]:approved_text_required"
-                    )
                 if requested not in service_ids:
                     errors.append(
                         f"clinic_policies.yaml: service_alternatives[{idx}]:requested_service_unknown"

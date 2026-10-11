@@ -23,7 +23,7 @@ from contracts.d2_session_context import (
 from contracts.response_plan import D2PriceDetailUiAction, D2PriceSelectUiAction, SessionKey
 from contracts.d2_dialogue_result import (
     DiscussionScope, DiscussionVolume, D2DialogueResult, PriceOperation, ExplanationOperation, DetailOperation,
-    ContactOperation, DoctorsOperation, PolicyOperation, CommercialOperation,
+    ContactOperation,
     ClarifiedOperation, D2ExplanationTask,
     ServiceTarget, TopicTarget, UnresolvedTarget, ScopedOperation, OffTopicOperation,
 )
@@ -65,7 +65,6 @@ from core.d2_snapshot_sources import (
 from core.d2_spam_gate import build_d2_spam_gate_response, is_d2_garbage_message
 from core.d2_contacts_cta import build_d2_contact_fact_block
 from core.d2_offtopic import build_d2_offtopic_response
-from core.d2_directory import build_d2_directory_response
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
 from core.one_call_envelope_protocol import (
     parse_production_envelope_json,
@@ -771,8 +770,6 @@ def _run_reserved_d2_dialogue_turn(
     pending = None
     first_price_seen = False
     contact_button = canonical_contact = None
-    commercial_operations = []
-    directory_cta = None
     suppress_forbidden_booking_cta = False
     policy_keys = d2_authored_policy_answers(tenant)
     for block in result.blocks:
@@ -783,21 +780,6 @@ def _run_reserved_d2_dialogue_turn(
             deferred.append(block)
             continue
         first_price_seen |= is_price
-        if isinstance(block, DoctorsOperation):
-            answer = build_d2_directory_response(
-                tenant, session_key=session_key, kind="doctors_for_service",
-                service_id=block.service_id, as_of=now.date(),
-            )
-            exact_text.append(D2ExactTextBlock(request_id=block.request_id,
-                source_client_id=session_key.client_id, display_text=answer.rendered_text))
-            exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
-                kind="doctors", status="answered", scope="service", service_id=block.service_id,
-                discussion_scope=DiscussionScope(target=block.target),
-                topic_id=resolve_d2_clarify_service_topic(tenant, (block.service_id,))))
-            directory_cta = directory_cta or next(
-                (button for button in answer.resolved.ui_plan.buttons if button.action_kind == "cta"), None,
-            )
-            continue
         if isinstance(block, OffTopicOperation):
             answer = build_d2_offtopic_response(tenant, session_key=session_key)
             exact_text.append(D2ExactTextBlock(request_id=block.request_id,
@@ -838,38 +820,14 @@ def _run_reserved_d2_dialogue_turn(
             contact_button = contact_button or button
             canonical_contact = canonical_contact or canonical
             continue
-        if isinstance(block, PolicyOperation):
-            policy = resolve_clinic_policy_operations(client_id=session_key.client_id,
-                operations=(block,), policy_keys=policy_keys)
-            suppress_forbidden_booking_cta |= policy.suppress_forbidden_booking_cta
-            answer = build_d2_clinic_policy_response(
-                tenant, session_key=session_key, request=block, policy_result=policy,
-            )
-            # Rules have already been applied to this local operation. The final
-            # renderer receives code-owned text, not a second route decision.
-            exact_text.append(D2ExactTextBlock(request_id=block.request_id,
-                source_client_id=session_key.client_id, display_text=answer.rendered_text,
-                policy_ids=tuple(dict.fromkeys(d.policy_key for d in policy.decisions
-                    if d.outcome == "allowed_by_known_rules" and d.policy_key))))
-            exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
-                kind="clarification" if answer.resolved.route == "CLARIFY" else "reference",
-                status="answered", scope="clinic",
-                source_results=tuple(D2SourceResult(source_ref=f"policy:{policy_id}", outcome="answered")
-                    for policy_id in exact_text[-1].policy_ids)))
-            continue
-        if isinstance(block, CommercialOperation):
-            commercial_operations.append(block)
-            continue
         if isinstance(block, PriceOperation):
             policy = resolve_clinic_policy_operations(client_id=session_key.client_id,
                 operations=(block,), policy_keys=policy_keys)
             suppress_forbidden_booking_cta |= policy.suppress_forbidden_booking_cta
             blocked = tuple(d.policy_key for d in policy.decisions if d.outcome == "blocked" and d.policy_key)
             if blocked:
-                rule = PolicyOperation(request_id=block.request_id, kind="clinic_policy",
-                    policy_ids=blocked, age_group=block.age_group, context=block.context)
                 answer = build_d2_clinic_policy_response(tenant, session_key=session_key,
-                    request=rule, policy_result=policy)
+                    request=block, policy_result=policy)
                 exact_text.append(D2ExactTextBlock(request_id=block.request_id,
                     source_client_id=session_key.client_id, display_text=answer.rendered_text,
                     policy_ids=blocked))
@@ -893,6 +851,9 @@ def _run_reserved_d2_dialogue_turn(
                     discussion_scope=DiscussionScope(target=block.target, volume=block.volume, brand_id=block.brand_id)
                         if isinstance(block.target, (ServiceTarget, TopicTarget)) else None))
                 continue
+        if isinstance(block, ExplanationOperation):
+            operations.append(block)
+            continue
         target = getattr(block, "target", None)
         brand = getattr(block, "brand_id", None)
         reference_response = None
@@ -955,8 +916,6 @@ def _run_reserved_d2_dialogue_turn(
         selected_price_offer_id=(selected_price_select_action.offer_id
                                 if selected_price_select_action is not None else None),
         selected_price_select_actions=selected_price_select_actions,
-        commercial_operations=tuple(commercial_operations),
-        directory_cta=directory_cta,
         suppress_forbidden_booking_cta=(suppress_forbidden_booking_cta
             or all(isinstance(block, OffTopicOperation) for block in result.blocks)),
     )
@@ -964,7 +923,7 @@ def _run_reserved_d2_dialogue_turn(
         # Resolve siblings before the existing lead owner mutates intake state.
         booking = resolve_d2_booking_lead_entry(
             snapshot=tenant, session_key=session_key,
-            operations=tuple(p for p in result.blocks if p.kind in {"booking", "price", "clinic_policy"}),
+            operations=tuple(p for p in result.blocks if p.kind in {"booking", "price"}),
         )
         booking_part = booking.response.resolved.d2_request_parts[0].model_copy(
             update={"request_id": booking_blocks[0].request_id})
@@ -1010,20 +969,6 @@ def _run_reserved_d2_dialogue_turn(
     captured_details = {b.request_id for b in response.resolved.d2_price_detail_blocks
         if b.request_id in contextual_details and b.rows and all(
             (r.source_client_id, r.offer_id, r.service_id) in input_refs for r in b.rows)}
-    commercial_by_id = {p.request_id: p for p in commercial_operations}
-    completed_parts = []
-    for part in parts:
-        operation = commercial_by_id.get(part.request_id)
-        if operation is not None and operation.volume is None:
-            displayed = [p.discussion_scope for p in parts if p.kind == "price"
-                and p.status == "answered" and p.discussion_scope is not None
-                and p.discussion_scope.target == operation.target]
-            descriptor = (displayed[0] if displayed and all(s == displayed[0] for s in displayed)
-                else scope if not displayed and scope is not None and scope.target == operation.target else None)
-            if descriptor is not None:
-                part = part.model_copy(update={"discussion_scope": descriptor, "brand_id": descriptor.brand_id})
-        completed_parts.append(part)
-    parts = tuple(completed_parts)
     if scope is not None:
         parts = tuple(part.model_copy(update={"discussion_scope": scope,
             "brand_id": scope.brand_id, "topic_id": scope.topic_id or part.topic_id})

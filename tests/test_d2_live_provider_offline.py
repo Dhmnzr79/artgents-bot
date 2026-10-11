@@ -43,16 +43,17 @@ def _response(content: str = "{}") -> object:
     )
 
 
-def test_cp3_prompt_reuses_v19_contract_and_typed_d2_snapshot() -> None:
+def test_prompt_uses_current_schema_and_ordinary_prose_contract() -> None:
+    import json
+    from contracts.d2_dialogue_result import D2DialogueResult
     system, user = build_d2_d1r_messages(_request())
-    assert "ONE_CALL_PROMPT_CONTRACT v19" in system["content"]
-    assert "D2_DIRECTION_PRICES" in system["content"]
-    assert "classic.one_tooth.impro" in system["content"]
-    assert "=== D2_DIALOGUE_FOLLOW_UP ===" in system["content"]
-    assert "topic_id to that direction id and service_id=null" in system["content"]
-    assert "relation=self" in system["content"]
-    assert "continuity:\"same\"" in system["content"]
-    assert "sales_fast" not in system["content"]
+    prompt = system["content"]
+    schema_text = prompt.split("=== D2_RESULT_SCHEMA ===\n", 1)[1]
+    assert json.JSONDecoder().raw_decode(schema_text)[0] == D2DialogueResult.model_json_schema()
+    assert "classic.one_tooth.impro" in prompt
+    assert "Ordinary doctor, clinic-policy, brand and marketing questions" in prompt
+    assert "code renders its approved answer" not in prompt
+    assert "Use exact policy_id values for clinic_policy requests" not in prompt
     assert "D2_SESSION_CONTEXT" in user["content"]
 
 
@@ -63,7 +64,7 @@ def test_prompt_contains_the_complete_tenant_fullcontext_corpus_and_policies() -
 
     assert "=== APPROVED_MD_CORPUS ===" in prompt
     assert "DOCUMENT_INDEX" not in prompt
-    assert "content_ref: exact filename from an APPROVED_MD_CORPUS document boundary or null." in prompt
+    assert "APPROVED_MD_CORPUS" in prompt and "content_ref" in prompt
     snapshot = load_d2_tenant_snapshot("demo", clients_root=Path("clients"))
     markdown_files = tuple((path, raw) for path, raw in snapshot.files if path.startswith("md/"))
     assert prompt.count("---BEGIN APPROVED MD:") == len(markdown_files)
@@ -80,19 +81,14 @@ def test_named_direction_price_uses_answer_overview_in_d2_prompt() -> None:
     request = replace(_request(), user_message="Сколько стоит имплантация?")
     system, user = build_d2_d1r_messages(request)
     prompt = system["content"]
-    instruction = prompt.split("=== D2_DIRECTION_PRICE ===", 1)[1]
-
     assert "Сколько стоит имплантация?" in user["content"]
     assert "D2_DIRECTION_PRICES" in prompt
-    assert "route=ANSWER" in instruction
-    assert "kind=price" in instruction
-    assert "topic_id=implantation" in instruction
-    assert "service_id=null" in instruction
-    assert "subjects=[{subject_id:s1,relation:self,age_group:unknown}]" in instruction
-    assert "price request's subject_id=s1" in instruction
-    assert "primary_price_request_id" in instruction
-    assert "do not return CLARIFY merely because several services" in instruction
-    assert "genuinely ambiguous question without a named direction" in instruction.lower()
+    assert "A named direction" in prompt
+    assert "is a valid price overview" in prompt
+    assert "Preserve that direction as a topic target" in prompt
+    assert "do not" in prompt
+    assert "require service/extent merely because" in prompt
+    assert "whether the data allow an overview, exact prices, a data gap or clarification" in prompt
 
 
 def test_cp3_provider_has_one_shared_two_call_budget() -> None:

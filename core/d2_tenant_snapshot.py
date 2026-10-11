@@ -64,7 +64,7 @@ def _read_set(client_root: Path) -> tuple[tuple[str, bytes], ...]:
             continue
         files.extend(item for item in base.rglob(pattern)
                      if item.is_file() and item not in (target / "marketing.yaml", target / "clinic_strategy.yaml"))
-    for name in ("tone.yaml", "ui.yaml", "video_catalog.yaml", "doctor_catalog.json", "clinic_policies.yaml"):
+    for name in ("tone.yaml", "ui.yaml", "video_catalog.yaml", "clinic_policies.yaml"):
         path = client_root / name
         if path.is_file():
             files.append(path)

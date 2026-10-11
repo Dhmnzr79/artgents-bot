@@ -32,7 +32,7 @@ def parse(value):
     return D2DialogueResult.model_validate({"outcome": "dialogue", "blocks": [value]})
 
 
-@pytest.mark.parametrize("kind", ["price", "content", "price_detail", "commercial_fact"])
+@pytest.mark.parametrize("kind", ["price", "content", "price_detail"])
 @pytest.mark.parametrize("pending", [False, True])
 def test_same_type_and_canonical_nested_roundtrip(kind, pending):
     result = parse(block(kind, pending))
@@ -58,7 +58,7 @@ def test_same_type_and_canonical_nested_roundtrip(kind, pending):
     assert context.clarify_task is operation
 
 
-@pytest.mark.parametrize("kind", ["price", "content", "price_detail", "commercial_fact"])
+@pytest.mark.parametrize("kind", ["price", "content", "price_detail"])
 def test_explicit_null_clarification_remains_invalid(kind):
     with pytest.raises(ValueError):
         parse({**block(kind), "clarification": None})
@@ -79,19 +79,18 @@ def test_direct_price_preserves_targetless_policy_inputs(target):
 
 
 @pytest.mark.parametrize("clarification", [TERM, SERVICE_QUESTION])
-@pytest.mark.parametrize("kind", ["price", "commercial_fact"])
+@pytest.mark.parametrize("kind", ["price"])
 def test_known_target_cannot_be_hidden_by_clarification(kind, clarification):
     with pytest.raises(ValueError):
         parse({**block(kind, True), "target": SERVICE, "clarification": clarification})
 
 
-def test_pending_commercial_service_scope_remains_valid_until_service_selection():
-    pending = parse({**block("commercial_fact", True), "promotion_scope": "service", "clarification": SERVICE_QUESTION})
-    values = pending.blocks[0].model_dump(exclude={"clarification"})
-    completed = parse({**values, "target": SERVICE})
-    assert type(completed.blocks[0]) is type(pending.blocks[0])
-    assert completed.blocks[0].promotion_scope == "service"
-    assert completed.blocks[0].fact_ids == ("installment_12",)
+@pytest.mark.parametrize("kind", ["doctors", "clinic_policy", "commercial_fact"])
+def test_removed_information_commands_cannot_be_stored_as_pending(kind):
+    with pytest.raises(ValueError):
+        parse({"kind": kind, "request_id": "r1", "clarification": SERVICE_QUESTION})
+    with pytest.raises(ValueError):
+        TypeAdapter(ClarifiedOperation).validate_python({"kind": kind, "request_id": "r1"})
 
 
 def test_payment_content_clinic_target_stays_rejected_not_repaired():
@@ -105,7 +104,7 @@ def test_actual_schema_has_one_branch_per_kind_and_no_pending_types():
     schema = D2DialogueResult.model_json_schema()
     items = schema["properties"]["blocks"]["items"]
     assert set(items["discriminator"]["mapping"]) == {
-        "price", "content", "price_detail", "contact", "clinic_policy", "booking", "commercial_fact", "off_topic", "doctors"}
-    assert len(items["oneOf"]) == 9
+        "price", "content", "price_detail", "contact", "booking", "off_topic"}
+    assert len(items["oneOf"]) == 6
     assert not any(name.startswith("Pending") for name in schema["$defs"])
     assert "AuthorizedExplanationOperation" not in json.dumps(schema)

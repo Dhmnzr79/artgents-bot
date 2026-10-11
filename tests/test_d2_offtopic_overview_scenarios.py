@@ -20,7 +20,6 @@ import yaml
 from contracts.response_plan import SessionKey
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore
-from core.d2_directory import classify_d2_directory_request
 from core.d2_offtopic import is_d2_offtopic_envelope
 from core.one_call_envelope_protocol import production_envelope_template
 from types import SimpleNamespace
@@ -297,17 +296,6 @@ def test_medical_terminal_not_offtopic(tmp_path: Path) -> None:
 
 
 def test_doctors_overview_is_content_not_directory_card(tmp_path: Path) -> None:
-    part = SimpleNamespace(
-        kind="content",
-        topic_id="doctors",
-        service_id=None,
-        content_ref="doctors__doctor__overview.md",
-    )
-    assert (
-        classify_d2_directory_request(part=part, envelope_commercial_intent="none")
-        is None
-    )
-
     outcome, saved, provider = _run(
         tmp_path,
         message="Расскажите про ваших врачей",

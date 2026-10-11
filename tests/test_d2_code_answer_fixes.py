@@ -33,9 +33,9 @@ def test_off_topic_has_no_dental_ui_and_replays_without_model(http_env, transpor
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
 @pytest.mark.parametrize("block,expected", [
-    ({"kind": "clinic_policy", "request_id": "r1", "payment_scheme": "oms",
-      "payment_scheme_intent": "eligibility_question"}, {"no_oms"}),
-    ({"kind": "clinic_policy", "request_id": "r1", "age_group": "child"},
+    ({"kind": "booking", "request_id": "r1", "payment_scheme": "oms",
+      "payment_scheme_intent": "requested_payment"}, {"no_oms"}),
+    ({"kind": "booking", "request_id": "r1", "age_group": "child"},
      {"no_pediatric_dentistry"}),
     ({"kind": "price", "request_id": "r1", "age_group": "child",
       "target": {"type": "service", "id": "classic"}}, {"no_pediatric_dentistry"}),

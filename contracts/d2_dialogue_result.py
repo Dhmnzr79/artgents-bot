@@ -27,11 +27,6 @@ class UnresolvedTarget(Closed):
     type: Literal["unresolved"]
 
 
-class ClinicTarget(Closed):
-    """Explicit clinic-wide commercial meaning, never an omitted target."""
-    type: Literal["clinic"]
-
-
 Target = Annotated[Union[ServiceTarget, TopicTarget, UnresolvedTarget], Field(discriminator="type")]
 
 
@@ -175,58 +170,11 @@ class ContactOperation(Operation):
     contact_branch_id: str | None = None
 
 
-class DoctorsOperation(Operation):
-    kind: Literal["doctors"]
-    target: ServiceTarget
-
-    @property
-    def service_id(self):
-        return self.target.id
-
-
-class PolicyOperation(PolicyScope):
-    kind: Literal["clinic_policy"]
-    policy_ids: tuple[str, ...] = ()
-    payment_scheme: Literal["oms", "dms", "self_pay", "unspecified"] = "unspecified"
-    payment_scheme_intent: Literal["eligibility_question", "requested_payment", "not_requested", "unspecified"] = "unspecified"
-
-
 class BookingOperation(PolicyScope):
     kind: Literal["booking"]
     payment_scheme: Literal["oms", "dms", "self_pay", "unspecified"] = "unspecified"
     payment_scheme_intent: Literal["eligibility_question", "requested_payment", "not_requested", "unspecified"] = "unspecified"
     policy_ids: tuple[str, ...] = ()
-
-
-class CommercialFields(ScopedOperation):
-    kind: Literal["commercial_fact"]
-    fact_ids: tuple[str, ...] = ()
-    promotion_scope: Literal["none", "general", "service", "shown"] = "none"
-
-    @model_validator(mode="after")
-    def commercial_task_required(self):
-        if not self.fact_ids and self.promotion_scope == "none":
-            raise ValueError("commercial_task_required")
-        return self
-
-
-class CommercialOperation(CommercialFields):
-    target: Annotated[Union[ServiceTarget, TopicTarget, ClinicTarget, UnresolvedTarget], Field(discriminator="type")]
-    clarification: MeaningClarification | None = Field(default=None, exclude_if=lambda v: v is None)
-
-    @model_validator(mode="after")
-    def promotion_service_required(self):
-        if "clarification" in self.model_fields_set and self.clarification is None:
-            raise ValueError("clarification_required")
-        if self.clarification is not None:
-            if not isinstance(self.target, UnresolvedTarget):
-                raise ValueError("commercial_pending_unresolved_required")
-            return self
-        if isinstance(self.target, UnresolvedTarget):
-            raise ValueError("commercial_completed_scope_required")
-        if self.promotion_scope == "service" and self.service_id is None:
-            raise ValueError("d2_promotion_service_required")
-        return self
 
 
 class OffTopicOperation(Operation):
@@ -259,7 +207,7 @@ MeaningClarification = Annotated[Union[ServiceClarification, TermClarification],
 Clarification = Annotated[Union[ServiceClarification, TermClarification, ParameterClarification], Field(discriminator="missing")]
 
 
-for _operation in (PriceOperation, ExplanationOperation, DetailOperation, CommercialOperation):
+for _operation in (PriceOperation, ExplanationOperation, DetailOperation):
     _operation.model_rebuild()
 
 
@@ -271,14 +219,14 @@ def _require_pending_operation(operation):
 
 
 ClarifiedOperation = Annotated[
-    Union[PriceOperation, ExplanationOperation, DetailOperation, CommercialOperation],
+    Union[PriceOperation, ExplanationOperation, DetailOperation],
     Field(discriminator="kind"), AfterValidator(_require_pending_operation),
 ]
 
 
 Block = Annotated[Union[PriceOperation, ExplanationOperation, DetailOperation,
-    ContactOperation, PolicyOperation, BookingOperation, CommercialOperation,
-    OffTopicOperation, DoctorsOperation], Field(discriminator="kind")]
+    ContactOperation, BookingOperation,
+    OffTopicOperation], Field(discriminator="kind")]
 
 
 class D2DialogueResult(Closed):
@@ -366,8 +314,6 @@ def validate_d2_payload(payload: dict, *, active_service_ids: frozenset[str], kn
     else:
         result = D2DialogueResult.model_validate(payload)
     for block in result.blocks:
-        if isinstance(block, DoctorsOperation) and block.service_id not in active_service_ids:
-            raise ValueError("doctors_service_not_active")
         clarification = getattr(block, "clarification", None)
         if clarification is not None and any(c not in active_service_ids for c in clarification.choices):
             raise ValueError("clarify_service_not_active")

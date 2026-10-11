@@ -61,7 +61,7 @@ def test_admin_is_exclusive_and_contact_has_no_price_fields():
 
 @pytest.mark.parametrize("service_id", ["foreign-service", "braces"])
 def test_doctors_rejects_nonactive_tenant_service(service_id):
-    with pytest.raises(ValueError, match="doctors_service_not_active"):
+    with pytest.raises(ValueError, match="union_tag_invalid"):
         parse({"outcome": "dialogue", "blocks": [{"kind": "doctors", "request_id": "r1",
                "target": {"type": "service", "id": service_id}}]})
 

@@ -43,7 +43,8 @@ def test_absent_price_is_a_part_gap_and_keeps_address(http_env, transport, targe
         assert resolved.d2_result_status == ("degraded" if address_position else "failed")
         assert resolved.d2_price_block is None
         assert resolved.finalized_commercial_ids.price_offer_ids == ()
-        part = next(p for p in resolved.d2_request_parts if p.request_id == "r1")
+        part = next(p for p in resolved.d2_request_parts if p.kind == "price")
+        assert part.request_id == ("r2" if address_position == "before" else "r1")
         assert (part.status, part.failure_reason) == ("unavailable", "d2_no_price_candidates")
         assert len(resolved.d2_part_failure_blocks) == 1
         assert completed_context(store, key).ordinary.d2_shown_price_offer_refs == ()
@@ -52,19 +53,21 @@ def test_absent_price_is_a_part_gap_and_keeps_address(http_env, transport, targe
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
-def test_unknown_explicit_price_detail_remains_strict(http_env, transport):
+def test_unknown_explicit_price_detail_is_failed_without_foreign_data(http_env, transport):
     client, db, use, _ = http_env
     operation = price()
     operation.update(kind="price_detail", price_detail_aspect="includes")
     fake = use(FakeProvider(raw(operation)))
-    response = (post if transport == "json" else post_sse)(client, sid="detail")
-    if transport == "json":
-        assert response.status_code == 400
-    else:
-        events = dict(sse_events(response))
-        assert "error" in events and "ui" not in events and "done" not in events
+    body = send(client, transport, sid="detail")
+    assert "Не получилось подготовить эту часть ответа" in body["answer"]
+    assert not body["ui"]["projected_commercial_ids"]["price_offer_ids"]
+    assert not body["ui"]["quick_replies"]
     with D2DialogueStore(db) as store:
-        assert store.read_latest_completion(SessionKey(client_id="demo", sid="detail")) is None
+        resolved = store.read_latest_completion(SessionKey(client_id="demo", sid="detail")).response.resolved
+        assert resolved.d2_result_status == "failed"
+        assert resolved.d2_price_detail_blocks == ()
+        assert [(p.kind, p.status, p.failure_reason) for p in resolved.d2_request_parts] == [
+            ("price_detail", "unavailable", "d2_operation_invalid")]
     assert len(fake.inputs) == 1
 
 

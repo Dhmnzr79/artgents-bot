@@ -1638,3 +1638,25 @@ Preliminary wider selection: 93 passed, 330.64s, before price-scope correction.
 Final evidence contract-boundary-final/results.xml; independent Checker PASS
 for narrow §36, no blockers/test weakening; full group remains open.
 No full-CI or live/widget acceptance; residual model-output errors stay open.
+
+§49 / Stage I A1–A2 — 2026-10-11, baseline1975eb3, codex/model-price-experiment.
+Ordinary whole-list admission replaced by independent operation acceptance;
+optional content claims no longer own text admission; exact commands stay strict.
+Existing unavailable result carries local invalid-operation failures; no new
+model wire/state/memory/call. Internal parser result is consumed directly.
+Latest group evidence:194PASS/2known baselineFAIL (three-row price expectations),
+details and intermediate corrections in Interface Task49.1. No full CI/live.
+Independent Checker pending; Cursor/widget pending. Staging empty; no commit/push;
+provider/browser/SMTP0. Prior46 WIP and foreign prototypes/experiments/EOL kept.
+
+§49 focused corrections: initial Checker REJECT on softened unfinished task
+and fatal ordinary ordinal conflict. Both corrected;14 adverse/ownership cases
+added. Latest group evidence208PASS/2existing three-row baselineFAIL; recheck
+104PASS plus2ownershipPASS after test-import correction. Focused Checker pending;
+Cursor/widget pending. No new model format/state/memory/call, no commit/push.
+
+§49 final focused Checker PASS: both P1 fixed,12independent probes PASS;
+no test weakening/repair/fallback/new model wire/state/memory/call. Cursor/widget
+still pending; branch/HEAD1975eb3 unchanged, staging empty, provider/live0.
+
+§49 accepted: Cursor PASS only A1–A2; owner widget OK. Cursor reports232PASS/3existing-expectationFAIL plus guards50PASS/1existing-wordingFAIL; see Interface49.4. Independent Checker PASS already recorded. Prepare exact10-file checkpoint from1975eb3; no provider/live/browser/SMTP calls by agents. §46 and foreign WIP excluded. StageII variant representation still requires owner agreement before implementation.

@@ -375,6 +375,7 @@ class FrozenPriceOfferRow(ResponsePlanModel):
 
 D2PriceMode = Literal["fixed", "from", "range", "no_public_price"]
 D2PartFailureReason = Literal[
+    "d2_operation_invalid",
     "d2_no_price_candidates",
     "d2_no_scope_price_candidates",
     "d2_model_prose_empty",
@@ -388,6 +389,7 @@ D2ResultStatus = Literal["complete", "degraded", "failed"]
 D2ContentPublication = Literal["model_prose"]
 D2_PRICE_DEFERRAL_TEXT = "Стоимость следующей услуги можно спросить следующим сообщением"
 D2_CLARIFICATION_DEFERRAL_TEXT = "Этот вопрос пока отложим. Его можно задать следующим сообщением."
+D2_OPERATION_FAILURE_TEXT = "Не получилось подготовить эту часть ответа. Попробуйте спросить отдельно."
 
 
 class D2FrozenPriceRow(ResponsePlanModel):
@@ -958,7 +960,7 @@ class D2ResolvedRequestPart(ResponsePlanModel):
             if self.failure_reason is not None:
                 raise ValueError("d2_deferred_part_failure_reason_forbidden")
         if self.kind == "price" and self.status == "unavailable" and self.failure_reason not in {
-            "d2_no_price_candidates", "d2_no_scope_price_candidates",
+            "d2_no_price_candidates", "d2_no_scope_price_candidates", "d2_operation_invalid",
         }:
             raise ValueError("d2_price_part_failure_reason_invalid")
         if self.kind == "content":
@@ -974,6 +976,7 @@ class D2ResolvedRequestPart(ResponsePlanModel):
                 "d2_model_prose_money",
                 "d2_model_prose_link",
                 "d2_content_source_missing",
+                "d2_operation_invalid",
             }:
                 raise ValueError("d2_content_part_failure_reason_invalid")
             if self.status != "unavailable" and self.snapshot_fingerprint is None:
@@ -983,6 +986,7 @@ class D2ResolvedRequestPart(ResponsePlanModel):
                 if self.failure_reason not in {
                     "d2_price_detail_context_ambiguous", "d2_no_price_candidates",
                     "d2_no_scope_price_candidates",
+                    "d2_operation_invalid",
                 }:
                     raise ValueError("d2_price_detail_part_failure_reason_invalid")
             elif self.status != "answered" or self.failure_reason is not None:
@@ -990,7 +994,9 @@ class D2ResolvedRequestPart(ResponsePlanModel):
             if self.content_publication is not None or self.snapshot_fingerprint is not None:
                 raise ValueError("d2_exact_fact_part_content_provenance_forbidden")
         elif self.kind in {"contact", "clinic_policy"}:
-            if self.status != "answered" or self.failure_reason is not None:
+            if not ((self.status == "answered" and self.failure_reason is None)
+                    or (self.kind == "contact" and self.status == "unavailable"
+                        and self.failure_reason == "d2_operation_invalid")):
                 raise ValueError("d2_exact_fact_part_status_invalid")
             if self.content_publication is not None or self.snapshot_fingerprint is not None:
                 raise ValueError("d2_exact_fact_part_content_provenance_forbidden")
@@ -1048,7 +1054,8 @@ def _validate_d2_part_result_shape(
             for part in parts[:first_price_index]
         )
         if (parts[first_price_index].status == "deferred" and not earlier_active_clarification) or any(
-            part.status != "deferred" for part in parts[first_price_index + 1:] if part.kind in {"price", "price_clarification", "price_reference"}
+            part.status != "deferred" and not (part.status == "unavailable" and part.failure_reason == "d2_operation_invalid")
+            for part in parts[first_price_index + 1:] if part.kind in {"price", "price_clarification", "price_reference"}
         ):
             raise ValueError("d2_request_part_price_linkage_invalid")
         price_part = parts[first_price_index]
@@ -1544,7 +1551,7 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
     content_by_request = {block.request_id: block for block in plan.information_blocks}
     exact_by_id = {b.request_id: b for b in plan.d2_exact_text_blocks}
     exact_parts = [p for p in parts if p.kind in {"clarification", "reference", "price_clarification", "price_reference", "lead"}
-                   and not (p.kind == "clarification" and p.status == "deferred")]
+                   and p.status == "answered"]
     if len(exact_by_id) != len(plan.d2_exact_text_blocks) or {p.request_id for p in exact_parts} != set(exact_by_id):
         raise ValueError("d2_exact_text_linkage_invalid")
     for part in exact_parts:
@@ -1579,7 +1586,7 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
             or block.replacement_reason != part.failure_reason
         ):
             raise ValueError("d2_request_part_content_linkage_invalid")
-    contact_parts = [part for part in parts if part.kind == "contact"]
+    contact_parts = [part for part in parts if part.kind == "contact" and part.status == "answered"]
     if len(contact_parts) != len(contact_by_request):
         raise ValueError("d2_request_part_contact_linkage_invalid")
     for part in contact_parts:

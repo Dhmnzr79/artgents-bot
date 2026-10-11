@@ -265,6 +265,10 @@ def build_d2_contact_fact_block(
     )
 
 
+class D2ContactReferenceError(ValueError):
+    """A model-selected branch is absent; tenant/data errors stay fatal."""
+
+
 def _d2_contact_text(
     snapshot: D2TenantSnapshot,
     *,
@@ -287,7 +291,7 @@ def _d2_contact_text(
         if contact_branch_id is not None:
             branch = branch_by_id(facts, contact_branch_id)
             if branch is None:
-                raise ValueError("d2_contact_branch_unknown")
+                raise D2ContactReferenceError("d2_contact_branch_unknown")
             branches = (branch,)
         else:
             branches = facts.branches
@@ -314,7 +318,7 @@ def _d2_contact_text(
         return "\n".join(dict.fromkeys(lines)), phone
 
     if contact_branch_id is not None:
-        raise ValueError("d2_contact_branch_unknown")
+        raise D2ContactReferenceError("d2_contact_branch_unknown")
     for field in wanted:
         attr = _FIELD_TO_ATTR.get(field)
         if attr is None:

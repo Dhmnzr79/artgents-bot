@@ -5,9 +5,10 @@ never infer meaning from text/context and are not additional stored fields.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Annotated, Literal, Union
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, TypeAdapter, ValidationError, model_validator
 
 class Closed(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -133,7 +134,7 @@ class ExplanationFields(ScopedOperation):
 
 class ExplanationOperation(ExplanationFields):
     """One explanation operation, either completed or explicitly unfinished."""
-    content_text: str | None = Field(default=None, min_length=1, max_length=4000, exclude_if=lambda v: v is None)
+    content_text: str | None = Field(default=None, min_length=1, exclude_if=lambda v: v is None)
     pending_question: str | None = Field(default=None, min_length=1, max_length=4000, exclude_if=lambda v: v is None)
     clarification: Clarification | None = Field(default=None, exclude_if=lambda v: v is None)
 
@@ -274,6 +275,27 @@ class D2ExplanationReply(Closed):
     explanations: tuple[D2ExplanationReplyItem, ...] = Field(min_length=1)
 
 
+@dataclass(frozen=True)
+class D2RejectedOperation:
+    """Internal validation outcome, never a command in the model schema."""
+    request_id: str
+    kind: str
+
+
+@dataclass(frozen=True)
+class D2ParsedDialogueResult:
+    """Ordered acceptance results consumed directly by the existing executor."""
+    outcome: str
+    blocks: tuple
+
+    @property
+    def requests(self):
+        return self.blocks
+
+
+_operation_adapter = TypeAdapter(Block)
+
+
 def validate_d2_payload(payload: dict, *, active_service_ids: frozenset[str], known_task=None):
     if known_task is not None:
         expected = known_task.blocks
@@ -312,7 +334,54 @@ def validate_d2_payload(payload: dict, *, active_service_ids: frozenset[str], kn
             "blocks": tuple(completed),
         })
     else:
-        result = D2DialogueResult.model_validate(payload)
+        # Root/terminal identity is indivisible; an ordinary list is not.
+        if set(payload) != {"outcome", "blocks"} or payload.get("outcome") != "dialogue":
+            return D2DialogueResult.model_validate(payload)
+        items = payload["blocks"]
+        if not isinstance(items, list) or not items:
+            return D2DialogueResult.model_validate(payload)
+        accepted = []
+        first_error = None
+        for index, item in enumerate(items, 1):
+            identity = f"r{index}"
+            kind = item.get("kind") if isinstance(item, dict) else None
+            try:
+                if not isinstance(item, dict):
+                    raise ValueError("operation_object_required")
+                if kind == "content" and item.get("clarification") is None and "pending_question" not in item:
+                    # Text and optional claims have separate authority. Neither
+                    # projection is a retry of a rejected whole operation.
+                    block = ExplanationOperation.model_validate({
+                        "kind": kind, "request_id": identity, "content_text": item.get("content_text"),
+                    })
+                    if block.content_text is not None and not block.content_text.strip():
+                        raise ValueError("completed_explanation_text_required")
+                    claim_fields = {key: item[key] for key in (
+                        "target", "volume", "brand_id", "content_ref", "content_section_refs"
+                    ) if key in item}
+                    try:
+                        claims = ExplanationFields.model_validate({
+                            "kind": kind, "request_id": identity, **claim_fields,
+                        })
+                    except ValidationError:
+                        claims = None
+                    if claims is not None:
+                        block = block.model_copy(update={key: getattr(claims, key)
+                            for key in type(claims).model_fields if key not in {"kind", "request_id"}})
+                else:
+                    block = _operation_adapter.validate_python({**item, "request_id": identity})
+                clarification = getattr(block, "clarification", None)
+                if clarification is not None and any(c not in active_service_ids for c in clarification.choices):
+                    raise ValueError("clarify_service_not_active")
+                accepted.append(block)
+            except (ValidationError, ValueError) as exc:
+                first_error = first_error or exc
+                accepted.append(D2RejectedOperation(identity, kind if isinstance(kind, str) and kind in {
+                    "content", "price", "price_detail", "contact", "booking", "off_topic"
+                } else "reference"))
+        if all(isinstance(block, D2RejectedOperation) for block in accepted):
+            raise first_error
+        return D2ParsedDialogueResult("dialogue", tuple(accepted))
     for block in result.blocks:
         clarification = getattr(block, "clarification", None)
         if clarification is not None and any(c not in active_service_ids for c in clarification.choices):

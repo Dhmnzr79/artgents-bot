@@ -340,9 +340,6 @@ def _direction_prices(
 _COMMERCIAL_CODES = (
     "commercial_blank",
     "commercial_package_not_single",
-    "commercial_promo_ref_cap",
-    "commercial_promo_ref_duplicate",
-    "commercial_promo_fact_duplicate",
     "commercial_package_duplicate",
     "commercial_profile_duplicate",
     "commercial_incompatibility_duplicate",
@@ -366,6 +363,9 @@ def _commercial_texts(*values: str) -> tuple[str, ...]:
 def _commercial_contract(
     files: tuple[tuple[str, bytes], ...], bundle: ResponseDataCatalog, client_id: str,
 ) -> D2CommercialPack:
+    for fact in bundle.facts.values():
+        if fact.active and fact.kind == "promo" and fact.microfact_text is None:
+            raise D2TenantSnapshotError("commercial_promo_short_missing")
     raw = dict(files).get("target_response/d2_commercial.json")
     if raw is None:
         return D2CommercialPack(version=1)
@@ -375,15 +375,6 @@ def _commercial_contract(
         raise D2TenantSnapshotError(_commercial_error_code(exc)) from exc
     if pack.client_id is not None and pack.client_id != client_id:
         raise D2TenantSnapshotError("commercial_tenant_mismatch")
-    promos = {item.fact_id: item for item in pack.promo_facts}
-    for promo in pack.promo_facts:
-        fact = bundle.facts.get(promo.fact_id)
-        if fact is None or not fact.active:
-            raise D2TenantSnapshotError("commercial_fact_unavailable")
-        if fact.kind != "promo":
-            raise D2TenantSnapshotError("commercial_promo_kind_invalid")
-        if fact.microfact_text is None:
-            raise D2TenantSnapshotError("commercial_promo_short_missing")
     boosters = {item.package_id: item for item in pack.price_booster_packages}
     also_lists = {item.package_id: item for item in pack.also_list_packages}
     for profile in pack.service_profiles:
@@ -391,14 +382,11 @@ def _commercial_contract(
         if service is None or not service.active:
             raise D2TenantSnapshotError("commercial_service_unavailable")
         owned: list[str] = []
-        for fact_id in profile.promo_refs:
-            promo = promos.get(fact_id)
-            fact = bundle.facts.get(fact_id)
-            if promo is None:
-                raise D2TenantSnapshotError("commercial_promo_forms_missing")
-            if fact is None or profile.service_id not in fact.allowed_service_ids or profile.service_id in fact.excluded_service_ids:
-                raise D2TenantSnapshotError("commercial_promo_inapplicable")
-            owned.extend(_commercial_texts(fact.microfact_text, fact.text_fact))
+        for fact in bundle.facts.values():
+            if (fact.active and fact.kind == "promo"
+                    and profile.service_id in fact.allowed_service_ids
+                    and profile.service_id not in fact.excluded_service_ids):
+                owned.extend(_commercial_texts(fact.microfact_text, fact.text_fact))
         if profile.price_booster_id is not None:
             package = boosters.get(profile.price_booster_id)
             if package is None:

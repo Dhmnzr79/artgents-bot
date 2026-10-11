@@ -158,7 +158,7 @@ def test_empty_packages_keep_published_price(tmp_path: Path) -> None:
     assert "от 6 500" in outcome.response.rendered_text.replace("\u00a0", " ").replace("\u202f", " ")
 
 
-def test_shown_auto_promo_is_not_repeated(tmp_path: Path) -> None:
+def test_price_promo_repeats_even_when_previously_shown(tmp_path: Path) -> None:
     first, saved, _, clients = _run(tmp_path, _raw_price("professional_whitening", "whitening"))
     assert [block.fact_id for block in first.response.resolved.promo_blocks] == ["professional_whitening_discount"]
     provider = RawFakeProvider(_raw_price("professional_whitening", "whitening"))
@@ -171,7 +171,7 @@ def test_shown_auto_promo_is_not_repeated(tmp_path: Path) -> None:
             store=store,
             now=NOW.replace(minute=1),
         )
-    assert second.response.resolved.promo_blocks == ()
+    assert [b.fact_id for b in second.response.resolved.promo_blocks] == ["professional_whitening_discount"]
     assert second.response.resolved.d2_price_block is not None
     assert second.response.resolved.d2_price_booster_block is not None
     assert saved.state.accumulated_shown_ids.promo_fact_ids == ("professional_whitening_discount",)

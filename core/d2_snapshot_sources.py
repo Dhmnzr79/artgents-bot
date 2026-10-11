@@ -34,7 +34,6 @@ from contracts.response_plan_adapter import ResponsePlanAdapterUiAuthority, Resp
 from contracts.response_plan_materialization import (
     D2CommercialAuthority,
     D2CommercialPackageAuthority,
-    D2CommercialPromoAuthority,
     D2CompatibilityGroupAuthority,
     D2DirectionAuthority,
     D2DirectionPricePresentation,
@@ -350,14 +349,6 @@ def _commercial_authority(client_id: str, model_view: D2ModelView, bundle: Respo
     pack = model_view.commercial
     return D2CommercialAuthority(
         source_client_id=client_id,
-        promo_facts=tuple(
-            D2CommercialPromoAuthority(
-                source_client_id=client_id, fact_id=item.fact_id,
-                short_text=bundle.facts[item.fact_id].microfact_text,
-                full_text=bundle.facts[item.fact_id].text_fact,
-            )
-            for item in pack.promo_facts
-        ),
         price_booster_packages=tuple(
             D2CommercialPackageAuthority(
                 source_client_id=client_id, package_id=item.package_id, name=item.name, body_text=item.body_text,
@@ -372,7 +363,7 @@ def _commercial_authority(client_id: str, model_view: D2ModelView, bundle: Respo
         ),
         service_profiles=tuple(
             D2ServiceCommercialProfileAuthority(
-                source_client_id=client_id, service_id=item.service_id, promo_refs=item.promo_refs,
+                source_client_id=client_id, service_id=item.service_id,
                 price_booster_id=item.price_booster_id, also_list_id=item.also_list_id,
                 price_detail_ids=item.price_detail_ids,
             )

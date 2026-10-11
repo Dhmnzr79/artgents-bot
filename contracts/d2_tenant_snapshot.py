@@ -52,15 +52,6 @@ def _require_non_blank(*values: str) -> None:
         raise ValueError("commercial_blank")
 
 
-class D2CommercialPromoFact(ResponsePlanModel):
-    fact_id: str
-
-    @model_validator(mode="after")
-    def _validate_promo(self) -> Self:
-        _require_non_blank(self.fact_id)
-        return self
-
-
 class D2CommercialPackage(ResponsePlanModel):
     package_id: str
     name: str
@@ -74,7 +65,6 @@ class D2CommercialPackage(ResponsePlanModel):
 
 class D2ServiceCommercialProfile(ResponsePlanModel):
     service_id: str
-    promo_refs: tuple[str, ...] = ()
     price_booster_id: str | None = None
     also_list_id: str | None = None
     price_detail_ids: tuple[Literal["includes", "stages"], ...] = ()
@@ -88,13 +78,9 @@ class D2ServiceCommercialProfile(ResponsePlanModel):
 
     @model_validator(mode="after")
     def _validate_profile(self) -> Self:
-        _require_non_blank(self.service_id, *self.promo_refs)
+        _require_non_blank(self.service_id)
         if any(not value or value != value.strip() for value in (self.price_booster_id, self.also_list_id) if value is not None):
             raise ValueError("commercial_blank")
-        if len(self.promo_refs) > 2:
-            raise ValueError("commercial_promo_ref_cap")
-        if len(set(self.promo_refs)) != len(self.promo_refs):
-            raise ValueError("commercial_promo_ref_duplicate")
         if len(self.price_detail_ids) > 2 or len(set(self.price_detail_ids)) != len(self.price_detail_ids):
             raise ValueError("commercial_price_detail_ids_invalid")
         return self
@@ -118,7 +104,6 @@ class D2IncompatibilityGroup(ResponsePlanModel):
 class D2CommercialPack(ResponsePlanModel):
     version: Literal[1]
     client_id: str | None = None
-    promo_facts: tuple[D2CommercialPromoFact, ...] = ()
     price_booster_packages: tuple[D2CommercialPackage, ...] = ()
     also_list_packages: tuple[D2CommercialPackage, ...] = ()
     service_profiles: tuple[D2ServiceCommercialProfile, ...] = ()
@@ -128,8 +113,6 @@ class D2CommercialPack(ResponsePlanModel):
     def _unique_ids(self) -> Self:
         if self.client_id is not None:
             _require_non_blank(self.client_id)
-        if len({item.fact_id for item in self.promo_facts}) != len(self.promo_facts):
-            raise ValueError("commercial_promo_fact_duplicate")
         package_ids = tuple(item.package_id for item in (*self.price_booster_packages, *self.also_list_packages))
         if len(set(package_ids)) != len(package_ids):
             raise ValueError("commercial_package_duplicate")

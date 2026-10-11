@@ -803,32 +803,27 @@ def resolve_d2_operations(
         else "failed" if unavailable_count == len(request_parts)
         else "degraded"
     )
+    commercial_topic_id = None
     if price_parts:
-        commercial_service_id = (
-            None if price_block is None and price_parts[0].brand_id is not None
-            else price_parts[0].service_id
-        )
-    elif direct_promotion and promotion_scope == "general":
-        commercial_service_id = None
+        published_services = tuple(dict.fromkeys(row.service_id for row in price_block.rows)) if price_block else ()
+        commercial_service_id = published_services[0] if len(published_services) == 1 else None
     elif direct_promotion or auto_promo:
         commercial_service_id = content_parts[0].service_id if content_parts else None
+        commercial_topic_id = selected_topic_id
     else:
         commercial_service_id = None
-    active_promo_ids = frozenset(
-        fact.id
-        for fact in sources.material_authority.bundle.facts.values()
-        if fact_active_as_of(fact, as_of)
-    )
     commercial = resolve_d2_commercial_plan(
         authority=sources.d2_commercial,
+        bundle=sources.material_authority.bundle,
+        as_of=as_of,
         service_id=commercial_service_id,
+        topic_id=commercial_topic_id,
         include_packages=price_block is not None and not direct_promotion and not direct_fact,
         shown_promo_fact_ids=sources.shown_promo_fact_ids,
         promo_form="full" if direct_promotion else "short",
         promotion_scope=promotion_scope if direct_promotion else "service",
-        skip_shown=not direct_promotion,
-        max_promo=4 if direct_promotion else 2,
-        active_promo_ids=active_promo_ids,
+        skip_shown=not direct_promotion and price_block is None,
+        max_promo=None if price_block is not None else (4 if direct_promotion else 2),
     )
     commercial_facts = _d2_requested_fact_candidates(
         requested_fact_ids,

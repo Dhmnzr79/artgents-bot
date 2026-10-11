@@ -297,13 +297,6 @@ class OfferConditionEvidence(ResponsePlanModel):
         return self
 
 
-class D2CommercialPromoAuthority(ResponsePlanModel):
-    source_client_id: str
-    fact_id: str
-    short_text: str
-    full_text: str
-
-
 class D2CommercialPackageAuthority(ResponsePlanModel):
     source_client_id: str
     package_id: str
@@ -314,7 +307,6 @@ class D2CommercialPackageAuthority(ResponsePlanModel):
 class D2ServiceCommercialProfileAuthority(ResponsePlanModel):
     source_client_id: str
     service_id: str
-    promo_refs: tuple[str, ...] = ()
     price_booster_id: str | None = None
     also_list_id: str | None = None
     price_detail_ids: tuple[Literal["includes", "stages"], ...] = ()
@@ -329,7 +321,6 @@ class D2CompatibilityGroupAuthority(ResponsePlanModel):
 
 class D2CommercialAuthority(ResponsePlanModel):
     source_client_id: str
-    promo_facts: tuple[D2CommercialPromoAuthority, ...] = ()
     price_booster_packages: tuple[D2CommercialPackageAuthority, ...] = ()
     also_list_packages: tuple[D2CommercialPackageAuthority, ...] = ()
     service_profiles: tuple[D2ServiceCommercialProfileAuthority, ...] = ()

@@ -67,20 +67,18 @@ def test_demo_pack_loads_commercial_contract_through_snapshot(tmp_path: Path) ->
     commercial = view.commercial
     classic = next(item for item in commercial.service_profiles if item.service_id == "classic")
     caries = next(item for item in commercial.service_profiles if item.service_id == "caries")
-    discount = next(item for item in commercial.promo_facts if item.fact_id == "implant_same_day_discount")
+    assert not hasattr(commercial, "promo_facts")
 
     assert view.client_id == "demo"
-    assert len(classic.promo_refs) == 2
+    assert not hasattr(classic, "promo_refs")
     assert classic.price_booster_id == "demo_payment_booster"
     assert classic.also_list_id == "demo_also_diagnostics"
-    assert caries.promo_refs == ()
+    assert not hasattr(caries, "promo_refs")
     assert caries.price_booster_id is None
     assert caries.also_list_id is None
-    assert discount.fact_id == "implant_same_day_discount"
-    assert discount.model_dump() == {"fact_id": "implant_same_day_discount"}
     assert len(commercial.price_booster_packages) == 2
     assert len(commercial.also_list_packages) == 3
-    assert any(item.service_id == "veneers" and item.promo_refs == () for item in commercial.service_profiles)
+    assert any(item.service_id == "veneers" for item in commercial.service_profiles)
     assert any(item.service_id == "pterygoid_implants" for item in commercial.service_profiles)
     assert commercial.incompatibility_groups[0].explanation_text
     assert not hasattr(commercial.price_booster_packages[0], "fact_refs")
@@ -91,7 +89,7 @@ def test_empty_and_missing_packages_are_valid(tmp_path: Path) -> None:
     payload = _read_commercial(root)
     payload["price_booster_packages"] = []
     payload["also_list_packages"] = []
-    payload["service_profiles"] = [{"service_id": "caries", "promo_refs": []}]
+    payload["service_profiles"] = [{"service_id": "caries"}]
     _write_commercial(root, payload)
     view = _load(root)
     assert view.commercial.price_booster_packages == ()
@@ -101,7 +99,7 @@ def test_empty_and_missing_packages_are_valid(tmp_path: Path) -> None:
     _commercial_path(root).unlink()
     missing = _load(root)
     assert missing.commercial.service_profiles == ()
-    assert missing.commercial.promo_facts == ()
+    assert not hasattr(missing.commercial, "promo_facts")
 
 
 def test_fact_only_edit_supplies_both_forms_from_captured_snapshot(tmp_path: Path, monkeypatch) -> None:
@@ -129,17 +127,18 @@ def test_fact_only_edit_supplies_both_forms_from_captured_snapshot(tmp_path: Pat
     sources = build_d2_snapshot_sources(
         snapshot, model_view=view, operations=(), session_key=SessionKey(client_id="demo", sid="kb1"),
     )
-    assert [row.fact_id for row in sources.d2_commercial.promo_facts] == [
-        row.fact_id for row in view.commercial.promo_facts]
-    promo = next(row for row in sources.d2_commercial.promo_facts if row.fact_id == "implant_same_day_discount")
-    assert promo.short_text == "Проверочная короткая форма: до 15%."
-    assert promo.full_text == "Проверочная полная форма: до 15% при оплате в день обращения."
+    assert set(sources.material_authority.bundle.facts) == set(snapshot.bundle.facts)
+    fact = sources.material_authority.bundle.facts["implant_same_day_discount"]
+    assert fact.microfact_text == "Проверочная короткая форма: до 15%."
+    assert fact.text_fact == "Проверочная полная форма: до 15% при оплате в день обращения."
+    assert not hasattr(sources.d2_commercial, "promo_facts")
 
 
 @pytest.mark.parametrize("field", ["short_text", "full_text"])
 def test_promo_reference_rejects_legacy_text_fields(tmp_path: Path, field: str) -> None:
     root = _copy_named(tmp_path, "demo")
     payload = _read_commercial(root)
+    payload["promo_facts"] = [{"fact_id": "implant_same_day_discount"}]
     payload["promo_facts"][0][field] = "Второй источник текста запрещён."
     _write_commercial(root, payload)
     with pytest.raises(D2TenantSnapshotError, match="commercial_config_invalid"):
@@ -149,13 +148,13 @@ def test_promo_reference_rejects_legacy_text_fields(tmp_path: Path, field: str) 
 @pytest.mark.parametrize(
     ("fault", "code"),
     (
-        ("unknown_fact", "commercial_fact_unavailable"),
+        ("unknown_fact", "commercial_config_invalid"),
         ("foreign_tenant", "commercial_tenant_mismatch"),
         ("two_boosters", "commercial_package_not_single"),
         ("two_also", "commercial_package_not_single"),
         ("legacy_forms", "commercial_config_invalid"),
-        ("promo_cap", "commercial_promo_ref_cap"),
-        ("inapplicable", "commercial_promo_inapplicable"),
+        ("promo_cap", "commercial_config_invalid"),
+        ("inapplicable", "commercial_config_invalid"),
         ("unknown_package", "commercial_package_unavailable"),
         ("unknown_service", "commercial_service_unavailable"),
         ("unknown_group_id", "commercial_incompatibility_ref_unavailable"),
@@ -167,7 +166,7 @@ def test_broken_commercial_contract_fails_closed(tmp_path: Path, fault: str, cod
     payload = _read_commercial(root)
     classic = next(item for item in payload["service_profiles"] if item["service_id"] == "classic")
     if fault == "unknown_fact":
-        payload["promo_facts"][0]["fact_id"] = "missing_promo"
+        payload["promo_facts"] = [{"fact_id": "missing_promo"}]
         classic["promo_refs"] = ["missing_promo", "free_implant_consult"]
     elif fault == "foreign_tenant":
         payload["client_id"] = "clinic_b"
@@ -176,7 +175,7 @@ def test_broken_commercial_contract_fails_closed(tmp_path: Path, fault: str, cod
     elif fault == "two_also":
         classic["also_list_id"] = ["demo_also_diagnostics", "demo_also_followup"]
     elif fault == "legacy_forms":
-        payload["promo_facts"][0]["short_text"] = "Другая короткая форма."
+        payload["promo_facts"] = [{"fact_id": "implant_same_day_discount", "short_text": "Другая короткая форма."}]
     elif fault == "promo_cap":
         classic["promo_refs"] = [
             "implant_same_day_discount",
@@ -196,7 +195,7 @@ def test_broken_commercial_contract_fails_closed(tmp_path: Path, fault: str, cod
         ]
     else:
         facts = json.loads((root / "demo" / "target_response" / "pricebook" / "facts.json").read_text(encoding="utf-8"))
-        payload["also_list_packages"][0]["body_text"] = facts[payload["promo_facts"][0]["fact_id"]]["microfact_text"]
+        payload["also_list_packages"][0]["body_text"] = facts["implant_same_day_discount"]["microfact_text"]
     _write_commercial(root, payload)
 
     with pytest.raises(D2TenantSnapshotError, match=code):
@@ -248,7 +247,7 @@ def test_legacy_marketing_lists_are_not_d2_authority(tmp_path: Path, monkeypatch
 
     view = _load(root)
     classic = next(item for item in view.commercial.service_profiles if item.service_id == "classic")
-    assert classic.promo_refs == ("implant_same_day_discount", "free_implant_consult")
+    assert not hasattr(classic, "promo_refs")
     assert classic.price_booster_id == "demo_payment_booster"
     assert classic.also_list_id == "demo_also_diagnostics"
     assert all(package.package_id != "fact:installment_12" for package in view.commercial.price_booster_packages)

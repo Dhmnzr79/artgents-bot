@@ -41,7 +41,7 @@ def test_card_commercial_sections_keep_exact_frozen_text_and_contacts_separate(h
     address = next(p for p in parts if "Адрес:" in p.get("text", ""))
     assert not address["price_owned"] and address.get("price_section") is None
     assert sum("Адрес:" in p.get("text", "") for p in parts) == 1
-    assert bool(any(p.get("price_section") for p in parts)) == (service in {"classic", "professional_whitening"})
+    assert bool(any(p.get("price_section") for p in parts)) == (service in {"classic", "all_on_4", "professional_whitening"})
     assert len(fake.inputs) == 1
     fake.generate = forbidden
     assert post(client, q="Цена и адрес?").get_json() == body

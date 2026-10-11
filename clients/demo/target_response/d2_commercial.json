@@ -1,16 +1,5 @@
 {
   "version": 1,
-  "promo_facts": [
-    {
-      "fact_id": "implant_same_day_discount"
-    },
-    {
-      "fact_id": "free_implant_consult"
-    },
-    {
-      "fact_id": "professional_whitening_discount"
-    }
-  ],
   "price_booster_packages": [
     {
       "package_id": "demo_payment_booster",
@@ -43,28 +32,26 @@
   "service_profiles": [
     {
       "service_id": "classic",
-      "price_detail_ids": ["includes", "stages"],
-      "promo_refs": ["implant_same_day_discount", "free_implant_consult"],
+      "price_detail_ids": [
+        "includes",
+        "stages"
+      ],
       "price_booster_id": "demo_payment_booster",
       "also_list_id": "demo_also_diagnostics"
     },
     {
-      "service_id": "caries",
-      "promo_refs": []
+      "service_id": "caries"
     },
     {
       "service_id": "professional_whitening",
-      "promo_refs": ["professional_whitening_discount"],
       "price_booster_id": "demo_payment_booster",
       "also_list_id": "demo_also_diagnostics"
     },
     {
-      "service_id": "veneers",
-      "promo_refs": []
+      "service_id": "veneers"
     },
     {
       "service_id": "pterygoid_implants",
-      "promo_refs": ["implant_same_day_discount"],
       "price_booster_id": "demo_payment_booster",
       "also_list_id": "demo_also_warranty"
     }
@@ -72,7 +59,10 @@
   "incompatibility_groups": [
     {
       "group_id": "demo_discount_or_installment",
-      "offer_or_fact_ids": ["implant_same_day_discount", "installment_12"],
+      "offer_or_fact_ids": [
+        "implant_same_day_discount",
+        "installment_12"
+      ],
       "explanation_text": "Скидка и рассрочка не суммируются: можно выбрать один вариант."
     }
   ]

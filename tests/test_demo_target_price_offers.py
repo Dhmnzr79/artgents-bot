@@ -119,6 +119,11 @@ UNIT_LABELS = {
     ),
 }
 
+EXTRACTION_LABELS = {'tooth_extraction.complex': 'за сложное удаление одного зуба; окончательная '
+                             'стоимость зависит от анатомии зуба и результата '
+                             'осмотра',
+ 'tooth_extraction.default': 'за удаление одного зуба'}
+
 EXPECTED_BRANDS = {
     "version": 1,
     "brands": {
@@ -273,8 +278,8 @@ def test_target_files_are_strict_complete_frozen_wire_data() -> None:
     brands_raw = _load_json(TARGET_BRANDS)
     facts_raw = _load_json(TARGET_FACTS)
 
-    assert len(offer_files) == len(offers) == 32
-    assert len({offer["offer_id"] for offer in offers}) == 32
+    assert len(offer_files) == len(offers) == 33
+    assert len({offer["offer_id"] for offer in offers}) == 33
     for path, offer in zip(offer_files, offers, strict=True):
         assert path.name == f'{offer["offer_id"]}.json'
     for offer in offers:
@@ -316,7 +321,7 @@ def test_exact_12_top_offers_preserve_authored_payment_stages() -> None:
         assert followup_ids == ["stages", "includes"]
 
     offers_without_stages = set(target) - materialized_offer_ids
-    assert len(offers_without_stages) == 20
+    assert len(offers_without_stages) == 21
     assert {
         "sinus_lift.one_site.closed",
         "sinus_lift.one_site.open",
@@ -351,7 +356,8 @@ def test_owner_units_labels_and_followups_have_no_legacy_dead_actions() -> None:
             continue
         unit, label = UNIT_LABELS[offer["service_id"]]
         assert offer["price"]["billing_unit"] == unit
-        assert offer["package"]["label"] == label
+        expected_label = EXTRACTION_LABELS.get(offer["offer_id"], label)
+        assert offer["package"]["label"] == expected_label
         assert all(
             followup["id"] in {"stages", "includes"}
             for followup in offer["followups"]
@@ -393,7 +399,11 @@ def test_brands_and_facts_preserve_target_integrity() -> None:
     for fact_id, fact in facts.items():
         parsed = TargetCommercialFact.model_validate(fact)
         assert parsed.active is True
-        assert parsed.incompatible_with == []
+        expected_incompatible = {
+            "installment_12": ["implant_same_day_discount"],
+            "implant_same_day_discount": ["installment_12"],
+        }
+        assert parsed.incompatible_with == expected_incompatible.get(fact_id, [])
         if parsed.detail_ref:
             assert f"kb:{parsed.detail_ref}" in kb_refs
         linked = [
@@ -417,7 +427,7 @@ def test_real_bundle_builds_every_service_price_doctor_context() -> None:
     doctors = load_doctor_catalog(DEMO_ROOT / "doctor_catalog.json")
 
     assert len(bundle.services) >= 22
-    assert len(bundle.offers) == 32
+    assert len(bundle.offers) == 33
     for service_id in bundle.services:
         context = build_service_data_context(bundle, doctors, service_id)
         expected_offers = [
@@ -513,21 +523,20 @@ CHANGED_OFFER_IDS = frozenset(
         "sinus_lift.one_site.open",
         "removable_dentures.jaw.full",
         "removable_dentures.jaw.partial",
+        "tooth_extraction.complex",
     }
 )
 
-UNCHANGED_OFFER_SHA256 = {
-    "aligners.default": "ccc2f71863a93134c319e4880cd14ea0489aaf953cc87e2f2dbd327269bd5873",
-    "caries.default": "0e6f0e22879cc3e3372504745d068073c6103bd448785e8e87e3ab8335c8867d",
-    "clasp_dentures.default": "e06056cea65981bec26eeb128107e896d0dcd93116619088e6da50c8a467d696",
-    "periodontitis.default": "8374c42e22ab17f3d2948f744152295c1796f65f6712526760d30ef3e985eed3",
-    "professional_whitening.default": "98574b42e086b344885ce8055705ed14caa0501dd3e4b664a30800656f7f72d1",
-    "pulpitis.default": "c617d6746a6baf02d97c0dd385826b66d8c5dd0d4cb0eb79ac06faf5f20def4d",
-    "teeth_treatment.default": "f90932839c87b59f43c1c307721678ce9e6cc69f8bd4d724bd4db978fec77697",
-    "tomography.default": "daec4b2203db784200297359e4b3ef021bbf09ea5f06c6b7322bf023fcdc162b",
-    "tooth_extraction.default": "1ca8c4d0db94dda49d9f7d1dcced59d29aef93fa9a9794812436fa288ca1bb2d",
-    "veneers.default": "cb903c935892ec5cd8065749b720d4aa2f4386396b41c8a08ec49188c766100d",
-}
+FROZEN_SIMPLE_OFFER_SHA256 = {'aligners.default': '03c9df1c22b476854e5a8d54e436118394dc7900a4a80d2c139526d81c4b86bb',
+ 'caries.default': 'efe9fdce9f2ff5e6e4a99396e4bb73eec7f701f6a0e9c52c80b3c97d5da5f42a',
+ 'clasp_dentures.default': '1490d5fd4a17c17ee67c8720d81f86a0e0b691239ddd9906368286eb6f68dfe7',
+ 'periodontitis.default': 'fcb3831d066f20a4bef3459bfd23fcea864cfc5a0678d1bc13a002d87e7abed0',
+ 'professional_whitening.default': 'f53d76a9b4a98f2795a1f2910c7d6e952c73a4c01f6037d0154e600464afaee1',
+ 'pulpitis.default': 'ce1b9c9f0c6617d1e9efdf08b24a30bb2c496ec59643f6ced63e776ea1b78c29',
+ 'teeth_treatment.default': '390a754f5af627840e5f16f8b7ef53b94c672820494adb74dd2a1e42e0bca99a',
+ 'tomography.default': '9c6f42f1a11f2c217bf072004919407e029b48be814fd19cb61bc998e7b26946',
+ 'tooth_extraction.default': '174520b7d59bb11f01531ff67032bbe2aa6108c93409466c43d2746a0f79689a',
+ 'veneers.default': '9a9a3c6de8e7f56855417047328fb6540f99ab601562b9ee7998af2424128ebb'}
 
 
 def test_owner_decisions_disambiguate_single_unit_offers() -> None:
@@ -592,13 +601,13 @@ def test_classic_and_one_stage_include_permanent_crown_not_silent_temporary() ->
         assert sum(stage["amount"] for stage in stages) == offer["price"]["amount"]
 
 
-def test_ambiguous_offer_checkpoint_touches_only_seventeen_offers() -> None:
+def test_demo_offer_inventory_and_simple_offer_content_are_frozen() -> None:
     offer_ids = {path.stem for path in _target_offer_files()}
-    assert len(offer_ids) == 32
-    assert len(CHANGED_OFFER_IDS) == 22
-    assert len(UNCHANGED_OFFER_SHA256) == 10
-    assert offer_ids == CHANGED_OFFER_IDS | set(UNCHANGED_OFFER_SHA256)
-    for offer_id, expected_hash in UNCHANGED_OFFER_SHA256.items():
+    assert len(offer_ids) == 33
+    assert len(CHANGED_OFFER_IDS) == 23
+    assert len(FROZEN_SIMPLE_OFFER_SHA256) == 10
+    assert offer_ids == CHANGED_OFFER_IDS | set(FROZEN_SIMPLE_OFFER_SHA256)
+    for offer_id, expected_hash in FROZEN_SIMPLE_OFFER_SHA256.items():
         path = TARGET_OFFERS / f"{offer_id}.json"
         assert _sha256(path) == expected_hash
 
@@ -657,14 +666,15 @@ def test_temporary_teeth_md_aligns_protocol_timing_without_all_on_single_crown()
     assert "на один зуб" in korotko
     assert "не временный несъёмный протез на всю челюсть" in korotko
     assert "2–3 дня" in korotko
-    assert "3–4 месяца" in korotko
+    assert "после оценки приживления" in korotko
     assert "all-on" not in korotko.lower()
     assert "сразу после имплантации или через несколько дней" not in korotko
 
     when_section = body.split("### Когда ставят")[1].split("### Ограничения")[0]
     assert "одномоментной" in when_section
     assert "классической" in when_section
-    assert "3–4 месяца" in when_section
+    assert "после оценки приживления" in when_section
+    assert "3–6 месяцев" in body
 
 
 def test_duration_faq_md_separates_temporary_result_from_permanent_crown() -> None:
@@ -716,13 +726,15 @@ def test_canonical_fact_texts_carry_unambiguous_source_conditions() -> None:
 
     installment = bundle.facts["installment_12"]
     assert "12 месяцев" in installment.text_fact
-    assert "оформление на консультации" in installment.text_fact
+    assert "после согласования плана лечения" in installment.text_fact
+    assert "не суммируются" in installment.text_fact
+    assert "оформление на консультации" in installment.microfact_text
     assert "24" not in installment.text_fact
 
     consult = bundle.facts["free_implant_consult"]
     assert "31 декабря 2026" in consult.text_fact
     assert "бесплатная консультация" in consult.text_fact.lower()
-    assert "три варианта плана лечения по стоимости" in consult.text_fact
+    assert "до трёх вариантов плана по стоимости" in consult.text_fact
     assert "КТ при необходимости оплачивается отдельно" in consult.text_fact
     assert "не бесплатное лечение" not in consult.text_fact.lower()
     assert "20 000" not in consult.text_fact
@@ -730,7 +742,10 @@ def test_canonical_fact_texts_carry_unambiguous_source_conditions() -> None:
     assert "стаж" not in consult.text_fact.lower()
 
     warranty = bundle.facts["implant_warranty"]
-    assert "корректировки и помощь бесплатно" in warranty.text_fact
+    assert "1 год" in warranty.text_fact
+    assert "при соблюдении рекомендаций" in warranty.text_fact
+    assert "паспортом системы и договором" in warranty.text_fact
+    assert "бесплатно" not in warranty.text_fact
     assert "поломке конструкции" not in warranty.text_fact
     assert "перестановка" not in warranty.text_fact.lower()
 
@@ -831,3 +846,46 @@ def test_checkpoint_offers_link_facts_in_real_service_data_context() -> None:
         fact_ref for offer in whitening.offers for fact_ref in offer.fact_refs
     }
     assert "professional_whitening_discount" in whitening_fact_refs
+
+
+@pytest.mark.parametrize(
+    ("extent", "expected_offers", "expected_units"),
+    [
+        ("one_tooth", ("zirconia_crowns.default", "implant_supported_prosthetics.default"),
+         ("tooth", "tooth")),
+        ("few_teeth", ("zirconia_crowns.default", "removable_dentures.jaw.partial",
+                       "clasp_dentures.default"), ("tooth", "jaw", "unit")),
+        ("full_arch", ("removable_dentures.jaw.full", "all_on_4.jaw.implantium",
+                       "all_on_6.jaw.implantium"), ("jaw", "jaw", "jaw")),
+    ],
+)
+def test_real_demo_prosthetics_scope_materializes_matching_price_units(
+    extent, expected_offers, expected_units,
+) -> None:
+    from datetime import date
+    from contracts.d2_dialogue_result import D2DialogueResult
+    from contracts.response_plan import SessionKey
+    from core.d2_tenant_snapshot import load_d2_tenant_snapshot, build_d2_model_view
+    from core.d2_snapshot_sources import build_d2_snapshot_sources
+    from core.response_plan_materialization import resolve_d2_operations
+
+    snapshot = load_d2_tenant_snapshot("demo", clients_root=DEMO_ROOT.parent)
+    result = D2DialogueResult.model_validate({
+        "outcome": "dialogue", "blocks": [{
+            "request_id": "r1", "kind": "price",
+            "target": {"type": "topic", "id": "prosthetics"},
+            "volume": {"extent": extent, "tooth_count": None, "jaw": "unknown"},
+        }],
+    })
+    sources = build_d2_snapshot_sources(
+        snapshot, model_view=build_d2_model_view(snapshot), operations=result.blocks,
+        session_key=SessionKey(client_id="demo", sid="demo-data-scope"),
+    )
+    outcome = resolve_d2_operations(result.blocks, sources, as_of=date(2026, 10, 11))
+    assert outcome.resolved.d2_result_status == "complete"
+    rows = outcome.resolved.d2_price_block.rows
+    assert tuple(row.offer_id for row in rows) == expected_offers
+    assert tuple(row.billing_unit for row in rows) == expected_units
+    if extent == "full_arch":
+        assert tuple(row.amount for row in rows) == (65000, 318000, 398000)
+        assert all(row.offer_id != "implant_supported_prosthetics.default" for row in rows)

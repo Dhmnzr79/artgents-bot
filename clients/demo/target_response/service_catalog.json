@@ -20,7 +20,12 @@
     "active": true,
     "content_ref": "diagnostics__service__tomography.md",
     "selection": {
-      "mode": "direct"
+      "mode": "direct",
+      "extent": [
+        "one_tooth",
+        "few_teeth",
+        "full_arch"
+      ]
     },
     "options": []
   },
@@ -38,7 +43,12 @@
     "active": true,
     "content_ref": "whitening__service__teeth_whitening.md",
     "selection": {
-      "mode": "context"
+      "mode": "context",
+      "extent": [
+        "one_tooth",
+        "few_teeth",
+        "full_arch"
+      ]
     },
     "options": []
   },
@@ -180,6 +190,10 @@
       "stage": [
         "extraction_context",
         "implant_placed"
+      ],
+      "extent": [
+        "one_tooth",
+        "few_teeth"
       ]
     },
     "options": []
@@ -203,8 +217,7 @@
       "mode": "scope",
       "extent": [
         "one_tooth",
-        "few_teeth",
-        "full_arch"
+        "few_teeth"
       ],
       "stage": [
         "implant_placed"
@@ -227,7 +240,11 @@
     "active": true,
     "content_ref": "treatment__service__caries.md",
     "selection": {
-      "mode": "direct"
+      "mode": "direct",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
     },
     "options": []
   },
@@ -245,7 +262,11 @@
     "active": true,
     "content_ref": "treatment__service__pulpitis.md",
     "selection": {
-      "mode": "direct"
+      "mode": "direct",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
     },
     "options": []
   },
@@ -263,7 +284,11 @@
     "active": true,
     "content_ref": "treatment__service__teeth_treatment.md",
     "selection": {
-      "mode": "context"
+      "mode": "context",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
     },
     "options": []
   },
@@ -284,9 +309,31 @@
     "active": true,
     "content_ref": "extraction__service__tooth_extraction.md",
     "selection": {
-      "mode": "direct"
+      "mode": "direct",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
     },
-    "options": []
+    "options": [
+      {
+        "option_id": "default",
+        "active": true,
+        "name": "Обычное удаление зуба",
+        "aliases": [
+          "простое удаление"
+        ]
+      },
+      {
+        "option_id": "complex",
+        "active": true,
+        "name": "Сложное удаление зуба",
+        "aliases": [
+          "сложное удаление",
+          "удаление ретинированного зуба"
+        ]
+      }
+    ]
   },
   "periodontitis": {
     "name": "Лечение пародонтита",
@@ -303,7 +350,12 @@
     "active": true,
     "content_ref": "periodontology__service__periodontitis.md",
     "selection": {
-      "mode": "direct"
+      "mode": "direct",
+      "extent": [
+        "one_tooth",
+        "few_teeth",
+        "full_arch"
+      ]
     },
     "options": []
   },
@@ -340,7 +392,12 @@
     "active": true,
     "content_ref": "orthodontics__service__aligners.md",
     "selection": {
-      "mode": "context"
+      "mode": "context",
+      "extent": [
+        "one_tooth",
+        "few_teeth",
+        "full_arch"
+      ]
     },
     "options": []
   },
@@ -361,7 +418,12 @@
     "active": true,
     "content_ref": "implantation__service__bone_graft.md",
     "selection": {
-      "mode": "direct"
+      "mode": "direct",
+      "extent": [
+        "one_tooth",
+        "few_teeth",
+        "full_arch"
+      ]
     },
     "options": [],
     "service_value_ref": "fact:sv_aprf"
@@ -380,7 +442,11 @@
     "active": true,
     "content_ref": "prosthetics__service__veneers.md",
     "selection": {
-      "mode": "context"
+      "mode": "context",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
     },
     "options": []
   },
@@ -406,8 +472,7 @@
         "few_teeth"
       ],
       "stage": [
-        "natural_tooth_present",
-        "implant_placed"
+        "natural_tooth_present"
       ]
     },
     "options": []
@@ -464,6 +529,11 @@
       ],
       "reported_context": [
         "reported_bone_deficit"
+      ],
+      "extent": [
+        "one_tooth",
+        "few_teeth",
+        "full_arch"
       ]
     },
     "options": [

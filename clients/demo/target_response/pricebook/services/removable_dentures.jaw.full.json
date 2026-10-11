@@ -9,7 +9,7 @@
     "billing_unit": "jaw"
   },
   "package": {
-    "label": "за одну челюсть",
+    "label": "за одну челюсть; имплантация — отдельно",
     "includes": [
       "осмотр и слепки",
       "изготовление протеза",
@@ -17,8 +17,11 @@
     ]
   },
   "fact_refs": [
+    "tax_deduction",
+    "installment_12",
     "free_implant_consult",
-    "installment_12"
+    "payment_stages",
+    "fixed_price"
   ],
   "followups": [],
   "option_id": "full",

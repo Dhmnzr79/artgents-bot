@@ -10,10 +10,25 @@
   },
   "package": {
     "label": "за одну процедуру; точная стоимость зависит от выбранного протокола",
-    "includes": []
+    "includes": [
+      "осмотр перед отбеливанием",
+      "защита дёсен",
+      "профессиональное кабинетное отбеливание",
+      "рекомендации по уходу после процедуры"
+    ],
+    "excludes": [
+      "профессиональная гигиена и лечение зубов перед отбеливанием"
+    ]
   },
   "fact_refs": [
-    "professional_whitening_discount"
+    "tax_deduction",
+    "professional_whitening_discount",
+    "fixed_price"
   ],
-  "followups": []
+  "followups": [],
+  "applies_to_extents": [
+    "one_tooth",
+    "few_teeth",
+    "full_arch"
+  ]
 }

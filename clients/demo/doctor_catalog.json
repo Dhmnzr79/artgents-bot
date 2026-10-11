@@ -8,9 +8,7 @@
         "caries",
         "pulpitis",
         "teeth_treatment",
-        "professional_whitening",
-        "veneers",
-        "zirconia_crowns"
+        "professional_whitening"
       ],
       "profile_ref": "kb:doctors__doctor__fedorova.md#korotko"
     },
@@ -59,9 +57,7 @@
         "sinus_lift",
         "bone_graft",
         "all_on_4",
-        "all_on_6",
-        "temporary_teeth",
-        "implant_supported_prosthetics"
+        "all_on_6"
       ],
       "profile_ref": "kb:doctors__doctor__orlov.md#korotko"
     },
@@ -78,7 +74,6 @@
         "pterygoid_implants",
         "all_on_4",
         "all_on_6",
-        "temporary_teeth",
         "tooth_extraction"
       ],
       "profile_ref": "kb:doctors__doctor__volkov.md#korotko"

@@ -10,12 +10,23 @@
   },
   "package": {
     "label": "за одно исследование",
-    "includes": []
+    "includes": [
+      "КТ зубов и челюстей в согласованной области",
+      "сохранение исследования в цифровом формате"
+    ]
   },
-  "fact_refs": [],
+  "fact_refs": [
+    "tax_deduction",
+    "fixed_price"
+  ],
   "followups": [],
   "required_conditions_metadata": {
     "completeness": "complete",
     "conditions": []
-  }
+  },
+  "applies_to_extents": [
+    "one_tooth",
+    "few_teeth",
+    "full_arch"
+  ]
 }

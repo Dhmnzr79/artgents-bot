@@ -10,8 +10,19 @@
   },
   "package": {
     "label": "за лечение одного зуба",
-    "includes": []
+    "includes": [
+      "местная анестезия при необходимости",
+      "прямая композитная реставрация разрушенной части зуба",
+      "восстановление формы зуба и проверка прикуса"
+    ]
   },
-  "fact_refs": [],
-  "followups": []
+  "fact_refs": [
+    "tax_deduction",
+    "fixed_price"
+  ],
+  "followups": [],
+  "applies_to_extents": [
+    "one_tooth",
+    "few_teeth"
+  ]
 }

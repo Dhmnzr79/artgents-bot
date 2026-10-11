@@ -10,8 +10,21 @@
   },
   "package": {
     "label": "за удаление одного зуба",
-    "includes": []
+    "includes": [
+      "местная анестезия",
+      "удаление одного зуба",
+      "обработка лунки и остановка кровотечения",
+      "рекомендации по уходу"
+    ]
   },
-  "fact_refs": [],
-  "followups": []
+  "fact_refs": [
+    "tax_deduction",
+    "fixed_price"
+  ],
+  "followups": [],
+  "applies_to_extents": [
+    "one_tooth",
+    "few_teeth"
+  ],
+  "option_id": "default"
 }

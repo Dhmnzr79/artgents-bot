@@ -10,7 +10,7 @@ from contracts.response_plan import (
 _AMPLIFIER_HEADER = "Также мы предлагаем:"
 
 
-def render_response_text(plan: ResolvedResponsePlan, *, include_lead: bool = True) -> str:
+def render_response_text(plan: ResolvedResponsePlan, *, include_lead: bool = True, include_card_details: bool = False) -> str:
     """Plain representation of the same ordered content used by the widget."""
     texts = []
     for part in render_response_parts(plan, include_lead=include_lead):
@@ -21,6 +21,15 @@ def render_response_text(plan: ResolvedResponsePlan, *, include_lead: bool = Tru
             _render_compact_price_group(part.price.rows, card_text,
                 show_service_in_each_row=len({row.service_id for row in part.price.rows}) > 1)
             texts.extend(card_text)
+            if include_card_details and len(part.price.rows) == 1:
+                # Match the sections available on the selected widget card.
+                # Overview alternatives have no expanded package sections.
+                row = part.price.rows[0]
+                for heading, lines in (("В стоимость входят", row.includes),
+                                       ("Отдельно оплачиваются / не входят", row.excludes if row.includes else ()),
+                                       ("Этапы оплаты", row.stages)):
+                    if lines:
+                        texts.append(heading + ":\n" + "\n".join("- " + line for line in lines))
     return _join_parts(texts)
 
 

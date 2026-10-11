@@ -43,12 +43,16 @@ def test_named_variant_card_history_detail_and_replay(http_env, transport, servi
     fake.generate = forbidden
     assert send(client, transport, request_id="first", q="Цена выбранного варианта?") == body
     fake.generate = FakeProvider.generate.__get__(fake)
-    fake.raw = raw(dict(kind="price_detail", request_id="r1", price_detail_aspect="includes"))
+    fake.raw = raw(explanation("Объяснение показанной стоимости."))
     send(client, transport, request_id="detail", q="Что входит?")
     assert [r.offer_id for r in fake.inputs[-1].context.ordinary.d2_shown_price_offer_refs] == [offer]
     with D2DialogueStore(db) as store:
         plan = store.read_latest_completion(SessionKey(client_id="demo", sid="cp6a")).response.resolved
-        assert plan.d2_price_detail_blocks[0].rows[0].offer_id == offer
+        assert plan.d2_price_detail_blocks == ()
+    history = fake.inputs[-1].context.ordinary.dialogue_pairs[-1]
+    assert [r.offer_id for r in history.offers] == [offer]
+    for text in (*row["includes"], *row["excludes"], *row["stages"]):
+        assert text in history.assistant_text
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])

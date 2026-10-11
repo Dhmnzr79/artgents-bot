@@ -152,20 +152,10 @@ class ExplanationOperation(ExplanationFields):
 
 
 class DetailOperation(ScopedOperation):
+    """Server-only execution of a verified card button; absent from model output."""
     brand_id: str | None = None
     kind: Literal["price_detail"]
     price_detail_aspect: Literal["includes", "stages"]
-    price_detail_offer_id: str | None = None
-    price_detail_offer_ordinal: int | None = Field(default=None, ge=1, strict=True)
-    clarification: Clarification | None = Field(default=None, exclude_if=lambda v: v is None)
-
-    @model_validator(mode="after")
-    def selector(self):
-        if "clarification" in self.model_fields_set and self.clarification is None:
-            raise ValueError("clarification_required")
-        if self.price_detail_offer_id is not None and self.price_detail_offer_ordinal is not None:
-            raise ValueError("price_detail_selector_conflict")
-        return self
 
 
 class ContactOperation(Operation):
@@ -211,7 +201,7 @@ MeaningClarification = Annotated[Union[ServiceClarification, TermClarification],
 Clarification = Annotated[Union[ServiceClarification, TermClarification, ParameterClarification], Field(discriminator="missing")]
 
 
-for _operation in (PriceOperation, ExplanationOperation, DetailOperation):
+for _operation in (PriceOperation, ExplanationOperation):
     _operation.model_rebuild()
 
 
@@ -223,12 +213,12 @@ def _require_pending_operation(operation):
 
 
 ClarifiedOperation = Annotated[
-    Union[PriceOperation, ExplanationOperation, DetailOperation],
+    Union[PriceOperation, ExplanationOperation],
     Field(discriminator="kind"), AfterValidator(_require_pending_operation),
 ]
 
 
-Block = Annotated[Union[PriceOperation, ExplanationOperation, DetailOperation,
+Block = Annotated[Union[PriceOperation, ExplanationOperation,
     ContactOperation, BookingOperation,
     OffTopicOperation], Field(discriminator="kind")]
 
@@ -380,7 +370,7 @@ def validate_d2_payload(payload: dict, *, active_service_ids: frozenset[str], kn
             except (ValidationError, ValueError) as exc:
                 first_error = first_error or exc
                 accepted.append(D2RejectedOperation(identity, kind if isinstance(kind, str) and kind in {
-                    "content", "price", "price_detail", "contact", "booking", "off_topic"
+                    "content", "price", "contact", "booking", "off_topic"
                 } else "reference"))
         if all(isinstance(block, D2RejectedOperation) for block in accepted):
             raise first_error

@@ -23,7 +23,7 @@ from contracts.d2_session_context import (
 from contracts.response_plan import D2PriceDetailUiAction, D2PriceSelectUiAction, SessionKey
 from contracts.d2_dialogue_result import (
     DiscussionScope, DiscussionVolume, D2DialogueResult, PriceOperation, ExplanationOperation, DetailOperation,
-    ContactOperation, D2RejectedOperation,
+    ContactOperation, D2RejectedOperation, D2ParsedDialogueResult,
     ClarifiedOperation, D2ExplanationTask,
     ServiceTarget, TopicTarget, UnresolvedTarget, ScopedOperation, OffTopicOperation,
 )
@@ -697,7 +697,7 @@ def _run_reserved_d2_dialogue_turn(
     elif selected_document_action is not None:
         known_task = build_d2_document_task(tenant, selected_document_action)
     elif selected_price_detail_action is not None:
-        known_task = D2DialogueResult(outcome="dialogue", blocks=(DetailOperation(
+        known_task = D2ParsedDialogueResult(outcome="dialogue", blocks=(DetailOperation(
             request_id="r1", kind="price_detail",
             target=(ServiceTarget(type="service", id=selected_price_detail_action.service_id)
                     if selected_price_detail_action.service_id else None),
@@ -717,7 +717,10 @@ def _run_reserved_d2_dialogue_turn(
             descriptor = source_parts[0].discussion_scope
             # Execute the scope captured by the shown source, not a semantic carry.
             task = known_task.blocks[0].model_copy(update={"target": descriptor.target, "volume": descriptor.volume, "brand_id": descriptor.brand_id})
-            known_task = type(known_task).model_validate({"outcome": "dialogue", "blocks": [task.model_dump()]})
+            if selected_price_detail_action is not None:
+                known_task = D2ParsedDialogueResult(outcome="dialogue", blocks=(task,))
+            else:
+                known_task = type(known_task).model_validate({"outcome": "dialogue", "blocks": [task.model_dump()]})
     needs_explanation = isinstance(known_task, D2ExplanationTask)
     if known_task is not None and not needs_explanation:
         result = known_task
@@ -806,7 +809,7 @@ def _run_reserved_d2_dialogue_turn(
         clarification = getattr(block, "clarification", None)
         if clarification is not None:
             # For price, only unresolved service/term tasks reach this branch.
-            # Content/detail also keep their agreed parameter clarifications.
+            # Content keeps its agreed parameter clarifications.
             if pending is not None:
                 if is_price:
                     deferred.append(block)
@@ -982,20 +985,6 @@ def _run_reserved_d2_dialogue_turn(
         "topic_id": part.topic_id or (resolve_d2_clarify_service_topic(tenant, (part.service_id,)) if part.service_id else None),
     }) if part.kind == "price" and part.request_id in price_operations_by_id else part
         for part in response.resolved.d2_request_parts)
-    # A targetless detail resolves the verified displayed offers, not a new topic.
-    # Freeze their captured descriptor with the completed publication.
-    contextual_details = {p.request_id for p in operations if isinstance(p, DetailOperation)
-        and p.target is None and p.volume is None and p.brand_id is None}
-    scope = context.ordinary.discussion_scope
-    input_refs = {(r.source_client_id, r.offer_id, r.service_id)
-        for r in context.ordinary.d2_shown_price_offer_refs}
-    captured_details = {b.request_id for b in response.resolved.d2_price_detail_blocks
-        if b.request_id in contextual_details and b.rows and all(
-            (r.source_client_id, r.offer_id, r.service_id) in input_refs for r in b.rows)}
-    if scope is not None:
-        parts = tuple(part.model_copy(update={"discussion_scope": scope,
-            "brand_id": scope.brand_id, "topic_id": scope.topic_id or part.topic_id})
-            if part.request_id in captured_details else part for part in parts)
     # Freeze proven source IDs, without changing published text or repricing.
     enriched = type(response.resolved).model_validate({**response.resolved.model_dump(), "d2_request_parts": parts})
     response = replace(response, resolved=enriched)

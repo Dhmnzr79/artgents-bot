@@ -491,49 +491,10 @@ def resolve_d2_operations(
         )
         scope_decision = None
         volume_choices = ()
-    detail_blocks: list[D2FrozenPriceDetailBlock] = []
-    detail_failures: dict[str, str] = {}
-    for detail_part in detail_parts:
-        effective_refs = (
-            tuple(D2ShownPriceOfferRef(
-                source_client_id=row.source_client_id, offer_id=row.offer_id,
-                service_id=row.service_id,
-            ) for row in price_block.rows)
-            if price_block is not None else shown_price_offer_refs
-        )
-        named_content_services = {
-            part.service_id for part in content_parts
-            if part.service_id is not None and content_scopes_by_id[part.request_id] is not None
-        }
-        if (
-            (named_content_services and (
-                len(named_content_services) != 1
-                or any(ref.service_id not in named_content_services for ref in effective_refs)
-            ))
-            or (detail_part.service_id is not None and any(
-                ref.service_id != detail_part.service_id for ref in effective_refs
-            ))
-        ):
-            effective_refs = ()
-        try:
-            detail_blocks.append(_d2_price_detail_block(
-                detail_part, sources=sources,
-                shown_price_offer_refs=effective_refs, selected_action=selected_price_detail_action,
-            ))
-        except MaterializationContractError as error:
-            if str(error) not in {"d2_price_detail_context_ambiguous", "d2_no_price_candidates", "d2_no_scope_price_candidates", "d2_operation_invalid"}:
-                raise
-            reason = str(error)
-            detail_failures[detail_part.request_id] = reason
-            ambiguous = reason == "d2_price_detail_context_ambiguous"
-            failure_blocks.append(D2PartFailureBlock(
-                request_id=detail_part.request_id, source_client_id=client_id,
-                message_id="d2-price-detail-clarify" if ambiguous else "d2-price-detail-unavailable",
-                reason=reason,
-                display_text=(D2_OPERATION_FAILURE_TEXT
-                    if reason == "d2_operation_invalid" else "Уточните, для какой услуги или варианта показать детали." if ambiguous
-                    else "Для этого варианта детали не указаны."),
-            ))
+    detail_blocks = [
+        _d2_price_detail_block(part, sources=sources, selected_action=selected_price_detail_action)
+        for part in detail_parts
+    ]
     details_by_id = {block.request_id: block for block in detail_blocks}
     if detail_blocks and not price_parts and not content_parts:
         detail_services = {row.service_id for block in detail_blocks for row in block.rows}
@@ -634,14 +595,12 @@ def resolve_d2_operations(
                 ),
             ))
         elif part.kind == "price_detail":
-            detail_block = details_by_id.get(part.request_id)
-            detail_failure_reason = detail_failures.get(part.request_id)
-            detail_services = {row.service_id for row in detail_block.rows} if detail_block is not None else set()
+            detail_block = details_by_id[part.request_id]
+            detail_services = {row.service_id for row in detail_block.rows}
             detail_service = next(iter(detail_services)) if len(detail_services) == 1 else None
             request_parts.append(D2ResolvedRequestPart(
                 request_id=part.request_id, kind="price_detail",
-                status="unavailable" if detail_failure_reason is not None else "answered",
-                failure_reason=detail_failure_reason,
+                status="answered",
                 discussion_scope=_discussion_descriptor(part),
                 scope="service" if detail_service is not None else "mixed",
                 service_id=detail_service,
@@ -986,80 +945,30 @@ def _d2_price_detail_ui(
 
 
 def _d2_price_detail_offer_ids(
-    part: RequestUnderstandingRequest,
+    part,
     *, sources: ResponsePlanMaterializationSources,
-    shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...],
     selected_action: D2PriceDetailUiAction | None,
 ) -> tuple[str, ...]:
+    """Only the authenticated published card action owns detail identity."""
     client_id = sources.session_key.client_id
     bundle = sources.material_authority.bundle
-    if any(ref.source_client_id != client_id for ref in shown_price_offer_refs):
-        raise MaterializationOwnershipError("d2_price_detail_offer_foreign")
-    applied_extent = part.volume.extent if part.volume is not None and part.volume.extent != "unknown" else None
-    detail_service_id = part.service_id
-    if detail_service_id is None and shown_price_offer_refs and (part.brand_id is not None or applied_extent is not None):
-        services = {ref.service_id for ref in shown_price_offer_refs}
-        if len(services) == 1:
-            detail_service_id = next(iter(services))
-    if selected_action is not None:
-        if (
-            selected_action.source_client_id != client_id
-            or selected_action.aspect != part.price_detail_aspect
-            or part.price_detail_offer_id is not None
-            or part.price_detail_offer_ordinal is not None
-            or part.service_id not in {None, selected_action.service_id}
-        ):
-            raise MaterializationOwnershipError("d2_price_detail_action_mismatch")
-        offer_ids = selected_action.offer_ids
-    elif part.price_detail_offer_ordinal is not None:
-        if part.price_detail_offer_ordinal > len(shown_price_offer_refs):
-            raise MaterializationContractError("d2_price_detail_context_ambiguous")
-        ref = shown_price_offer_refs[part.price_detail_offer_ordinal - 1]
-        if part.service_id not in {None, ref.service_id}:
-            raise MaterializationContractError("d2_price_detail_context_ambiguous")
-        offer_ids = (ref.offer_id,)
-    elif part.price_detail_offer_id is not None:
-        offer_ids = (part.price_detail_offer_id,)
-    elif shown_price_offer_refs and part.brand_id is None and applied_extent is None and (
-        part.service_id is None or all(ref.service_id == part.service_id for ref in shown_price_offer_refs)
-    ):
-        if part.service_id is None and len({ref.service_id for ref in shown_price_offer_refs}) != 1:
-            raise MaterializationContractError("d2_price_detail_context_ambiguous")
-        offer_ids = tuple(ref.offer_id for ref in shown_price_offer_refs)
-    elif detail_service_id is not None:
-        if detail_service_id not in bundle.services:
-            raise MaterializationContractError("d2_operation_invalid")
-        price, _ = _d2_price_block(
-            bundle=bundle, client_id=client_id, service_ids=(detail_service_id,),
-            published_terms=sources.d2_published_terms_by_offer,
-            brand_id=part.brand_id, applied_extent=applied_extent,
-            direct_service_only=True,
-        )
-        offer_ids = tuple(row.offer_id for row in price.rows)
-    else:
-        raise MaterializationContractError("d2_price_detail_context_ambiguous")
-    by_id = {offer.offer_id: offer for offer in bundle.offers}
-    if len(set(offer_ids)) != len(offer_ids):
+    if (selected_action is None
+        or selected_action.source_client_id != client_id
+        or selected_action.aspect != part.price_detail_aspect
+        or part.service_id not in {None, selected_action.service_id}):
+        raise MaterializationOwnershipError("d2_price_detail_action_mismatch")
+    offer_ids = selected_action.offer_ids
+    if not offer_ids or len(set(offer_ids)) != len(offer_ids):
         raise MaterializationOwnershipError("d2_price_detail_offer_duplicate")
+    by_id = {offer.offer_id: offer for offer in bundle.offers}
     for offer_id in offer_ids:
         offer = by_id.get(offer_id)
-        if (
-            offer is None or not offer.active
-            or offer.service_id not in bundle.services
-            or not bundle.services[offer.service_id].active
+        service = bundle.services.get(offer.service_id) if offer else None
+        if (offer is None or not offer.active or service is None or not service.active
             or offer_id not in sources.d2_published_terms_by_offer
-        ):
-            if selected_action is None and part.price_detail_offer_id is not None:
-                raise MaterializationContractError("d2_operation_invalid")
-            raise MaterializationOwnershipError("d2_price_detail_offer_foreign")
-        if (
-            (part.service_id is not None and offer.service_id != part.service_id)
-            or (selected_action is None and part.brand_id is not None and offer.brand_id != part.brand_id)
-            or (selected_action is None and applied_extent is not None
-                and not _d2_offer_applies(offer, bundle.services[offer.service_id], applied_extent))
-        ):
-            if selected_action is None:
-                raise MaterializationContractError("d2_operation_invalid")
+            or (selected_action.service_id is not None and offer.service_id != selected_action.service_id)
+            or (offer.option_id is not None and not any(
+                option.option_id == offer.option_id and option.active is not False for option in service.options))):
             raise MaterializationOwnershipError("d2_price_detail_offer_foreign")
     return offer_ids
 
@@ -1067,13 +976,12 @@ def _d2_price_detail_offer_ids(
 def _d2_price_detail_block(
     part: RequestUnderstandingRequest,
     *, sources: ResponsePlanMaterializationSources,
-    shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...],
     selected_action: D2PriceDetailUiAction | None,
 ) -> D2FrozenPriceDetailBlock:
     if part.price_detail_aspect is None:
         raise MaterializationContractError("d2_price_detail_aspect_required")
     offer_ids = _d2_price_detail_offer_ids(
-        part, sources=sources, shown_price_offer_refs=shown_price_offer_refs,
+        part, sources=sources,
         selected_action=selected_action,
     )
     bundle = sources.material_authority.bundle

@@ -41,7 +41,7 @@ def _project_pair(ref, result):
         "patient_text": safe(resolved.patient_text),
         "terminal_text": safe(resolved.terminal_text),
     })
-    safe_text = render_response_text(public_plan, include_lead=False)
+    safe_text = render_response_text(public_plan, include_lead=False, include_card_details=True)
     price_blocks = (*((resolved.d2_price_block,) if resolved.d2_price_block else ()),
         *resolved.d2_price_detail_blocks)
     offers = tuple({(row.source_client_id, row.offer_id, row.service_id):

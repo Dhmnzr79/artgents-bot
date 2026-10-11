@@ -203,20 +203,17 @@ def test_ordinary_selector_conflict_is_local(http_env, transport, selector, cons
     assert len(fake.inputs) == 2
 
 
-@pytest.mark.parametrize("source", ["history", "action"])
+@pytest.mark.parametrize("source", ["missing_action", "action"])
 def test_foreign_detail_binding_stays_fatal(source):
     from contracts.d2_dialogue_result import DetailOperation
     from contracts.response_plan import D2PriceDetailUiAction
-    from contracts.response_plan_session import D2ShownPriceOfferRef
     from contracts.response_plan_materialization import MaterializationOwnershipError
     from core.response_plan_materialization import _d2_price_detail_offer_ids
     from tests.test_d2_independent_request_parts import _sources_ab
     sources = _sources_ab()
     operation = DetailOperation(kind="price_detail", request_id="r1", price_detail_aspect="includes")
-    ref = D2ShownPriceOfferRef(source_client_id="nikadent", offer_id="foreign", service_id="foreign")
     action = D2PriceDetailUiAction(source_client_id="nikadent", reply_id="price_detail:includes",
         aspect="includes", service_id="foreign", offer_ids=("foreign",))
     with pytest.raises(MaterializationOwnershipError):
         _d2_price_detail_offer_ids(operation, sources=sources,
-            shown_price_offer_refs=(ref,) if source == "history" else (),
             selected_action=action if source == "action" else None)

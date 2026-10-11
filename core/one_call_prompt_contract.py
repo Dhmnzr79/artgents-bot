@@ -204,8 +204,11 @@ content_text answers from the clinic materials and conversation. A natural
 clarifying question is also ordinary content_text; use the typed service-choice
 clarification only when offering the existing verified choice buttons.
 No doctor/policy/fact command or ID list is required for these answers.
-Exact price cards and package details use price/price_detail. Contacts use
-contact. Never invent prices or claim a brand/service the clinic does not offer.
+Exact price cards use price. Ordinary questions about what is included,
+exclusions, payment stages, warranty and follow-ups use content_text from the
+clinic materials and the displayed card in conversation history. Card buttons
+are executed by the server. Contacts may be answered naturally from clinic
+materials; use contact for the existing structured contact UI. Never invent prices or claim a brand/service the clinic does not offer.
 A price operation uses a known service or direction target. A named direction
 is a valid price overview. Preserve that direction as a topic target; do not
 choose one of its services or require service/extent merely because the
@@ -233,22 +236,21 @@ Only a genuinely unidentified service or term may add clarification to a price
 operation (missing=service or term, target absent or unresolved). Do not
 omit a known target to manufacture ambiguity. An unanswered price request
 must remain a price operation, not explanatory prose asking for its parameters.
-For information or price_detail, existing parameter clarification remains
+For information, existing parameter clarification remains
 available when necessary. Keep the operation itself and add only
 clarification={missing,choices}; clarification has no operation, kind or ID.
-An operation says WHAT to do: kind=price, content or price_detail, plus
+An operation says WHAT to do: kind=price or content, plus
 request_id and its fields. Its target says WHAT it is about, using the target
 forms defined for that operation. The type/id object belongs only in operation.target;
 it is never a complete operation. Each operation has exactly one request_id.
 Preserve each requested operation's constraints in its existing typed fields,
-whether it is complete or needs clarification. For price and price_detail, if a brand explicitly qualifies the requested service, direction or variant,
+whether it is complete or needs clarification. For price, if a brand explicitly qualifies the requested service, direction or variant,
 include brand_id on that operation. Use its exact ID from BRAND_CATALOG; for
 an absent named brand retain the named lower-case identifier, never another brand.
 A brand narrows the offers within the identified target; it does not require
 choosing a treatment method before requesting a known direction's price overview.
-This includes package composition and payment-stage questions, in fresh
-conversations and follow-ups. Mentioning the brand only in prose or omitting
-brand_id does not preserve the constraint; code does not infer it from the question.
+Mentioning the brand only in prose or omitting brand_id does not preserve
+the price constraint; code does not infer it from the question.
 Preserve the stated volume (extent, tooth_count, jaw) and applicable payment fields
 in the same way. Keep unstated parameters absent/unknown under this contract;
 do not infer a brand from a service name or treat every mentioned brand as a choice.
@@ -283,14 +285,6 @@ the current clinic corpus, not guessed values):
 ```json
 {"outcome":"dialogue","blocks":[{"kind":"content","request_id":"r1","target":{"type":"topic","id":"<topic_id>"},"content_ref":"<selected_document_filename>.md","content_text":"Установка занимает <installation_duration_from_corpus>. До постоянной коронки обычно проходит <healing_duration_from_corpus>; точный срок зависит от клинической ситуации."}]}
 ```
-For price_detail, keep kind=price_detail and price_detail_aspect on the same
-operation; its clarification has only missing/choices, no text or nested task.
-Details of a service and brand explicitly requested by the user:
-```json
-{"outcome":"dialogue","blocks":[{"kind":"price_detail","request_id":"r1","target":{"type":"service","id":"<requested_service_id>"},"brand_id":"<requested_brand_id>","price_detail_aspect":"stages"}]}
-```
-Use IDs from the current tenant and the actual question; includes uses the same
-constraint rule. Add volume only when stated or relevant to a clear continuation.
 Named-direction price with an explicitly stated volume, including in a fresh
 conversation. The direction is known even when its treatment method is not:
 ```json

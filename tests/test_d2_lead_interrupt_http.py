@@ -459,3 +459,57 @@ def test_hidden_volume_choices_are_not_remembered_as_shown(http_env):
     assert len(fake.inputs) == 2
     with session_client_scope("demo"):
         assert mem_get(sid)["lead_intent"] == "paused"
+
+
+@pytest.mark.parametrize("transport", ["json", "sse"])
+@pytest.mark.parametrize("sibling", ["price", "contact"])
+def test_history_keeps_public_sibling_and_excludes_only_intake(http_env, transport, sibling):
+    from tests.d2_ci_http import send, completed_context
+    from core.response_text_renderer import render_response_text
+    client, db, use, _ = http_env
+    public = ({"kind": "price", "request_id": "r1", "target": {"type": "service", "id": "classic"}}
+        if sibling == "price" else {"kind": "contact", "request_id": "r1", "contact_fields": ["contact_address"]})
+    fake = use(FakeProvider(raw(public, {"kind": "booking", "request_id": "r2", "age_group": "adult"})))
+    sid = "history-mixed"
+    answer = send(client, transport, sid=sid, request_id="mixed", q="Расскажите и запишите меня")
+    with D2DialogueStore(db) as store:
+        result = store.read_completion(SessionKey(client_id="demo", sid=sid), "mixed")
+        plan = result.response.resolved
+        lead = next(p for p in plan.d2_request_parts if p.kind == "lead")
+        intake = next(b.display_text for b in plan.d2_exact_text_blocks if b.request_id == lead.request_id)
+        pair = completed_context(store, SessionKey(client_id="demo", sid=sid)).ordinary.dialogue_pairs[-1]
+    assert answer["answer"].endswith(intake)
+    assert intake not in pair.assistant_text
+    assert pair.assistant_text == answer["answer"][:-len(intake)].strip()
+    assert pair.assistant_text == render_response_text(plan, include_lead=False)
+    assert [p.kind for p in pair.parts] == [sibling]
+    if sibling == "price":
+        assert "76\xa0200" in pair.assistant_text and pair.offers
+        assert "31.12.2026" in pair.assistant_text
+    fake.raw = raw(explanation("Ответ на следующий вопрос."))
+    send(client, transport, sid=sid, request_id="cancel", q="Отменить запись")
+    send(client, transport, sid=sid, request_id="continue", q="Расскажите подробнее")
+    assert fake.inputs[-1].context.ordinary.dialogue_pairs[-1] == pair
+
+
+@pytest.mark.parametrize("transport", ["json", "sse"])
+@pytest.mark.parametrize("age", ["adult", "child", "past_history"])
+def test_history_distinguishes_intake_from_public_booking_outcomes(http_env, transport, age):
+    from tests.d2_ci_http import send, completed_context
+    client, db, use, _ = http_env
+    booking = {"kind": "booking", "request_id": "r1", "age_group": "adult" if age == "past_history" else age}
+    if age == "past_history":
+        booking["context"] = "past_history"
+    fake = use(FakeProvider(raw(booking)))
+    sid = "history-booking"
+    first = send(client, transport, sid=sid, request_id="book", q="Хочу записаться")
+    with D2DialogueStore(db) as store:
+        pairs = completed_context(store, SessionKey(client_id="demo", sid=sid)).ordinary.dialogue_pairs
+    if age == "adult":
+        assert pairs == ()
+    else:
+        assert len(pairs) == 1
+        assert pairs[0].assistant_text == first["answer"]
+        assert pairs[0].parts[0].kind in {"reference", "clarification"}
+        if age == "child":
+            assert pairs[0].parts[0].source_results[0].source_ref == "policy:no_pediatric_dentistry"

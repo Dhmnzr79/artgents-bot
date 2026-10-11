@@ -10,10 +10,10 @@ from contracts.response_plan import (
 _AMPLIFIER_HEADER = "Также мы предлагаем:"
 
 
-def render_response_text(plan: ResolvedResponsePlan) -> str:
+def render_response_text(plan: ResolvedResponsePlan, *, include_lead: bool = True) -> str:
     """Plain representation of the same ordered content used by the widget."""
     texts = []
-    for part in render_response_parts(plan):
+    for part in render_response_parts(plan, include_lead=include_lead):
         if isinstance(part, ResponseTextPart):
             texts.append(part.text)
         else:
@@ -24,7 +24,7 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
     return _join_parts(texts)
 
 
-def render_response_parts(plan: ResolvedResponsePlan) -> tuple:
+def render_response_parts(plan: ResolvedResponsePlan, *, include_lead: bool = True) -> tuple:
     """Assemble ordered text/card content exclusively from the frozen result."""
 
     if plan.terminal_text is not None:
@@ -50,16 +50,10 @@ def render_response_parts(plan: ResolvedResponsePlan) -> tuple:
             block.request_id: block for block in plan.d2_part_deferred_blocks
         }
         exact_by_request = {b.request_id: b for b in plan.d2_exact_text_blocks}
-        # Closing clinic references/clarifications follow the whole answer,
-        # including price-owned conditions and commercial additions.
-        body_end = len(plan.d2_request_parts)
-        while body_end and (
-            plan.d2_request_parts[body_end - 1].status == "answered"
-            and plan.d2_request_parts[body_end - 1].kind in {"reference", "clarification"}
-            and plan.d2_request_parts[body_end - 1].scope == "clinic"
-        ):
-            body_end -= 1
-        for part in plan.d2_request_parts[:body_end]:
+        # Intake is displayed last, and excluded from ordinary dialogue history.
+        for part in plan.d2_request_parts:
+            if part.kind == "lead":
+                continue
             if part.status == "unavailable":
                 parts.append(failures_by_request[part.request_id].display_text.strip())
             elif part.status == "deferred":
@@ -89,8 +83,9 @@ def render_response_parts(plan: ResolvedResponsePlan) -> tuple:
         _append_price_texts(parts, _render_d2_commercial_packages(plan), "compatibility")
         _append_price_texts(parts, _render_amplifier_list(plan), "benefits")
         _append_price_texts(parts, _render_textual_cta(plan), "consultation")
-        parts.extend(exact_by_request[part.request_id].display_text.strip()
-                     for part in plan.d2_request_parts[body_end:])
+        if include_lead:
+            parts.extend(exact_by_request[part.request_id].display_text.strip()
+                         for part in plan.d2_request_parts if part.kind == "lead")
         return _body_parts(parts)
 
     if plan.is_price_answer:

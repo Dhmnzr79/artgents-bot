@@ -48,14 +48,16 @@ def test_new_availability_keeps_source_and_clears_stale_subject(http_env, transp
     pair = projected.ordinary.dialogue_pairs[-1]
     ref = "brand_policy:osstem" if subject == "brand" else "service_alternative:braces"
     assert pair.parts[0].source_results == (D2SourceResult(source_ref=ref, outcome="answered"),)
-    assert pair.assistant_text == "" and pair.offers == ()
+    assert pair.assistant_text == first["answer"] and pair.offers == ()
     fake.raw = raw(explanation("Продолжение по последнему предмету."))
     send(client, transport, sid="sources", request_id="continue", q="Расскажите")
     incoming = fake.inputs[-1].context.ordinary
     assert incoming.discussion_scope is None
     assert incoming.dialogue_pairs[-1].parts[0].source_results[0].source_ref == ref
     system, user = build_d2_d1r_messages(fake.inputs[-1])
-    assert ref in user["content"] and "source_results" in system["content"]
+    assert ref in user["content"]
+    assert incoming.dialogue_pairs[-1].assistant_text == first["answer"]
+    assert "matching catalog source" not in system["content"]
     if subject == "brand":
         catalog = json.loads(fake.inputs[-1].model_view.clinic_policy_catalog_json)
         answer = next(row["answer"] for row in catalog["brand_policies"] if row["brand_id"] == "osstem")
@@ -74,7 +76,7 @@ def test_scoped_commercial_retains_subject_and_negative_is_not_positive(http_env
     pair = projected.dialogue_pairs[-1]
     assert pair.parts[0].service_id == service
     assert pair.parts[0].source_results == (D2SourceResult(source_ref="fact:installment_12", outcome=outcome),)
-    assert pair.assistant_text == ""
+    assert pair.assistant_text == first["answer"]
     assert pair.fact_ids == (("installment_12",) if outcome == "answered" else ())
     assert ("рассрочка не предоставляется" in first["answer"]) == (outcome == "excluded")
 
@@ -112,10 +114,10 @@ def test_card_same_subject_fact_contacts_detail_keep_selected_offer(http_env, tr
 def test_policy_source_and_expired_receipts_do_not_leak(http_env, transport):
     client, db, use, _ = http_env
     fake = use(FakeProvider(raw({"kind": "clinic_policy", "request_id": "r1", "policy_ids": ["no_oms"]})))
-    send(client, transport, sid="sources", request_id="policy", q="Работаете по ОМС?")
+    first = send(client, transport, sid="sources", request_id="policy", q="Работаете по ОМС?")
     pair = context(db).ordinary.dialogue_pairs[-1]
     assert pair.parts[0].source_results == (D2SourceResult(source_ref="policy:no_oms", outcome="answered"),)
-    assert pair.policy_ids == ("no_oms",) and pair.assistant_text == ""
+    assert pair.policy_ids == ("no_oms",) and pair.assistant_text == first["answer"]
     key = SessionKey(client_id="demo", sid="sources")
     with D2DialogueStore(db) as store:
         record = store.read(key)
@@ -164,7 +166,7 @@ def test_expired_fact_is_gap_with_identity_and_no_positive_fact(http_env, transp
     pair = context(db).ordinary.dialogue_pairs[-1]
     assert pair.parts[0].status == "unavailable"
     assert pair.parts[0].source_results[0].outcome == "unavailable"
-    assert pair.fact_ids == () and pair.assistant_text == ""
+    assert pair.fact_ids == () and pair.assistant_text == first["answer"]
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
@@ -173,24 +175,29 @@ def test_mixed_subjects_keep_order_but_do_not_choose_active_service(http_env, tr
     fake = use(FakeProvider(raw(
         {"kind": "commercial_fact", "request_id": "r1", "target": {"type": "service", "id": "caries"}, "fact_ids": ["installment_12"]},
         explanation("Ответ о КТ.", request_id="r2", target={"type": "service", "id": "tomography"}))))
-    send(client, transport, sid="sources", request_id="mixed", q="Рассрочка на лечение кариеса и что такое КТ?")
+    first = send(client, transport, sid="sources", request_id="mixed", q="Рассрочка на лечение кариеса и что такое КТ?")
     after = context(db).ordinary
     assert after.discussion_scope is None
     pair = after.dialogue_pairs[-1]
     assert [p.request_id for p in pair.parts] == ["r1", "r2"]
     assert pair.parts[0].source_results[0].outcome == "excluded"
     assert pair.parts[1].service_id == "tomography"
-    assert pair.assistant_text == "Ответ о КТ."
+    assert pair.assistant_text == first["answer"]
+    assert pair.assistant_text.endswith("Ответ о КТ.")
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
-def test_bounded_history_masks_pii_and_keeps_reference_identity(http_env, transport):
+def test_whole_history_masks_pii_and_keeps_reference_identity(http_env, transport):
     client, db, use, _ = http_env
     fake = use(FakeProvider(raw(explanation("Телефон +7 (999) 123-45-67, email test@example.com; " + "Содержательный ответ. " * 100,
         target={"type": "service", "id": "tomography"}))))
-    send(client, transport, sid="sources", request_id="long", q="Расскажите подробнее")
+    question = "Расскажите подробнее. " * 100 + "И про восстановление?"
+    first = send(client, transport, sid="sources", request_id="long", q=question)
     pair = context(db).ordinary.dialogue_pairs[-1]
-    assert len(pair.assistant_text) <= 1000
+    from core.user_text_privacy import mask_emails_in_text, mask_phones_in_text
+    assert pair.patient_text == question
+    assert len(pair.assistant_text) > 1000
+    assert pair.assistant_text == mask_emails_in_text(mask_phones_in_text(first["answer"]))
     assert "123-45-67" not in pair.assistant_text and "test@example.com" not in pair.assistant_text
     fake.raw = raw(explanation("ignored", target={"type": "unresolved"}, brand_id="osstem"))
     send(client, transport, sid="sources", request_id="brand", q="Есть Osstem?")

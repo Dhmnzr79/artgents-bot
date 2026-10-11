@@ -920,7 +920,7 @@ class D2SourceResult(ResponsePlanModel):
 
 class D2ResolvedRequestPart(ResponsePlanModel):
     request_id: NonBlankStr
-    kind: Literal["price", "price_detail", "content", "contact", "clinic_policy", "doctors", "clarification", "reference", "commercial_fact", "price_clarification", "price_reference"]
+    kind: Literal["price", "price_detail", "content", "contact", "clinic_policy", "doctors", "clarification", "reference", "commercial_fact", "price_clarification", "price_reference", "lead"]
     status: Literal["answered", "unavailable", "deferred"]
     failure_reason: D2PartFailureReason | None = None
     discussion_scope: DiscussionScope | None = None
@@ -1549,7 +1549,7 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
         raise ValueError("d2_request_part_content_block_duplicate")
     content_by_request = {block.request_id: block for block in plan.information_blocks}
     exact_by_id = {b.request_id: b for b in plan.d2_exact_text_blocks}
-    exact_parts = [p for p in parts if p.kind in {"clarification", "reference", "doctors", "commercial_fact", "price_clarification", "price_reference"}
+    exact_parts = [p for p in parts if p.kind in {"clarification", "reference", "doctors", "commercial_fact", "price_clarification", "price_reference", "lead"}
                    and not (p.kind == "clarification" and p.status == "deferred")]
     if len(exact_by_id) != len(plan.d2_exact_text_blocks) or {p.request_id for p in exact_parts} != set(exact_by_id):
         raise ValueError("d2_exact_text_linkage_invalid")

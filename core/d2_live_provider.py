@@ -89,11 +89,9 @@ def build_d2_d1r_messages(request: D2ProviderInput) -> tuple[dict[str, str], dic
     """Reuse the sole production D1R contract with the captured D2 input."""
     directions = [item.model_dump(mode="json") for item in request.model_view.direction_prices]
     history_contract = (
-        "Completed history parts retain source_results for code-owned answers. "
-        "source_ref identifies the tenant policy/alternative/fact actually used; answered means its answer was published, "
-        "not that treatment is available or a policy permits it. excluded means that fact did not apply; unavailable means no usable answer. "
-        "Read these results together with the ordered dialogue and matching catalog source to understand continuation; "
-        "an empty assistant_text is not an unanswered turn. Do not infer an invitation absent from the source."
+        "Completed dialogue pairs contain the published assistant text, with private intake omitted. "
+        "Read the ordered conversation to understand continuation. Historical prices describe past answers; "
+        "new price answers use the current approved price data."
     )
     if request.known_task is not None:
         system = "\n\n".join((

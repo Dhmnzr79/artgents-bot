@@ -114,11 +114,6 @@ def _shown_secondary_ref_ids(response) -> tuple[str, ...]:
     return tuple(shown)
 
 
-def _bounded_d2_text(value: str, *, limit: int) -> str:
-    """Keep only bounded, provider-safe prose in the D2 dialogue memory."""
-    return value.strip()[:limit].strip()
-
-
 def _apply_lead_pause_without_detail_actions(response):
     # Lead resume/cancel owns the sole navigation channel while paused.
     # Drop the private action map together with the visible detail replies.
@@ -597,9 +592,11 @@ def _commit_non_price_d2_turn(
     if ttl_policy is not None:
         refs = snapshot.state.dialogue_pairs if context.freshness == "fresh" else ()
         if (response.resolved.route in {"ANSWER", "CLARIFY"}
-            or (response.resolved.route == "ADMIN" and response.resolved.mode == "medical_terminal")) and (selected_ui_ref is not None or safe_user_message):
+            or (response.resolved.route == "ADMIN" and response.resolved.mode == "medical_terminal")) and (selected_ui_ref is not None or safe_user_message) and not (
+                response.resolved.d2_request_parts and all(p.kind == "lead"
+                    for p in response.resolved.d2_request_parts)):
             ref = D2DialogueReceiptRef(request_id=request_id,
-                patient_text=_bounded_d2_text(safe_user_message, limit=ttl_policy.history_text_max_chars) if selected_ui_ref is None else None,
+                patient_text=safe_user_message if selected_ui_ref is None else None,
                 selected_ui_ref=selected_ui_ref, committed_at_turn=turn)
             refs = (*refs, ref)[-ttl_policy.history_pair_limit:]
         state = state.model_copy(update={"dialogue_pairs": refs})
@@ -969,9 +966,8 @@ def _run_reserved_d2_dialogue_turn(
             snapshot=tenant, session_key=session_key,
             operations=tuple(p for p in result.blocks if p.kind in {"booking", "price", "clinic_policy"}),
         )
-        booking_part = D2ResolvedRequestPart(request_id=booking_blocks[0].request_id,
-            kind="clarification" if booking.kind == "unclear" else "reference",
-            status="answered", scope="clinic")
+        booking_part = booking.response.resolved.d2_request_parts[0].model_copy(
+            update={"request_id": booking_blocks[0].request_id})
         values = response.resolved.model_dump()
         values.update(
             attribution_kind=booking.response.resolved.attribution_kind,

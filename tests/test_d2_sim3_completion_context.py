@@ -112,20 +112,22 @@ def test_ttl_excludes_receipts_and_long_lived_scope(http_env):
     assert context.ordinary.dialogue_pairs == ()
 
 
-def test_price_detail_is_remembered_without_old_money_and_contact_prose_is_public(http_env):
+def test_price_and_detail_are_remembered_as_published(http_env):
     client, db, use, _ = http_env
     fake = use(FakeProvider(raw(price("classic", "service"))))
     first = post(client, request_id="price", q="Сколько стоит классическая имплантация?").get_json()
     detail = next(r["reply_id"] for r in first["ui"]["quick_replies"] if "includes" in r["reply_id"])
-    assert post(client, request_id="detail", q="", ref=detail, ui_revision=first["revision"]).status_code == 200
+    detail_response = post(client, request_id="detail", q="", ref=detail, ui_revision=first["revision"])
+    assert detail_response.status_code == 200
     fake.raw = raw(explanation("Ответ о сроках."))
     assert post(client, request_id="next", q="А сроки?").status_code == 200
     pairs = fake.inputs[-1].context.ordinary.dialogue_pairs
     assert pairs[-1].detail_aspects == ("includes",)
     assert pairs[-1].offers
-    serialized = json.dumps([p.model_dump(mode="json") for p in pairs], ensure_ascii=False)
-    for money in ("76 200", "85 200", "101 200", "₽", "amount_rub", "rendered_text"):
-        assert money not in serialized
+    assert pairs[-2].assistant_text == first["answer"]
+    assert pairs[-1].assistant_text == detail_response.get_json()["answer"]
+    assert "76\xa0200" in pairs[-2].assistant_text
+
 
 
 def test_receipt_reference_cannot_read_foreign_or_inflight_result(http_env):
@@ -330,3 +332,39 @@ def test_absent_scope_never_authorizes_old_refs():
         raise AssertionError("no lookup without current scope")
     assert _current_offers(N(), N(state=N(clarify_pending=False)),
         N(read_latest_completion=forbidden), None) == ()
+
+
+@pytest.mark.parametrize("transport", ["json", "sse"])
+def test_prose_history_does_not_supply_new_catalog_price(http_env, transport):
+    client, _, use, _ = http_env
+    fake = use(FakeProvider(raw(explanation("Ранее обсуждали стоимость 1 рубль."))))
+    first = send(client, transport, request_id="old", q="Что мы обсуждали?")
+    fake.raw = raw(price("classic", "service", brand_id="implantium", volume=_volume()))
+    second = send(client, transport, request_id="new", q="Какая цена Implantium?")
+    pair = fake.inputs[-1].context.ordinary.dialogue_pairs[-1]
+    assert pair.assistant_text == first["answer"]
+    assert "1 рубль" in pair.assistant_text
+    assert "76\xa0200" in second["answer"]
+    assert "1 рубль" not in second["answer"]
+
+
+@pytest.mark.parametrize("transport", ["json", "sse"])
+def test_historical_tab_keeps_selected_publication_in_next_input(http_env, transport):
+    client, _, use, _ = http_env
+    fake = use(FakeProvider(raw(price("classic", "service"))))
+    first = send(client, transport, request_id="card", q="Цена классической имплантации?")
+    fake.raw = raw({"kind": "contact", "request_id": "r1", "contact_fields": ["contact_phone"]})
+    contact = send(client, transport, request_id="phone", q="Какой телефон клиники?")
+    count = len(fake.inputs)
+    selected = send(client, transport, request_id="select", q="", ref="price_select:classic.one_tooth.nobel",
+        ui_revision=first["revision"])
+    assert len(fake.inputs) == count
+    fake.raw = raw(explanation("Продолжение по выбранному варианту."))
+    send(client, transport, request_id="next", q="Расскажите подробнее")
+    pairs = fake.inputs[-1].context.ordinary.dialogue_pairs
+    assert pairs[-2].assistant_text == contact["answer"]
+    assert pairs[-1].assistant_text == selected["answer"]
+    assert [r.offer_id for r in pairs[-1].offers] == ["classic.one_tooth.nobel"]
+    assert pairs[-1].selected_ui_ref is not None
+    assert "Nobel" in pairs[-1].assistant_text
+    assert "Implantium" not in pairs[-1].assistant_text

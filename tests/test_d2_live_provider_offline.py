@@ -114,3 +114,11 @@ def test_cp3_provider_has_one_shared_two_call_budget() -> None:
 def test_cp3_provider_rejects_any_budget_other_than_two() -> None:
     with pytest.raises(ValueError, match="exactly_two"):
         D2Cp3LiveProvider(max_calls=1)
+
+
+def test_history_prompt_uses_published_text_not_catalog_reconstruction():
+    system, _ = build_d2_d1r_messages(_request())
+    assert "published assistant text" in system["content"]
+    assert "Historical prices describe past answers" in system["content"]
+    assert "matching catalog source" not in system["content"]
+    assert "an empty assistant_text is not an unanswered turn" not in system["content"]

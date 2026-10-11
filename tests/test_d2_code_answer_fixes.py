@@ -52,7 +52,7 @@ def test_effective_policy_is_in_next_provider_context(http_env, transport, block
     _body(send(client, request_id="next", q="Следующий вопрос"), transport)
     pair = fake.inputs[-1].context.ordinary.dialogue_pairs[-1]
     assert set(pair.policy_ids) == expected
-    assert pair.assistant_text == ""  # IDs, not authored prose or financial text.
+    assert pair.assistant_text == first["answer"]  # The next turn sees the published refusal.
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])

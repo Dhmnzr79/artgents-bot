@@ -13,7 +13,7 @@ from contracts.d2_tenant_snapshot import D2TenantSnapshot
 from contracts.request_understanding import RequestUnderstanding
 from contracts.response_plan import (
     ComposerResult,
-    D2ExactTextBlock, D2ResolvedRequestPart,
+    D2ExactTextBlock, D2ResolvedRequestPart, D2SourceResult,
     ComposerSelectedRouteAuthority,
     PreComposerPlan,
     PricePlan,
@@ -255,7 +255,7 @@ def resolve_d2_booking_lead_entry(
             kind="unclear",
             response=_plain_answer(snapshot, session_key=session_key,
                 text="Уточните, пожалуйста, условия записи. Пока я не могу подтвердить её по указанным данным.",
-                quick=()),
+                quick=(), public_kind="clarification"),
         )
     sid = session_key.sid
     st = mem_get(sid)
@@ -497,6 +497,7 @@ def _plain_answer(
     quick: tuple[UiQuickReplyCandidate, ...],
     policy_ids: tuple[str, ...] = (),
     request_id: str | None = None,
+    public_kind: Literal["clarification"] | None = None,
 ) -> MaterializedResponseOutcome:
     if snapshot.client_id != session_key.client_id:
         raise ValueError("d2_lead_client_mismatch")
@@ -512,17 +513,19 @@ def _plain_answer(
         active_session_service_id=None,
         selected_topic_id=None,
         price_plan=PricePlan(kind="none"),
-        d2_result_status="complete" if policy_ids else None,
-        d2_request_parts=(D2ResolvedRequestPart(request_id=request_id,
-            kind="reference", status="answered", scope="clinic"),) if policy_ids else (),
-        d2_exact_text_blocks=(D2ExactTextBlock(request_id=request_id,
+        d2_result_status="complete",
+        d2_request_parts=(D2ResolvedRequestPart(request_id=request_id or "r1",
+            kind="reference" if policy_ids else public_kind or "lead", status="answered", scope="clinic",
+            source_results=tuple(D2SourceResult(source_ref=f"policy:{key}", outcome="answered")
+                for key in policy_ids)),),
+        d2_exact_text_blocks=(D2ExactTextBlock(request_id=request_id or "r1",
             source_client_id=session_key.client_id, display_text=text,
-            policy_ids=policy_ids),) if policy_ids else (),
+            policy_ids=policy_ids),),
         ui_candidates=UiPlanCandidates(quick_replies=quick),
         transport_kind="blocking",
     )
     composer = ComposerResult(route="ANSWER", mode="standard",
-        patient_text=None if policy_ids else text, code_owned_answer=bool(policy_ids))
+        patient_text=None, code_owned_answer=True)
     resolved = resolve_response_plan(plan, composer)
     resolved = resolved.model_copy(update={"attribution_kind": "lead"})
     return MaterializedResponseOutcome(

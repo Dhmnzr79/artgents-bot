@@ -4103,7 +4103,7 @@ history projection change; не обобщать этот screening на все 
 
 ## 42. Свободный разговор и общая история — owner GO 2026-10-11
 
-Классификация: **архитектурное упрощение**, реализация начинается после публикации проверенного checkpoint данных/документов. Основание: прямое поручение владельца «Давай зафиксируем всё это… И начинаем вот это всё делать» после подробного 12-пунктного плана. Канонический порядок — актуальный верх Roadmap. Сохраняется единственная таблица ответственности Target Contract §3.
+Классификация: **архитектурное упрощение**, реализация начинается после проверки опубликованного checkpoint данных/документов в Cursor и виджете и подтверждения владельца (последующее решение об остановках). Основание: прямое поручение владельца «Давай зафиксируем всё это… И начинаем вот это всё делать» после подробного 12-пунктного плана. Канонический порядок — актуальный верх Roadmap. Сохраняется единственная таблица ответственности Target Contract §3.
 
 До → после → удаляемая зависимость:
 - Обычный вопрос требует информационных kinds/ID и может попадать в кодовый шаблон → связное объяснение по MD → удалить обязательность информационных commands и их старые достижимые ветки, без нового-to-old adapter.
@@ -4123,3 +4123,27 @@ Root/top: C:/Cursor Projects/artgents-bot-active. Branch: codex/model-price-expe
 Allowlist: изменённые существующие clients/demo/md/*.md и новый clinic__info__policies.md; doctor_catalog.json; target_response/service_catalog.json, d2_direction_prices.json, pricebook/facts.json и существующие pricebook/services/*.json; tests/test_demo_target_service_catalog.py, test_demo_target_price_offers.py, test_demo_doctor_catalog.py; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md, DEMO_D2_INTERFACE_TASK.md, DEMO_D2_TARGET_CONTRACT.md, DEMO_D2_OWNER_DECISIONS.md, DEMO_D2_DEMO_BASE_REVIEW.md, DEMO_D2_RULES_INVENTORY_AUDIT.md. Включение исторического аудита — документация, не runtime-изменение. Содержимое разрешённых ранних DOC WIP сохраняется как история.
 
 Исключённый WIP: prototypes/, scripts/d2_context_candidate_protocol.py, scripts/experiment_d2_interface_comparison.py, tests/test_d2_interface_comparison_offline.py. Не удалять и не переносить в другую ветку. Ключи, логи, локальные БД и сырые разговоры не публиковать.
+
+### 42.1. Проект первого runtime checkpoint — достоверная история
+
+Подготовка опубликована: `f9b2b84` в origin/codex/model-price-experiment. Root/top/branch прежние; origin/main/merge-base efa3f77. Staging пуст. Исключённый прежний WIP: prototypes/ и три экспериментальных файла из §42. Часть MD может отображаться Git как stat/line-ending dirty без содержательного diff; не включать это в runtime-изменение.
+
+Astra consultation: сначала заменить выборочную history projection, затем отдельно удалять информационные kinds и их потребителей. Это последовательные части одного согласованного этапа, не объявление всего диалога готовым после первой.
+
+**Точный allowlist:** core/d2_completion_context.py, core/d2_dialogue.py, core/d2_lead_bridge.py, core/d2_live_provider.py, core/response_text_renderer.py; contracts/response_plan.py, contracts/d2_session_context.py; tests/test_d2_sim3_completion_context.py, tests/test_d2_completed_source_context.py, tests/test_d2_lead_interrupt_http.py, tests/test_d2_live_provider_offline.py, tests/test_d2_session_context.py; docs/tasks/DEMO_D2_INTERFACE_TASK.md, DEMO_D2_DELIVERY_ROADMAP.md, DEMO_D2_TARGET_CONTRACT.md.
+
+До: _project_pair собирает model_prose и отдельные виды exact, обрезает до1000символов; receipt capture обрезает вопрос; provider просит восстанавливать ответ по source ID. После: безопасная текстовая проекция упорядоченного опубликованного результата того же completion, целые последние3пары, без реконструкции по текущему каталогу. Единственный владелец — существующий completion/store/projection. Удаляются whitelist происхождений, обе1000slices/настройка cap, инструкция реконструкции.
+
+Защита lead: ранее согласованный §39.9 server result kind=lead, без нового model kind/state/field. Назначает существующий producer служебного запроса/ack. Public booking-blocked policy и public gap остаются обычными частями. Mixed merge сохраняет provenance каждой части; renderer заменяет эвристику хвостового reference/clarification на явный lead. В историю не попадают intake-текст и contactslots; siblings сохраняются. Existing receipt ownership/revision, TTL, выбранные UI и структурные ссылки не меняются. Phone/email masking сохраняется.
+
+Новая цена всегда читается из прайса. Цифры ранее показанной карточки в истории — только содержимое прошлого ответа, не authority новой цены. Контекст3пар — countbound, не обещание любого tokenbudget. Новые livecalls/overflowfallback не добавляются. Provider settings/model/outputbudget не меняются этим checkpoint.
+
+Тесты: сравнение реально опубликованного ответа и следующего provider input JSON/SSE; code invitation, policy/fact/gap, price/detail/tab, mixedlead+price/contact, pureintakeexcluded/publicbookingdenialretained, длинная реплика, privacy, replay, TTL. Затем независимый Checker и commit/push. Тесты данных уже приняты, повторять их без причины не требуется.
+
+### 42.2. STOP после каждого этапа — последнее решение владельца
+
+Классификация текущего изменения: только документация. Данные опубликованы commit `f9b2b846e48ab7f6e435174e33eb40bc1c8575e8`; runtime §42.1 ещё не реализован. После каждого этапа и промежуточного checkpoint обязательны отдельные Cursor review и проверка владельцем в виджете. До результатов обеих проверок и подтверждения владельца следующий шаг не начинать. Подготовленный allowlist §42.1 не является подтверждением прохождения этой остановки.
+
+Текущий allowlist документации: DEMO_D2_DELIVERY_ROADMAP.md, DEMO_D2_INTERFACE_TASK.md, DEMO_D2_TARGET_CONTRACT.md. Корень, ветка, origin/main и merge-base прежние; baseline этого doc-delta — f9b2b84. Прежний исключённый WIP сохранён. Новых provider/browser/SMTP вызовов нет.
+
+Дополнительный offline baseline перед будущим изменением истории: test_d2_sim3_completion_context.py, test_d2_completed_source_context.py, test_d2_lead_interrupt_http.py, test_d2_live_provider_offline.py, test_d2_session_context.py — 147 PASS / 3 FAIL. Все три FAIL в test_d2_live_provider_offline.py: ожидание v19 вместо текущего v44, старой инструкции content_ref и секции D2_DIRECTION_PRICE. Это результат до runtime-изменений, не приёмка этапа истории; отдельного сравнения этих трёх с чистым старым HEAD не делали. Он не заменяет 40 целевых PASS данных и не скрывается в отчёте об успешной подготовке базы.

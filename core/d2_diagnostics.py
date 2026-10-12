@@ -42,6 +42,9 @@ _REASONS = frozenset({
     "d2_native_reply_empty_or_rejected", "d2_native_reply_required",
     "d2_native_response_empty",
     "text_tail_empty_or_rejected", "text_tail_string_required", "d2_text_response_empty",
+    "d2_known_task_tool_forbidden", "d2_price_tool_unknown", "d2_price_tool_server_fields",
+    "d2_price_tool_inactive_clarification", "d2_completion_action_forbidden",
+    "d2_completion_refusal_text_required",
 })
 _PROSE_REVIEW_REASONS = frozenset({
     "d2_model_prose_money", "d2_model_prose_link",

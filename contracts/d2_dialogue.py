@@ -9,7 +9,7 @@ from contracts.d2_session_context import (
     D2SessionState, D2SessionActivity, D2SessionContextProjection,
 )
 from contracts.d2_tenant_snapshot import D2ModelView
-from contracts.d2_dialogue_result import D2ExplanationTask
+from contracts.d2_dialogue_result import D2ExplanationTask, D2ParsedDialogueResult
 from contracts.response_plan import ResponsePlanModel
 from contracts.response_plan_materialization import D2SelectedDocumentAction, MaterializedResponseOutcome
 from contracts.response_plan_session import D2SelectedUiRef
@@ -58,9 +58,22 @@ class D2ProviderInput:
     known_task: D2ExplanationTask | None = None
 
 
+@dataclass(frozen=True)
+class D2PriceToolReply:
+    """One turn's native tool transcript; never persisted as dialogue memory."""
+
+    result: D2ParsedDialogueResult
+    messages: tuple[dict, ...]
+    tool_calls: tuple[dict, ...]
+
+
 class D2RawProvider(Protocol):
-    def generate(self, request: D2ProviderInput) -> str:
-        """Return one ordinary text response with optional metadata tail."""
+    def generate(self, request: D2ProviderInput) -> str | D2PriceToolReply:
+        """Return ordinary text or native price requests, without an envelope adapter."""
+        ...
+
+    def complete_price(self, reply: D2PriceToolReply, outcome: dict) -> str:
+        """Finish prose using the already frozen price result, without more tools."""
         ...
 
 

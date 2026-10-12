@@ -364,11 +364,10 @@ def validate_d2_payload(payload: dict, *, active_service_ids: frozenset[str], kn
     return result
 
 
-# One optional tail in ordinary provider text; no native tool-call channel.
+# Optional informational metadata and non-price actions. Price uses its API tool.
 OPEN = "<D2_META>"
 CLOSE = "</D2_META>"
 ACTION_TYPES = {
-    "show_price":(PriceOperation,"price"),
     "show_contacts":(ContactOperation,"contact"),
     "start_booking":(BookingOperation,"booking"),
     "off_topic":(OffTopicOperation,"off_topic"),

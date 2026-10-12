@@ -8,8 +8,8 @@ from openai import OpenAI
 
 from core.alibaba_openai_transport_policy import (
     build_openai_compatible_client_kwargs,
-    validate_alibaba_chat_transport_config,
 )
+from core.chat_transport_policy import validate_chat_transport_config
 from config import (
     BOOKING_INTENT_LLM_MODEL,
     BOOKING_INTENT_LLM_ON,
@@ -65,8 +65,12 @@ def chat_completions_create(*, model: str, **kwargs):
         reserve_provider_call,
     )
 
-    validate_alibaba_chat_transport_config()
+    validate_chat_transport_config()
     kwargs = _qwen_disable_thinking(model=model, kwargs=dict(kwargs))
+    if "api.deepseek.com" in (CHAT_BASE_URL or ""):
+        extra_body = dict(kwargs.pop("extra_body", None) or {})
+        extra_body["thinking"] = {"type": "disabled"}
+        kwargs["extra_body"] = extra_body
     source = kwargs.pop("provider_call_source", None)
     started = time.monotonic()
     call_index = reserve_provider_call(model=model, source=source)

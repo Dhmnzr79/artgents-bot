@@ -4874,3 +4874,137 @@ Classifier правильно распознал цену в пяти откло
 Независимая Astra проверила реальную публикацию, историю, сохранность карточек, tab и все четыре ledger: PASS только исполнению эксперимента и учёту попыток. Ни один кандидат не получил полного поведенческого PASS; runtime adoption не разрешён этим вердиктом. Checker provider calls=0. Из локальных проверок четыре targeted tests passed; после изменения strict-кодировки focused schema test отдельно passed у root и Checker. Полный CI и исторические baseline failures не перепроверялись. Скрипт использует два чистых materialization и один commit; это диагностическое подключение, не готовая целевая архитектура.
 
 Вывод для обсуждения: обычный grounded tool наиболее перспективен в этом наборе. Следующее архитектурное решение — единое авторство окончательной прозы при кодовом отказе/готовом объяснении, с сохранением содержательной части смешанного вопроса. Не вводить фильтр по фразе Osstem и не объявлять второй вызов или strict универсальным решением. Рабочий сервер не переключался, новые runtime-правки не внесены. Branch codex/model-price-experiment, HEAD e4a098a; изменены только указанные новые скрипт/тест и этот отчёт; staging пуст, commit/push/PR/merge/deploy нет. Прежние WIP сохранены.
+
+
+## 56. DeepSeek + обычный show_price — owner GO 2026-10-12
+
+Baseline 08b5041 (WIP checkpoint предыдущих §46/55 и экспериментов, pushed).
+Папка C:/Cursor Projects/artgents-bot-active, ветка codex/model-price-experiment;
+origin/main и merge-base efa3f77. Foreign WIP: prototypes/ и 14 MD с line-ending-only diff.
+
+Классификация: замена транспорта ценового действия и исправление единого авторства
+финального ответа. Не объявляется завершением всего упрощения/REC-5.
+Решение владельца: DeepSeek Flash для всех ролей, обычный auto show_price, без strict
+и отдельного классификатора. Обычный вопрос — один вызов. Вызов цены — модель выбирает
+действие, код фиксирует результат, один дополнительный вызов пишет финальную прозу.
+Начальная проза при tool не публикуется. Нет retry, fallback на Qwen, нового контекста
+или ремонта аргументов. Полезная проза при пропуске карточки допустима; 100% гарантия
+карточки не является целью. FullContext и существующая история сохраняются. Чистка KB позже.
+
+До → после → удалённая зависимость: цена в необязательном D2_META → native show_price
+напрямую в PriceOperation → удалён исполняемый tail show_price и экспериментальный
+adapter/double materialization. Владелец выбора цены — модель; владелец сумм/вкладок —
+прежний resolver; окончательная поясняющая проза — completion. Проверки запретов
+остаются кодовыми, их результат передаётся completion; повтор готового отказа не печатается.
+Контакты, medical/lead/privacy и проверенные клики сохраняют владельцев Target Contract §3.
+Astra consult: сначала один frozen price/guard result, затем completion, затем существующая
+проверка sources и единая сборка UI/истории. Runtime не импортирует scripts экспериментов.
+
+Точный allowlist реализации:
+- config.py
+- llm.py
+- contracts/d2_dialogue.py
+- contracts/d2_dialogue_result.py
+- core/d2_live_provider.py
+- core/d2_dialogue.py
+- core/d2_diagnostics.py
+- core/one_call_prompt_contract.py
+- core/response_plan_materialization.py
+- core/chat_transport_policy.py (новый)
+- tests/test_d2_native_price_runtime.py (новый)
+- tests/test_chat_transport_policy.py (новый)
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md
+- docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md
+- docs/tasks/DEMO_D2_TARGET_CONTRACT.md
+- docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md
+Локальный .env переключается без коммита и вывода секретов. Другие runtime-файлы — только
+после объяснения необходимости. Прежние экспериментальные скрипты остаются отдельными.
+
+Приёмка: targeted offline JSON/SSE, обычный ответ, mixed price, отказ+информация,
+некорректные args/sources/actions completion, отсутствие commit при сетевом сбое,
+точные карточки/клики/replay/следующая история. Затем независимый Checker, bounded live
+с заранее объявленным бюджетом, Cursor и виджет. Ни PASS эксперимента, ни checkpoint
+не заменяет эту приёмку. Статус: реализация начата, live budget ещё не открыт.
+
+Allowlist расширен до правок: contracts/response_plan.py и core/response_text_renderer.py. Удаляется обязательная связка price_reference -> отдельный exact_text; основание отказа сохраняется, финальное объяснение — в проверенном content блока ответа. Без финальной прозы отсутствие текста отказа по-прежнему ошибка.
+
+
+### 56.1 Реализация и evidence
+
+Удалено: исполняемый show_price в D2_META, зависимость пояснения price_reference от
+отдельного обязательного exact_text. Экспериментальный adapter в runtime не добавлялся.
+Добавлено: native price tool schema из PriceOperation; внутренний D2PriceToolReply
+только на время хода; completion callable после frozen price/guards и до общей
+проверки sources/UI/commit; явный DeepSeek endpoint gate. Цена и guards выполняются
+один раз. Старый callback эксперимента с двумя materialization не используется.
+
+Начальный текст при native tool не публикуется. Существующие контакты/запись/off_topic
+из его metadata сохраняются как typed siblings; handoff остаётся исключительным.
+Второй ответ не может исполнять actions; tools передаются с tool_choice=none, как
+в выбранном эксперименте. Пустая готовая ценовая проза обозначается <NO_TEXT>.
+При отказе необходим текст объяснения. История/receipt пишутся только после завершения.
+Policy/brand источники остаются в request parts; запрет карточки/CTA сохраняется.
+Второй вызов тоже проходит обычный transport/admission/accounting. Retries=0.
+
+Локальный .env: CHAT_* и DEFAULT_LLM_MODEL переключены на DEEPSEEK_* (deepseek-flash).
+Прежние Qwen значения сохранены в DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL, QWEN_SAVED_MODEL;
+автоматического runtime fallback нет. .env не коммитится, ключи не печатались.
+FullContext/история/TTL/данные клиники не менялись. Из входа убраны только готовые
+introduction_text/unknown_extent_text настроенных обзоров: их печатает код.
+
+Offline: 43 distinct tests в test_d2_native_price_runtime.py + test_chat_transport_policy.py
+прошли по основному и focused-прогонам. JSON/SSE, frozen offer, source claims, история,
+replay, tab/detail/doc click, clarification roundtrip, отказ+информация, malformed args,
+completion actions/failure, контакты/запись/medical siblings. Целевой повтор2 JSON/SSE
+после tool_choice=none — PASS. Никаких реальных сетевых вызовов в pytest.
+Регрессионный набор response_plan_contract + response_plan_materialization +
+d2_input_boundary + d2_diagnostics: 146 passed, 12 failed. Все12 failure IDs диагностики
+воспроизведены на чистом08b5041 (28passed/12failed). Старые envelope/price-tail suites
+целиком не мигрировались и полный CI не заявлен зелёным. Новый negative test доказывает,
+что валидный прежний price-tail больше не исполняется; старый путь не оставлен ради тестов.
+
+Independent Checker Astra: начальный P1 — потеря non-price siblings рядом с native tool.
+Исправлено через прежние typed operations, focused recheck PASS. 43 distinct offline
+проверки независимо пройдены. Никакого отдельного распознавания фраз/новой памяти/retry.
+
+Live, explicit owner authority: первый hard budget20, затем дополнительный8; всего
+28/28 попыток, 17 HTTP-ходов, все ответы200, сетевых/провайдерских ошибок0, SMTP0.
+Использован реальный D2HttpProvider/llm transport и /ask,/ask/stream с изолированными
+тестовыми DB/tenant copies; не экспериментальный adapter, не browser test.
+Первый прогон16calls/10turns показал пересказ цены completion перед карточкой.
+После сохранения экспериментального tools+tool_choice=none и уточнения writer инструкции:
+4calls/2turns (чистая цена + mixed), затем8calls/5turns (Nobel→цена→один зуб→гарантия,
+общая имплантация). Финальные7ходов/12calls: pure prices завершаются NO_TEXT и карточкой;
+mixed сохраняет объяснение боли; warranty обычная проза; вводная цены одна.
+Последняя цепочка3.03–4.13сек полного локального HTTP; mixed focused5.44сек. Это небольшой
+направленный повтор, не гарантия latency/100% semantic reliability.
+Ignored evidence: logs/stage56-live, logs/stage56-live-focused, logs/stage56-live-chain.
+Все28calls: 1325723 total tokens по provider usage. Raw payloads не коммитятся.
+
+Остаточные риски: модель может не выбрать tool или выбрать неверные параметры;
+strict/classifier/фильтр ценовой прозы не добавлялись. Редактура длинных ответов и
+прежние повторы условий внутри карточок остаются будущей работой. Вопрос гарантии
+берёт действующий fact из базы; эта стадия не меняет медицинские/коммерческие факты.
+Полный свободный диалог, маркетинг §46/A6–A10/REC-5 не аттестуются.
+
+### 56.2 Cursor и ручной виджет
+
+Проверять только diff08b5041..checkpoint§56 по allowlist выше. Классификация — замена
+транспорта/исправление единого авторства. Проследить фактический /ask и /ask/stream:
+native show_price→PriceOperation→existing guards/freeze→completion с tools disabled→
+source binding/UI→single commit. Искать возврат оболочки, phrase rules, repair, retry,
+classifier, новую память/второй price resolver и обход medical/lead/privacy/ownership.
+Проверить mixed contact/booking/handoff, отказ+информацию, неисправные args/claims,
+completion actions/errors, replay/клики/историю. Не ослаблять assertions для PASS.
+Сверить live ограничения, не переносить PASS на весь бот. Запустить два новых test-файла;
+provider/network/SMTP запрещены проверяющему. Вердикт PASS/REJECT с конкретным call path.
+
+Виджет, новая беседа: Nobel ставите?→А сколько стоит?→Один зуб→А гарантия?;
+Сколько стоит имплантация?→All-on-6; mixed боль+All-on-6; Osstem;
+карточка→переключение вкладки→Что входит→Это всё включено?;
+информация о боли→реально показанный follow-up. Проверить отсутствие английского
+планирования и повторной ценовой вводной. Ручная приёмка ещё ожидается.
+
+Локальный виджет перезапущен штатным scripts/start_local_widget.ps1 2026-10-12.
+Startup подтвердил deepseek-flash, single_model=true, prompt_contract46;
+health/live отвечает200. Это локальный запуск, не deploy и не ручная приёмка виджета.

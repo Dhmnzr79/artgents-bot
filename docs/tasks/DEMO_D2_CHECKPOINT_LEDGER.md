@@ -1,3 +1,11 @@
+Текущий этап 2026-10-12: Interface §56, owner GO. DeepSeek Flash + native show_price,
+один grounded completion после кодового результата цены; обычная беседа — один вызов.
+Это заменяет прежний общий one-call запрет только в указанном ценовом пути.
+Без strict/классификатора/Qwen fallback. FullContext сохраняется, чистка KB отложена.
+Checkpoint прежнего WIP/экспериментов: 08b5041, pushed; не полный PASS бота.
+§56 реализован: 43 distinct targeted offline PASS, scoped Checker PASS; после доводки
+7 живых ходов/12 вызовов без повторов цен перед карточкой. Cursor/виджет ещё открыты.
+
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
 ## Составные ответы §24 — 2026-10-06

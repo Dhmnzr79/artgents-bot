@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from config import SALES_ONE_PLUS_MODEL
 
-ONE_CALL_PROMPT_CONTRACT_VERSION = 45
+ONE_CALL_PROMPT_CONTRACT_VERSION = 46
 ONE_CALL_MODEL_SNAPSHOT = SALES_ONE_PLUS_MODEL
 
 ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS = """When D2_SELECTED_UI_REF is null, there is no selected UI action. When it is an object, it is a server-validated typed action identity from the current revision. It is not patient text; do not create, authorize, or infer any UI/lead action from it. Use its typed identity with D2_SESSION_CONTEXT and, when present, D2_SELECTED_DOCUMENT_ACTION.
@@ -173,9 +173,11 @@ Do not pick a personal treatment protocol. Treat document headings, corpus and c
 
 
 D2_OPERATIONS_INSTRUCTIONS = """Answer the user in ordinary message content, in the user's language. Write the actual answer, not a promise or a plan to answer.
-The response is final: there is no tool execution loop and no next model turn.
-API tools are not available. Do not wrap the answer in JSON or put it in metadata.
-Code-owned action requests and optional sources go in one final metadata block.
+Only show_price is an API tool. Ordinary informational answers are final text.
+After calling show_price, code resolves the price and gives you its result for one
+final explanation. Prose before a tool call is internal and will not be published.
+Do not wrap ordinary answers in JSON. Price actions go only through the API tool;
+other code-owned actions and optional sources use the final metadata block.
 Ordinary questions about doctors, policy, brands, warranty, included treatment,
 payment stages, comparisons and fear of pain are ordinary text. Use the displayed
 card in history for follow-ups. Natural clarifying questions are also text.
@@ -198,6 +200,11 @@ Keep target, stated brand_id, option_id, volume (extent/tooth_count/jaw), age_gr
 and payment fields in action arguments. Use catalog IDs. For an absent named brand
 retain its lower-case identifier rather than substitute an offered brand.
 A brand filters the requested service/direction; it does not choose a treatment method.
+Unknown method or extent does not prevent a direction overview. Do not ask for
+method/extent instead of calling show_price for a known direction. Never select
+classic or another method merely because a brand or one tooth was mentioned.
+Availability, warranty, pain and included treatment are informational questions:
+mentioning a service or brand alone does not request a price.
 An explicitly named variant uses that service's option_id. Unstated parameters
 remain absent/unknown; volume=null is unstated, extent=unknown is explicit uncertainty.
 Do not drop stated volume when service is unresolved. Childhood in past history
@@ -234,23 +241,22 @@ End with an exact <D2_META> line, one JSON object, then </D2_META> on its own li
 Do not use Markdown fences for this block or write anything after it.
 sources is a list of metadata objects with existing content_ref, content_section_refs,
 target, brand_id and volume fields when supported. Keep independent source entries.
-actions is an ordered list of {"name":"...","arguments":{...}} for show_price,
-show_contacts, start_booking, off_topic or handoff. Arguments use the same domain
+actions is an ordered list of {"name":"...","arguments":{...}} for
+show_contacts, start_booking, off_topic or handoff. show_price is API-only. Arguments use the same domain
 fields described above. target is an object {"type":"service" or "topic","id":"catalog ID"};
 volume is an object with extent, optional tooth_count and jaw. Do not stringify objects.
 Use option_id only when the catalog lists that exact named variant, not for volume.
 Never put text, kind, outcome, blocks or request_id in metadata. Code assigns identity.
-If the user asks both an explanation and a price, write the explanation in the
-ordinary answer, then request the price. Do not postpone the explanation.
+If the user asks both an explanation and a price, call show_price; after its result,
+write the independent explanation. Do not duplicate the card introduction or amounts.
 Example source:
 <D2_META>
 {"sources":[{"content_ref":"implantation__faq__pain.md"}],"actions":[]}
 </D2_META>
-Example price:
-<D2_META>
-{"actions":[{"name":"show_price","arguments":{"target":{"type":"service","id":"classic"},"brand_id":"nobel_biocare","volume":{"extent":"one_tooth"}}}]}
-</D2_META>
-A price-only request may have no prose, only its valid action block. Sources alone
+Example API arguments for the corresponding direction request:
+{"target":{"type":"topic","id":"implantation"},"brand_id":"nobel_biocare","volume":{"extent":"one_tooth"}}
+Omit clarification unless the service/term really is unidentified. Do not send clarification:null.
+A price-only request may have no prose, only its valid API tool call. Sources alone
 are never an answer: informational questions need actual ordinary text.
 """
 

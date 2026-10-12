@@ -717,6 +717,9 @@ def _run_reserved_d2_dialogue_turn(
                 known_task = D2ParsedDialogueResult(outcome="dialogue", blocks=(task,))
             else:
                 known_task = type(known_task).model_validate({"outcome": "dialogue", "blocks": [task.model_dump()]})
+    from contracts.d2_dialogue import D2PriceToolReply
+    from contracts.d2_dialogue_result import split_d2_text_reply
+    price_reply = None
     needs_explanation = isinstance(known_task, D2ExplanationTask)
     if known_task is not None and not needs_explanation:
         result = known_task
@@ -731,10 +734,14 @@ def _run_reserved_d2_dialogue_turn(
         raw = provider.generate(provider_input)
         full_audit("raw_model_response", raw=raw)
         diagnostics.stage("parse")
-        result = parse_d2_text_reply(
-            raw, active_service_ids=view.active_service_catalog.active_service_ids,
-            known_task=known_task,
-        )
+        if isinstance(raw, D2PriceToolReply):
+            price_reply = raw
+            result = raw.result
+        else:
+            result = parse_d2_text_reply(
+                raw, active_service_ids=view.active_service_catalog.active_service_ids,
+                known_task=known_task,
+            )
     full_audit("parsed_result", result=result)
     commit_args = dict(
         session_key=session_key, store=store, snapshot=snapshot, context=context,
@@ -913,8 +920,19 @@ def _run_reserved_d2_dialogue_turn(
     )
     render_order = tuple(b.request_id for b in result.blocks
         if b.kind != "booking" or isinstance(b, D2RejectedOperation))
+    def complete_price(outcome):
+        raw = provider.complete_price(price_reply, outcome)
+        full_audit("price_completion", outcome=outcome, raw=raw)
+        if raw.strip() == "<NO_TEXT>":
+            return D2ParsedDialogueResult("dialogue", ())
+        _, metadata = split_d2_text_reply(raw)
+        if metadata and metadata.get("actions"):
+            raise ValueError("d2_completion_action_forbidden")
+        return parse_d2_text_reply(raw, active_service_ids=view.active_service_catalog.active_service_ids)
+
     response = resolve_d2_operations(
         tuple(operations), sources, as_of=now.date(),
+        complete_price=complete_price if price_reply is not None else None,
         source_claims=getattr(result, "source_claims", None),
         common_route_content_lookup=bool(operations) and all(isinstance(p, ExplanationOperation) for p in operations),
         exact_contact_blocks=tuple(contact_blocks), exact_policy_blocks=tuple(policy_blocks),

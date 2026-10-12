@@ -1550,8 +1550,14 @@ def _validate_d2_request_parts(plan: ResolvedResponsePlan) -> None:
         raise ValueError("d2_request_part_content_block_duplicate")
     content_by_request = {block.request_id: block for block in plan.information_blocks}
     exact_by_id = {b.request_id: b for b in plan.d2_exact_text_blocks}
+    # A price-reference decision may be explained by final model prose. Its
+    # provenance stays in parts; it does not require a second authored paragraph.
+    prose_explains_reference = any(p.kind == "content" and p.status == "answered"
+                                  and p.request_id in content_by_request for p in parts)
     exact_parts = [p for p in parts if p.kind in {"clarification", "reference", "price_clarification", "price_reference", "lead"}
-                   and p.status == "answered"]
+                   and p.status == "answered" and not (
+                       p.kind == "price_reference" and p.request_id not in exact_by_id
+                       and prose_explains_reference)]
     if len(exact_by_id) != len(plan.d2_exact_text_blocks) or {p.request_id for p in exact_parts} != set(exact_by_id):
         raise ValueError("d2_exact_text_linkage_invalid")
     for part in exact_parts:

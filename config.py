@@ -8,7 +8,7 @@ load_dotenv()
 
 APP_ENV = (os.getenv("APP_ENV") or "local").strip().lower()
 
-# --- LLM provider (Qwen/DashScope chat runtime; no OpenAI import-time requirement) ---
+# --- Explicit chat runtime endpoint/model. No automatic provider fallback. ---
 CHAT_API_KEY = (os.getenv("CHAT_API_KEY") or os.getenv("DASHSCOPE_API_KEY") or "").strip() or None
 CHAT_BASE_URL = (
     (os.getenv("CHAT_BASE_URL") or os.getenv("DASHSCOPE_BASE_URL") or "").strip()

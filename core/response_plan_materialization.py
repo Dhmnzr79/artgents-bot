@@ -309,7 +309,7 @@ def resolve_d2_operations(
     promotion_scope="none", requested_fact_ids=(), legacy_patient_text=None,
     exact_text_blocks=(), exact_parts=(), extra_ui=(), deferred_price_parts=(),
     exact_deferred_blocks=(), exact_failure_blocks=(),
-    suppress_forbidden_booking_cta=False, source_claims=None,
+    suppress_forbidden_booking_cta=False, source_claims=None, complete_price=None,
 ):
     """Resolve already-decided operations; never reconstruct a semantic envelope."""
     client_id = sources.material_authority.source_client_id
@@ -322,38 +322,12 @@ def resolve_d2_operations(
         for service_id, service in sources.material_authority.bundle.services.items()
         if service.content_ref in sources.d2_content_topics_by_ref
     }
-    mixed_source_scope = False
-    if source_claims is not None:
-        operations, mixed_source_scope = _d2_bind_source_claims(
-            operations, source_claims, client_id=client_id, sources=sources,
-        )
     price_parts = tuple(item for item in operations if item.kind == "price")
     content_parts = tuple(item for item in operations if item.kind == "content")
     detail_parts = tuple(item for item in operations if item.kind == "price_detail")
     direct_promotion = promotion_scope != "none"
     direct_fact = bool(requested_fact_ids)
 
-    # Keep the existing marketing policy for multi-part answers. Source UI
-    # below uses verified documents, not the number of content operations.
-    content_part_count = (max(1, len(source_claims)) if source_claims is not None else len(content_parts))
-    multiple_content_parts = content_part_count > 1
-    ready_comparison = (
-        content_part_count == 1
-        and content_parts[0].content_ref is not None
-        and content_parts[0].content_ref.startswith("comparison__")
-    )
-    auto_promo = (
-        common_route_content_lookup
-        and not direct_promotion
-        and not direct_fact
-        and not multiple_content_parts
-        and not ready_comparison
-        and not price_parts
-        and not detail_parts
-    )
-    # A direct commercial fact is an exact addition, not a replacement for
-    # ordinary FullContext prose in the same turn. Promotions remain code-only.
-    code_owned_null_content = False
     unsupported = tuple(
         item.request_id
         for item in operations
@@ -366,26 +340,10 @@ def resolve_d2_operations(
     if direct_promotion and promotion_scope not in {"general", "service", "shown"}:
         raise MaterializationContractError("d2_promotion_scope_invalid")
 
-    # Resolve content first. Wrong/missing refs soft-fail as part gaps (D2-078);
-    # foreign tenant material remains fatal and must not hide behind price recovery.
-    # FullContext prose is the ordinary answer path.  A content_ref remains
-    # useful provenance for source UI, but it does not decide whether the user
-    # asked an informational question or whether the prose may be published.
-    information_blocks, content_realizations, content_scopes_by_id = _d2_information_blocks(
-        content_parts=content_parts,
-        client_id=client_id,
-        sources=sources,
-        code_owned_null_content=code_owned_null_content,
-    )
-    if mixed_source_scope:
-        # A single publication does not turn several subjects into the first one.
-        for part in content_parts:
-            content_scopes_by_id[part.request_id] = None
-    content_blocks_by_id = {block.request_id: block for block in information_blocks}
-
     price_block: D2FrozenPriceBlock | None = None
     price_tab_rows = ()
     price_selected_scope = None
+    scope_decision = None
     failure_blocks: list[D2PartFailureBlock] = list(exact_failure_blocks)
     deferred_blocks: list[D2PartDeferredBlock] = [D2PartDeferredBlock(request_id=p.request_id, source_client_id=client_id) for p in deferred_price_parts]
     price_failure_reason: str | None = None
@@ -486,7 +444,76 @@ def resolve_d2_operations(
                 applied_extent=applied_extent,
                 selected_offer_ids=tuple(row.offer_id for row in price_block.rows),
             )
-    else:
+    if complete_price is not None:
+        outcome = {
+            "price": price_block.model_dump(mode="json") if price_block else None,
+            "scope": scope_decision.model_dump(mode="json") if price_parts and scope_decision else None,
+            "exact_text": [b.model_dump(mode="json") for b in exact_text_blocks],
+            "contacts": [b.model_dump(mode="json") for b in exact_contact_blocks],
+            "policies": [b.model_dump(mode="json") for b in exact_policy_blocks],
+            "parts": [p.model_dump(mode="json") for p in exact_parts],
+            "failures": [b.model_dump(mode="json") for b in failure_blocks],
+            "deferred": [b.model_dump(mode="json") for b in deferred_blocks],
+            "clarification_choices": [b.model_dump(mode="json") for b in extra_ui],
+        }
+        reply = complete_price(outcome)
+        if reply.outcome != "dialogue" or any(p.kind != "content" for p in reply.blocks):
+            raise MaterializationContractError("d2_completion_action_forbidden")
+        operations = (*reply.blocks, *operations)
+        source_claims = reply.source_claims
+        d2_request_order = (*[p.request_id for p in reply.blocks], *d2_request_order)
+        # Guard decisions/provenance remain in exact_parts. Only their final prose
+        # belongs to completion; clarification prompts remain code-owned.
+        refusal_ids = {p.request_id for p in exact_parts if p.kind == "price_reference"}
+        if refusal_ids and not reply.blocks:
+            raise MaterializationContractError("d2_completion_refusal_text_required")
+        exact_text_blocks = tuple(b for b in exact_text_blocks if b.request_id not in refusal_ids)
+
+    mixed_source_scope = False
+    if source_claims is not None:
+        operations, mixed_source_scope = _d2_bind_source_claims(
+            operations, source_claims, client_id=client_id, sources=sources,
+        )
+    content_parts = tuple(item for item in operations if item.kind == "content")
+    # Keep the existing marketing policy for multi-part answers. Source UI
+    # below uses verified documents, not the number of content operations.
+    content_part_count = (max(1, len(source_claims)) if source_claims is not None else len(content_parts))
+    multiple_content_parts = content_part_count > 1
+    ready_comparison = (
+        content_part_count == 1
+        and content_parts[0].content_ref is not None
+        and content_parts[0].content_ref.startswith("comparison__")
+    )
+    auto_promo = (
+        common_route_content_lookup
+        and not direct_promotion
+        and not direct_fact
+        and not multiple_content_parts
+        and not ready_comparison
+        and not price_parts
+        and not detail_parts
+    )
+    # A direct commercial fact is an exact addition, not a replacement for
+    # ordinary FullContext prose in the same turn. Promotions remain code-only.
+    code_owned_null_content = False
+    # Bind final prose to captured sources. Wrong/missing refs soft-fail (D2-078);
+    # foreign tenant material remains fatal and must not hide behind price recovery.
+    # FullContext prose is the ordinary answer path.  A content_ref remains
+    # useful provenance for source UI, but it does not decide whether the user
+    # asked an informational question or whether the prose may be published.
+    information_blocks, content_realizations, content_scopes_by_id = _d2_information_blocks(
+        content_parts=content_parts,
+        client_id=client_id,
+        sources=sources,
+        code_owned_null_content=code_owned_null_content,
+    )
+    if mixed_source_scope:
+        # A single publication does not turn several subjects into the first one.
+        for part in content_parts:
+            content_scopes_by_id[part.request_id] = None
+    content_blocks_by_id = {block.request_id: block for block in information_blocks}
+
+    if not price_parts:
         if content_parts:
             first = content_parts[0]
             service_ids, response_scope, selected_topic_id = (

@@ -67,7 +67,7 @@ def test_shared_limit_before_transport_and_other_tenant_unchanged(http_env, monk
     calls = wire(monkeypatch)
     import core.d2_demo_limits as quota
     if kind == 'daily':
-        seed(db, count=200)
+        seed(db, count=400)
     else:
         monkeypatch.setattr(quota, 'RATE_LIMIT_MAX_PER_IP', 1)
         seed(db, peer='127.0.0.1')
@@ -115,7 +115,7 @@ def test_counters_persist_and_rolling_window_and_concurrency(tmp_path):
 def test_daily_and_ip_windows_expire_without_resetting_session(tmp_path, monkeypatch):
     import core.d2_demo_limits as quota
     path = tmp_path/'windows.sqlite'
-    seed(path, count=200, stamp=0)
+    seed(path, count=400, stamp=0)
     with sqlite3.connect(path) as conn:
         with pytest.raises(D2DemoLimitReached, match='demo_daily_limit'):
             admit_demo_call(conn, sid='fresh', peer_ip='new', now=86399)

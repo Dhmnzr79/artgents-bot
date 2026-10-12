@@ -33,7 +33,7 @@ def admit_demo_call(connection, *, sid, peer_ip, now=None):
             ("demo_session_limit", 30, "sid=?", (sid,)),
             ("demo_ip_limit", RATE_LIMIT_MAX_PER_IP,
              "peer_hash=? AND admitted_at>?", (peer, stamp - RATE_LIMIT_WINDOW_SEC)),
-            ("demo_daily_limit", 200, "admitted_at>?", (stamp - 86400,)),
+            ("demo_daily_limit", 400, "admitted_at>?", (stamp - 86400,)),
         )
         for code, limit, clause, args in checks:
             count = connection.execute(

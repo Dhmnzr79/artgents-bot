@@ -161,6 +161,8 @@ class TargetOptionSelection(TargetSchemaModel):
 class TargetServiceOption(TargetSchemaModel):
     option_id: NonBlankStr
     name: NonBlankStr
+    # Optional button caption; canonical name and model descriptor stay separate.
+    tab_label: NonBlankStr | None = None
     aliases: list[NonBlankStr] = Field(default_factory=list)
     active: bool | None = None
     content_ref: NonBlankStr | None = None

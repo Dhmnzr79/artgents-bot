@@ -1929,173 +1929,138 @@ export function mountWidget(root, config) {
   function renderPriceBody(bubble, message) {
     let texts = [];
     let financialCard = null;
-    const financialSections = new Map();
+    const sections = new Map();
+    let promotionCount = 0;
+    const svg = (name) => {
+      const paths = {layers:'m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5',
+        check:'m5 12 4 4 10-10',clock:'M12 7v5l4 2',info:'M12 11v6M12 7v1',
+        gift:'M3 9h18v4H3ZM5 13v8h14v-8M12 9v12M12 9C5 9 5 3 8 3c3 0 4 6 4 6s1-6 4-6c3 0 3 6-4 6Z',
+        chevron:'m9 5 7 7-7 7',extent:'m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3ZM4 7.5l8 4.5 8-4.5M12 12v9'};
+      const el = document.createElementNS('http://www.w3.org/2000/svg','svg');
+      el.setAttribute('viewBox','0 0 24 24'); el.setAttribute('aria-hidden','true');
+      el.classList.add('clinic-price-card__icon');
+      if (name === 'info' || name === 'clock') {
+        const circle = document.createElementNS(el.namespaceURI,'circle');
+        circle.setAttribute('cx','12');circle.setAttribute('cy','12');circle.setAttribute('r','9');el.appendChild(circle);
+      }
+      const path = document.createElementNS(el.namespaceURI,'path');path.setAttribute('d',paths[name]);el.appendChild(path);
+      return el;
+    };
     const flushText = () => {
       if (!texts.length) return;
-      const body = document.createElement("div");
-      body.className = "clinic-msg__body";
-      setBotAnswerBody(body, texts.join("\n\n"));
-      bubble.appendChild(body);
-      texts = [];
+      const body = document.createElement('div');body.className='clinic-msg__body';
+      setBotAnswerBody(body,texts.join('\n\n'));bubble.appendChild(body);texts=[];
     };
+    const detail = (key, label, icon) => {
+      if (sections.has(key)) return sections.get(key);
+      const el=document.createElement('details');el.className='clinic-price-card__detail';
+      el.dataset.priceSection=key;
+      const summary=document.createElement('summary');summary.appendChild(svg(icon));
+      const title=document.createElement('span');title.textContent=label;summary.appendChild(title);
+      const arrow=svg('chevron');arrow.classList.add('clinic-price-card__chevron');summary.appendChild(arrow);
+      el.appendChild(summary);financialCard.appendChild(el);sections.set(key,el);return el;
+    };
+    const addText = (target,text) => {
+      const body=document.createElement('div');body.className='clinic-price-card__detail-body';
+      setBotAnswerBody(body,text);target.appendChild(body);
+    };
+    const disabled = () => state.pending || Boolean(state.retryBody) || isActiveLeadFlowPayload(state.lastPayload);
+    const select = (choice, revision) => void sendAsk({ref:choice.reply_id,ui_revision:revision,q:'',priceMessage:message});
     for (const part of message.bodyParts) {
-      if (part.kind === "text" && part.price_owned && part.price_section && financialCard) {
+      if (part.kind==='text' && part.price_owned && part.price_section && financialCard) {
         flushText();
-        let section = financialSections.get(part.price_section);
-        if (!section) {
-          const titles = {promotion:"Акции и предложения", compatibility:"Условия",
-            benefits:"Дополнительно", consultation:"Консультация", conditions:"Условия стоимости"};
-          section = document.createElement(part.price_section === "promotion" ? "details" : "section");
-          section.className = "clinic-price-card__detail clinic-price-card__commercial";
-          const heading = document.createElement(part.price_section === "promotion" ? "summary" : "p");
-          heading.className = "clinic-price-card__detail-heading";
-          heading.textContent = titles[part.price_section] || "Условия";
-          section.appendChild(heading);
-          financialCard.appendChild(section);
-          financialSections.set(part.price_section, section);
+        if (part.price_section==='promotion' && promotionCount++===0) {
+          const promo=document.createElement('section');promo.className='clinic-price-card__promotion';
+          promo.appendChild(svg('gift'));
+          const content=document.createElement('div');addText(content,part.text);promo.appendChild(content);financialCard.appendChild(promo);
+        } else {
+          const payment=part.price_section==='consultation';
+          addText(detail(payment?'payment':'conditions',payment?'Как оплачивается лечение':'Условия и преимущества',payment?'clock':'info'),part.text);
         }
-        const text = document.createElement("div");
-        text.className = "clinic-msg__body";
-        setBotAnswerBody(text, part.text);
-        section.appendChild(text);
         continue;
       }
-      if (part.kind === "text") { texts.push(part.text); continue; }
-      if (part.kind !== "price_card" || part.price?.source_client_id !== clientId) continue;
+      if(part.kind==='text'){texts.push(part.text);continue;}
+      if(part.kind!=='price_card'||part.price?.source_client_id!==clientId)continue;
       flushText();
-      const rows = part.price.rows || [];
-      if (!rows.length || rows.some((row) => row.source_client_id !== clientId)) continue;
-      const card = document.createElement("section");
-      card.className = "clinic-price-card";
-      card.setAttribute("aria-label", part.overview ? "Варианты лечения" : rows[0].service_name);
-      if (!message.volumeNavigation && part.overview?.volume_choices?.length) {
-        message.volumeNavigation = {revision:message.revision,
-          choices:part.overview.volume_choices.map(choice => choice.candidate)};
+      const rows=part.price.rows||[];
+      if(!rows.length||rows.some(row=>row.source_client_id!==clientId))continue;
+      const card=document.createElement('section');card.className='clinic-price-card';
+      const overview=Boolean(part.overview);
+      card.setAttribute('aria-label',overview?'Варианты лечения':rows[0].service_name);
+      financialCard=card;sections.clear();promotionCount=0;
+      if(!message.volumeNavigation&&part.overview?.volume_choices?.length){
+        message.volumeNavigation={revision:message.revision,choices:part.overview.volume_choices.map(choice=>choice.candidate)};
       }
-      const appendNavigation = (choices, revision, className) => {
-        const nav = document.createElement("div");
-        nav.className = className;
-        for (const choice of choices) {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "clinic-price-card__tab";
-          button.textContent = choice.label;
-          button.disabled = state.pending || Boolean(state.retryBody) || isActiveLeadFlowPayload(state.lastPayload);
-          button.addEventListener("click", () => void sendAsk({ref:choice.reply_id,
-            ui_revision:revision, q:"", priceMessage:message}));
-          nav.appendChild(button);
+      if(overview&&message.volumeNavigation?.choices.length){
+        const nav=document.createElement('div');nav.className='clinic-price-card__tabs clinic-price-card__volumes';
+        for(const choice of message.volumeNavigation.choices){
+          const button=document.createElement('button');button.type='button';button.className='clinic-price-card__tab';
+          button.textContent=choice.label;button.disabled=disabled();
+          button.addEventListener('click',()=>select(choice,message.volumeNavigation.revision));nav.appendChild(button);
         }
         card.appendChild(nav);
-      };
-      if (message.volumeNavigation) appendNavigation(message.volumeNavigation.choices,
-        message.volumeNavigation.revision, "clinic-price-card__tabs clinic-price-card__volumes");
-      const title = document.createElement("h3");
-      title.className = "clinic-price-card__title";
-      title.textContent = part.overview ? "Варианты лечения" : rows[0].service_name;
-      card.appendChild(title);
-      if (part.service_choices?.length) appendNavigation(part.service_choices,
-        message.revision, "clinic-price-card__services");
-      if (!part.overview && (part.choices || []).length > 1) {
-        const tabs = document.createElement("div");
-        tabs.className = "clinic-price-card__tabs";
-        tabs.setAttribute("role", "group");
-        tabs.setAttribute("aria-label", "Вариант");
-        for (const choice of part.choices) {
-          const active = choice.reply_id === `price_select:${rows[0].offer_id}`;
-          const tab = document.createElement("button");
-          tab.type = "button";
-          tab.className = "clinic-price-card__tab";
-          tab.textContent = choice.label;
-          tab.setAttribute("aria-pressed", String(active));
-          tab.disabled = state.pending || Boolean(state.retryBody) || isActiveLeadFlowPayload(state.lastPayload);
-          tab.addEventListener("click", () => {
-            if (!active || message.revision !== state.lastPayload?.revision)
-              void sendAsk({ref: choice.reply_id, ui_revision: message.revision,
-              q: "", priceMessage: message});
-          });
-          tabs.appendChild(tab);
-        }
-        card.appendChild(tabs);
       }
-      const terms = rows.map((row) => [...new Set([row.scope_text, ...(row.condition_texts || [])].filter(Boolean))]);
-      const common = terms[0].filter((term) => terms.every((list) => list.includes(term)));
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        if (row.mode === "no_public_price") {
-          const description = document.createElement("div");
-          description.className = "clinic-msg__body";
-          setBotAnswerBody(description, row.display_text);
-          card.appendChild(description);
-          for (const term of terms[i].filter(text => !common.includes(text))) {
-            const note = document.createElement("p");
-            note.className = "clinic-price-card__condition";
-            note.textContent = term;
-            card.appendChild(note);
-          }
-          continue;
+      const title=document.createElement('h3');title.className='clinic-price-card__title';
+      title.textContent=overview?'Варианты лечения':rows[0].service_name;card.appendChild(title);
+      if(!overview&&(part.choices||[]).length>1){
+        const tabs=document.createElement('div');tabs.className='clinic-price-card__tabs';tabs.setAttribute('role','group');tabs.setAttribute('aria-label','Вариант');
+        for(const choice of part.choices){
+          const active=choice.reply_id===`price_select:${rows[0].offer_id}`;
+          const tab=document.createElement('button');tab.type='button';tab.className='clinic-price-card__tab';
+          tab.textContent=choice.label;tab.setAttribute('aria-pressed',String(active));tab.disabled=disabled();
+          tab.addEventListener('click',()=>{if(!active||message.revision!==state.lastPayload?.revision)select(choice,message.revision)});tabs.appendChild(tab);
+        }card.appendChild(tabs);
+      }
+      if(!overview&&(part.choices||[]).length<=1&&rows[0].variant_label){
+        const label=document.createElement('p');label.className='clinic-price-card__selected-variant';
+        label.textContent=rows[0].variant_label;card.appendChild(label);
+      }
+      const allChoices=[...(part.choices||[]),...(part.service_choices||[])];
+      for(const row of rows){
+        const choice=allChoices.find(choice=>choice.reply_id===`price_select:${row.offer_id}`);
+        const item=document.createElement(overview&&choice?'button':'div');
+        item.className=overview?'clinic-price-card__overview-row':'clinic-price-card__price-area';
+        if(overview&&choice){item.type='button';item.disabled=disabled();item.addEventListener('click',()=>select(choice,message.revision));}
+        if(overview){const name=document.createElement('span');name.className='clinic-price-card__overview-name';name.textContent=row.service_name;item.appendChild(name);}
+        const amount=document.createElement('strong');amount.className='clinic-price-card__amount';
+        amount.textContent=row.mode==='no_public_price'?row.display_text:row.price_display_text;
+        if(row.mode==='no_public_price')amount.classList.add('clinic-price-card__amount--description');
+        else if(!overview)amount.classList.add('clinic-price-card__amount--single');item.appendChild(amount);
+        if(overview&&choice){const arrow=svg('chevron');arrow.classList.add('clinic-price-card__row-arrow');item.appendChild(arrow);}
+        if(row.scope_text){const caption=document.createElement('p');caption.className='clinic-price-card__caption';if(!overview)caption.appendChild(svg('extent'));const scope=document.createElement('span');scope.textContent=row.scope_text;caption.appendChild(scope);item.appendChild(caption);}
+        // Overview is a compact preview; full authored conditions stay in detail.
+        for(const term of (overview ? [] : [...new Set(row.condition_texts||[])])){
+          if(term===row.scope_text)continue;
+          const note=document.createElement('p');note.className='clinic-price-card__condition';note.appendChild(svg('info'));
+          const text=document.createElement('span');text.textContent=term.charAt(0).toUpperCase()+term.slice(1);note.appendChild(text);item.appendChild(note);
         }
-        const item = document.createElement("div");
-        item.className = "clinic-price-card__variant";
-        if (rows.length > 1 || (row.variant_label && !(part.choices || []).length)) {
-          const label = document.createElement("span");
-          label.className = "clinic-price-card__brand";
-          label.textContent = rows.length > 1 ? row.service_name : row.variant_label;
-          item.appendChild(label);
-        }
-        const price = document.createElement("strong");
-        price.className = "clinic-price-card__amount";
-        if (row.mode === "no_public_price") price.classList.add("clinic-price-card__amount--description");
-        else if (rows.length === 1) price.classList.add("clinic-price-card__amount--single");
-        price.textContent = row.price_display_text;
-        item.appendChild(price);
         card.appendChild(item);
-        for (const term of terms[i].filter((text) => !common.includes(text))) {
-          const note = document.createElement("p");
-          note.className = "clinic-price-card__condition";
-          note.textContent = term;
-          card.appendChild(note);
-        }
-      }
-      for (const term of common) {
-        const note = document.createElement("p");
-        note.className = "clinic-price-card__condition";
-        note.textContent = term;
-        card.appendChild(note);
-      }
-      if (rows.length === 1) {
-        const row = rows[0];
-        const appendDetail = (title, sections) => {
-          const details = document.createElement("details");
-          details.className = "clinic-price-card__detail";
-          const summary = document.createElement("summary");
-          summary.textContent = title;
-          details.appendChild(summary);
-          for (const [heading, lines] of sections) {
-            if (!lines?.length) continue;
-            if (heading) {
-              const caption = document.createElement("p");
-              caption.className = "clinic-price-card__detail-heading";
-              caption.textContent = heading;
-              details.appendChild(caption);
-            }
-            const list = document.createElement("ul");
-            for (const line of lines) {
-              const li = document.createElement("li");
-              li.textContent = line;
-              list.appendChild(li);
-            }
-            details.appendChild(list);
-          }
-          card.appendChild(details);
-        };
-        if (row.includes?.length) appendDetail("Что входит в стоимость", [
-          ["", row.includes], ["Оплачивается отдельно", row.excludes]]);
-        if (row.stages?.length) appendDetail("Этапы оплаты", [["", row.stages]]);
       }
       bubble.appendChild(card);
-      financialCard = card;
-      financialSections.clear();
+      if(!overview&&rows.length===1){
+        const row=rows[0];
+        if(row.includes?.length){
+          const el=detail('includes','Что входит в стоимость','layers');
+          const list=document.createElement('ul');list.className='clinic-price-card__check-list';
+          for(const line of row.includes){const li=document.createElement('li');li.appendChild(svg('check'));const text=document.createElement('span');text.textContent=line;li.appendChild(text);list.appendChild(li);}el.appendChild(list);
+          if(row.excludes?.length){const heading=document.createElement('p');heading.className='clinic-price-card__detail-heading';heading.textContent='Оплачивается отдельно';el.appendChild(heading);const exclusions=document.createElement('ul');for(const line of row.excludes){const li=document.createElement('li');li.textContent=line;exclusions.appendChild(li);}el.appendChild(exclusions);}
+        }
+        if(row.stages?.length){
+          const el=detail('payment','Как оплачивается лечение','clock');
+          for(const line of row.stages){
+            // Frozen stage formatter separates its heading/amount from timing with '. '.
+            const separator=line.indexOf('. ');
+            const body=document.createElement('div');body.className='clinic-price-card__detail-body';
+            const heading=document.createElement('strong');heading.className='clinic-price-card__stage-title';
+            heading.textContent=separator<0?line:line.slice(0,separator+1);body.appendChild(heading);
+            if(separator>=0){const timing=document.createElement('p');timing.textContent=line.slice(separator+2);body.appendChild(timing);}
+            el.appendChild(body);
+          }
+        }
+      }
     }
+    // Commercial parts may arrive after the promotion; keep the open promo last.
+    for(const card of bubble.querySelectorAll('.clinic-price-card')){const promo=card.querySelector('.clinic-price-card__promotion');if(promo)card.appendChild(promo);}
     flushText();
   }
 

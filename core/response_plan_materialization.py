@@ -770,7 +770,7 @@ def resolve_d2_operations(
             offer = offers_by_id[row.offer_id]
             reply_id = f"price_select:{row.offer_id}"
             replies.append(UiQuickReplyCandidate(source_client_id=client_id,
-                reply_id=reply_id, label=row.variant_label or row.service_name))
+                reply_id=reply_id, label=_offer_tab_label(sources.material_authority.bundle, offer) or row.service_name))
             actions.append(D2PriceSelectUiAction(source_client_id=client_id,
                 reply_id=reply_id, offer_id=row.offer_id, service_id=row.service_id, service_name=row.service_name,
                 discussion_scope=DiscussionScope(target=ServiceTarget(type="service", id=row.service_id),
@@ -793,7 +793,7 @@ def resolve_d2_operations(
                     raise MaterializationOwnershipError("d2_price_select_offer_unavailable")
                 actions[index] = action.model_copy(update={"service_name":service.name})
                 replies.append(UiQuickReplyCandidate(source_client_id=client_id,
-                    reply_id=action.reply_id, label=_offer_variant_label(sources.material_authority.bundle, offer) or service.name))
+                    reply_id=action.reply_id, label=_offer_tab_label(sources.material_authority.bundle, offer) or service.name))
         if actions and (len(actions) > 1 or scope_decision is not None or selected_price_select_actions):
             ui_candidates = ui_candidates.model_copy(update={
                 "quick_replies": (*ui_candidates.quick_replies, *replies),
@@ -2192,6 +2192,17 @@ def _offer_variant_label(bundle: ResponseSchemaBundle, offer: TargetOffer) -> st
                     if label:
                         return label
     return None
+
+
+def _offer_tab_label(bundle: ResponseSchemaBundle, offer: TargetOffer) -> str | None:
+    """Button-only authored caption; never replace canonical price or model labels."""
+    if not offer.brand_id and offer.option_id:
+        service = bundle.services.get(offer.service_id)
+        if service is not None:
+            for option in service.options:
+                if option.option_id == offer.option_id and option.tab_label:
+                    return str(option.tab_label)
+    return _offer_variant_label(bundle, offer)
 
 
 def _offer_distinguishing_label(bundle: ResponseSchemaBundle, offer: TargetOffer) -> str:

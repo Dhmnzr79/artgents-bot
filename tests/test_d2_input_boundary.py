@@ -3,16 +3,16 @@ import pytest
 
 from contracts.response_plan import SessionKey
 from core.d2_dialogue_store import D2DialogueStore
-from tests.d2_ci_http import FakeProvider, completed_context, explanation, http_env, raw, send
+from tests.d2_ci_http import FakeProvider, completed_context, http_env, send
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
 @pytest.mark.parametrize("query", ["Да", "Ок", "А", "Сколько **стоит** КТ?"])
 def test_short_and_formatted_turn_reaches_provider_without_reclassification(http_env, transport, query):
     client, db, use, _ = http_env
-    fake = use(FakeProvider(raw(explanation("Могу рассказать о технологиях клиники."))))
+    fake = use(FakeProvider("Могу рассказать о технологиях клиники."))
     send(client, transport, sid="input-boundary", request_id="first", q="Расскажите о клинике")
-    fake.raw = raw(explanation("Продолжение разговора."))
+    fake.raw = "Продолжение разговора."
     args = dict(sid="input-boundary", request_id="next", q=query)
     answer = send(client, transport, **args)
     assert fake.inputs[-1].user_message == query
@@ -29,7 +29,7 @@ def test_short_and_formatted_turn_reaches_provider_without_reclassification(http
 def test_punctuation_email_is_masked_in_input_and_assistant_history(http_env, transport):
     client, db, use, _ = http_env
     email = "boundary.person+tag@sub.example.co.uk"
-    fake = use(FakeProvider(raw(explanation(f"Напишите {email}. Можно обсудить КТ."))))
+    fake = use(FakeProvider(f"Напишите {email}. Можно обсудить КТ."))
     query = f"Почта {email}. Сколько стоит КТ?"
     send(client, transport, sid="input-boundary", request_id="email", q=query)
     assert email not in fake.inputs[-1].user_message
@@ -39,7 +39,7 @@ def test_punctuation_email_is_masked_in_input_and_assistant_history(http_env, tr
         pair = result.ordinary.dialogue_pairs[-1]
         assert email not in pair.patient_text and email not in pair.assistant_text
         assert pair.assistant_text == "Напишите [email скрыт]. Можно обсудить КТ."
-    fake.raw = raw(explanation("Продолжение."))
+    fake.raw = "Продолжение."
     send(client, transport, sid="input-boundary", request_id="continue", q="Расскажите")
     pair = fake.inputs[-1].context.ordinary.dialogue_pairs[-1]
     assert email not in pair.assistant_text and email not in pair.patient_text

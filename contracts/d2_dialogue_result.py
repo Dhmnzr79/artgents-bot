@@ -136,19 +136,8 @@ class ExplanationFields(ScopedOperation):
 
 
 class ExplanationOperation(ExplanationFields):
-    """One explanation operation, either completed or explicitly unfinished."""
-    content_text: str | None = Field(default=None, min_length=1, exclude_if=lambda v: v is None)
-    pending_question: str | None = Field(default=None, min_length=1, max_length=4000, exclude_if=lambda v: v is None)
-    clarification: Clarification | None = Field(default=None, exclude_if=lambda v: v is None)
-
-    @model_validator(mode="after")
-    def explanation_form(self):
-        if self.clarification is None:
-            if self.content_text is None or {"pending_question", "clarification"} & self.model_fields_set:
-                raise ValueError("completed_explanation_text_required")
-        elif self.pending_question is None or "content_text" in self.model_fields_set:
-            raise ValueError("pending_explanation_question_required")
-        return self
+    """Published prose, including natural questions to the user."""
+    content_text: str = Field(min_length=1)
 
 
 class DetailOperation(ScopedOperation):
@@ -192,17 +181,10 @@ class TermClarification(Closed):
     choices: tuple[str, ...] = Field(default=(), max_length=0)
 
 
-class ParameterClarification(Closed):
-    missing: Literal["extent", "jaw", "stage"]
-    choices: tuple[str, ...] = Field(default=(), max_length=0)
-
-
 MeaningClarification = Annotated[Union[ServiceClarification, TermClarification], Field(discriminator="missing")]
-Clarification = Annotated[Union[ServiceClarification, TermClarification, ParameterClarification], Field(discriminator="missing")]
 
 
-for _operation in (PriceOperation, ExplanationOperation):
-    _operation.model_rebuild()
+PriceOperation.model_rebuild()
 
 
 def _require_pending_operation(operation):
@@ -213,8 +195,7 @@ def _require_pending_operation(operation):
 
 
 ClarifiedOperation = Annotated[
-    Union[PriceOperation, ExplanationOperation],
-    Field(discriminator="kind"), AfterValidator(_require_pending_operation),
+    PriceOperation, AfterValidator(_require_pending_operation),
 ]
 
 
@@ -280,6 +261,7 @@ class D2ParsedDialogueResult:
     """Ordered acceptance results consumed directly by the existing executor."""
     outcome: str
     blocks: tuple
+    source_claims: tuple[ExplanationFields, ...] | None = None
 
     @property
     def requests(self):
@@ -380,3 +362,94 @@ def validate_d2_payload(payload: dict, *, active_service_ids: frozenset[str], kn
         if clarification is not None and any(c not in active_service_ids for c in clarification.choices):
             raise ValueError("clarify_service_not_active")
     return result
+
+
+# One optional tail in ordinary provider text; no native tool-call channel.
+OPEN = "<D2_META>"
+CLOSE = "</D2_META>"
+ACTION_TYPES = {
+    "show_price":(PriceOperation,"price"),
+    "show_contacts":(ContactOperation,"contact"),
+    "start_booking":(BookingOperation,"booking"),
+    "off_topic":(OffTopicOperation,"off_topic"),
+}
+
+
+def split_d2_text_reply(raw):
+    """Exact reserved line only; no repairs or guesses about misspelled markers."""
+    if not isinstance(raw, str):
+        raise ValueError("text_tail_string_required")
+    lines = raw.splitlines(keepends=True)
+    offsets, offset = [], 0
+    for line in lines:
+        if line.rstrip("\r\n") == OPEN:
+            offsets.append(offset)
+        offset += len(line)
+    if not offsets:
+        return raw.strip(), None
+    text = raw[:offsets[0]].strip()
+    tail = raw[offsets[0]:]
+    if len(offsets) != 1 or tail.count(CLOSE) != 1:
+        return text, None
+    if sum(line.rstrip("\r\n")==CLOSE for line in tail.splitlines(keepends=True)) != 1:
+        return text, None
+    body, trailing = tail[len(OPEN):].split(CLOSE, 1)
+    if trailing.strip():
+        return text, None
+    from core.one_call_envelope_protocol import _loads_strict_json_object
+    try:
+        metadata = _loads_strict_json_object(body.strip())
+        if set(metadata) - {"sources", "actions"}:
+            return text, None
+        if any(not isinstance(metadata.get(key, []), list) for key in ("sources", "actions")):
+            return text, None
+    except (ValueError, TypeError):
+        return text, None
+    return text, metadata
+
+
+def parse_d2_text_reply(raw, *, active_service_ids, known_task=None):
+    text, metadata = split_d2_text_reply(raw)
+    if known_task is not None:
+        if len(known_task.blocks) != 1 or not text:
+            raise ValueError("known_task_explanation_text_required")
+        original = known_task.blocks[0]
+        return D2ParsedDialogueResult("dialogue", (
+            ExplanationOperation(**original.model_dump(exclude={"pending_question"}), content_text=text),
+        ))
+    actions, claims = [], []
+    for item in (metadata or {}).get("actions", []):
+        identity = f"r{len(actions)+2 if text else len(actions)+1}"
+        name = item.get("name") if isinstance(item, dict) else None
+        kind = ACTION_TYPES.get(name, (None,"reference"))[1] if isinstance(name,str) else "reference"
+        try:
+            if not isinstance(item, dict) or set(item) != {"name","arguments"}:
+                raise ValueError("text_tail_action_shape_invalid")
+            args = item["arguments"]
+            if not isinstance(args, dict) or {"request_id","kind","content_text"}.intersection(args):
+                raise ValueError("text_tail_server_fields_forbidden")
+            if name == "handoff":
+                if args:
+                    raise ValueError("handoff_arguments_forbidden")
+                return D2ParsedDialogueResult("admin", ())
+            model, kind = ACTION_TYPES[name]
+            action = model.model_validate(dict(args, kind=kind, request_id=identity))
+            clarification = getattr(action, "clarification", None)
+            if clarification is not None and any(c not in active_service_ids for c in clarification.choices):
+                raise ValueError("clarify_service_not_active")
+            actions.append(action)
+        except (ValueError, TypeError, KeyError):
+            actions.append(D2RejectedOperation(identity, kind))
+    for i, source in enumerate((metadata or {}).get("sources", []), 1):
+        identity = f"r{i}"
+        try:
+            if not isinstance(source, dict) or {"kind","request_id","content_text","clarification","pending_question"}.intersection(source):
+                raise ValueError("text_tail_source_shape_invalid")
+            claims.append(ExplanationFields.model_validate(dict(source, kind="content", request_id=identity)))
+        except (ValueError, TypeError):
+            # Multiplicity and invalid siblings must survive authority checking.
+            claims.append(ExplanationFields(kind="content", request_id=identity))
+    blocks = ((ExplanationOperation(kind="content", request_id="r1", content_text=text),) if text else ()) + tuple(actions)
+    if not blocks or all(isinstance(b,D2RejectedOperation) for b in blocks):
+        raise ValueError("text_tail_empty_or_rejected")
+    return D2ParsedDialogueResult("dialogue", blocks, tuple(claims) if text and metadata is not None else None)

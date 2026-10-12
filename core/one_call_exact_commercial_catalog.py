@@ -87,6 +87,7 @@ def _serialize_fact_row(fact_id: str, fact: TargetCommercialFact) -> dict[str, o
         "allowed_service_ids": sorted(str(item) for item in fact.allowed_service_ids),
         "allowed_topics": sorted(str(item) for item in fact.allowed_topics),
         "incompatible_with": sorted(str(item) for item in fact.incompatible_with),
+        "excluded_service_ids": sorted(str(item) for item in fact.excluded_service_ids),
     }
     if fact.active_from is not None:
         row["active_from"] = str(fact.active_from)
@@ -94,6 +95,12 @@ def _serialize_fact_row(fact_id: str, fact: TargetCommercialFact) -> dict[str, o
         row["active_until"] = str(fact.active_until)
     if fact.detail_ref is not None:
         row["detail_ref"] = str(fact.detail_ref)
+    if fact.microfact_text is not None:
+        row["microfact_text"] = str(fact.microfact_text)
+    if fact.excluded_scope_text is not None:
+        row["excluded_scope_text"] = str(fact.excluded_scope_text)
+    if fact.requested_display_policy is not None:
+        row["requested_display_policy"] = fact.requested_display_policy.model_dump(mode="json")
     return row
 
 

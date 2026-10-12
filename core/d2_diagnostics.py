@@ -39,6 +39,9 @@ _REASONS = frozenset({
     "d2_question_invalid", "d2_provider_input_privacy_only",
     "d2_http_response_choices_missing", "d2_http_response_content_missing",
     "d2_prompt_fullcontext_empty",
+    "d2_native_reply_empty_or_rejected", "d2_native_reply_required",
+    "d2_native_response_empty",
+    "text_tail_empty_or_rejected", "text_tail_string_required", "d2_text_response_empty",
 })
 _PROSE_REVIEW_REASONS = frozenset({
     "d2_model_prose_money", "d2_model_prose_link",

@@ -11,9 +11,8 @@ from config import DEFAULT_LLM_MODEL
 from core import d2_diagnostics as diagnostics
 from core.d2_full_audit import full_audit
 from contracts.d2_dialogue import D2ProviderInput
-from contracts.d2_dialogue_result import D2DialogueResult, D2ExplanationReply
 from core.one_call_prompt_contract import (
-    ONE_CALL_KNOWN_TASK_INSTRUCTIONS,
+    D2_KNOWN_TASK_INSTRUCTIONS,
     D2_OPERATIONS_INSTRUCTIONS,
     one_call_contract_header,
 )
@@ -24,11 +23,11 @@ CP3_MAX_PROVIDER_CALLS = 2
 
 
 def d2_strict_response_format(request: D2ProviderInput) -> dict:
-    """Provider schema shared with runtime structural validation.
+    """Historical offline probe schema, never used by either native provider.
 
-    Keep optional fields and unions exactly as the runtime declares them. No
-    provider-output repair or separately maintained semantic schema is involved.
+    Kept for archived strict-format experiments; not a response route or fallback.
     """
+    from contracts.d2_dialogue_result import D2DialogueResult, D2ExplanationReply
     reply_type = D2ExplanationReply if request.known_task is not None else D2DialogueResult
     return {
         "type": "json_schema",
@@ -96,9 +95,10 @@ def build_d2_d1r_messages(request: D2ProviderInput) -> tuple[dict[str, str], dic
     if request.known_task is not None:
         system = "\n\n".join((
             one_call_contract_header(),
-            ONE_CALL_KNOWN_TASK_INSTRUCTIONS,
+            D2_KNOWN_TASK_INSTRUCTIONS,
             history_contract,
             "=== CLINIC_BUSINESS_POLICIES ===\n" + request.model_view.clinic_policy_catalog_json,
+            request.model_view.commercial_fact_catalog.block_text(),
             _approved_md_corpus_block(request),
         ))
         user = "\n\n".join((
@@ -115,9 +115,6 @@ def build_d2_d1r_messages(request: D2ProviderInput) -> tuple[dict[str, str], dic
         one_call_contract_header(),
         "=== D2_OPERATIONS_INSTRUCTIONS ===\n" + D2_OPERATIONS_INSTRUCTIONS,
         history_contract,
-        "=== D2_RESULT_SCHEMA ===\n" + json.dumps(
-            D2DialogueResult.model_json_schema(), ensure_ascii=False, separators=(",", ":"),
-        ),
         request.model_view.service_reference_catalog.block_text(),
         request.model_view.active_service_catalog.block_text(),
         request.model_view.commercial_fact_catalog.block_text(),
@@ -183,15 +180,12 @@ class D2Cp3LiveProvider:
             max_completion_tokens=1024,
             timeout=LLM_REQUEST_TIMEOUT_SEC,
             messages=(system, user),
-            response_format={"type": "json_object"},
             provider_call_source="d2_cp3_live",
         )
         choices = getattr(response, "choices", None) or ()
         if not choices:
             raise D2LiveProviderError("d2_cp3_response_choices_missing")
-        content = getattr(getattr(choices[0], "message", None), "content", None)
-        if not isinstance(content, str) or not content.strip():
-            raise D2LiveProviderError("d2_cp3_response_content_missing")
+        reply = _plain_text_reply(choices[0].message)
         usage = getattr(response, "usage", None)
         observed = getattr(response, "model", None)
         self.observations.append(D2LiveCallObservation(
@@ -202,7 +196,7 @@ class D2Cp3LiveProvider:
             completion_tokens=_usage_int(usage, "completion_tokens"),
             duration_ms=max(0, int((time.monotonic() - started) * 1000)),
         ))
-        return content.strip()
+        return reply
 
 
 class D2HttpProvider:
@@ -228,19 +222,24 @@ class D2HttpProvider:
         response = diagnostics.call_provider(self._transport,
             model=self.model, temperature=0, max_completion_tokens=1024,
             timeout=LLM_REQUEST_TIMEOUT_SEC, messages=(system, user),
-            response_format={"type": "json_object"},
             provider_call_source="d2_http",
         )
         diagnostics.stage("provider_response")
         choices = getattr(response, "choices", None) or ()
         if not choices:
             raise D2LiveProviderError("d2_http_response_choices_missing")
-        content = getattr(getattr(choices[0], "message", None), "content", None)
-        if not isinstance(content, str) or not content.strip():
-            raise D2LiveProviderError("d2_http_response_content_missing")
+        reply = _plain_text_reply(choices[0].message)
         full_audit(
             "provider_response", model=getattr(response, "model", None),
-            usage=getattr(response, "usage", None), raw=content,
+            usage=getattr(response, "usage", None), raw=reply,
             choice_count=len(choices),
         )
-        return content.strip()
+        return reply
+
+
+def _plain_text_reply(message) -> str:
+    """Only the provider's ordinary text; no tool-channel adapter or repair."""
+    text = getattr(message, "content", None)
+    if not isinstance(text, str) or not text.strip():
+        raise D2LiveProviderError("d2_text_response_empty")
+    return text

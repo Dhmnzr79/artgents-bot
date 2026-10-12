@@ -4,14 +4,15 @@ from lead_interrupt import LEAD_CANCEL_REF, LEAD_PENDING_ANSWER_REF, LEAD_RESUME
 from session import mem_get, session_client_scope
 from tests.test_d2_document_click_task_http import _body
 from tests.test_d2_http_contract import FakeProvider, http_env, post, post_sse
-from tests.test_d2_sim2_dialogues import raw, price
+from tests.test_d2_text_http import reply, price
+from tests.test_d2_text_reply import action
 
 
 @pytest.mark.parametrize('transport', ['json', 'sse'])
 @pytest.mark.parametrize('pause', [False, True])
 def test_cancel_only_at_phone(http_env, transport, pause):
     client, _, use, _ = http_env
-    fake = use(FakeProvider(raw({'kind': 'booking', 'request_id': 'r1', 'age_group': 'adult'})))
+    fake = use(FakeProvider(reply(None, action('start_booking', age_group='adult'))))
     send = post if transport == 'json' else post_sse
     def call(**args):
         response = send(client, **args)
@@ -27,7 +28,7 @@ def test_cancel_only_at_phone(http_env, transport, pause):
         assert mem_get('cp6a')['lead_intent'] == 'collecting_name'
     if pause:
         pending = call(request_id='question', q='Сколько стоит имплантация?')
-        fake.raw = raw(price('classic', 'service'))
+        fake.raw = reply(None, price('classic'))
         args = dict(request_id='answer', q='', ref=LEAD_PENDING_ANSWER_REF, ui_revision=pending['revision'])
         answer = call(**args)
         assert refs(answer) == {LEAD_RESUME_REF}

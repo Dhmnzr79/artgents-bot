@@ -1,4 +1,4 @@
-"""Thin commercial fact identity projection for envelope validation (CP-EXACT-1A)."""
+"""Captured commercial facts for dialogue grounding and identity validation."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ _COMMERCIAL_FACT_CATALOG_HEADER = "=== COMMERCIAL_FACT_CATALOG ==="
 
 @dataclass(frozen=True, slots=True)
 class CommercialFactCatalogSnapshot:
-    """Deterministic fact-identity snapshot for envelope direct_fact_ids validation."""
+    """Deterministic complete fact snapshot, without offers or service catalogs."""
 
     canonical_json: str
     fact_ids: frozenset[str] = field(default_factory=frozenset)
@@ -27,17 +27,7 @@ class CommercialFactCatalogSnapshot:
         cls, exact_catalog: ExactCommercialCatalogSnapshot
     ) -> CommercialFactCatalogSnapshot:
         payload = json.loads(exact_catalog.canonical_json)
-        rows: list[dict[str, object]] = []
-        for row in payload["facts"]:
-            rows.append(
-                {
-                    "fact_id": str(row["fact_id"]),
-                    "kind": str(row["kind"]),
-                    "catalog_label": str(row["catalog_label"]),
-                    "active": bool(row.get("active", True)),
-                }
-            )
-        canonical = {"facts": rows}
+        canonical = {"facts": payload["facts"]}
         canonical_json = json.dumps(canonical, ensure_ascii=False, separators=(",", ":"))
         return cls(
             canonical_json=canonical_json,

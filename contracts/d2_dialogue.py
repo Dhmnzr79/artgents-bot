@@ -60,7 +60,7 @@ class D2ProviderInput:
 
 class D2RawProvider(Protocol):
     def generate(self, request: D2ProviderInput) -> str:
-        """Return raw production D1R JSON text, never a parsed envelope."""
+        """Return one ordinary text response with optional metadata tail."""
         ...
 
 

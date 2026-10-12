@@ -23,13 +23,13 @@ from contracts.d2_session_context import (
 from contracts.response_plan import D2PriceDetailUiAction, D2PriceSelectUiAction, SessionKey
 from contracts.d2_dialogue_result import (
     DiscussionScope, DiscussionVolume, D2DialogueResult, PriceOperation, ExplanationOperation, DetailOperation,
-    ContactOperation, D2RejectedOperation, D2ParsedDialogueResult,
+    ContactOperation, D2RejectedOperation, D2ParsedDialogueResult, parse_d2_text_reply,
     ClarifiedOperation, D2ExplanationTask,
     ServiceTarget, TopicTarget, UnresolvedTarget, ScopedOperation, OffTopicOperation,
 )
 from contracts.response_plan import (
-    D2ExactTextBlock, D2ResolvedRequestPart, D2PartDeferredBlock, D2PartFailureBlock, D2SourceResult,
-    D2_CLARIFICATION_DEFERRAL_TEXT, D2_OPERATION_FAILURE_TEXT,
+    D2ExactTextBlock, D2ResolvedRequestPart, D2PartFailureBlock, D2SourceResult,
+    D2_OPERATION_FAILURE_TEXT,
 )
 from contracts.response_plan_materialization import D2SelectedDocumentAction
 from contracts.response_plan_session import (
@@ -66,9 +66,6 @@ from core.d2_spam_gate import build_d2_spam_gate_response, is_d2_garbage_message
 from core.d2_contacts_cta import build_d2_contact_fact_block, D2ContactReferenceError
 from core.d2_offtopic import build_d2_offtopic_response
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
-from core.one_call_envelope_protocol import (
-    parse_production_envelope_json,
-)
 from core.response_plan_materialization import resolve_d2_operations
 from core.user_text_privacy import provider_message_has_substance, provider_safe_user_text
 from core.clinic_policy_resolver import resolve_clinic_policy_operations
@@ -680,9 +677,8 @@ def _run_reserved_d2_dialogue_turn(
             raise ValueError("d2_ui_service_task_missing")
         if selected_service_id not in view.active_service_catalog.active_service_ids:
             raise ValueError("d2_ui_service_selection_mismatch")
-        # A verified click executes the saved kind with the selected service.
-        task_type = D2ExplanationTask if pending.kind == "content" else D2DialogueResult
-        known_task = task_type.model_validate({"outcome": "dialogue", "blocks": [{
+        # A verified click executes the saved price with the selected service.
+        known_task = D2DialogueResult.model_validate({"outcome": "dialogue", "blocks": [{
             **pending.model_dump(exclude={"clarification"}),
             "target": {"type": "service", "id": selected_service_id},
         }]})
@@ -735,11 +731,9 @@ def _run_reserved_d2_dialogue_turn(
         raw = provider.generate(provider_input)
         full_audit("raw_model_response", raw=raw)
         diagnostics.stage("parse")
-        result = parse_production_envelope_json(
-            raw, active_service_catalog=view.active_service_catalog,
-            service_reference_catalog=view.service_reference_catalog,
-            commercial_fact_catalog=view.commercial_fact_catalog,
-            known_task=known_task, d2_contract=True,
+        result = parse_d2_text_reply(
+            raw, active_service_ids=view.active_service_catalog.active_service_ids,
+            known_task=known_task,
         )
     full_audit("parsed_result", result=result)
     commit_args = dict(
@@ -770,7 +764,6 @@ def _run_reserved_d2_dialogue_turn(
 
     operations, contact_blocks, policy_blocks = [], [], []
     exact_text, exact_parts, extra_ui, deferred = [], [], [], []
-    exact_deferred = []
     exact_failures = []
 
     def reject_part(block):
@@ -808,16 +801,9 @@ def _run_reserved_d2_dialogue_turn(
             continue
         clarification = getattr(block, "clarification", None)
         if clarification is not None:
-            # For price, only unresolved service/term tasks reach this branch.
-            # Content keeps its agreed parameter clarifications.
+            # Only unresolved price service/term tasks reach this branch.
             if pending is not None:
-                if is_price:
-                    deferred.append(block)
-                else:
-                    exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
-                        kind="clarification", status="deferred", scope="clinic"))
-                    exact_deferred.append(D2PartDeferredBlock(request_id=block.request_id,
-                        source_client_id=session_key.client_id, display_text=D2_CLARIFICATION_DEFERRAL_TEXT))
+                deferred.append(block)
                 continue
             pending = block
             answer = build_d2_focus_clarify_response(
@@ -827,7 +813,7 @@ def _run_reserved_d2_dialogue_turn(
             exact_text.append(D2ExactTextBlock(request_id=block.request_id,
                 source_client_id=session_key.client_id, display_text=answer.rendered_text))
             exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
-                kind="price_clarification" if is_price else "clarification", status="answered", scope="clinic"))
+                kind="price_clarification", status="answered", scope="clinic"))
             extra_ui.extend(answer.resolved.ui_plan.quick_replies)
             continue
         if isinstance(block, ContactOperation):
@@ -929,12 +915,13 @@ def _run_reserved_d2_dialogue_turn(
         if b.kind != "booking" or isinstance(b, D2RejectedOperation))
     response = resolve_d2_operations(
         tuple(operations), sources, as_of=now.date(),
+        source_claims=getattr(result, "source_claims", None),
         common_route_content_lookup=bool(operations) and all(isinstance(p, ExplanationOperation) for p in operations),
         exact_contact_blocks=tuple(contact_blocks), exact_policy_blocks=tuple(policy_blocks),
         exact_contact_button=contact_button, exact_canonical_contact=canonical_contact,
         exact_text_blocks=tuple(exact_text), exact_parts=tuple(exact_parts),
         extra_ui=tuple(extra_ui), deferred_price_parts=tuple(deferred),
-        exact_deferred_blocks=tuple(exact_deferred), exact_failure_blocks=tuple(exact_failures),
+        exact_failure_blocks=tuple(exact_failures),
         d2_request_order=render_order,
         shown_price_offer_refs=context.ordinary.d2_shown_price_offer_refs,
         selected_price_detail_action=selected_price_detail_action,

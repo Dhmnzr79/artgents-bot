@@ -309,7 +309,7 @@ def resolve_d2_operations(
     promotion_scope="none", requested_fact_ids=(), legacy_patient_text=None,
     exact_text_blocks=(), exact_parts=(), extra_ui=(), deferred_price_parts=(),
     exact_deferred_blocks=(), exact_failure_blocks=(),
-    suppress_forbidden_booking_cta=False,
+    suppress_forbidden_booking_cta=False, source_claims=None,
 ):
     """Resolve already-decided operations; never reconstruct a semantic envelope."""
     client_id = sources.material_authority.source_client_id
@@ -322,6 +322,11 @@ def resolve_d2_operations(
         for service_id, service in sources.material_authority.bundle.services.items()
         if service.content_ref in sources.d2_content_topics_by_ref
     }
+    mixed_source_scope = False
+    if source_claims is not None:
+        operations, mixed_source_scope = _d2_bind_source_claims(
+            operations, source_claims, client_id=client_id, sources=sources,
+        )
     price_parts = tuple(item for item in operations if item.kind == "price")
     content_parts = tuple(item for item in operations if item.kind == "content")
     detail_parts = tuple(item for item in operations if item.kind == "price_detail")
@@ -330,9 +335,10 @@ def resolve_d2_operations(
 
     # Keep the existing marketing policy for multi-part answers. Source UI
     # below uses verified documents, not the number of content operations.
-    multiple_content_parts = len(content_parts) > 1
+    content_part_count = (max(1, len(source_claims)) if source_claims is not None else len(content_parts))
+    multiple_content_parts = content_part_count > 1
     ready_comparison = (
-        len(content_parts) == 1
+        content_part_count == 1
         and content_parts[0].content_ref is not None
         and content_parts[0].content_ref.startswith("comparison__")
     )
@@ -371,6 +377,10 @@ def resolve_d2_operations(
         sources=sources,
         code_owned_null_content=code_owned_null_content,
     )
+    if mixed_source_scope:
+        # A single publication does not turn several subjects into the first one.
+        for part in content_parts:
+            content_scopes_by_id[part.request_id] = None
     content_blocks_by_id = {block.request_id: block for block in information_blocks}
 
     price_block: D2FrozenPriceBlock | None = None
@@ -1522,6 +1532,53 @@ def _d2_requested_fact_candidates(
     return tuple(candidates)
 
 
+def _d2_verified_content_claim(part, *, client_id, sources):
+    """Verify optional provenance, without reading or deciding answer text."""
+    authority = next((a for a in sources.d2_authored_content if a.content_ref == part.content_ref), None)
+    if authority is not None and authority.source_client_id != client_id:
+        raise MaterializationOwnershipError("materialization_foreign_material")
+    scope = _d2_typed_content_scope_from_part(part, client_id=client_id, sources=sources)
+    if scope is None or authority is None:
+        return scope, None, ()
+    if any(ref not in {s.section_ref for s in authority.sections} for ref in part.content_section_refs):
+        return scope, None, ()
+    if part.service_id is not None and part.service_id not in authority.allowed_service_ids:
+        return scope, None, ()
+    if part.topic_id is not None and authority.allowed_service_ids:
+        topics = {d.topic_id for d in sources.d2_directions if d.source_client_id == client_id
+                  and set(authority.allowed_service_ids).intersection(d.service_ids)}
+        if topics and part.topic_id not in topics:
+            return scope, None, ()
+    source_topic = sources.d2_content_topics_by_ref.get(authority.content_ref)
+    if part.topic_id is not None and source_topic is not None and part.topic_id != source_topic:
+        return scope, None, ()
+    service_ids, _, topic = scope
+    if service_ids and authority.allowed_service_ids and not set(service_ids).intersection(authority.allowed_service_ids):
+        return scope, None, ()
+    if (part.service_id is not None and part.service_id not in service_ids) or (part.topic_id is not None and part.topic_id != topic):
+        return None, None, ()
+    return scope, authority.content_ref, part.content_section_refs
+
+
+def _d2_bind_source_claims(operations, claims, *, client_id, sources):
+    """One prose publication, common verified provenance, original slot count elsewhere."""
+    if not claims:
+        return operations, False
+    checked = [_d2_verified_content_claim(c, client_id=client_id, sources=sources) for c in claims]
+    first = claims[0]
+    common_scope = checked[0][0] is not None and all(
+        check[0] == checked[0][0] and (c.target, c.volume, c.brand_id) == (first.target, first.volume, first.brand_id)
+        for c, check in zip(claims, checked)
+    )
+    common_ref = checked[0][1] if all(c[1] == checked[0][1] for c in checked) else None
+    sections = tuple(dict.fromkeys(ref for c in checked for ref in c[2])) if common_ref else ()
+    update = dict(content_ref=common_ref, content_section_refs=sections,
+                  target=first.target if common_scope else None,
+                  volume=first.volume if common_scope else None,
+                  brand_id=first.brand_id if common_scope else None)
+    return tuple(p.model_copy(update=update) if p.kind == "content" else p for p in operations), not common_scope
+
+
 def _d2_information_blocks(
     *,
     content_parts: tuple[RequestUnderstandingRequest, ...],
@@ -1532,7 +1589,6 @@ def _d2_information_blocks(
     tuple[InformationSourceBlock, ...], dict[str, D2ContentRealization],
     dict[str, tuple[tuple[str, ...], str, str | None] | None],
 ]:
-    by_ref = {item.content_ref: item for item in sources.d2_authored_content}
     blocks: list[InformationSourceBlock] = []
     realizations: dict[str, D2ContentRealization] = {}
     scopes: dict[str, tuple[tuple[str, ...], str, str | None] | None] = {}
@@ -1560,95 +1616,17 @@ def _d2_information_blocks(
             )
 
     for part in content_parts:
-        authority = by_ref.get(part.content_ref)
-        if authority is not None and authority.source_client_id != client_id:
-            raise MaterializationOwnershipError("materialization_foreign_material")
-        verified_scope = _d2_typed_content_scope_from_part(
+        verified_scope, verified_ref, _ = _d2_verified_content_claim(
             part, client_id=client_id, sources=sources,
         )
         scopes[part.request_id] = verified_scope
-        if verified_scope is None:
-            unverified_source(part)
-            continue
-        if part.content_ref is None:
-            if code_owned_null_content:
+        if verified_scope is None or verified_ref is None:
+            if part.content_ref is None and verified_scope is not None and code_owned_null_content:
                 realizations[part.request_id] = D2ContentRealization(
-                    outcome="answered",
-                    publication=None,
-                    display_text=None,
-                    section_refs=(),
-                )
-            elif not (part.content_text or "").strip():
-                # No prose and no optional provenance is still a real gap.
-                realizations[part.request_id] = D2ContentRealization(
-                    outcome="unavailable",
-                    publication=None,
-                    display_text=None,
-                    section_refs=(),
-                    reason="d2_content_source_missing",
+                    outcome="answered", publication=None, display_text=None, section_refs=(),
                 )
             else:
-                realization = realize_d2_unattributed_content(part)
-                realizations[part.request_id] = realization
-                if realization.outcome != "unavailable":
-                    assert realization.display_text is not None
-                    blocks.append(InformationSourceBlock(
-                        request_id=part.request_id,
-                        source_client_id=client_id,
-                        content_ref=None,
-                        display_text=realization.display_text,
-                        source_section_refs=(),
-                        publication="model_prose",
-                        snapshot_fingerprint=sources.d2_snapshot_fingerprint,
-                        replacement_reason=None,
-                    ))
-            continue
-        if authority is None:
-            # A name absent from this snapshot does not prove foreign ownership.
-            unverified_source(part)
-            continue
-        section_by_ref = {section.section_ref: section for section in authority.sections}
-        if any(ref not in section_by_ref for ref in part.content_section_refs):
-            unverified_source(part)
-            continue
-        if part.service_id is not None and part.service_id not in authority.allowed_service_ids:
-            unverified_source(part)
-            continue
-        if part.topic_id is not None and authority.allowed_service_ids:
-            content_topics = {
-                item.topic_id
-                for item in sources.d2_directions
-                if item.source_client_id == client_id
-                and set(authority.allowed_service_ids).intersection(item.service_ids)
-            }
-            if content_topics and part.topic_id not in content_topics:
                 unverified_source(part)
-                continue
-        source_topic = sources.d2_content_topics_by_ref.get(authority.content_ref)
-        if part.topic_id is not None and source_topic is not None and part.topic_id != source_topic:
-            unverified_source(part)
-            continue
-        part_service_ids, _, part_topic_id = verified_scope
-        if part_service_ids and authority.allowed_service_ids and not set(part_service_ids).intersection(authority.allowed_service_ids):
-            unverified_source(part)
-            continue
-        if part.service_id is not None and part.service_id not in part_service_ids:
-            realizations[part.request_id] = D2ContentRealization(
-                outcome="unavailable",
-                publication=None,
-                display_text=None,
-                section_refs=(),
-                reason="d2_content_source_missing",
-            )
-            continue
-        if part.topic_id is not None and part.topic_id != part_topic_id:
-            realizations[part.request_id] = D2ContentRealization(
-                outcome="unavailable",
-                publication=None,
-                display_text=None,
-                section_refs=(),
-                reason="d2_content_source_missing",
-            )
             continue
         realization = realize_d2_content(part)
         realizations[part.request_id] = realization
@@ -1660,7 +1638,7 @@ def _d2_information_blocks(
             InformationSourceBlock(
                 request_id=part.request_id,
                 source_client_id=client_id,
-                content_ref=authority.content_ref,
+                content_ref=verified_ref,
                 display_text=realization.display_text,
                 source_section_refs=realization.section_refs,
                 publication=realization.publication,

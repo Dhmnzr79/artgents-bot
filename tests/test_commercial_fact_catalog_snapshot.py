@@ -9,20 +9,8 @@ from core.response_schema_loader import load_response_schema_bundle
 
 _DEMO_ROOT = Path("clients/demo/target_response")
 _NIKADENT_ROOT = Path("clients/nikadent/target_response")
-_ROW_KEYS = frozenset({"fact_id", "kind", "catalog_label", "active"})
-_FORBIDDEN_ROW_KEYS = frozenset(
-    {
-        "text_fact",
-        "active_from",
-        "active_until",
-        "allowed_service_ids",
-        "allowed_topics",
-        "detail_ref",
-        "incompatible_with",
-        "aliases",
-        "render_mode",
-    }
-)
+_ROW_KEYS = frozenset({"fact_id", "kind", "catalog_label", "active", "text_fact", "render_mode", "allowed_service_ids", "allowed_topics", "incompatible_with", "excluded_service_ids"})
+_OPTIONAL_KEYS = ("active_from", "active_until", "detail_ref", "microfact_text", "excluded_scope_text", "requested_display_policy")
 
 
 def _demo_bundle():
@@ -31,14 +19,6 @@ def _demo_bundle():
 
 def _nikadent_bundle():
     return load_response_schema_bundle(_NIKADENT_ROOT)
-
-
-def _parsed_catalog_keys(canonical_json: str) -> set[str]:
-    payload = json.loads(canonical_json)
-    keys = set(payload.keys())
-    for row in payload["facts"]:
-        keys.update(row.keys())
-    return keys
 
 
 def test_snapshot_is_deterministic_for_demo() -> None:
@@ -61,7 +41,8 @@ def test_row_key_closure_is_exact() -> None:
     snapshot = CommercialFactCatalogSnapshot.from_bundle(_demo_bundle())
     payload = json.loads(snapshot.canonical_json)
     for row in payload["facts"]:
-        assert set(row.keys()) == _ROW_KEYS
+        fact = _demo_bundle().facts[row["fact_id"]]
+        assert set(row.keys()) == _ROW_KEYS | {key for key in _OPTIONAL_KEYS if getattr(fact, key) is not None}
 
 
 def test_fact_and_active_id_sets_match_bundle() -> None:
@@ -95,19 +76,23 @@ def test_block_text_uses_exact_header() -> None:
     assert snapshot.block_text().startswith("=== COMMERCIAL_FACT_CATALOG ===\n")
 
 
-def test_canonical_json_contains_no_mutable_fact_fields() -> None:
+def test_full_values_are_preserved_without_offer_or_service_rows() -> None:
+    bundle = _demo_bundle()
+    payload = json.loads(CommercialFactCatalogSnapshot.from_bundle(bundle).canonical_json)
+    assert set(payload) == {"facts"}
+    for row in payload["facts"]:
+        fact = bundle.facts[row["fact_id"]]
+        expected = fact.model_dump(mode="json", exclude_none=True)
+        expected["fact_id"] = expected.pop("id")
+        for key in ("allowed_service_ids", "allowed_topics", "incompatible_with", "excluded_service_ids"):
+            expected[key] = sorted(expected[key])
+        assert row == expected
+
+
+def test_captured_text_does_not_follow_later_bundle_mutation() -> None:
     bundle = _demo_bundle()
     snapshot = CommercialFactCatalogSnapshot.from_bundle(bundle)
-    parsed_keys = _parsed_catalog_keys(snapshot.canonical_json)
-    assert parsed_keys.isdisjoint(_FORBIDDEN_ROW_KEYS)
-    for fact in bundle.facts.values():
-        assert str(fact.text_fact) not in snapshot.canonical_json
-
-
-def test_forbidden_catalog_row_keys_are_detected_structurally() -> None:
-    snapshot = CommercialFactCatalogSnapshot.from_bundle(_demo_bundle())
-    payload = json.loads(snapshot.canonical_json)
-    payload["facts"][0]["text_fact"] = "Injected mutable value."
-    polluted_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-    polluted_keys = _parsed_catalog_keys(polluted_json)
-    assert not polluted_keys.isdisjoint(_FORBIDDEN_ROW_KEYS)
+    original = snapshot.canonical_json
+    bundle.facts["free_implant_consult"].text_fact = "Changed after capture."
+    assert snapshot.canonical_json == original
+    assert CommercialFactCatalogSnapshot.from_bundle(bundle).canonical_json != original

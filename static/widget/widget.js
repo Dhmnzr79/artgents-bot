@@ -158,31 +158,30 @@ function fillHeaderStatus(el, config) {
 }
 
 
-/** @param {unknown} meta */
-function leadMetaPhoneStep(meta) {
-  return Boolean(
-    meta && typeof meta === "object" && meta.lead_flow && meta.lead_step === "phone"
-  );
-}
-
 /** @param {unknown} payload */
 function isActiveLeadFlowPayload(payload) {
   return Array.isArray(payload?.ui?.quick_replies) &&
     payload.ui.quick_replies.some((item) => String(item?.reply_id || "").startsWith("lead:"));
 }
 
-/** 10 цифр после «7» (пользователь может ввести 9… или 8… или уже +7…) */
-function extractNational10Digits(raw) {
-  let d = String(raw || "").replace(/\D/g, "");
-  if (!d.length) return "";
-  if (d.startsWith("8")) d = "7" + d.slice(1);
-  if (d.startsWith("7")) return d.slice(1, 11);
-  return d.slice(0, 10);
+/** Phone-shaped input only; ordinary questions stay available during intake. */
+function isPhoneInput(raw) {
+  return Boolean(String(raw || "").trim()) && /^[\d+()\s-]+$/.test(String(raw || ""));
 }
 
-/** Отображение: +7(000) 000-00-00 */
-function formatRuMobileDisplay(nationalUpTo10) {
-  const n = nationalUpTo10.replace(/\D/g, "").slice(0, 10);
+function extractNational10Digits(raw) {
+  const value = String(raw || "").trim();
+  const digits = value.replace(/\D/g, "");
+  if (value.startsWith("+7") || ((digits.length < 10 || digits.length === 11) && /^[78]/.test(digits))) {
+    return digits.slice(1);
+  }
+  return digits;
+}
+
+/** Display: +7(999) 999-99-99. Never discard excess digits. */
+function formatRuMobileDisplay(national) {
+  const n = national.replace(/\D/g, "");
+  if (n.length > 10) return n;
   if (!n.length) return "+7";
   let s = "+7(" + n.slice(0, 3);
   if (n.length <= 3) return s;
@@ -190,14 +189,15 @@ function formatRuMobileDisplay(nationalUpTo10) {
   if (n.length <= 6) return s;
   s += "-" + n.slice(6, 8);
   if (n.length <= 8) return s;
-  s += "-" + n.slice(8, 10);
-  return s;
+  return s + "-" + n.slice(8, 10);
 }
 
 function ruPhoneToBackendE164(inputVal) {
-  const n = extractNational10Digits(inputVal);
-  if (n.length !== 10) return "";
-  return "+7" + n;
+  if (!isPhoneInput(inputVal)) return "";
+  const value = String(inputVal).trim();
+  if (value.startsWith("+") && !value.startsWith("+7")) return "";
+  const n = extractNational10Digits(value);
+  return n.length === 10 ? "+7" + n : "";
 }
 
 /**
@@ -2139,7 +2139,7 @@ export function mountWidget(root, config) {
     let q = raw;
     let userBubbleText = q;
 
-    if (isLeadPhoneStep()) {
+    if (isLeadPhoneStep() && isPhoneInput(raw)) {
       const backend = ruPhoneToBackendE164(input.value);
       if (backend.length !== 12) return;
       q = backend;
@@ -2176,24 +2176,39 @@ export function mountWidget(root, config) {
   }
 
   function isLeadPhoneStep() {
-    const m = state.lastPayload?.meta;
-    return leadMetaPhoneStep(m);
+    return state.lastPayload?.ui?.composer_input_mode === "phone";
   }
 
   function syncComposerLeadUi() {
     const phone = isLeadPhoneStep();
-    input.inputMode = phone ? "numeric" : "text";
+    input.inputMode = phone ? "tel" : "text";
     input.classList.toggle("clinic-shell__textarea--phone", phone);
-    input.placeholder = phone ? "+7(900) 000-00-00" : "Введите сообщение";
+    input.placeholder = phone ? "+7(999) 999-99-99" : "Введите сообщение";
   }
 
-  function onComposerInput() {
-    if (isLeadPhoneStep()) {
+  function onComposerInput(event) {
+    // Leave deletions natural, including clearing the prefix and separators.
+    if (isLeadPhoneStep() && isPhoneInput(input.value) &&
+        !String(event?.inputType || "").startsWith("delete")) {
       const nat = extractNational10Digits(input.value);
-      const next = formatRuMobileDisplay(nat);
-      if (next !== input.value) {
-        input.value = next;
-        input.selectionStart = input.selectionEnd = next.length;
+      const foreignPrefix = input.value.trim().startsWith("+") && !input.value.trim().startsWith("+7");
+      if (nat.length <= 10 && !foreignPrefix) {
+        const old = input.value;
+        const caret = input.selectionStart;
+        const digitsBefore = old.slice(0, caret).replace(/\D/g, "").length;
+        const next = formatRuMobileDisplay(nat);
+        if (next !== old) {
+          input.value = next;
+          const prefixAdded = !old.trim().startsWith("+7") && old.replace(/\D/g, "").length !== 11;
+          const wanted = digitsBefore + (prefixAdded ? 1 : 0);
+          let seen = 0;
+          let pos = 0;
+          while (pos < next.length && seen < wanted) {
+            if (/\d/.test(next[pos])) seen++;
+            pos++;
+          }
+          input.selectionStart = input.selectionEnd = caret === old.length ? next.length : pos;
+        }
       }
     }
     autoResizeTextarea(input);
@@ -2205,8 +2220,8 @@ export function mountWidget(root, config) {
       sendBtn.disabled = true;
       return;
     }
-    if (isLeadPhoneStep()) {
-      sendBtn.disabled = extractNational10Digits(input.value).length !== 10;
+    if (isLeadPhoneStep() && isPhoneInput(input.value)) {
+      sendBtn.disabled = !ruPhoneToBackendE164(input.value);
       return;
     }
     sendBtn.disabled = !input.value.trim();

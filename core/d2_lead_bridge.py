@@ -462,12 +462,17 @@ def _phone_prompt_response(
         or "Оставьте, пожалуйста, номер телефона — администратор свяжется с вами, "
         "чтобы подтвердить запись."
     )
-    return _plain_answer(
+    response = _plain_answer(
         snapshot,
         session_key=session_key,
         text=text,
         quick=_lead_slot_quick_replies(snapshot.client_id),
     )
+
+
+    return replace(response, ui_projection=response.ui_projection.model_copy(
+        update={"composer_input_mode": "phone"},
+    ))
 
 
 def _plain_answer(

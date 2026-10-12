@@ -1495,3 +1495,10 @@ package effect, not pure JSON causality. Candidate execution/card/auth/lead rema
 through current roadmap before runtime edits.
 
 Уточнение UI и текстов владельца после §45: три непустых раздела («Что входит», «Как оплачивается лечение», «Гарантия и преимущества»), выделенная главная акция из настроек клиники; остальные факты — в назначенных местах без рекламных дублей. Один факт с заголовком, краткой и полной формами; цельный текст каждого блока. Проверка всех Demo-формулировок обязательна. Подробности — Interface§45.3. Визуал пока не реализован.
+
+
+2026-10-13 owner GO: Interface §59 fixes RF booking phone mask after accepted visual checkpoint58a9e42. Lead owner supplies frozen presentation mode; remove obsolete widget meta dependency, preserve questions and reject excess digits without truncation. No semantic/dialogue change or provider calls. Content cleanup and other deferred work remain deferred. Verification/Checker in §59; commit/push pending.
+
+§59 scoped independent Checker PASS; offline transitions/replay and actual-widget JS/browser mask verified. Old pause-price fixture failures reproduced on58a9e42. No provider/SMTP calls; no commit/push yet.
+
+2026-10-13: owner explicitly authorizes commit/push of the seven-path phone-mask checkpoint. Existing verification and focused Astra recheck PASS retained; no additional runtime edits or provider calls. Foreign MD/prototypes remain excluded. Commit title: Fix RF phone mask in booking widget.

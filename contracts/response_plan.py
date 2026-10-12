@@ -1841,6 +1841,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
 
 
 class ResponseUIProjection(ResponsePlanModel):
+    composer_input_mode: Literal["text", "phone"] = "text"
     quick_replies: tuple[UiQuickReplyCandidate, ...] = ()
     buttons: tuple[UiButtonCandidate, ...] = ()
     widget: UiWidgetCandidate | None = None

@@ -60,8 +60,8 @@ def test_demo_doctors_use_md_without_parallel_catalog():
         text = profile.read_text(encoding="utf-8")
         assert "{#korotko}" in text
         assert len(text) > 200
-    # Known independent contact duplication is not removed to make this stage green.
-    assert validate_client_pack(_DEMO) == ["md/clinic__info__contacts.md: duplicate_contact_facts_forbidden"]
+    # Canonical contact facts live in clinic_policies.yaml; the contacts MD has no duplicates.
+    assert validate_client_pack(_DEMO) == []
 
 
 @pytest.mark.parametrize("reference", ["doctor:doctors__doctor__ghost", "kb:doctors__doctor__missing.md#korotko"])

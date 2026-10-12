@@ -7,7 +7,7 @@ from tests.d2_ci_http import FakeProvider, completed_context, http_env, send
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
-@pytest.mark.parametrize("query", ["Да", "Ок", "А", "Сколько **стоит** КТ?"])
+@pytest.mark.parametrize("query", ["Да", "Ок", "А", "Сколько **стоит** КТ?", "2", "3", "35", "123", "2-3", "2–3"])
 def test_short_and_formatted_turn_reaches_provider_without_reclassification(http_env, transport, query):
     client, db, use, _ = http_env
     fake = use(FakeProvider("Могу рассказать о технологиях клиники."))
@@ -43,3 +43,22 @@ def test_punctuation_email_is_masked_in_input_and_assistant_history(http_env, tr
     send(client, transport, sid="input-boundary", request_id="continue", q="Расскажите")
     pair = fake.inputs[-1].context.ordinary.dialogue_pairs[-1]
     assert email not in pair.assistant_text and email not in pair.patient_text
+
+
+@pytest.mark.parametrize("raw", ["1234", "+7 (999) 123-45-67", "person@example.com", "...", "👍"])
+def test_numeric_allowance_preserves_privacy_and_noise(raw):
+    from core.user_text_privacy import provider_safe_user_text, provider_message_has_substance
+    from core.lead_provider_input_privacy import prepare_lead_pending_provider_question
+    assert not provider_message_has_substance(provider_safe_user_text(raw), raw_source=raw)
+    assert prepare_lead_pending_provider_question(raw) is None
+
+
+def test_numeric_raw_source_cannot_be_a_stripped_contact():
+    from core.user_text_privacy import provider_message_has_substance
+    from core.lead_provider_input_privacy import prepare_lead_pending_provider_question
+    from core.d2_spam_gate import is_d2_garbage_message
+    assert not provider_message_has_substance("2", raw_source="+7 (999) 123-45-67")
+    assert not provider_message_has_substance("2", raw_source="person@example.com 2")
+    assert prepare_lead_pending_provider_question("2-3") == "2-3"
+    assert is_d2_garbage_message("...")
+    assert is_d2_garbage_message("qwerty")

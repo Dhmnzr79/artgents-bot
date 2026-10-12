@@ -143,6 +143,11 @@ def _contains_leaked_phone_digits(cleaned: str, raw: str) -> bool:
     return False
 
 
+def is_short_numeric_reply(text: str) -> bool:
+    """Recognize a short number/range, without interpreting its dialogue meaning."""
+    return bool(re.fullmatch(r"[0-9]{1,3}(?:\s*[-–—]\s*[0-9]{1,3})?", text.strip()))
+
+
 def provider_message_has_substance(
     text: str,
     *,
@@ -153,6 +158,8 @@ def provider_message_has_substance(
     s = _normalize_spaces(text)
     if not s:
         return False
+    if is_short_numeric_reply(s) and (raw_source is None or is_short_numeric_reply(raw_source)):
+        return True
     if re.fullmatch(r"[\d+\s().\-]+", s):
         return False
     stripped = _PLACEHOLDER_RX.sub(" ", s)

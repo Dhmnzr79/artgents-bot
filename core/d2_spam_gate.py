@@ -28,6 +28,7 @@ from contracts.response_plan_materialization import (
 )
 from contracts.response_plan_post_composer import ResponseSituationDelta
 from core.local_problem_gate import decide_local_problem_gate
+from core.user_text_privacy import is_short_numeric_reply
 from core.response_plan_resolver import resolve_response_plan
 from core.response_text_renderer import render_response_text
 from core.response_ui_projection import project_response_ui
@@ -84,6 +85,8 @@ def is_d2_garbage_message(text: str) -> bool:
         return True
     # Contact-only / privacy-stripped inputs stay on the privacy fail path, not spam.
     if _looks_like_contact_only(raw):
+        return False
+    if is_short_numeric_reply(raw):
         return False
     if len(raw) <= 2 and not any(ch.isalpha() for ch in raw):
         return True

@@ -5008,3 +5008,16 @@ provider/network/SMTP запрещены проверяющему. Вердик�
 Локальный виджет перезапущен штатным scripts/start_local_widget.ps1 2026-10-12.
 Startup подтвердил deepseek-flash, single_model=true, prompt_contract46;
 health/live отвечает200. Это локальный запуск, не deploy и не ручная приёмка виджета.
+
+
+## 57. Demo budget and short numeric input — owner GO 2026-10-12
+
+Bug fix/input allowance and demo configuration, not architecture simplification. Owner authorizes 30 billable calls per session and short numeric replies; other technical work deferred, price-card appearance next. Baseline 50be797, branch codex/model-price-experiment, root C:/Cursor Projects/artgents-bot-active, origin/main and merge-base efa3f77. Foreign 14 EOL-only MD and prototypes preserved.
+
+Allowlist: core/d2_demo_limits.py; core/d2_spam_gate.py; core/user_text_privacy.py; tests/test_d2_input_boundary.py; tests/test_d2_demo_session_budget.py (new); this document; DEMO_D2_DELIVERY_ROADMAP.md. Accept short ASCII integers (1–3 digits) and ranges of such integers as ordinary text. No semantic interpretation; model owns meaning. Shared lexical predicate, raw-source check prevents admitting stripped phone fragments. Existing contact masking/lead processing remain. Daily/IP quotas unchanged; price uses two calls. Offline JSON/SSE history/replay, contact/noise negatives, quota concurrency/boundary. No live calls required.
+
+Allowlist extension before staging: tests/test_user_text_privacy_contract_offline.py. Replace obsolete rejection of 123 with 1234; approved short integer acceptance is covered on JSON/SSE, contact assertions unchanged. First privacy run:62 PASS/1 obsolete numeric expectation, not labelled baseline failure.
+
+§57 evidence: first targeted input-boundary/native-quota run29 PASS (95.50s), JSON/SSE, real provider wrapper with offline transport, history/replay and atomic quota boundary. Added 123 case afterwards receives focused independent recheck. No live/provider/SMTP calls. Server auto-reload confirmed DeepSeek Flash / prompt46 and health200. Old quota HTTP fixtures using removed envelope are not migrated or declared green; new native transport coverage replaces no assertions in those files. Full CI not run. No model semantics, history limits, daily/IP budgets or lead state changes.
+
+Independent Astra Checker PASS scoped §57:72 PASS (privacy63, numeric123 JSON/SSE2, guards6, quota windows1); 95 distinct cases across executor/checker. Initial checker temp-directory permission errors resolved by writable scratch, no runtime failure. Exact8 staged files, diff check clean, foreign WIP preserved. No live calls. Owner can verify numeric continuation in widget; next priority remains price-card visual work, Cursor §56 pending.

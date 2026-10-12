@@ -44,7 +44,7 @@ def test_email_sentence_boundary_preserves_punctuation(email, suffix):
     assert provider_message_has_substance(safe, raw_source=raw)
 
 
-@pytest.mark.parametrize("raw", ["", " ", "**", "?", "123", "+79991234001", "person@example.com.", "a@b", "[email скрыт] [телефон скрыт]"])
+@pytest.mark.parametrize("raw", ["", " ", "**", "?", "1234", "+79991234001", "person@example.com.", "a@b", "[email скрыт] [телефон скрыт]"])
 def test_empty_contact_only_and_unmasked_contact_stay_blocked(raw):
     assert not provider_message_has_substance(provider_safe_user_text(raw), raw_source=raw)
 

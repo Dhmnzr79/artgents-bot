@@ -1,5 +1,40 @@
 # D2 — текущее состояние и куда смотреть
 
+## Актуальная точка — 2026-10-13
+
+Этот раздел — текущий статус. Нижние датированные записи — история checkpoint,
+а не инструкции для возвращения удалённых механизмов.
+
+- Demo развёрнут на VPS: последний подтверждённый GitHub release `8888fdd`, PR #26.
+  CI, Publish image и Deploy production успешно завершены. Повторный SSH-аудит
+  контейнера не выполнялся; реальные production-пользовательские диалоги не заявлены.
+- Рабочая модель по решению владельца — DeepSeek Flash через `CHAT_BASE_URL`;
+  обычный ответ — prose с optional `<D2_META>`, цена — native `show_price`.
+  Дополнительный provider response после инструмента использует фактический
+  результат цены. Strict и отдельный классификатор не выбраны.
+- Canonical контакты — `clinic_policies.yaml -> contact`; исправления `33c1f55`
+  (readiness DeepSeek) и `0a9b1ce` (публичные контакты в обычном контексте) в release.
+  Удалённые JSON-envelope, ordinary price_detail/clarify_content и doctor_catalog
+  не являются требованиями к новому ответу.
+- Native price, code-owned verified clicks и lead/privacy/tenant boundaries
+  сохраняются. Обычные разговорные вопросы не требуют команды состава.
+- Лимиты demo: 30 model calls/session, 400/day. Второй provider call тоже расходует
+  model budget; не путать число пользовательских сообщений и число вызовов.
+- Последний GitHub CI: offline639 PASS, policy85 PASS, PostgreSQL14+6 PASS;
+  publish verify698 PASS. Наборы пересекаются. Полный historical suite не зелёный.
+- Roboto400/500/600, интервалы0, замены14.5→15 сохранены checkpoint `9f8c8f7`
+  и тегом `checkpoint/pre-cleanup-2026-10-13`; перенесены на cleanup baseline
+  `58c1afa`. На VPS эти визуальные изменения ещё не выкладывались.
+- Ветка работ — `codex/docs-tests-cleanup`, от `origin/main=8888fdd`.
+  14 MD были только EOL-only: точные копии сохранены локально в ignored
+  `logs/pre-cleanup-md-eol-20261013/`; tracked WIP устранён. Prototypes удалены
+  по решению владельца. `.env`, logs, БД не публикуются.
+
+Текущая работа: Interface Task §60 / верхний раздел Roadmap. Сначала CI coverage
+и карта чистки, затем миграция полезных тестов и архивирование старых документов.
+KB demo-клиента — следующий отдельный этап. VPS пока не менять; итоговая
+выкладка совместная после проверки. Это не закрытие SIM/REC whole-bot acceptance.
+
 ## Кодовые ответы: bug-fix checkpoint — 2026-10-06
 
 Точка возврата перед правками: 9179cbb (cleanup + три экспериментальных

@@ -1,4 +1,32 @@
 §58: владелец подтвердил визуал и разрешил checkpoint commit/push, затем стоп.
+
+## Текущая очередь — owner GO 2026-10-13: документация и тесты
+
+Эта очередь заменяет исторические «следующие шаги» ниже. Не возвращать удалённую
+архитектуру ради прежних acceptance fixtures. Runtime и client KB не входят.
+Текущий release/status: [CURRENT_STATUS](DEMO_D2_CURRENT_STATUS.md).
+Рабочая карточка: [Interface §60](DEMO_D2_INTERFACE_TASK.md#60-cleanup-checkpoint--2026-10-13).
+
+1. Включить contact model context regression в PR/publish gate и защитить списки
+   workflow-contract tests. Security/PostgreSQL/build/smoke/deploy не ослаблять.
+2. Сверить tests: обязательные инварианты → сохранить/мигрировать; obsolete format
+   assertions → удалить после trace; дубли → удалить при явном equivalent coverage.
+   Красный тест сам по себе не основание удаления. Сравнить с baseline.
+3. Документы: один актуальный вход, архитектура нынешнего D2, запуск/выкладка,
+   CI coverage и статус/остатки. Исторические аудиты/эксперименты — архив;
+   exact duplicates можно удалить. Исправить ссылки перед переносом.
+4. Обновить stale deployment statements в AGENTS/Execution Lock по реальности
+   VPS demo; не вводить вымышленных production пользователей и новых runtime guarantees.
+5. SIM/REC: «выполнено / заменено / отменено / отложено» только с evidence.
+   Не объявлять semantic quality доказанной offline fixtures.
+6. После coherent checkpoint — targeted tests, Checker, exact commit/push.
+   Затем отдельно client KB. Итоговый deploy только после общего завершения;
+   текущий VPS demo остаётся рабочим, новая выкладка этим этапом не разрешена.
+
+Temporary demo gate остаётся ограниченным release coverage, не whole historical PASS.
+Его переход к постоянному набору требует законченной карты полезных проверок;
+не возвращать все прежние suites механически и не оставлять TODO незаметно навсегда.
+
 Итог: цена22px, объём подценой с кубом, активныевкладкисиние400,
 краткий overview безусловий, трипункта при наличии данных, открытаяDemoакция.
 Следующий согласованный фокус после возвращения: чистка базы и уменьшение

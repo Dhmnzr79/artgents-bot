@@ -5076,3 +5076,50 @@ Acceptance: JSON/SSE name→phone→interruption→retry→cancel; replay frozen
 §59 evidence: new JSON/SSE transition/replay tests2 PASS; existing name/phone/cancel cases2 PASS. Old pause-price cases2 FAIL identically on clean archived58a9e42 (d2_invalid_turn, obsolete price-tail fixture); unchanged and not declared fixed. Actual-widget Node suite passes typing with9/8/7 prefixes, paste, incomplete/overflow/foreign prefix, question preservation, deletion/clear, mode transitions and sendFromComposer submission. Independent Astra Checker PASS scoped bug fix: newHTTP2 PASS + Node suite, call path and privacy ownership reviewed, no architecture/whole-bot PASS. Browser offline page uses current widget source and stub transport: pasted8-prefix formats +7(999) 999-99-99, excessive digit remains visible/disabled, textual question remains unchanged/enabled. Screenshot logs/phone-mask-check/browser-mask.png ignored. No real contact submitted; provider/SMTP0. Physical mobile keyboard not certified. Staging empty, HEAD58a9e42; no commit/push for§59 yet.
 
 2026-10-13: owner explicitly authorizes commit/push of the seven-path phone-mask checkpoint. Existing verification and focused Astra recheck PASS retained; no additional runtime edits or provider calls. Foreign MD/prototypes remain excluded. Commit title: Fix RF phone mask in booking widget.
+
+
+## 60. Cleanup checkpoint — 2026-10-13
+
+Owner GO: после сохранения visual checkpoint привести документацию и tests
+к действующему боту; затем отдельно demo KB; совместная итоговая выкладка.
+Baseline58c1afa, branchcodex/docs-tests-cleanup, origin/main/mergebase8888fdd,
+rootC:/Cursor Projects/artgents-bot-active, foreignWIP0 (EOL originals backed up).
+Это CI regression coverage + документационная сверка, не runtime simplification.
+
+Первый allowlist: .github/workflows/ci.yml; .github/workflows/publish-image.yml;
+tests/test_g2_pr_ci_contract.py; tests/test_g3_immutable_image_contract.py;
+docs/README.md; this card; DEMO_D2_CURRENT_STATUS.md; DEMO_D2_DELIVERY_ROADMAP.md.
+
+### Карта чистки — первоначальная инвентаризация
+
+192 файла docs/artifacts и515 test*.py на baseline. Это размер дерева, не число
+устаревших файлов. Не классифицировать автоматически по возрасту/имени.
+
+| Группа | Решение / необходимое доказательство |
+|---|---|
+| docs/README.md | Исправить вход: старые A1–A9 не текущая очередь; current status и roadmap впереди. |
+| CURRENT_ARCHITECTURE.md, ROUTING_MAP.md, FLAGS_AND_STATUS.md, старые A9/S*/hybrid планы | Кандидаты исторического архива; проверить входящие ссылки и вынести ещё действующие гарантии до переноса. CURRENT_ARCHITECTURE сам уже помечен stale. |
+| DEMO_D2_CURRENT_STATUS / DELIVERY_ROADMAP | Новый актуальный верхний статус, нижние receipts исторические; дальнейшее сокращение с сохранением evidence в архиве. |
+| Interface/Experiment/Ledger | Извлечь текущие принятые решения и unresolved debt; исторические tool/JSON/model trials не самостоятельный current contract. |
+| AGENTS / EXECUTION_LOCK | Исправить отрицание VPS deployment, сохранив согласованные protections. Не менять остальной workflow произвольно. |
+| tests/test_d2_contact_model_context.py | Уже актуален: включить PR/publish; JSON/SSE prompt факты, snapshot/tenant/branch binding. |
+| test_d2_demo_limits.py | Мигрировать полезные replay/free-click/session/daily/IP boundaries, снять obsolete10/JSON fixtures; не удалять файл как «просто старый лимит». |
+| test_d2_situation_disabled.py | Сохранить отказ obsolete actions без mutation/provider, PII/history guards; обновить booking fixtures. |
+| test_d2_policy_text_refs.py, test_d2_af1b_contacts_http.py | Перенести ещё не покрытые refusal/text_ref/missing/branch/mixed/replay assertions на actual text/native protocol. Baseline35FAIL22PASS на этих двух suites подтверждён ранее. |
+| test_one_call_stage3b_offline.py | Отделить полезную endpoint-security проверку от helper, требующего удалённый doctor_catalog; не возвращать doctor JSON. |
+| old envelope/selector/price_detail/doctor-catalog-only assertions | Кандидаты удаления после просмотра callers/importers и проверки equivalent current guards. Ни одного удаления только по имени/FAIL. |
+| tenant/privacy/lead/PG/G2–G8 safety | Сохранить покрытие; не восстанавливать legacy payload ради fixture. |
+| docs/evidence/, audits/, artifacts/ | История не выдаёт implementation authority. Архивировать с восстановлением ссылок, не переименовывать старый FAIL в PASS. |
+
+Удаления ещё не выполнены. Карта задаёт последовательность и сохраняемые
+инварианты; не утверждает, что все515 тестов прочитаны или вся архитектура закрыта.
+Первый CI delta: существующий contact regression добавлен в явные gate lists,
+G2/G3 tests требуют его присутствия. Никакие прежние selected tests не исключены.
+
+Первый checkpoint evidence: contact_model_context + G2/G3 contracts60 PASS,
+135 existing datetime deprecation warnings; git diff --check PASS. PR/publish
+selection parity: publish = union current PR jobs + G3 (без exclusions).
+Current docs entry file links PASS. Live/provider/SMTP0, full suites не запускались.
+Историческая карта — inventory/proposal, не выполненное удаление или новая
+architecture acceptance. Checker проверяет этот coherent checkpoint; дальнейшая
+миграция/архивирование отдельными scope после него. VPS/KB unchanged.

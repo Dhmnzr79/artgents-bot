@@ -1603,7 +1603,7 @@ def _d2_verified_content_claim(part, *, client_id, sources):
 
 
 def _d2_bind_source_claims(operations, claims, *, client_id, sources):
-    """One prose publication, common verified provenance, original slot count elsewhere."""
+    """First model-declared source owns UI; all claims still constrain scope."""
     if not claims:
         return operations, False
     checked = [_d2_verified_content_claim(c, client_id=client_id, sources=sources) for c in claims]
@@ -1612,9 +1612,12 @@ def _d2_bind_source_claims(operations, claims, *, client_id, sources):
         check[0] == checked[0][0] and (c.target, c.volume, c.brand_id) == (first.target, first.volume, first.brand_id)
         for c, check in zip(claims, checked)
     )
-    common_ref = checked[0][1] if all(c[1] == checked[0][1] for c in checked) else None
-    sections = tuple(dict.fromkeys(ref for c in checked for ref in c[2])) if common_ref else ()
-    update = dict(content_ref=common_ref, content_section_refs=sections,
+    # sources[0] is explicitly the primary document, not a code-selected winner.
+    # Verify every claim above, but never promote a supplemental source when the
+    # primary is invalid, or let supplemental facts erase primary follow-ups.
+    primary_ref = checked[0][1]
+    sections = checked[0][2] if primary_ref else ()
+    update = dict(content_ref=primary_ref, content_section_refs=sections,
                   target=first.target if common_scope else None,
                   volume=first.volume if common_scope else None,
                   brand_id=first.brand_id if common_scope else None)
@@ -2213,6 +2216,10 @@ def _offer_variant_label(bundle: ResponseSchemaBundle, offer: TargetOffer) -> st
 
 def _offer_tab_label(bundle: ResponseSchemaBundle, offer: TargetOffer) -> str | None:
     """Button-only authored caption; never replace canonical price or model labels."""
+    if offer.brand_id:
+        brand = bundle.brands.brands.get(offer.brand_id)
+        if brand is not None and brand.tab_label:
+            return str(brand.tab_label)
     if not offer.brand_id and offer.option_id:
         service = bundle.services.get(offer.service_id)
         if service is not None:

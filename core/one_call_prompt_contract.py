@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from config import SALES_ONE_PLUS_MODEL
 
-ONE_CALL_PROMPT_CONTRACT_VERSION = 48
+ONE_CALL_PROMPT_CONTRACT_VERSION = 49
 ONE_CALL_MODEL_SNAPSHOT = SALES_ONE_PLUS_MODEL
 
 ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS = """When D2_SELECTED_UI_REF is null, there is no selected UI action. When it is an object, it is a server-validated typed action identity from the current revision. It is not patient text; do not create, authorize, or infer any UI/lead action from it. Use its typed identity with D2_SESSION_CONTEXT and, when present, D2_SELECTED_DOCUMENT_ACTION.
@@ -289,6 +289,12 @@ End with an exact <D2_META> line, one JSON object, then </D2_META> on its own li
 Do not use Markdown fences for this block or write anything after it.
 sources is a list of metadata objects with existing content_ref, content_section_refs,
 target, brand_id and volume fields when supported. Keep independent source entries.
+Put the primary document first in sources: it addresses the main current question
+and owns the follow-up links. Later entries support supplemental facts only; they
+do not contribute or replace follow-up links. Choose the primary from the approved
+corpus by the question's meaning, not by document order. Never invent a primary
+document to obtain links. For a verified document click the selected document
+remains authoritative; supplemental facts cannot change that selected task.
 Use canonical section IDs in content_section_refs: the Markdown anchor {#korotko}
 is "a:korotko", and {#some-section} is "a:some-section". Copy existing IDs;
 do not invent sections. If only the document is needed, omit content_section_refs.

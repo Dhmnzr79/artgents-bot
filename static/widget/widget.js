@@ -2060,7 +2060,7 @@ export function mountWidget(root, config) {
       const paths = {layers:'m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5',
         check:'m5 12 4 4 10-10',clock:'M12 7v5l4 2',info:'M12 11v6M12 7v1',
         gift:'M3 9h18v4H3ZM5 13v8h14v-8M12 9v12M12 9C5 9 5 3 8 3c3 0 4 6 4 6s1-6 4-6c3 0 3 6-4 6Z',
-        chevron:'m9 5 7 7-7 7',extent:'m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3ZM4 7.5l8 4.5 8-4.5M12 12v9'};
+        chevron:'m9 5 7 7-7 7',arrow:'M4 12h16M14 6l6 6-6 6',extent:'m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3ZM4 7.5l8 4.5 8-4.5M12 12v9'};
       const el = document.createElementNS('http://www.w3.org/2000/svg','svg');
       el.setAttribute('viewBox','0 0 24 24'); el.setAttribute('aria-hidden','true');
       el.classList.add('clinic-price-card__icon');
@@ -2166,7 +2166,7 @@ export function mountWidget(root, config) {
         amount.textContent=row.mode==='no_public_price'?row.display_text:row.price_display_text;
         if(row.mode==='no_public_price')amount.classList.add('clinic-price-card__amount--description');
         else if(!overview)amount.classList.add('clinic-price-card__amount--single');item.appendChild(amount);
-        if(overview&&choice){const arrow=svg('chevron');arrow.classList.add('clinic-price-card__row-arrow');item.appendChild(arrow);}
+        if(overview&&choice){const arrow=svg('arrow');arrow.classList.add('clinic-price-card__row-arrow');item.appendChild(arrow);}
         if(row.scope_text){const caption=document.createElement('p');caption.className='clinic-price-card__caption';if(!overview)caption.appendChild(svg('extent'));const scope=document.createElement('span');scope.textContent=row.scope_text;caption.appendChild(scope);item.appendChild(caption);}
         // Overview is a compact preview; full authored conditions stay in detail.
         for(const term of (overview ? [] : [...new Set(row.condition_texts||[])])){

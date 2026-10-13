@@ -7,7 +7,9 @@
 Полная прежняя дорожная карта сохранена в
 [архиве](../archive/checkpoints/DEMO_D2_DELIVERY_ROADMAP.md).
 Состояние — [Current Status](DEMO_D2_CURRENT_STATUS.md),
-ближайший checkpoint — [Interface §62](DEMO_D2_INTERFACE_TASK.md#62-document-section-guidance).
+ближайший checkpoint — [Interface §63](DEMO_D2_INTERFACE_TASK.md#63-primary-document-owns-follow-up--owner-go-2026-10-14).
+Owner GO 2026-10-14: основной документ задаёт follow-up; дополнительные источники
+не подмешивают и не обнуляют ссылки. Это узкий bug fix поверх текущего UI WIP.
 
 ## Уже выполнено
 

@@ -546,3 +546,37 @@ actualnatural-languagecompliance still ownerwidget review, not certified.
 rotation contention onexecutor (botopen) and datetimewarnings, no assertionfailures
 or loggingchanges. Exact5paths/diffcheckPASS, stagingempty/foreignWIP0before save;
 provider/live0; sharedguidance delivery established, modelcompliance notcertified.
+
+
+## 63. Primary document owns follow-up — owner GO 2026-10-14
+
+Bug fix: supplemental document currently erases the shared content_ref, losing
+both first-visit follow-ups. Owner agreed for all themes: sources[0] is the
+model-declared primary; subsequent entries supply facts only. Sole free-question
+primary decision owner is the model. Code validates and executes that order;
+known document clicks keep the server-authorized source. No new field/call/state.
+
+Baseline: C:/Cursor Projects/artgents-bot-active, codex/docs-tests-cleanup,
+HEAD1653489; origin/main and mergebase8888fdd. Foreign WIP: compact UI/font/promo,
+arrow, unknown-tab label, Nobel tab label plus root4originalJPG. Preserve all.
+Allowlist: core/one_call_prompt_contract.py; core/response_plan_materialization.py
+(existing Nobel WIP preserved); tests/test_d2_primary_source_followups.py;
+docs/BOT_BEHAVIOR.md; this card; DEMO_D2_DELIVERY_ROADMAP.md.
+
+Remove all-source-reference equality as the prerequisite for source UI. Validate
+all claims, preserve foreign-tenant failure and no UI for invalid primary; never
+promote a later source. Preserve common_scope/mixed response-memory behavior,
+marketing slot count, secondary UI price restrictions, click/revision ownership,
+clicked follow-up suppression and two-slot limit. This is not suggest_refs support.
+
+Acceptance: real offline HTTP/SSE first-visit + consultation sources, two topics
+and reversed primary, invalid primary and supplemental sources, clicked document
+binding; native price remains unchanged. Targeted tests plus independent Checker;
+no live provider calls, no commit/push without a new owner instruction.
+
+§63 evidence: 107 distinct targeted cases passed across primary-source HTTP/SSE,
+text-protocol, current UI, native-price and demo release suites. Initial combined
+boundary run:74PASS plus one new test failed due to wrong payload path; corrected
+assertion uses ui.body_parts, focused recheck1PASS. No runtime change for that
+failure. IndependentCheckerPASS; diffcheckPASS; staging empty; provider/live0.
+Actual model primary selection quality still requires owner widget review.

@@ -31,7 +31,9 @@
 [АРХИВ](archive/README.md): прежние architecture/config/status,19 old plans/audits,
 one-call/patient-scope/hybrid и инциденты. Материалы сохранены для provenance,
 не для восстановления отменённых контрактов или запуска старых тестов в release.
-Некоторые historical probe readers ещё держат старые пути; такие документы
+[Historical references](HISTORICAL_READERS.md) показывают оставшиеся связи
+старых test/eval fixtures с документами. Эти материалы не включаются в release
+по умолчанию. Некоторые historical probe readers ещё держат старые пути; такие документы
 помечаются историческими. Остальные планы/аудиты и SIM/REC evidence ещё
 классифицируются: не считать весь корпус уже очищенным.
 
@@ -41,3 +43,5 @@ Secret scan, deployment/security/PostgreSQL contracts и tenant/lead/privacy
 
 Старые50 task cards/prompts и полные прежние Interface/Roadmap теперь в архиве.
 На прежних currentпутях оставлены только текущая очередь и карточкаdocs/tests.
+
+Июльский backlog TECH_DEBT архивирован; [нынешние остатки](TECH_DEBT.md) — указатель на текущую очередь.

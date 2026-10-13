@@ -60,6 +60,7 @@
 | §60.6 | PR и Publish используют shared release selections; прежние проверки сохранены, добавлен selection contract |
 | §60.7 | Новый owner behavior entry;19 старых планов/аудитов перенесены в архив с явной исторической пометкой |
 | §60.8 | 50 старых task cards/prompts и полные Interface/Roadmap snapshots архивированы; current очередь и process pointers очищены |
+| §60.9 | Старые reference-bound документы явно помечены историческими; июльский backlog архивирован, current debt pointer обновлён |
 
 Последний локальный прогон точного publish offline selection (50 файлов, §60.6):
 **821 passed,5 skipped,0 failed**. Все5 skips — ограничения symlink на Windows/POSIX.
@@ -68,7 +69,7 @@ selection/G2–G8:271PASS5SKIP, independent selection/G2/G3:65PASS и Checker PA
 Targeted text/native-price/G2/G3:120PASS; independent Checker §60.4 — PASS.
 Два trailing-whitespace места архива исправлены в `2cbbd15`, focused Checker PASS.
 Это offline evidence, не повторная проверка Docker/PG/deploy и не полный historical suite.
-GitHubCI checkpoint `51d4bd2`: все5jobs SUCCESS, включая PostgreSQL и secret scan.
+GitHubCI checkpoint `22917cc`: все5jobs SUCCESS, включая PostgreSQL и secret scan.
 Publish image/deploy этого PR не запускались. Новых live/provider/SMTP calls в чистке:0. Runtime и client KB не менялись.
 
 ## Что осталось

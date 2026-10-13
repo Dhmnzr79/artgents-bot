@@ -1,5 +1,12 @@
 # A9 — unknown-safe composable patient scope
 
+> **ИСТОРИЯ. НЕ ТЕКУЩИЙ КОНТРАКТ И НЕ РАЗРЕШЕНИЕ НА РЕАЛИЗАЦИЮ.**
+> Прежний путь и исходный текст сохранены для historical test/eval references.
+> Старые «TARGET», «нормативный», модели, STOP/GO и правила относятся к baseline оригинала.
+> Нынешнее поведение: [D2 architecture](CURRENT_ARCHITECTURE.md),
+> процесс и статус: [документация](README.md).
+
+
 Статус: design-only, shadow target. Этот документ не передаёт authority, не меняет runtime и не разрешает реализацию без нового `TASK.md`.
 
 ## 1. Решение в одном абзаце

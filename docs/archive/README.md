@@ -21,3 +21,5 @@
 - `checkpoints/` —полные прежние Interface/Roadmap; прежние STOP/GO и планы не
   определяют текущий checkpoint. Unresolved SIM/REC protections сохраняются
   текущими контрактами; перенос не является закрытием acceptance.
+
+Прежний TECH_DEBT2026-07-10 — в legacy-plans. Старые reference-bound документы пока отмечены на прежних путях; [индекс](../HISTORICAL_READERS.md).

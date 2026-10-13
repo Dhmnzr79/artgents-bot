@@ -1,6 +1,6 @@
 # Текущая карточка — чистка документации и тестов
 
-Действующий checkpoint — §60.8, ниже. Предыдущие §60–60.7 — receipts этой же
+Действующий checkpoint — §60.9, ниже. Предыдущие §60–60.8 — receipts этой же
 чистки, не новая очередь и не повторное разрешение на runtime.
 Прежние интерфейсные этапы1–59 и полный исходный snapshot сохранены
 в [архиве checkpoint](../archive/checkpoints/DEMO_D2_INTERFACE_TASK.md).
@@ -421,3 +421,31 @@ focusedindependentChecker before save. Provider/live0; foreignWIP0.
 FocusedCheckerPASS:13linecontextmatch independentlyconfirmed, preciseexisting
 falsepositivefingerprintrelocation, no scanweakening. Allother4GitHubjobs onb7a49ce
 SUCCESS; onlysecretjobfailed. Nextcommit must triggerGitHubscan to verify fix.
+
+
+### 60.9 Historical reference labels and current debt pointer
+
+Documentation only. Owner GO: continue remaining cleanup without runtime/client
+changes or revival of obsolete tests. Repo/topC:/Cursor Projects/artgents-bot-active;
+branchcodex/docs-tests-cleanup; baseline22917cc; main/base8888fdd; preflightclean/WIP0.
+Allowlist: docs/ARCH_TARGET_DESIGN.md; ONE_CALL_CACHED_FULLCONTEXT_ARCHITECTURE_LOCK.md;
+PATIENT_SCOPE_DESIGN_A9.md; MARKETING_TARGET_MIGRATION_AUDIT.md; TECH_DEBT.md;
+archive/legacy-plans/TECH_DEBT.md; HISTORICAL_READERS.md; README.md; archive/README.md;
+CurrentStatus,Roadmap,thiscard undertasks.
+
+Four preserved-path source documents receive historical banner afterfirsttitle;
+all originalbytes retained (no body rewrites). Existing ARCH/STRANGLER warnings
+remain. Referenceindex distinguishes basename references from actual readers and
+lists known tests/evals paths; no authority to execute them or restore legacy.
+TECH_DEBT oldJulybacklog preservedinarchive (links/EOL/trailingformat only), stable
+path becomes currentpointer to knownunresolved coverage/KB/acceptance/risk/deploy.
+No new behavior, modelcalls, tests, workflows, data or requirements introduced.
+Current release selection unchanged. Prior22917cc GitHubCI5jobsPASS is dated
+proof, not freshpytest/livequality. Validate preservation/entrylinks/exactscope/
+diffcheck; independentChecker before checkpoint. Useful-test retirement remains
+futureclassifiedwork; not all references mean obsolete-only tests.
+
+§60.9 independentCheckerPASS: exact12docs,4sourcebodies preserved;Julybacklog
+retained; referencecounts7/3/2/1/7/12 independentlyconfirmed, core/scripts/deploy0.
+No runtime/test/coveragechange; newentrylinks/whitespace/diffcheckPASS;
+stagingempty/foreignWIP0 before checkpoint; provider/live0. Freshpytestnotrequired.

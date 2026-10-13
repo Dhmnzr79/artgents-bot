@@ -7,7 +7,7 @@
 Полная прежняя дорожная карта сохранена в
 [архиве](../archive/checkpoints/DEMO_D2_DELIVERY_ROADMAP.md).
 Состояние — [Current Status](DEMO_D2_CURRENT_STATUS.md),
-ближайший checkpoint — [Interface §60.8](DEMO_D2_INTERFACE_TASK.md#608-historical-task-archive-and-current-process-pointers).
+ближайший checkpoint — [Interface §60.9](DEMO_D2_INTERFACE_TASK.md#609-historical-reference-labels-and-current-debt-pointer).
 
 ## Уже выполнено
 
@@ -16,16 +16,17 @@
 - Удалены15 доказанных obsolete cases. Shared selections для PR/Publish
   сохраняют все49 прежних файлов; добавлен selection contract.
 - Последний точный publish offline selection:821PASS5platformSKIP,50файлов.
-  GitHubCI51d4bd2: все5jobs SUCCESS. Security/PostgreSQL/Docker защиты не ослаблены.
+  GitHubCI22917cc: все5jobs SUCCESS. Security/PostgreSQL/Docker защиты не ослаблены.
 - Созданы owner behavior/current status/architecture/test index.
-  19 прежних rootпланов архивированы; следующий checkpoint§60.8 переносит
-  ещё50 historical cards и полный прежний Interface/Roadmap в архив.
+  19 прежних rootпланов и50 historical cards архивированы вместе с полными
+  Interface/Roadmap. Четыре старых reference-bound источника помечены историческими;
+  прежнийJulyTECH_DEBT сохранён отдельно, current debt pointer обновлён.
   Это не завершение всех historical docs/tests или whole-bot acceptance.
 
 ## Что делать дальше
 
-1. Завершить текущий документальный checkpoint§60.8: архивные cards/prompts,
-   актуальные процессные указатели и ссылки; независимый Checker, exact commit/push.
+1. Завершить текущий документальный checkpoint§60.9: historical labels, debt
+   pointer и reference inventory; независимый Checker, exact commit/push.
 2. Продолжить классификацию оставшихся docs/evidence/probe bindings. Действующие
    tenant/privacy/medical/price/UI/transport/deploy protections сохранять.
    Исторические планы и эксперименты убрать из текущего чтения.

@@ -93,3 +93,9 @@ Publish image/deploy этого PR не запускались. Новых live/
 проверки — [Test index](../TEST_SUITE_ARCHITECTURE.md).
 Процесс — [AGENTS](../../AGENTS.md), [Execution Lock](DEMO_D2_EXECUTION_LOCK.md),
 [Git/запуск](../WORKFLOW_GIT.md), [Checker](../WORKFLOW_CHECKER.md).
+
+
+Prompt§61 (ownerGO): clinic facts grounded, general dental knowledge permitted;
+mild redundancy reduction without paragraph/word caps. Version47 guidance shared
+ordinary/known/nativecompletion. Offline delivery checks don't prove livecompliance;
+no live agentcalls/China MD changes. Runtime mechanics unchanged.

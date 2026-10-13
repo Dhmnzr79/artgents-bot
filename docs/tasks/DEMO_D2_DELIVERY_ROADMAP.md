@@ -7,7 +7,7 @@
 Полная прежняя дорожная карта сохранена в
 [архиве](../archive/checkpoints/DEMO_D2_DELIVERY_ROADMAP.md).
 Состояние — [Current Status](DEMO_D2_CURRENT_STATUS.md),
-ближайший checkpoint — [Interface §60.10](DEMO_D2_INTERFACE_TASK.md#6010-retire-cancelled-one_call-wiring-assertions).
+ближайший checkpoint — [Interface §61](DEMO_D2_INTERFACE_TASK.md#61-clinic-factual-grounding-and-proportionate-answer-detail).
 
 ## Уже выполнено
 
@@ -25,8 +25,9 @@
 
 ## Что делать дальше
 
-1. Завершить текущий test/doc checkpoint§60.10: cancelled wiring assertions
-   и current model guards; targeted tests, независимый Checker, exact commit/push.
+1. OwnerGO§61: stronger grounding for clinic facts, general dental knowledge
+   remains permitted; mild brevity without fixed caps. Only existing prompt tuning
+   extends earlier docs/tests scope; targeted tests and Checker before save.
 2. Продолжить классификацию оставшихся docs/evidence/probe bindings. Действующие
    tenant/privacy/medical/price/UI/transport/deploy protections сохранять.
    Исторические планы и эксперименты убрать из текущего чтения.
@@ -44,8 +45,8 @@
 
 ## Границы
 
-Текущая задача не меняет runtime, client KB, модель,30/400 лимиты или продуктовые
-владения. Strict/classifier/Qwen fallback не возвращать. Live/provider calls,
+Текущая задача сохраняет runtime mechanics, client KB, модель,30/400 лимиты
+и владения. OwnerGO§61 разрешает только tuning существующего prompt. Strict/classifier/Qwen fallback не возвращать. Live/provider calls,
 merge/deploy и разрушительная чистка требуют явной authority и нужного бюджета.
 Текущий agreed model path:DeepSeek prose/META + nativeprice + secondresponse.
 Основная ответственность — TargetContract§3 и позднейшие явные решения владельца.

@@ -145,6 +145,10 @@ def test_current_http_reply_has_no_json_envelope_requirement(known):
     assert calls[0]['max_completion_tokens'] == 1536
     assert calls[0]['provider_call_source'] == 'd2_http'
     assert calls[0]['messages'] == build_d2_d1r_messages(request)
+    from core.one_call_prompt_contract import D2_CLINIC_FACTS_AND_STYLE_INSTRUCTIONS
+    system = calls[0]['messages'][0]['content']
+    assert system.count(D2_CLINIC_FACTS_AND_STYLE_INSTRUCTIONS.strip()) == 1
+
     if known:
         assert not {'tools','tool_choice'} & calls[0].keys()
     else:

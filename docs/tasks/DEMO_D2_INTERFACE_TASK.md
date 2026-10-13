@@ -1,6 +1,6 @@
 # Текущая карточка — чистка документации и тестов
 
-Действующий checkpoint — §60.10, ниже. Предыдущие §60–60.9 — receipts этой же
+Действующий checkpoint — §61, ниже. Предыдущие §60–60.10 — receipts этой же
 чистки, не новая очередь и не повторное разрешение на runtime.
 Прежние интерфейсные этапы1–59 и полный исходный snapshot сохранены
 в [архиве checkpoint](../archive/checkpoints/DEMO_D2_INTERFACE_TASK.md).
@@ -485,3 +485,39 @@ own15PASS29deselected,4remainingfunctions ASTidentical and currentcallpath trace
 No runtime/workflow/clientdata change, provider/live0, exact7paths/diffcheckPASS;
 fullhistoricalsuite notcertified. Previous2failures belong onlycancelledwiring,
 not newregressions. GitHubcurrentCI aftersave validatesreleaseboundary separately.
+
+
+## 61. Clinic factual grounding and proportionate answer detail
+
+OwnerGO: stronger grounding only for clinic-specific services/materials/prices/terms;
+general dental knowledge/comparisons remain permitted. Mild brevity, no fixed caps.
+Prompt bugfix/tuning, not architecture simplification. Explicit extension of former
+docs/tests-only scope: existing instructions only; no new execution mechanism.
+Repo/topC:/Cursor Projects/artgents-bot-active; branchcodex/docs-tests-cleanup;
+baseline983c4b4; origin/main/mergebase8888fdd; preflightclean/foreignWIP0.
+Exactallowlist: core/one_call_prompt_contract.py; tests/test_d2_text_reply.py;
+tests/test_d2_native_price_runtime.py; docs/BOT_BEHAVIOR.md; taskCurrentStatus,
+Roadmap,thiscard. Owner writes China MD separately; no clientdata changes.
+
+Shared text appended to existing ordinary/known-task instructions; nativecompletion
+retains original system. Existing version46→47. Clinic facts require approved data;
+general knowledge doesn't establish offered technique/material. Missing detail isn't
+unavailability; explicit policies retained. General dental reasoning permitted without
+unsupported clinic promises; medical boundaries intact. Length follows complexity,
+removes redundancy/repeated invitations, preserves arguments/conditions/exclusions;
+no word/paragraph cap or max_tokens change. No phrase-specific filling/China branch,
+classifier/verifier/retry/tool/state/schema/modelcall added.
+Offline tests check actual ordinary/known provider inputs and nativecompletion;
+existing lead/UI/metadata/price/invocation guards retained. Delivery evidence cannot
+prove live model compliance. No live agentcalls for this new checkpoint; no new hard
+budget agreed. IndependentChecker+targeted tests; widget/model quality separate.
+
+Ownerrefinement§61: explicitly prefer compact/substantive answers bydefault,
+not exhaustive adjacent-topic overviews; still no fixed paragraph/word limit.
+Clinic-specific restriction onlythisclinic, general dental/China reasoning permitted.
+
+§61 evidence: executor93PASS80.68s; final compact-default wording followed by
+focused4PASS6.61s; independentCheckerPASS64PASS. Exact7paths/diffcheckPASS;
+provider/live0. Windows ignoredlogrotation file-in-use and datetimewarnings
+observed without assertionfailures; no loggingchanges. LocalhealthGET200, no model
+request. Shared instructions delivery verified; actualmodel/widgetbehavior notcertified.

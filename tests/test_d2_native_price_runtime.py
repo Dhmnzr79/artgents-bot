@@ -109,6 +109,11 @@ def test_price_only_without_duplicate_introduction(http_env, transport):
     assert not completed(db).response.resolved.information_blocks
     assert "Not published" not in body["answer"]
     assert "introduction_text" not in wire.calls[0]["messages"][0]["content"]
+    from core.one_call_prompt_contract import D2_CLINIC_FACTS_AND_STYLE_INSTRUCTIONS
+    first_system = wire.calls[0]["messages"][0]
+    assert D2_CLINIC_FACTS_AND_STYLE_INSTRUCTIONS.strip() in first_system["content"]
+    assert wire.calls[1]["messages"][0] == first_system
+
     assert len(wire.calls) == 2
     assert {call["model"] for call in wire.calls} == {"configured-test-model"}
 

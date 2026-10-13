@@ -12,6 +12,7 @@ _ALLOWED_EXACT_HOSTS: frozenset[str] = frozenset(
     {
         "dashscope-intl.aliyuncs.com",
         "dashscope.aliyuncs.com",
+        "api.deepseek.com",
     }
 )
 _BLOCKED_HOST_SUFFIXES: tuple[str, ...] = (

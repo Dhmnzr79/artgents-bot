@@ -24,6 +24,8 @@
 [конфигурация](FLAGS_AND_STATUS.md), [проверки](TEST_SUITE_ARCHITECTURE.md).
 Старые ROUTING/FLAGS/envelope-task snapshots теперь в archive/pre-d2;
 стабильные старые пути оставлены короткими указателями, не старым каноном.
+Хроника Current Status тоже [в архиве](archive/pre-d2/tasks/DEMO_D2_CURRENT_STATUS.md);
+актуальный статус больше не смешан с прежними остановками и отменёнными планами.
 
 ## Принятые решения и ограничения
 

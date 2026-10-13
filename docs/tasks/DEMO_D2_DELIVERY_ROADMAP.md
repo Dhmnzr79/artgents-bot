@@ -1,3 +1,7 @@
+§60.5: Current Status сокращён до актуального состояния, результатов и остатков.
+Прежняя полная хроника сохранена в archive/pre-d2/tasks с перенесёнными ссылками.
+Это только документация; runtime/test gate/KB/VPS не менялись.
+
 §58: владелец подтвердил визуал и разрешил checkpoint commit/push, затем стоп.
 
 §60.4: удалены15 obsolete envelope/prompt/doctor assertions; current

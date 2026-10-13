@@ -5259,3 +5259,32 @@ qualification/deploy. Platform skips remain documented environment limitations.
 Entry/index links and archive narrative preservation (only link relocation) PASS;
 other workflow jobs unchanged; diffcheckPASS. Independent Checker follows.
 Provider/live/SMTP0. Current archived evidence not relabeled as runtime authority.
+
+
+### 60.5 Current status separated from checkpoint history
+
+Documentation only, not runtime simplification. Baseline2cbbd15; root/top
+C:/Cursor Projects/artgents-bot-active; branch codex/docs-tests-cleanup;
+origin/main and merge-base8888fdd; status clean, foreignWIP0 before edits.
+Allowlist: tasks/DEMO_D2_CURRENT_STATUS.md; archive/pre-d2/tasks counterpart;
+docs/README.md; this card; DEMO_D2_DELIVERY_ROADMAP.md.
+
+Old full status preserved in archive, valid relative file links relocated.
+Stable original path now states deployed8888fdd versus draft PR27, current model/
+price/META/contacts/quotas, local typography, exact latest offline evidence,
+unresolved historical suites/docs/SIM/REC and separate KB/deploy scope.
+Removed from current status: old branch/WIP/one-call/envelope instructions mixed
+with current facts. Not removed: historical evidence or agreed protections.
+Roadmap/Interface historical sections remain to classify; no whole-docs PASS.
+No runtime, workflow selection, tests, KB or VPS changes. Provider/live/SMTP0.
+Verification: archived narrative preservation, relative link relocation, current
+file links, five-path allowlist and full branch diffcheck; independent Checker.
+No pytest rerun needed for documentation only; previous812PASS5platformSKIP
+is dated evidence, not a new run. Commit/push only after coherent Checker PASS.
+
+§60.5 verification PASS: complete439line archive narrative retained; all28
+relative Markdown links preserve their original file targets; current/archive
+file links valid. Direct whitespace scan includes untracked archive; branch
+and working diffcheck PASS. Independent Checker PASS, current claims traced to
+config/provider/dialogue/snapshot/quota code; no implementation simplification
+or live/whole-bot quality certified. Exact5paths, stagingempty, foreignWIP0.

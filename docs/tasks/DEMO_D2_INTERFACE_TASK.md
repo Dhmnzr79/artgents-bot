@@ -5178,3 +5178,42 @@ migration and obsolete-only test deletions remain separate unresolved scope.
 96PASS58.00s; existing datetime warnings. Add-only gate delta and equality
 publish=PR job union+G3 confirmed; other jobs unchanged. DiffcheckPASS.
 Independent Checker follows. Full historical suite not run/closed; live0.
+
+### 60.3 Policy/contact fixture migration
+
+Baseline d166841; same branch/root/main. Test fixture bug fix + docs; runtime0.
+Allowlist: test_d2_policy_text_refs.py; test_d2_af1b_contacts_http.py; two workflows;
+G2/G3 tests; TEST_SUITE_ARCHITECTURE.md; this card; Current Status; Roadmap.
+Baseline two suites35FAIL22PASS57cases. Policy keeps all38cases. Native show_price
+with actual code-result/second-response wire replaces old price envelope; policy
+text MD mutation verified in tool result before final prose, missing offers/booking
+and CTA suppression, replay and exact next-turn published history checked.
+Booking uses META. Bad/missing/inline policy refs keep their old integrity guards.
+
+Contacts use META show_contacts. Valid synthetic secondary clone with branch
+contact samples only in temp; no real nikadent runtime certification. Exact values,
+requested-field isolation, missing parking/address, multiple branches/phones remain.
+Two old content_first permutations removed as identical current prose-before-META
+wire; JSON/SSE mixed/replay assertions retained. Unknown foreign branch expanded
+from1 to4cases (JSON/SSE, with/without valid prose): current rejection is a frozen
+contact-unavailable part/failure, not old whole-HTTP400. Assert no canonical contacts,
+no address/phone leak or contact buttons, preserved sibling prose and free replay.
+Malformed empty fields still rejected whole. Default consultation CTA in a demo
+clone is not an arbitrary call button; verify absence of contact action and correct
+button tenant rather than old blanket buttons==[]. No product behavior changed.
+
+Old literal contact_branch_id prompt assertion replaced by canonical branch IDs,
+public fact grounding and supported ContactOperation schema field. Prompt branch
+selection by live model not certified; exact argument-name advertising is absent
+from current prose instructions, recorded as potential quality debt outside test migration.
+Contact suite now20PASS; policy38cases retained. Gates add both under policy job and
+publish; G2/G3 require them. Situation module no longer falsely listed as retired
+in G2 (its active coverage remains mandatory in offline job).
+Provider/network/SMTP0; no runtime/KB/VPS edits. Broad historical suite still open.
+
+§60.3 final executor evidence: policy38 + contacts20 + modelcontext4 +
+G2/G3 56 =118PASS54.68s. Baseline35FAIL22PASS57cases; no case skip/xfail,
+only2 duplicate old order permutations removed and3 adverse branch cases added.
+Gate delta add-only two suites; other jobs and publish/PR union parity unchanged.
+DiffcheckPASS. Current protocol outcomes verified by frozen state, not status-only.
+Independent Checker follows; live/provider0 and whole historical suite unresolved.

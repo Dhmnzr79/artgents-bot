@@ -28,6 +28,8 @@ Secret scan, lint/client validation, PostgreSQL qualification, Docker build/smok
 | test_d2_demo_limits | Actual admission: replay/free click, daily/IP windows, atomic persistent counters, charged failures и сохранность lead при quota denial |
 | test_d2_phone_mask | frozen phone projection и lead transitions/replay |
 | test_d2_situation_disabled | obsolete actions отвергаются; old flags не вмешиваются в обычную речь/заявку; pause/resume и PII |
+| test_d2_policy_text_refs | Authored MD/ref integrity, captured snapshot, price/booking refusals и published history |
+| test_d2_af1b_contacts_http | Exact contacts, missing fields, mixed prose/replay, branch ownership и безопасный local gap |
 | PG/privacy/G2–G8 | сохраняемые изоляция, persistence, security и безопасная выкладка |
 
 Это не exhaustive список: workflows — источник actual selection.

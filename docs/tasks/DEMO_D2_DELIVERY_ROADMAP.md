@@ -1,5 +1,10 @@
 §58: владелец подтвердил визуал и разрешил checkpoint commit/push, затем стоп.
 
+§60.3: policy/contact fixtures переведены на current native/META protocol,
+оба набора возвращены в gates. Data/ref/tenant guards сохранены; two obsolete
+mixed-order duplicates заменены JSON/SSE current tests, branch rejection усилен.
+Новые runtime fixes и live branch understanding этим не сертифицируются.
+
 §60.2: demo quota suite мигрирован12PASS (baseline9FAIL3PASS), возвращён
 в PR/publish gate. Runtime лимиты30/400 не менялись. Policy/contact
 historical suites и остальное архивирование ещё открыты.

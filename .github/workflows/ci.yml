@@ -197,6 +197,8 @@ jobs:
             tests/test_clinic_policy_resolver_offline.py \
             tests/test_clinic_policies_loader.py \
             tests/test_one_call_stage4_3_contacts_specific.py \
+            tests/test_d2_policy_text_refs.py \
+            tests/test_d2_af1b_contacts_http.py \
             tests/test_d2_demo_release_gate.py \
             tests/test_d2_native_price_runtime.py
 

@@ -245,6 +245,7 @@ def test_g2_contract_runs_in_offline_unit_and_contracts_job() -> None:
 def test_clinic_policy_job_requires_current_demo_protection_suites():
     block = _workflow_text().split('  demo-d1-clinic-policy-regression:', 1)[1].split('  postgres-qualification:', 1)[0]
     for name in ('d2_demo_release_gate', 'd2_native_price_runtime',
+                 'd2_policy_text_refs', 'd2_af1b_contacts_http',
                  'clinic_policy_resolver_offline', 'clinic_policies_loader', 'one_call_stage4_3_contacts_specific'):
         assert f'tests/test_{name}.py' in block
     assert 'TEMPORARY DEMO GATE' in _workflow_text()
@@ -252,7 +253,7 @@ def test_clinic_policy_job_requires_current_demo_protection_suites():
     # Inspect executed test paths, not comments that merely mention historical files.
     paths = re.findall(r'^\s+tests/(test_[\w]+\.py)', block, re.MULTILINE)
     for retired in ('test_d2_sim2_contract.py', 'test_d2_compound_answers.py',
-                    'test_d2_ci_clinic_policy.py', 'test_d2_situation_disabled.py'):
+                    'test_d2_ci_clinic_policy.py'):
         assert retired not in paths
 
 

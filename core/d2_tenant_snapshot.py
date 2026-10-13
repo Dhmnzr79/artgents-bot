@@ -5,12 +5,14 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from dataclasses import asdict
 from pathlib import Path
 from types import MappingProxyType
 
 import yaml
 
 from core.clinic_policies_loader import validate_policy_text_refs
+from core.clinic_contact_policies import parse_clinic_contact_facts_from_policies_raw
 
 from contracts.d2_tenant_snapshot import (
     D2CommercialPack,
@@ -233,7 +235,7 @@ def _approved_md_corpus(snapshot: D2TenantSnapshot) -> str:
 
 
 def _clinic_policy_catalog_json(snapshot: D2TenantSnapshot) -> str:
-    """Expose policy IDs and MD references from the captured tenant pack only."""
+    """Expose policy references and canonical public contacts from the captured pack."""
     raw = dict(snapshot.files).get("clinic_policies.yaml")
     if raw is None:
         return json.dumps(
@@ -302,6 +304,7 @@ def _clinic_policy_catalog_json(snapshot: D2TenantSnapshot) -> str:
             "brand_policies": brand_rows,
             "service_alternatives": service_rows,
             "contact_branches": branch_rows,
+            "contact_facts": asdict(parse_clinic_contact_facts_from_policies_raw(parsed)),
         },
         ensure_ascii=False, separators=(",", ":"), sort_keys=True,
     )

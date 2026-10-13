@@ -103,13 +103,14 @@ def test_refusal_has_one_prose_owner_and_preserves_guards(http_env, transport, f
 def test_price_only_without_duplicate_introduction(http_env, transport):
     client, db, use, _ = http_env
     wire = Transport(message("Not published", {"target": {"type": "topic", "id": "implantation"}}), message("<NO_TEXT>"))
-    use(D2HttpProvider(transport=wire))
+    use(D2HttpProvider(model="configured-test-model", transport=wire))
     body = send(client, transport, request_id="direction", q="Сколько стоит имплантация?")
     assert cards(body)
     assert not completed(db).response.resolved.information_blocks
     assert "Not published" not in body["answer"]
     assert "introduction_text" not in wire.calls[0]["messages"][0]["content"]
     assert len(wire.calls) == 2
+    assert {call["model"] for call in wire.calls} == {"configured-test-model"}
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
@@ -118,7 +119,7 @@ def test_price_only_without_duplicate_introduction(http_env, transport):
 def test_completion_failure_never_commits_partial_price(http_env, transport, response):
     client, db, use, _ = http_env
     wire = Transport(message("Предыдущий ответ."), message(None, price()), response)
-    use(D2HttpProvider(transport=wire))
+    use(D2HttpProvider(model="configured-test-model", transport=wire))
     send(client, transport, request_id="before", q="Расскажите")
     previous = completed(db)
     result = (post if transport == "json" else post_sse)(client, request_id="failed", q="Цена?")
@@ -129,6 +130,7 @@ def test_completion_failure_never_commits_partial_price(http_env, transport, res
         assert "error" in events and "ui" not in events
     assert completed(db) == previous
     assert len(wire.calls) == 3
+    assert {call["model"] for call in wire.calls} == {"configured-test-model"}
 
 
 @pytest.mark.parametrize("bad", [{"target": "classic"}, price(option_id=7), price(clarification=None)])

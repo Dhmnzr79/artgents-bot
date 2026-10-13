@@ -80,3 +80,8 @@ Current release tests: [shared selections](../tests/release/README.md).
 Current behavior: [BOT_BEHAVIOR](BOT_BEHAVIOR.md).
 Архивирование остальных docs/evidence и useful-test inventory ещё не завершены.
 Клиентская база знаний и реальные runtime пути этим индексом не меняются.
+
+§60.10: из test_sales_one_plus_governance удалены3 cancelled wiring assertions;
+4 helper/fixture guards и normative_boundary_ref остались. Reference file counts
+этого индекса не меняются: файл всё ещё ссылается на historical lock.
+Current model/no-fallback/quota assertions выполняются в native/session D2 tests.

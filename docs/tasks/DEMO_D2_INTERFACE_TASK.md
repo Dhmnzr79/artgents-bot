@@ -1,6 +1,6 @@
 # Текущая карточка — чистка документации и тестов
 
-Действующий checkpoint — §60.9, ниже. Предыдущие §60–60.8 — receipts этой же
+Действующий checkpoint — §60.10, ниже. Предыдущие §60–60.9 — receipts этой же
 чистки, не новая очередь и не повторное разрешение на runtime.
 Прежние интерфейсные этапы1–59 и полный исходный snapshot сохранены
 в [архиве checkpoint](../archive/checkpoints/DEMO_D2_INTERFACE_TASK.md).
@@ -449,3 +449,39 @@ futureclassifiedwork; not all references mean obsolete-only tests.
 retained; referencecounts7/3/2/1/7/12 independentlyconfirmed, core/scripts/deploy0.
 No runtime/test/coveragechange; newentrylinks/whitespace/diffcheckPASS;
 stagingempty/foreignWIP0 before checkpoint; provider/live0. Freshpytestnotrequired.
+
+
+### 60.10 Retire cancelled ONE_CALL wiring assertions
+
+Test/doc cleanup, not runtime simplification. Repo/topC:/Cursor Projects/artgents-bot-active;
+branchcodex/docs-tests-cleanup; baselinef8c1700; origin/main/mergebase8888fdd;
+preflightclean/foreignWIP0. OwnerGO continue cleanup, no revival obsolete tests.
+Exactallowlist: tests/test_sales_one_plus_governance.py,test_d2_native_price_runtime.py;
+docs/TEST_SUITE_ARCHITECTURE.md,HISTORICAL_READERS.md; taskCurrentStatus,Roadmap,thiscard.
+
+Original7cases baseline2FAIL5PASS. Remove3cases (2FAIL1PASS), not just redones:
+app oldhttp_provider_budget_scope/_orchestrate_ask_turn_inner stringrequirements;
+planner SALES_ONE_PLUS_ON marker; archivedQwen backend SALES_ONE_PLUS_FLASH_MODEL.
+No callers/imports of removedtestfunctions found. Keep4helper/fixturetests and
+one_call_stage2_fixture imports: budgetmodule+llmwrappers still serve historical
+probe accounting, frozenmedical/admin evidence isn't broad cancellationauthority.
+Do not remove actual protections just because these old wiring owners changed.
+
+Trace current /ask,/ask/stream →d2_http_adapter→d2_dialogue→D2HttpProvider._call;
+actualmodeluses self.model, currentadmissionviaD2DemoLimits, nativecompletionknown
+result→sameprovider. No legacy app budget context/planner selection on this path.
+Currentequivalentguards: test_d2_demo_session_budget thirtiethcall/freeReplay/atomic;
+test_d2_demo_limits failurecharged/released and pretransportdenial/other-tenant;
+native_price_runtime exactinvocationcount/error/commit boundary. Existing native
+success2cases/failure6cases strengthened with configured-test-model assertion for
+allordinary/selection/completion calls; no extra testcases/calls/semantic decisions.
+Runtime/CIselection/clientKB/VPS unchanged; provider/live/SMTP0.
+Targeted remaining4helper+native37+session3+limits12+selection/G2/G3 and Checker.
+FullcurrentGitHubCI beforemerge, not fullhistorical suite or livequality claim.
+
+§60.10 finaltargeted:4remaininghelper +native37+session3+limits12+selection9+
+G2/G3 56=121PASS79.30s. Existingdatetimewarnings only. IndependentCheckerPASS,
+own15PASS29deselected,4remainingfunctions ASTidentical and currentcallpath traced.
+No runtime/workflow/clientdata change, provider/live0, exact7paths/diffcheckPASS;
+fullhistoricalsuite notcertified. Previous2failures belong onlycancelledwiring,
+not newregressions. GitHubcurrentCI aftersave validatesreleaseboundary separately.

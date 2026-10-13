@@ -78,3 +78,15 @@ Native price schema/arguments/transcript проверяет test_d2_native_price
 Historical strict probe budget/no-retry/no-secret safety остаётся; весь файл
 structured_output не объявлен current или зелёным. Общие legacy helpers импортируются
 другими suites, поэтому адресные удаления не превращены в массовый file deletion.
+
+
+## Удаления §60.10
+
+test_sales_one_plus_governance: удалены3 статических требования к cancelled
+app wrapper/planner flag/Qwen backend field; baseline2FAIL1PASS этихcases.
+Оставшиеся4helper/fixture guards сохранены, shared one_call_stage2_fixture не трогали.
+Не объявлять весь legacy budget helper частью нынешнего D2 /ask.
+Current quota/session suite проверяет charged first+second calls, transport denial,
+free replay/persistence. Nativeprice existing success/failure tests дополнительно
+проверяют единую настроенную модель во всех вызовах без альтернативного fallback.
+Новых testcases/CI files/runtime fields нет;50-file release selection неизменен.

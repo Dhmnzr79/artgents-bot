@@ -1,3 +1,9 @@
+"""Historical ONE_CALL helpers and frozen admin fixtures, not current D2 wiring.
+
+Keep helper-accounting and preserved fixture evidence. Cancelled app wrapper,
+planner flag and old-model backend wiring assertions were retired at cleanup60.10.
+Current invocation/quota/model checks live in native D2 HTTP suites.
+"""
 from __future__ import annotations
 
 import json
@@ -19,21 +25,10 @@ def test_stage1_provider_budget_wiring_is_present() -> None:
     assert "http_provider_budget_scope" in text
 
 
-def test_orchestrate_ask_turn_wraps_http_provider_budget() -> None:
-    app_text = Path("app.py").read_text(encoding="utf-8")
-    assert "http_provider_budget_scope" in app_text
-    assert "_orchestrate_ask_turn_inner" in app_text
-
-
 def test_chat_completions_create_reserves_before_transport() -> None:
     llm_text = Path("llm.py").read_text(encoding="utf-8")
     assert "reserve_provider_call" in llm_text
     assert "record_provider_call_outcome" in llm_text
-
-
-def test_planner_speculation_disabled_when_sales_one_plus_on() -> None:
-    planner_text = Path("core/planner_compute_executor.py").read_text(encoding="utf-8")
-    assert "SALES_ONE_PLUS_ON" in planner_text
 
 
 def test_normative_answer_admin_boundary_is_documented() -> None:
@@ -72,15 +67,3 @@ def test_frozen_admin_matrix_cases_follow_normative_answer_admin_table() -> None
         case = by_id[case_id]
         assert case.expected_decision == "answer"
         assert case.protected_category is None
-
-
-def test_stage3a_production_stack_has_no_plus_model_fallback() -> None:
-    paths = (
-        Path("core/sales_one_plus_live_backend.py"),
-        Path("orchestration/sales_fast_widget_turn.py"),
-        Path("core/sales_fast_widget_runtime.py"),
-    )
-    for path in paths:
-        text = path.read_text(encoding="utf-8")
-        assert "qwen3.7-plus" not in text
-        assert "SALES_ONE_PLUS_FLASH_MODEL" in text

@@ -5,20 +5,18 @@ Task-specific acceptance criteria belong in the current task or PR, not here.
 
 ## Deployment reality — non-negotiable
 
-**This repository has no production bot and no production users.** The current
-local `/ask` and `/ask/stream` route is a disposable baseline for comparison,
-not a production-compatibility target.
+**A demo bot is deployed on a VPS (owner confirmed 2026-10-13).** Real
+production-user traffic and migration requirements have not been placed in scope.
+The local `/ask` and `/ask/stream` remain the development/test checkout, distinct
+from the deployed demo.
 
-- A task may replace or break the local normal-dialogue runtime when that is
-  necessary for the agreed result. Preserve only explicitly named external
-  contracts, tenant data, and lead/privacy boundaries.
-- Do **not** assume production migration, user-data compatibility, dual-run,
-  per-request fallback, release rollback, or protection of the current local
-  semantic route unless the owner explicitly says that a production deployment
-  exists and places it in scope.
-- Reports must distinguish a local baseline from a deployed, user-facing bot.
-  Never cite the existence of the local route as a reason to defer a clean
-  semantic replacement.
+- Preserve explicitly agreed tenant, lead/privacy, price/UI and transport boundaries.
+  Local runtime changes must follow the current authorized task; no implied legacy
+  compatibility, dual-run, per-request fallback or user-data migration is required.
+- Do not merge or deploy without explicit owner authority. A topic-branch push is
+  not a VPS deployment. Documentation/test cleanup does not modify the deployed bot.
+- Reports must distinguish local checks, GitHub build/deploy evidence and actual
+  deployed dialogue verification. Do not infer production-user guarantees from demo.
 
 ## Workspace model
 

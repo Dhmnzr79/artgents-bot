@@ -1,5 +1,10 @@
 # D2 — текущее состояние и куда смотреть
 
+Документальная сверка §60.1: current architecture/test index обновлены,
+предыдущие snapshots перенесены в docs/archive/pre-d2. AGENTS/Execution Lock
+теперь отражают VPS demo. Situation regression мигрирован18PASS и возвращён
+в обязательные gates; оставшиеся historical suites ещё не закрыты.
+
 ## Актуальная точка — 2026-10-13
 
 Этот раздел — текущий статус. Нижние датированные записи — история checkpoint,

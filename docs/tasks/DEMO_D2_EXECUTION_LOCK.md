@@ -11,12 +11,14 @@
 
 ## 1. Реальность развёртывания
 
-- В production **нет бота и нет пользователей**.
-- Текущий локальный `/ask`, `/ask/stream` и виджет — одноразовая база для
-  сравнения. Старый local runtime **не является compatibility target**:
-  его допустимо заменять и временно ломать.
-- Сохраняются только явно названные границы: tenant isolation,
-  lead/privacy, заявки, typed UI action ownership, transport-защиты.
+- По подтверждению владельца2026-10-13 demo бот развёрнут на VPS.
+  Реальные production-пользовательские диалоги и миграция не поставлены в scope.
+- Локальный /ask,/ask/stream — отдельный development/test запуск. Старый
+  semantic runtime не становится compatibility target из-за наличия VPS demo.
+- Tenant isolation, lead/privacy, заявки, typed UI и transport-защиты сохраняются.
+  Merge/deploy только по явному разрешению; topic push не обновляет VPS.
+- Чистка документации/tests и последующая demo KB выполняются отдельно;
+  итоговая совместная выкладка ещё не разрешена этим checkpoint.
 
 ## 2. Неснимаемая цель
 

@@ -1,5 +1,10 @@
 §58: владелец подтвердил визуал и разрешил checkpoint commit/push, затем стоп.
 
+Документальная сверка §60.1: current architecture/test index обновлены,
+предыдущие snapshots перенесены в docs/archive/pre-d2. AGENTS/Execution Lock
+теперь отражают VPS demo. Situation regression мигрирован18PASS и возвращён
+в обязательные gates; оставшиеся historical suites ещё не закрыты.
+
 ## Текущая очередь — owner GO 2026-10-13: документация и тесты
 
 Эта очередь заменяет исторические «следующие шаги» ниже. Не возвращать удалённую

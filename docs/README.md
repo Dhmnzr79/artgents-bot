@@ -14,6 +14,12 @@
    — allowlist, инвентаризация, что сохраняем/мигрируем/архивируем.
 4. [Git и локальный запуск](WORKFLOW_GIT.md), [Checker](WORKFLOW_CHECKER.md).
 
+## Текущая архитектура
+
+[CURRENT_ARCHITECTURE](CURRENT_ARCHITECTURE.md) описывает нынешний D2 path,
+текст/native price, контекст, lead/privacy и env. Старый pre-D2 snapshot
+перенесён в [архив](archive/pre-d2/CURRENT_ARCHITECTURE.md).
+
 ## Принятые решения и ограничения
 
 [Product Decisions](tasks/DEMO_D2_PRODUCT_DECISIONS.md) и
@@ -25,13 +31,13 @@ boundaries. Позднейшие явные owner decisions (обычная pros
 
 ## Исторические материалы — пока перенос не завершён
 
-`CURRENT_ARCHITECTURE.md` сам помечен как stale pre-S69 snapshot и **не описывает
-нынешний runtime**. A1–A9/S*/prepared-hybrid/sales-one-plus plans, audit evidence,
-старые experiment/card sections — история либо будущие предложения, не текущая
+A1–A9/S*/prepared-hybrid/sales-one-plus plans, audit evidence и старые
+experiment/card sections — история либо будущие предложения, не текущая
 очередь. Они ещё не все перенесены физически в архив: это открытая работа §60.
 Действующие инварианты и полезные tests нужно выделить перед переносом/удалением.
 
 Отдельно сохраняются deployment/security/PG contracts, client authoring инструкции
 и настоящие tenant/lead/privacy protections. Они не отменяются из-за возраста.
-Новая короткая current architecture и сверенный permanent test index ещё в работе;
+[Текущий индекс тестов](TEST_SUITE_ARCHITECTURE.md) описывает actual gate;
+полная миграция historical tests ещё в работе;
 не выдавать этот исправленный вход за завершённую чистку всего корпуса.

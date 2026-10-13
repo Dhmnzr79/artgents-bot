@@ -5123,3 +5123,32 @@ Current docs entry file links PASS. Live/provider/SMTP0, full suites не зап
 Историческая карта — inventory/proposal, не выполненное удаление или новая
 architecture acceptance. Checker проверяет этот coherent checkpoint; дальнейшая
 миграция/архивирование отдельными scope после него. VPS/KB unchanged.
+
+### 60.1 Current architecture and situation regression migration
+
+Baselinec6f4fe3, same branch/root/main. Documentation + fixture bug fix, not
+runtime simplification. Allowlist: AGENTS.md; docs/tasks/DEMO_D2_EXECUTION_LOCK.md;
+docs/CURRENT_ARCHITECTURE.md; docs/TEST_SUITE_ARCHITECTURE.md; docs/README.md;
+new archive/pre-d2 counterparts for the two replaced documents;
+tests/test_d2_situation_disabled.py; two workflows; G2/G3 contract tests;
+this card; Current Status and Delivery Roadmap.
+
+Removed false no-deployment statement and legacy architecture as current entry.
+Archived pre-D2 architecture (relative links adjusted) and old test target; replaced
+with actual D2/provider/text/nativeprice/snapshot/contacts/lead/security description.
+Owner-provided VPS demo fact preserved separately from unclaimed production users.
+No runtime/KB/provider changes or whole architecture certification.
+
+Situation tests: baseline8FAIL10PASS. Old JSON fixtures replaced by prose and
+proper line-delimited D2_META start_booking. Existing assertions retained; strengthened
+HTTP/SSE success and collecting_name/phone setup. Previous active-case tests could
+pass without actually starting booking; no such false positive after migration.
+Final targeted18PASS22.38s. Module included in PR/publish gate, G2/G3 require it.
+No file deletions/tests skipped/xfail. Quota/policy/contact historic migration remains.
+
+§60.1 final executor evidence: situation18 + demo_release25 + contact4 +
+G2/G3 contracts56 =103 PASS57.33s, existing datetime warnings. Link targets
+current/new archive files PASS; archived architecture only relative links adjusted,
+archived test document preserved exactly. Workflow delta add-only situation module;
+all other jobs compare equal to baseline. git diff --check PASS. Provider/SMTP0,
+no runtime/KB/VPS changes. Independent Checker follows before checkpoint save.

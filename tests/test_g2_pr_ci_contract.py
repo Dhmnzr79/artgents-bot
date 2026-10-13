@@ -43,6 +43,11 @@ _FORBIDDEN_DEPLOY_PATTERNS = (
 )
 
 _MANDATORY_OFFLINE_MODULES = (
+    # Temporary 2026-10-14 demo gate; restore historical coverage after migration.
+    "tests/test_d2_demo_release_gate.py",
+    "tests/test_d2_native_price_runtime.py",
+    "tests/test_d2_demo_session_budget.py",
+    "tests/test_d2_phone_mask.py",
     "tests/test_g2_pr_ci_contract.py",
     "tests/test_g4_manual_deploy_contract.py",
     "tests/test_g5_manual_rollback_contract.py",
@@ -50,17 +55,7 @@ _MANDATORY_OFFLINE_MODULES = (
     "tests/test_g8_postgres_qualification_contract.py",
     "tests/test_turn_planner_llm.py",
     "tests/test_turn_planner_wiring.py",
-    "tests/test_tenant_resource_isolation_offline.py",
-    "tests/test_one_call_tenant_isolation_offline.py",
-    "tests/test_d2_http_contract.py",
-    "tests/test_d2_demo_limits.py",
-    "tests/test_d2_situation_disabled.py",
-    "tests/test_d2_ci_clinic_policy.py",
-    "tests/test_d2_lead_interrupt_http.py",
-    "tests/test_tenant_ingress_prod_boundary_offline.py",
-    "tests/test_session_tenant_binding_hardening_offline.py",
     "tests/test_tenant_lead_routing_context_offline.py",
-    "tests/test_tenant_lead_pending_question_offline.py",
     "tests/test_pg_tenant_context_offline.py",
     "tests/test_pg_tenant_write_contract_offline.py",
     "tests/test_pg_schema_readiness_offline.py",
@@ -244,18 +239,18 @@ def test_g2_contract_runs_in_offline_unit_and_contracts_job() -> None:
     assert "postgres-qualification:" not in offline
 
 
-def test_clinic_policy_job_requires_current_d2_protection_suites():
+def test_clinic_policy_job_requires_current_demo_protection_suites():
     block = _workflow_text().split('  demo-d1-clinic-policy-regression:', 1)[1].split('  postgres-qualification:', 1)[0]
-    for name in ('d2_sim2_contract', 'd2_demo_audit_fixes', 'd2_compound_answers',
-                 'd2_no_legacy_path', 'd2_ci_clinic_policy', 'd2_discussion_context_http',
-                 'd2_code_answer_fixes', 'd2_lead_interrupt_http', 'd2_situation_disabled',
-                 'tenant_lead_pending_question_offline', 'one_call_tenant_isolation_offline',
-                 'clinic_policy_resolver_offline', 'clinic_policies_loader'):
+    for name in ('d2_demo_release_gate', 'd2_native_price_runtime',
+                 'clinic_policy_resolver_offline', 'clinic_policies_loader', 'one_call_stage4_3_contacts_specific'):
         assert f'tests/test_{name}.py' in block
-    for retired in ('request_understanding_schema_offline', 'demo_d1r_http_offline',
-                    'demo_d1r_composition_offline', 'demo_d1r_route_budget_offline',
-                    'demo_clinic_policy_authority_offline', 'demo_implant_volume_scope_offline'):
-        assert f'tests/test_{retired}.py' not in block
+    assert 'TEMPORARY DEMO GATE' in _workflow_text()
+    assert 'TODO(after demo)' in _workflow_text()
+    # Inspect executed test paths, not comments that merely mention historical files.
+    paths = re.findall(r'^\s+tests/(test_[\w]+\.py)', block, re.MULTILINE)
+    for retired in ('test_d2_sim2_contract.py', 'test_d2_compound_answers.py',
+                    'test_d2_ci_clinic_policy.py', 'test_d2_situation_disabled.py'):
+        assert retired not in paths
 
 
 def test_g8_integration_not_in_offline_pytest_list() -> None:

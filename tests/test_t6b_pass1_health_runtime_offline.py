@@ -211,7 +211,11 @@ def test_readiness_prod_schema_not_ready_closes_connection(monkeypatch: pytest.M
     assert any(r.startswith("postgres_schema_not_ready:") for r in payload["checks"]["reasons"])
 
 
-def test_readiness_prod_schema_ready(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(
+    "base_url",
+    ["https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "https://api.deepseek.com"],
+)
+def test_readiness_prod_schema_ready(monkeypatch: pytest.MonkeyPatch, base_url: str) -> None:
     import config as config_module
 
     monkeypatch.setattr(config_module, "APP_ENV", "prod")
@@ -221,7 +225,7 @@ def test_readiness_prod_schema_ready(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         config_module,
         "CHAT_BASE_URL",
-        "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        base_url,
     )
     monkeypatch.setenv("BOT_PG_DSN", "postgresql://bot:bot@127.0.0.1:5432/bot_events")
     conn = MagicMock()

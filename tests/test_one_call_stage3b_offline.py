@@ -119,6 +119,7 @@ def _ledger_events(path: Path) -> list[dict[str, object]]:
     [
         SINGAPORE_ENDPOINT,
         DASHSCOPE_CN_ENDPOINT,
+        "https://api.deepseek.com",
         MAAS_ENDPOINT,
         MAAS_HYPHEN_WORKSPACE_ENDPOINT,
         MAAS_FRANKFURT_ENDPOINT,
@@ -146,6 +147,7 @@ def test_observability_from_maas_base_url(base_url: str, region: str) -> None:
     [
         ("", "chat_base_url_missing"),
         ("https://api.openai.com/v1", "chat_base_url_host_blocked"),
+        ("https://api.deepseek.com.attacker.com", "chat_base_url_host_blocked"),
         ("https://chat.openai.com/v1", "chat_base_url_host_blocked"),
         ("https://evil-dashscope-intl.aliyuncs.com.attacker.com/v1", "chat_base_url_host_blocked"),
         ("http://dashscope-intl.aliyuncs.com/v1", "chat_base_url_scheme_invalid"),

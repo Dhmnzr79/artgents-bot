@@ -1,3 +1,7 @@
 # False positive: offline test evidence prose, no credential or private payload.
 # Restricted to this finding in the preserved checkpoint, not the whole file/rule.
 bc26997ced1f3988b76b121c7e5aa51b14bc0f54:docs/tasks/DEMO_D2_INTERFACE_TASK.md:generic-api-key:2673
+
+# Same approved offline evidence prose, relocated into the historical snapshot.
+# Exact finding only; no path/rule wildcard or scan bypass.
+b7a49ce937c719504c2041ef77826c8c183c478a:docs/archive/checkpoints/DEMO_D2_INTERFACE_TASK.md:generic-api-key:2694

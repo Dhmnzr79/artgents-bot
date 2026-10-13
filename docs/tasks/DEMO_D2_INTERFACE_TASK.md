@@ -404,3 +404,20 @@ SIM/REC classification and useful-testinventory still unresolved. KB/VPSuntouche
 No readers of50movedbasenames; entrylinks and whitespacePASS; ExecutionLock
 protections/sourcepriority preserved. No freshpytest/provider/live/SMTPcalls;
 no runtime/test/workflow/clientKB/VPSedits, noforeignWIP, stagingemptybeforecheckpoint.
+
+
+#### 60.8 Focused relocated secret-scan false positive
+
+Baselineb7a49ce, samebranch/root/main, preflightclean. Bug fix in CI finding
+metadata, not runtime simplification. Exactadditionalallowlist:.gitleaksignore,
+thiscard. GitHubscan38429390522 flagged generic-api-key in the archived snapshot
+at2694. Existing explicitfalsepositive approval is bc26997:oldInterface:2673.
+Full13linecontext equal byte-for-text atnew/oldlocations; ordinaryoffline test
+reportprose, not credential/privatepayload. Preserve oldfingerprint and add only
+newfinding b7a49ce:newarchivepath:generic-api-key:2694. No wholepath/ruleallowlist,
+no scan bypass/runtime/workflow change. New scan must confirm exact exception;
+focusedindependentChecker before save. Provider/live0; foreignWIP0.
+
+FocusedCheckerPASS:13linecontextmatch independentlyconfirmed, preciseexisting
+falsepositivefingerprintrelocation, no scanweakening. Allother4GitHubjobs onb7a49ce
+SUCCESS; onlysecretjobfailed. Nextcommit must triggerGitHubscan to verify fix.

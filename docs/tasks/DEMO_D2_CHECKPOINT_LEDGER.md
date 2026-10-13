@@ -1,3 +1,11 @@
+Текущий этап 2026-10-12: Interface §56, owner GO. DeepSeek Flash + native show_price,
+один grounded completion после кодового результата цены; обычная беседа — один вызов.
+Это заменяет прежний общий one-call запрет только в указанном ценовом пути.
+Без strict/классификатора/Qwen fallback. FullContext сохраняется, чистка KB отложена.
+Checkpoint прежнего WIP/экспериментов: 08b5041, pushed; не полный PASS бота.
+§56 реализован: 43 distinct targeted offline PASS, scoped Checker PASS; после доводки
+7 живых ходов/12 вызовов без повторов цен перед карточкой. Cursor/виджет ещё открыты.
+
 # D2 Checkpoint Ledger — таблица подтверждённых фактов
 
 ## Составные ответы §24 — 2026-10-06
@@ -1638,3 +1646,65 @@ Preliminary wider selection: 93 passed, 330.64s, before price-scope correction.
 Final evidence contract-boundary-final/results.xml; independent Checker PASS
 for narrow §36, no blockers/test weakening; full group remains open.
 No full-CI or live/widget acceptance; residual model-output errors stay open.
+
+§49 / Stage I A1–A2 — 2026-10-11, baseline1975eb3, codex/model-price-experiment.
+Ordinary whole-list admission replaced by independent operation acceptance;
+optional content claims no longer own text admission; exact commands stay strict.
+Existing unavailable result carries local invalid-operation failures; no new
+model wire/state/memory/call. Internal parser result is consumed directly.
+Latest group evidence:194PASS/2known baselineFAIL (three-row price expectations),
+details and intermediate corrections in Interface Task49.1. No full CI/live.
+Independent Checker pending; Cursor/widget pending. Staging empty; no commit/push;
+provider/browser/SMTP0. Prior46 WIP and foreign prototypes/experiments/EOL kept.
+
+§49 focused corrections: initial Checker REJECT on softened unfinished task
+and fatal ordinary ordinal conflict. Both corrected;14 adverse/ownership cases
+added. Latest group evidence208PASS/2existing three-row baselineFAIL; recheck
+104PASS plus2ownershipPASS after test-import correction. Focused Checker pending;
+Cursor/widget pending. No new model format/state/memory/call, no commit/push.
+
+§49 final focused Checker PASS: both P1 fixed,12independent probes PASS;
+no test weakening/repair/fallback/new model wire/state/memory/call. Cursor/widget
+still pending; branch/HEAD1975eb3 unchanged, staging empty, provider/live0.
+
+§49 accepted: Cursor PASS only A1–A2; owner widget OK. Cursor reports232PASS/3existing-expectationFAIL plus guards50PASS/1existing-wordingFAIL; see Interface49.4. Independent Checker PASS already recorded. Prepare exact10-file checkpoint from1975eb3; no provider/live/browser/SMTP calls by agents. §46 and foreign WIP excluded. StageII variant representation still requires owner agreement before implementation.
+
+§50/A4: owner approved named catalog option→selected tab, generic→existing initial tab. Baseline211ef55, branchcodex/model-price-experiment. Bug fix, not global architecture simplification. Optional PriceOperation.option_id and existing active catalog option ID/name projection; no session state/UI action fields/model calls. Three runtime files plus new test and three documents; §46 foreign WIP excluded. Initial20targetedPASS, expanded checks and independent Checker pending. No commit/push/provider/browser/SMTP. A3 still open.
+
+§50 final offline:139PASS/4baselineFAIL plus3catalogPASS; four failures reproduced in clean211ef55. Independent Astra Checker PASS A4 only:29tests+15probes. Cursor/widget pending, no commit/push, stagingempty, provider/browser/SMTP0. A3 remains open. Evidence Interface50.3.
+
+§50 accepted by Cursor (141PASS/4confirmed baselineFAIL) and owner widget. Separate seven-file checkpoint from211ef55; no new provider calls. Duplicate sinus exclusion recorded in50.4 for card/text stage. A3 remains open, §46/foreignWIP excluded.
+
+§51/A3 baseline23d9b40, codex/model-price-experiment: bug fix final offer/topic membership, six runtime lines, no wire/state/memory/calls. Initial tests18PASS/2FAIL exposed unsupported obsolete detail revision; supported historical tab return then current detail tested instead, ingress protection unchanged (Interface51). Independent Checker and final offline in progress. §46/foreign WIP untouched, no commit/push/provider calls.
+
+§51 final: latest distinct root groups107PASS (105 + corrected2; focused run4 includes2overlap), Astra Checker PASS A3:22HTTP+9probes. Test fixture corrected to published historical tab, guards unchanged. Cursor/widget pending, no commit/push/provider calls, stagingempty. Known consultation failures unchanged outside run; §46/foreignWIP preserved.
+
+§52 targeted audit after owner widget failures: Cursor PASS §51 received; connected dialogue acceptance remains open. HEAD23d9b40 unchanged. Root+Astra read-only code/retained-trace analysis and offline probes confirm named detail option schema gap (A4 scope), root-list rejection, shown-offer expansion on repeated extent, neighboring content clearing detail refs, and inactive-option bypass by exact detail ID. Wrong model target is separately evidenced, not blamed on A3. Interface§52 records findings/proposals; only Interface/Roadmap/Ledger edited. No implementation approval inferred; no runtime/test changes, new provider/browser/SMTP calls, staging, commit or push. §46/A3 and foreign WIP preserved. No global PASS or full CI claim.
+
+§53 owner GO2026-10-12: remove ordinary detail command, retain exact code card buttons, project frozen selected card into existing history. Baseline/HEAD23d9b40; six runtime, four docs, new card conversation, superseded A3 test plus price-option/resilience migrations. Main52PASS; resilience48PASS excluding8obsolete selectors; focused14PASS after Checker found generic/active=None guard regression. Corrected and Astra focused PASS:42+17tests,10+4probes. No new modelcalls/memory/adapter/phrase rules. Cursor/widget pending, stagingempty, commit/push none. §46/foreignWIP preserved. Rootformat/live quality/wholebot not certified. Details Interface53.
+
+§53 final guard run76PASS/19obsolete-fixture cases deselected;179distinct root cases across latest groups (not one full run). diff --check PASS; Cursor/widget pending; stagingempty, HEAD23d9b40, no commit/push/PR/provider calls.
+
+§53 checkpoint authorization2026-10-12: owner explicitly requested commit/push. Astra PASS available; Cursor result not supplied, widget root-format failure remains open. Publishing14-file checkpoint from23d9b40 does not assert full acceptance. Foreign§46/MD/prototypes/experiments excluded. No runtime edits or new provider calls during Git step.
+
+
+§54 native text/actions, owner GO2026-10-12; baseline/HEAD e4a098a, branch codex/model-price-experiment. Root JSON is absent from both provider requests and D2 live parsing; native text independently published, optional metadata/each action checked separately. Single connected text before code blocks, exclusive handoff, known-task plain text. Source slot multiplicity retained for promo/source UI; mixed scope never first scope. No extra call/retry/fallback/old-envelope adapter. 59PASS main plus6PASS guard and2corrected clarification cases =67 distinct tests; focused provider test repeats one of59. Fixture fixes only, no weakened guards. Independent Checker running. Two synthetic network attempts earlier, one success; no provider in offline tests. No full CI/widget certification, historical JSON fixtures not migrated, foreign§46/MD/prototypes/scripts preserved. Staging empty, no commit/push/PR.
+
+
+§54 final Independent Astra Checker PASS:67/67 tests +6offline HTTP/SSE probes, no P0/P1. P2 prompt intake-last wording corrected and focused confirmation PASS. Runtime unchanged after test set. Cursor/widget pending; no fullCI/live quality claim. HEAD e4a098a, stagingempty, commit/push/PR0; foreignWIP retained. Server read-only process check:9001 Flask --reload, no restart or provider request.
+
+
+§54.4 owner GO 2026-10-12: удалить обычный clarify_content в текущем незакоммиченном §54. Архитектурное упрощение, ценовые уточнения и document follow-up сохранить. Прежний PASS не закрывает расширение; новый focused review и Cursor/widget впереди.
+
+§54.4 готов к Cursor/widget: native68PASS + исправленный focused2PASS, independent Astra PASS и3probes. Удалены команда и информационный pending, сохранены цены/документ. Новых live calls0, stagingempty, HEADe4a098a, commit/pushнет. ПолныйCI и качество модели не закрыты.
+
+§54.6 livecomparison:10Qwen+10DeepSeek, retries0, noactions. Parser3/10Qwen vs10/10DeepSeek; оба DeepSeekmixed неполные Englishпланирования, неуспехдиалога. Независимая Astra проверка подтверждает ограничения/неготовность обоихвариантов. Никакой tinyJSON/runtime-switch; §54остаётсяоткрытым. Артефакты ignored logs/native-model-probe-20261012. HEAD e4a098a/stagingempty/commitpushнет.
+
+§54.7 globalaudit:25live(20Qwen5DeepSeek), retries0; инструменты→source-only наordinary. Qwentoolsoff4/4ordinaryvscurrent1/4,DeepSeek3/4 сanesthesiaFAIL. ASTRAREJECTnativeготовности.12offlineHTTP/SSEreplayPASS. Diagnosticclosedreasonfixroot3PASS/independent3PASS; никакойзаменыпротокола/runtimeмодели. HEADe4a098a/stagingempty/commitpushнет. См.Interface§54.7.
+
+§54.8 ownerGOprototype:29distinctoffline, independentAstraPASS,12live6Qwen6DS stop/parsed withRussiananswers,24capturedHTTP/SSEPASSexactNobel101200/fearfollowup/history. Nativeworkingruntimeнеизменён. Sourceauthoritylimitationsсохранены. Nextcoherentruntime replacement removeAPItools/oldreachablepath, nofallback. HEADe4a098a/stagingempty/commitpushнет.
+
+§55 ownerGOintegration послеGit/docscheck: remotee4a098a=HEAD, main/mergebaseefa3f77, stagingempty/unmergednone;backup49files logs/pre-stage55-20261012. §54непринят/неcommitted; §54.8толькоprototypePASS. Начатsingleplaintext-tail runtime replacement; nofallback, historicalnative scriptsquarantine. СледующийcheckpointпослеChecker/Cursor/widget, commitpushпока нет.
+
+
+§55 итог 2026-10-12: рабочий plain-text + optional metadata путь заменил native API tools/reply/parser. Нет fallback, retry, второй памяти или дополнительного вызова; архив native доступен только scripts. Root offline 121 distinct PASS; независимый Astra Checker scoped PASS (46 passed, 6 deselected). Интегрированный сервер Qwen, prompt 45: 6/6 HTTP/SSE запросов успешны, provider_attempts=1, finish_reason=stop; Nobel, точная карточка 101200, гарантия, страх боли, follow-up и приживление. Это не ручная UI или полная bot/CI приёмка. Cursor/виджет ожидаются; промпт Interface §55.3. HEAD/baseline e4a098a, remote совпал; staging пуст, commit/push/PR нет. Backup 49 WIP файлов локальный ignored; foreign hashes без изменений. §46 и прочие долги сохранены, не аттестованы.

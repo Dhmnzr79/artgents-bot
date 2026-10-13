@@ -23,20 +23,19 @@ def test_load_authored_service_alternatives_demo_canonical_row() -> None:
     assert row.approved_text.strip()
 
 
-def test_legacy_keyword_rows_remain_in_policy_bundle_only() -> None:
+def test_demo_has_no_parallel_keyword_alternative_rows() -> None:
     bundle = load_clinic_policies("demo")
     assert bundle is not None
     keyword_rows = [alt for alt in bundle.service_alternatives if alt.match_keywords]
-    assert keyword_rows
+    assert keyword_rows == []
     authored = load_authored_service_alternatives("demo")
     assert all(not hasattr(row, "match_keywords") for row in authored)
 
 
-def test_legacy_keyword_helper_still_works_with_sales_one_plus_off() -> None:
+def test_demo_has_no_legacy_keyword_alternative_with_sales_one_plus_off() -> None:
     assert config.SALES_ONE_PLUS_ON is False
     alt = find_service_alternative("ставите брекеты?", "demo")
-    assert alt is not None
-    assert alt.suggest_ref
+    assert alt is None
 
 
 def test_demo_business_policy_keys_include_oms_dms_pediatric() -> None:
@@ -51,14 +50,16 @@ def test_demo_business_policy_keys_include_oms_dms_pediatric() -> None:
     "policies: {}\n",
     "policies:\n  no_oms: null\n",
     "policies:\n  no_oms:\n    triggers: [омс]\n    answer: ''\n",
-    "policies:\n  no_oms:\n    triggers: []\n    answer: Нет ОМС\n",
-    "policies:\n  no_oms:\n    triggers: [омс]\n    answer: Нет ОМС\n  no_dms: null\n",
-    "policies:\n  no_oms:\n    triggers: [12]\n    answer: Нет ОМС\n",
+    "policies:\n  no_oms:\n    triggers: []\n    text_ref: policy.md#rule\n",
+    "policies:\n  no_oms:\n    triggers: [омс]\n    text_ref: policy.md#rule\n  no_dms: null\n",
+    "policies:\n  no_oms:\n    triggers: [12]\n    text_ref: policy.md#rule\n",
     "policies: [unterminated\n",
 ])
 def test_d1r_boundary_rejects_raw_malformed_policy_rows(tmp_path, monkeypatch, body) -> None:
     path = tmp_path / "clinic_policies.yaml"
     path.write_text(body, encoding="utf-8")
+    (tmp_path / "md").mkdir()
+    (tmp_path / "md/policy.md").write_text("### Правило {#rule}\nНет ОМС", encoding="utf-8")
     monkeypatch.setattr(loader, "_policies_path", lambda _cid: str(path))
     loader._CACHE.pop("demo", None)
     with pytest.raises(ValueError):

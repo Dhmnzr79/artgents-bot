@@ -5,8 +5,6 @@ topic: periodontology
 subtopic: periodontitis
 
 aliases:
-  - "лечение пародонтита"
-  - "пародонтит"
   - "парадонтит"
   - "лечение пародонтоза"
   - "пародонтоз"
@@ -14,7 +12,6 @@ aliases:
   - "кровоточат десны"
   - "шатаются зубы"
   - "оголились корни зубов"
-  - "воспаление десен"
 
 suggest_h3:
   - chto-proishodit-s-desnami

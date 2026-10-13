@@ -10,11 +10,26 @@
   },
   "package": {
     "label": "за один зуб; полная реставрация улыбки рассчитывается на консультации",
-    "includes": []
+    "includes": [
+      "планирование формы и цвета одного винира",
+      "подготовка зуба и получение слепка или скана",
+      "изготовление керамического винира E-max",
+      "примерка и фиксация"
+    ],
+    "excludes": [
+      "предварительное лечение зуба при необходимости"
+    ]
   },
   "fact_refs": [
+    "tax_deduction",
+    "installment_12",
     "free_implant_consult",
-    "installment_12"
+    "payment_stages",
+    "fixed_price"
   ],
-  "followups": []
+  "followups": [],
+  "applies_to_extents": [
+    "one_tooth",
+    "few_teeth"
+  ]
 }

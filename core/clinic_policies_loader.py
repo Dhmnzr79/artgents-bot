@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import re
+from pathlib import Path
 import threading
 from dataclasses import dataclass
 from typing import Any
@@ -48,6 +50,60 @@ def _policies_path(client_id: str) -> str:
     return os.path.join(root, "clients", client_id, "clinic_policies.yaml")
 
 
+def resolve_policy_text(row: dict, read_md) -> str:
+    """Read one explicit tenant MD section; never fall back to inline YAML."""
+    if any(key in row for key in ("answer", "approved_text", "note")):
+        raise ValueError("policy_inline_text_forbidden")
+    ref = row.get("text_ref")
+    match = re.fullmatch(r"([A-Za-z0-9_-]+\.md)#([A-Za-z0-9_-]+)", ref or "") if isinstance(ref, str) else None
+    if match is None:
+        raise ValueError("policy_text_ref_invalid")
+    filename, anchor = match.groups()
+    try:
+        text = read_md(filename)
+    except (OSError, KeyError, UnicodeError) as exc:
+        raise ValueError("policy_text_document_missing") from exc
+    lines = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL).splitlines()
+    starts = [i for i, line in enumerate(lines)
+              if re.fullmatch(r"#{1,6}\s+.+?\s+\{#" + re.escape(anchor) + r"\}\s*", line)]
+    if len(starts) != 1 or not lines[starts[0]].startswith("### "):
+        raise ValueError("policy_text_section_missing_or_duplicate")
+    start = starts[0] + 1
+    end = next((i for i in range(start, len(lines)) if re.match(r"^#{1,3}\s", lines[i])), len(lines))
+    result = "\n".join(lines[start:end]).strip()
+    if not result:
+        raise ValueError("policy_text_section_empty")
+    return result
+
+
+def validate_policy_text_refs(raw: dict, read_md) -> None:
+    if not isinstance(raw, dict):
+        raise ValueError("clinic_business_policies_malformed")
+    policies = raw.get("policies", {})
+    if not isinstance(policies, dict):
+        raise ValueError("clinic_business_policies_malformed")
+    rows = list(policies.values())
+    for key in ("service_alternatives", "brand_alternatives"):
+        values = raw.get(key, [])
+        if not isinstance(values, list):
+            raise ValueError("clinic_business_policies_malformed")
+        rows.extend(values)
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("clinic_business_policies_malformed")
+        resolve_policy_text(row, read_md)
+
+
+def _policy_md_reader(path):
+    root = (Path(path).parent / "md").resolve()
+    def read(filename):
+        target = (root / filename).resolve()
+        if not target.is_relative_to(root):
+            raise ValueError("policy_text_ref_outside_tenant")
+        return target.read_text(encoding="utf-8")
+    return read
+
+
 def validate_raw_clinic_business_policies(client_id: str) -> None:
     """Validate authored policy rows before the permissive legacy loader filters them."""
     path = _policies_path(resolve_pack_client_id(client_id))
@@ -68,7 +124,7 @@ def validate_raw_clinic_business_policies(client_id: str) -> None:
     for key, body in policies.items():
         if not isinstance(key, str) or not key.strip() or not isinstance(body, dict):
             raise ValueError("clinic_business_policies_malformed")
-        answer = body.get("answer")
+        answer = resolve_policy_text(body, _policy_md_reader(path))
         triggers = body.get("triggers")
         if not isinstance(answer, str) or not answer.strip():
             raise ValueError("clinic_business_policies_malformed")
@@ -99,7 +155,7 @@ def load_clinic_policies(client_id: str) -> ClinicPoliciesBundle | None:
             if not isinstance(body, dict):
                 continue
             triggers = body.get("triggers")
-            answer = str(body.get("answer") or "").strip()
+            answer = resolve_policy_text(body, _policy_md_reader(path))
             if not answer:
                 continue
             trig_list = (
@@ -120,7 +176,7 @@ def load_clinic_policies(client_id: str) -> ClinicPoliciesBundle | None:
                 continue
             mk = row.get("match_keywords")
             mention = str(row.get("mention") or "").strip()
-            note = str(row.get("note") or "").strip()
+            note = resolve_policy_text(row, _policy_md_reader(path))
             suggest_ref = str(row.get("suggest_ref") or row.get("ref") or "").strip() or None
             kw = (
                 [str(x).strip().lower() for x in mk if str(x).strip()]
@@ -155,7 +211,7 @@ def load_clinic_policies(client_id: str) -> ClinicPoliciesBundle | None:
     return bundle
 
 
-def _parse_authored_service_alternatives(raw: object) -> tuple[AuthoredServiceAlternative, ...]:
+def _parse_authored_service_alternatives(raw: object, read_md) -> tuple[AuthoredServiceAlternative, ...]:
     if not isinstance(raw, list):
         return ()
     out: list[AuthoredServiceAlternative] = []
@@ -166,7 +222,7 @@ def _parse_authored_service_alternatives(raw: object) -> tuple[AuthoredServiceAl
         if not requested_service_id:
             continue
         alt_ids_raw = row.get("alternative_service_ids")
-        approved_text = str(row.get("approved_text") or "").strip()
+        approved_text = resolve_policy_text(row, read_md)
         alt_ids = (
             [str(x).strip() for x in alt_ids_raw if str(x).strip()]
             if isinstance(alt_ids_raw, list)
@@ -204,7 +260,7 @@ def load_authored_service_alternatives(client_id: str) -> tuple[AuthoredServiceA
     else:
         with open(path, "r", encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
-        authored = _parse_authored_service_alternatives(raw.get("service_alternatives"))
+        authored = _parse_authored_service_alternatives(raw.get("service_alternatives"), _policy_md_reader(path))
     with _LOCK:
         _AUTHORED_ALTS_CACHE[cid] = authored
     return authored

@@ -1,4 +1,4 @@
-export const TECHNICAL_ERROR_MESSAGE = "Не получилось показать ответ. Понимаю, что это неудобно";
+export const TECHNICAL_ERROR_MESSAGE = "Сейчас не получилось ответить. Понимаю, что это неудобно. Попробуйте задать другой вопрос.";
 
 // Presentation only: never publish exception details or claim a lead outcome.
 export function friendlyErrorMessage(error) {

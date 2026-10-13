@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
+from core.clinic_policies_loader import resolve_policy_text
+
 from pathlib import Path
 
 import yaml
 
 from contracts.d2_tenant_snapshot import D2ModelView, D2TenantSnapshot
+from contracts.response_schema import ResponseDataCatalog
 from contracts.one_call_envelope import OneCallEnvelope
 from contracts.response_plan import (
     CodeOwnedTerminalCandidate,
     ComposerResult,
     ComposerSelectedRouteAuthority,
     D2PolicyFactBlock,
+    D2ResolvedRequestPart,
+    D2SourceResult,
+    D2ExactTextBlock,
     PreComposerPlan,
     PricePlan,
     RouteModePair,
@@ -28,7 +34,6 @@ from contracts.response_plan_adapter import ResponsePlanAdapterUiAuthority, Resp
 from contracts.response_plan_materialization import (
     D2CommercialAuthority,
     D2CommercialPackageAuthority,
-    D2CommercialPromoAuthority,
     D2CompatibilityGroupAuthority,
     D2DirectionAuthority,
     D2DirectionPricePresentation,
@@ -232,14 +237,9 @@ def build_d2_snapshot_sources(
     # snapshot-binding hard errors. Foreign tenant identity stays fatal above.
     # Soft-fail happens in the materializer as d2_content_source_missing.
 
-    # Broad prices require explicit authored direction membership and order.
+    # Ordinary price availability belongs to materialization. Missing authored
+    # overview must not discard independently answerable operations.
     configured_topics = {item.topic_id for item in model_view.direction_prices}
-    if any(
-        request.kind == "price" and request.service_id is None and request.topic_id is not None
-        and request.topic_id not in configured_topics
-        for request in operations
-    ):
-        raise D2SnapshotBindingError("direction_overview_not_configured")
 
     tone = _yaml_file(snapshot, "tone.yaml")
     ui_yaml = _yaml_file(snapshot, "ui.yaml")
@@ -279,11 +279,12 @@ def build_d2_snapshot_sources(
                              service_ids=item.service_ids, ordered_offer_ids=item.offer_ids)
         for item in model_view.direction_prices
     )
+    bundle = build_d2_bundle(snapshot)
     return ResponsePlanMaterializationSources(
         session_key=session_key,
         context_strategy="full_context",
         transport_kind=transport_kind,  # type: ignore[arg-type]
-        material_authority=PostComposerMaterialAuthority(source_client_id=snapshot.client_id, bundle=build_d2_bundle(snapshot)),
+        material_authority=PostComposerMaterialAuthority(source_client_id=snapshot.client_id, bundle=bundle),
         d2_published_terms_by_offer={term.offer_id: term for term in model_view.published_terms},
         ui_authority=ui_authority,
         d2_authored_content=snapshot.content,
@@ -312,7 +313,7 @@ def build_d2_snapshot_sources(
         shown_d2_secondary_ref_ids=shown_secondary_ref_ids,
         shown_promo_fact_ids=shown_promo_fact_ids,
         d2_snapshot_fingerprint=snapshot.fingerprint,
-        d2_commercial=_commercial_authority(snapshot.client_id, model_view),
+        d2_commercial=_commercial_authority(snapshot.client_id, model_view, bundle),
     )
 
 
@@ -344,16 +345,10 @@ def _volume_choices_for_topic(
     )
 
 
-def _commercial_authority(client_id: str, model_view: D2ModelView) -> D2CommercialAuthority:
+def _commercial_authority(client_id: str, model_view: D2ModelView, bundle: ResponseDataCatalog) -> D2CommercialAuthority:
     pack = model_view.commercial
     return D2CommercialAuthority(
         source_client_id=client_id,
-        promo_facts=tuple(
-            D2CommercialPromoAuthority(
-                source_client_id=client_id, fact_id=item.fact_id, short_text=item.short_text, full_text=item.full_text,
-            )
-            for item in pack.promo_facts
-        ),
         price_booster_packages=tuple(
             D2CommercialPackageAuthority(
                 source_client_id=client_id, package_id=item.package_id, name=item.name, body_text=item.body_text,
@@ -368,7 +363,7 @@ def _commercial_authority(client_id: str, model_view: D2ModelView) -> D2Commerci
         ),
         service_profiles=tuple(
             D2ServiceCommercialProfileAuthority(
-                source_client_id=client_id, service_id=item.service_id, promo_refs=item.promo_refs,
+                source_client_id=client_id, service_id=item.service_id,
                 price_booster_id=item.price_booster_id, also_list_id=item.also_list_id,
                 price_detail_ids=item.price_detail_ids,
             )
@@ -485,7 +480,7 @@ def resolve_d2_clarify_service_topic(
         service = snapshot.bundle.services.get(service_id)
         if service is None or not service.active or not service.content_ref:
             return None
-        topic = _frontmatter(snapshot, service.content_ref).get("topic")
+        topic = snapshot.service_topics.get(service_id)
         if not isinstance(topic, str) or not topic.strip():
             return None
         topics.add(topic)
@@ -593,7 +588,7 @@ def d2_authored_policy_answers(snapshot: D2TenantSnapshot) -> dict[str, str]:
     for key, body in raw.items():
         if not isinstance(key, str) or not isinstance(body, dict):
             continue
-        answer = body.get("answer")
+        answer = resolve_policy_text(body, lambda name: dict(snapshot.files)["md/" + name].decode("utf-8"))
         if isinstance(answer, str) and answer.strip():
             out[key] = answer.strip()
     return out
@@ -613,7 +608,7 @@ def _authored_service_alternative(
         requested = str(row.get("requested_service_id") or "").strip()
         if requested != service_id:
             continue
-        approved = str(row.get("approved_text") or "").strip()
+        approved = resolve_policy_text(row, lambda name: dict(snapshot.files)["md/" + name].decode("utf-8"))
         alt_raw = row.get("alternative_service_ids")
         alts = (
             [str(item).strip() for item in alt_raw if str(item).strip()]
@@ -735,21 +730,10 @@ def build_d2_unknown_brand_response(
         raise D2SnapshotBindingError("brand_client_mismatch")
     if brand_id in build_d2_bundle(snapshot).brands.brands:
         raise D2SnapshotBindingError("brand_is_known")
-    text = _INFO_GAP
-    rows = _clinic_policies_raw(snapshot).get("service_alternatives")
-    if isinstance(rows, list):
-        for row in rows:
-            if not isinstance(row, dict) or row.get("suggest_ref") != "implantation__info__implant_systems.md#korotko":
-                continue
-            keywords = row.get("match_keywords")
-            if isinstance(keywords, list) and brand_id.casefold() in {
-                str(item).strip().casefold() for item in keywords
-            }:
-                approved = row.get("note")
-                if isinstance(approved, str) and approved.strip():
-                    text = approved.strip()
-                break
-    return _d2_code_owned_answer(session_key=session_key, text=text, route="ANSWER")
+    policy = build_d2_brand_policy_response(snapshot, session_key=session_key, brand_id=brand_id)
+    if policy is not None:
+        return policy
+    return _d2_code_owned_answer(session_key=session_key, text=_INFO_GAP, route="ANSWER")
 
 
 def build_d2_unknown_reference_response(
@@ -783,9 +767,10 @@ def build_d2_brand_policy_response(
     for row in raw:
         if not isinstance(row, dict) or row.get("requested_brand_id") != brand_id:
             continue
-        text = row.get("approved_text")
+        text = resolve_policy_text(row, lambda name: dict(snapshot.files)["md/" + name].decode("utf-8"))
         if isinstance(text, str) and text.strip():
-            return _d2_code_owned_answer(session_key=session_key, text=text.strip(), route="ANSWER")
+            return _d2_code_owned_answer(session_key=session_key, text=text.strip(), route="ANSWER",
+                source_results=(D2SourceResult(source_ref=f"brand_policy:{brand_id}", outcome="answered"),))
     return None
 
 
@@ -845,6 +830,13 @@ def build_d2_service_availability_response(
         code_owned_answer=True,
     )
     resolved = resolve_response_plan(plan, composer)
+    published_text = render_response_text(resolved)
+    resolved = resolved.model_copy(update={"patient_text": None,
+        "d2_exact_text_blocks": (D2ExactTextBlock(request_id="r1", source_client_id=snapshot.client_id, display_text=published_text),),
+        "d2_request_parts": (D2ResolvedRequestPart(
+        request_id="r1", kind="reference", status="answered", scope="service", service_id=service_id,
+        source_results=(D2SourceResult(source_ref=f"service_alternative:{service_id}", outcome="answered"),),
+    ),)})
     return MaterializedResponseOutcome(
         resolved=resolved,
         rendered_text=render_response_text(resolved),
@@ -862,6 +854,7 @@ def _d2_code_owned_answer(
     session_key: SessionKey,
     text: str,
     route: str,
+    source_results: tuple[D2SourceResult, ...] = (),
 ) -> MaterializedResponseOutcome:
     plan = PreComposerPlan(
         session_key=session_key,
@@ -885,6 +878,13 @@ def _d2_code_owned_answer(
         code_owned_answer=(route == "ANSWER"),
     )
     resolved = resolve_response_plan(plan, composer)
+    if source_results:
+        resolved = resolved.model_copy(update={"patient_text": None,
+            "d2_exact_text_blocks": (D2ExactTextBlock(request_id="r1", source_client_id=session_key.client_id, display_text=text),),
+            "d2_request_parts": (D2ResolvedRequestPart(
+            request_id="r1", kind="reference", status="answered", scope="clinic",
+            source_results=source_results,
+        ),)})
     return MaterializedResponseOutcome(
         resolved=resolved,
         rendered_text=render_response_text(resolved),

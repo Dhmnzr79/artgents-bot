@@ -65,10 +65,10 @@ def test_payment_terms_document_present_for_cleanup() -> None:
 
 def test_facts_have_payment_terms_detail_refs() -> None:
     facts = json.loads(_FACTS_PATH.read_text(encoding="utf-8"))
-    assert facts["installment_12"]["detail_ref"] == "clinic__info__payment_terms.md#rassrochka"
-    assert facts["payment_stages"]["detail_ref"] == "clinic__info__payment_terms.md#oplata-po-etapam"
-    assert facts["tax_deduction"]["detail_ref"] == "clinic__info__payment_terms.md#nalogovyj-vychet"
-    assert facts["fixed_price"]["detail_ref"] == "clinic__info__payment_terms.md#fiksatsiya-stoimosti"
+    assert facts["installment_12"]["detail_ref"] == "clinic__info__payment_terms.md#korotko"
+    assert facts["payment_stages"]["detail_ref"] == "clinic__info__payment_terms.md#korotko"
+    assert facts["tax_deduction"]["detail_ref"] == "clinic__info__payment_terms.md#korotko"
+    assert facts["fixed_price"]["detail_ref"] == "clinic__info__payment_terms.md#korotko"
     assert facts["free_implant_consult"]["detail_ref"].startswith("clinic__info__promo__")
 
 

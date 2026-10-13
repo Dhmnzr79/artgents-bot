@@ -401,3 +401,20 @@ def test_late_clock_failure_preserves_result_exception_and_context(monkeypatch, 
     assert len(clock_calls) == 1  # The late failure was actually exercised.
     assert diagnostics._current.get() is None
     assert SECRET not in json.dumps(events, ensure_ascii=False)
+
+
+@pytest.mark.parametrize("reason", ["d2_native_reply_empty_or_rejected", "d2_native_reply_required", "d2_native_response_empty", "text_tail_empty_or_rejected", "text_tail_string_required", "d2_text_response_empty"])
+def test_native_failure_reason_is_exact_and_observer_remains_text_free(monkeypatch, reason):
+    events = []
+    monkeypatch.setattr(diagnostics, "_write", lambda fields: events.append(dict(fields)))
+    import core.d2_full_audit as audit
+    monkeypatch.setattr(audit, "full_audit", lambda *args, **kwargs: None)
+    with diagnostics._Bound(diagnostics._begin()):
+        diagnostics.stage("parse")
+        diagnostics.failure(ValueError(reason, SECRET))
+    failed = event_rows(events, "failure")
+    assert len(failed) == 1
+    assert failed[0]["reason"] == reason
+    assert failed[0]["stage"] == "parse"
+    assert SECRET not in json.dumps(events, ensure_ascii=False)
+    assert diagnostics._current.get() is None

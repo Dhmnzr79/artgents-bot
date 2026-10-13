@@ -1,5 +1,5 @@
 # Local demo launcher for the one owner-approved Windows checkout.
-# Never stops an existing process or sends a request to the bot.
+# Never stops an unrelated process or sends a request to the bot.
 $ErrorActionPreference = "Stop"
 
 $expectedRoot = "C:\Cursor Projects\artgents-bot-active"
@@ -41,6 +41,7 @@ Write-Host "Bot folder: $repoRoot"
 Write-Host "Branch: $branch; commit: $head"
 Write-Host "Widget: http://127.0.0.1:9001/static/widget-test.html"
 Write-Host "Stop this bot with Ctrl+C."
+Write-Host "Auto-restart is ON for Python changes. Keep this terminal open."
 
 Push-Location -LiteralPath $repoRoot
 try {
@@ -67,7 +68,7 @@ if enabled:
     if ($LASTEXITCODE -ne 0) {
         throw "Log write check failed. Bot was not started."
     }
-    & $python -m flask --app app run --host 127.0.0.1 --port 9001 --no-reload
+    & $python -m flask --app app run --host 127.0.0.1 --port 9001 --reload --no-debugger
 } finally {
     Pop-Location
 }

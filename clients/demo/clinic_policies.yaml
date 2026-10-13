@@ -16,76 +16,31 @@ policies:
       - "детям"
       - "малыш"
       - "несовершеннолет"
-    answer: >-
-      Мы работаем только со взрослыми пациентами — детскую стоматологию в клинике не ведём.
-      Если вопрос по взрослому лечению — подскажу по услугам клиники.
+    text_ref: clinic__info__policies.md#no_pediatric_dentistry
 
   no_oms:
     triggers:
       - "омс"
       - "полис омс"
       - "по омс"
-    answer: >-
-      По полису ОМС мы не работаем — лечение идёт на платной основе.
-      Могу подсказать по стоимости и условиям оплаты.
+    text_ref: clinic__info__policies.md#no_oms
 
   no_dms:
     triggers:
       - "дмс"
       - "полис дмс"
       - "по дмс"
-    answer: >-
-      По ДМС напрямую не работаем — оплата по договору с клиникой (наличные, карта, рассрочка).
-      Подробности по оплате могу подсказать отдельно.
+    text_ref: clinic__info__policies.md#no_dms
 
 service_alternatives:
   - requested_service_id: braces
     alternative_service_ids:
       - aligners
-    approved_text: >-
-      Брекеты мы не устанавливаем. Для выравнивания зубов
-      в клинике используются элайнеры.
-
-  - match_keywords:
-      - "брекет"
-    mention: "элайнеры"
-    suggest_ref: "orthodontics__service__aligners.md#korotko"
-    note: >-
-      Брекеты мы не устанавливаем; для выравнивания зубов у нас есть элайнеры — прозрачные капы.
-      Могу кратко рассказать про элайнеры и сориентировать по стоимости.
-
-  - match_keywords:
-      - "базальн"
-      - "basal"
-    mention: "классическая имплантация"
-    suggest_ref: "implantation__service__classic.md#korotko"
-    note: >-
-      Базальную имплантацию мы не проводим. Работаем с проверенными протоколами классической
-      и одномоментной имплантации, All-on-4/6 и костной пластикой — по показаниям после диагностики.
-
-  - match_keywords:
-      - "мини-имплант"
-      - "мини имплант"
-    mention: "классическая имплантация"
-    suggest_ref: "implantation__service__classic.md#korotko"
-    note: >-
-      Мини-импланты не используем как основной протокол. Для постоянного результата обычно
-      подбираем стандартные системы имплантов после осмотра и КТ.
-
-  - match_keywords:
-      - "osstem"
-      - "ossstem"
-      - "остем"
-    mention: "Implantium, Impro, Nobel Biocare"
-    suggest_ref: "implantation__info__implant_systems.md#korotko"
-    note: >-
-      Osstem в ассортименте нет. Работаем с Implantium, Impro и Nobel Biocare — могу рассказать
-      про отличия систем и ориентиры по стоимости «под ключ».
+    text_ref: clinic__info__policies.md#braces
 
 brand_alternatives:
   - requested_brand_id: osstem
-    approved_text: >-
-      Osstem в ассортименте нет. Работаем с Implantium, Impro и Nobel Biocare.
+    text_ref: clinic__info__policies.md#brendy
 
 service_not_offered_template: >-
   К сожалению, услугу «{requested_service}» в нашей клинике не оказываем.

@@ -20,16 +20,16 @@ from contracts.d2_session_context import (
     D2SessionActivity, D2SessionTtlPolicy, D2SessionState, D2SessionSnapshot,
     D2_SESSION_SCHEMA_VERSION, empty_d2_session_snapshot,
 )
-from contracts.response_plan import D2PriceDetailUiAction, SessionKey
+from contracts.response_plan import D2PriceDetailUiAction, D2PriceSelectUiAction, SessionKey
 from contracts.d2_dialogue_result import (
     DiscussionScope, DiscussionVolume, D2DialogueResult, PriceOperation, ExplanationOperation, DetailOperation,
-    ContactOperation, DoctorsOperation, PolicyOperation, CommercialOperation,
-    ClarifiedOperation, PendingExplanationOperation, D2ExplanationTask,
+    ContactOperation, D2RejectedOperation, D2ParsedDialogueResult, parse_d2_text_reply,
+    ClarifiedOperation, D2ExplanationTask,
     ServiceTarget, TopicTarget, UnresolvedTarget, ScopedOperation, OffTopicOperation,
 )
 from contracts.response_plan import (
-    D2ExactTextBlock, D2ResolvedRequestPart, D2PartDeferredBlock,
-    D2_CLARIFICATION_DEFERRAL_TEXT,
+    D2ExactTextBlock, D2ResolvedRequestPart, D2PartFailureBlock, D2SourceResult,
+    D2_OPERATION_FAILURE_TEXT,
 )
 from contracts.response_plan_materialization import D2SelectedDocumentAction
 from contracts.response_plan_session import (
@@ -63,13 +63,9 @@ from core.d2_snapshot_sources import (
     build_d2_document_task,
 )
 from core.d2_spam_gate import build_d2_spam_gate_response, is_d2_garbage_message
-from core.d2_contacts_cta import build_d2_contact_fact_block
+from core.d2_contacts_cta import build_d2_contact_fact_block, D2ContactReferenceError
 from core.d2_offtopic import build_d2_offtopic_response
-from core.d2_directory import build_d2_directory_response
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
-from core.one_call_envelope_protocol import (
-    parse_production_envelope_json,
-)
 from core.response_plan_materialization import resolve_d2_operations
 from core.user_text_privacy import provider_message_has_substance, provider_safe_user_text
 from core.clinic_policy_resolver import resolve_clinic_policy_operations
@@ -108,23 +104,19 @@ def _turn_from_completion(completion: D2CompletedTurn, *, idempotent_replay: boo
 def _shown_secondary_ref_ids(response) -> tuple[str, ...]:
     ui = response.ui_projection
     shown = [ui.video.video_id] if ui.video is not None else []
-    price_refs = {item.reply_id for item in response.resolved.ui_plan.price_detail_actions}
+    price_refs = {item.reply_id for item in (*response.resolved.ui_plan.price_detail_actions,
+                                           *response.resolved.ui_plan.price_select_actions)}
     shown.extend(item.reply_id for item in ui.quick_replies if item.reply_id not in price_refs)
     return tuple(shown)
-
-
-def _bounded_d2_text(value: str, *, limit: int) -> str:
-    """Keep only bounded, provider-safe prose in the D2 dialogue memory."""
-    return value.strip()[:limit].strip()
 
 
 def _apply_lead_pause_without_detail_actions(response):
     # Lead resume/cancel owns the sole navigation channel while paused.
     # Drop the private action map together with the visible detail replies.
     ui = response.resolved.ui_plan
-    if ui.price_detail_actions:
+    if ui.price_detail_actions or ui.price_select_actions:
         resolved = response.resolved.model_copy(update={
-            "ui_plan": ui.model_copy(update={"price_detail_actions": ()}),
+            "ui_plan": ui.model_copy(update={"price_detail_actions": (), "price_select_actions": ()}),
         })
         response = replace(response, resolved=resolved)
     return apply_d2_lead_pause_ui(response)
@@ -231,12 +223,21 @@ def run_d2_dialogue_turn(
         selected_ui_ref: D2SelectedUiRef | None = None
         selected_document_action: D2SelectedDocumentAction | None = None
         selected_price_detail_action: D2PriceDetailUiAction | None = None
+        selected_price_select_action: D2PriceSelectUiAction | None = None
+        selected_price_select_actions = ()
         selected_volume_price_task: _SelectedVolumePriceTask | None = None
         if lead_ui_ref and ui_revision is not None:
-            shown = store.read_latest_completion(session_key)
+            price_selection = lead_ui_ref.startswith("price_select:")
+            historical_price_ui = price_selection or lead_ui_ref.startswith("volume:")
+            if historical_price_ui and ((d2_lead_session_client_matches(session_key)
+                    and peek_lead_paused(session_key.sid)) or d2_lead_needs_pre_provider(
+                    session_key=session_key, lead_ui_ref=None, user_message="")):
+                raise ValueError("d2_stale_ui_action")
+            shown = (store.read_completion_at_revision(session_key, ui_revision)
+                     if historical_price_ui else store.read_latest_completion(session_key))
             if (
                 previous is None or shown is None or early_context.freshness != "fresh"
-                or previous.state.revision != ui_revision
+                or (not historical_price_ui and previous.state.revision != ui_revision)
                 or shown.committed_revision != ui_revision
             ):
                 raise ValueError("d2_stale_ui_action")
@@ -260,13 +261,21 @@ def run_d2_dialogue_turn(
                         (item for item in shown.response.resolved.ui_plan.price_detail_actions
                          if item.reply_id == reply.reply_id), None,
                     )
-                    if selected_price_detail_action is None:
+                    selected_price_select_action = next((item
+                        for item in shown.response.resolved.ui_plan.price_select_actions
+                        if item.reply_id == reply.reply_id), None)
+                    if price_selection and selected_price_select_action is None:
+                        raise ValueError("d2_unauthorized_ui_action")
+                    if selected_price_select_action is not None:
+                        selected_price_select_actions = shown.response.resolved.ui_plan.price_select_actions
+                    if selected_price_detail_action is None and selected_price_select_action is None:
                         selected_document_action = resolve_d2_selected_document_action(
                             tenant, reply_id=reply.reply_id,
                             source_revision=ui_revision,
                             shown_source_content_ref=shown.response.resolved.ui_plan.source_content_ref,
                         )
-                    if selected_document_action is None and selected_price_detail_action is None:
+                    if (selected_document_action is None and selected_price_detail_action is None
+                            and selected_price_select_action is None):
                         source = shown.response.resolved.d2_price_scope_decision
                         if source is not None:
                             choice = next((
@@ -291,6 +300,8 @@ def run_d2_dialogue_turn(
                                     brand_id=source.brand_id,
                                     extent=choice.extent,
                                 )
+                    if lead_ui_ref.startswith("volume:") and selected_volume_price_task is None:
+                        raise ValueError("d2_unauthorized_ui_action")
         full_audit(
             "ui_binding", effective_ref=lead_ui_ref,
             selected_ui_ref=selected_ui_ref,
@@ -408,6 +419,8 @@ def run_d2_dialogue_turn(
             selected_ui_ref=selected_ui_ref,
             selected_document_action=selected_document_action,
             selected_price_detail_action=selected_price_detail_action,
+            selected_price_select_action=selected_price_select_action,
+            selected_price_select_actions=selected_price_select_actions,
             selected_volume_price_task=selected_volume_price_task,
             selected_service_id=(
                 lead_ui_ref.removeprefix("service:")
@@ -575,9 +588,11 @@ def _commit_non_price_d2_turn(
     if ttl_policy is not None:
         refs = snapshot.state.dialogue_pairs if context.freshness == "fresh" else ()
         if (response.resolved.route in {"ANSWER", "CLARIFY"}
-            or (response.resolved.route == "ADMIN" and response.resolved.mode == "medical_terminal")) and (selected_ui_ref is not None or safe_user_message):
+            or (response.resolved.route == "ADMIN" and response.resolved.mode == "medical_terminal")) and (selected_ui_ref is not None or safe_user_message) and not (
+                response.resolved.d2_request_parts and all(p.kind == "lead"
+                    for p in response.resolved.d2_request_parts)):
             ref = D2DialogueReceiptRef(request_id=request_id,
-                patient_text=_bounded_d2_text(safe_user_message, limit=ttl_policy.history_text_max_chars) if selected_ui_ref is None else None,
+                patient_text=safe_user_message if selected_ui_ref is None else None,
                 selected_ui_ref=selected_ui_ref, committed_at_turn=turn)
             refs = (*refs, ref)[-ttl_policy.history_pair_limit:]
         state = state.model_copy(update={"dialogue_pairs": refs})
@@ -631,6 +646,8 @@ def _run_reserved_d2_dialogue_turn(
     selected_ui_ref: D2SelectedUiRef | None = None,
     selected_document_action: D2SelectedDocumentAction | None = None,
     selected_price_detail_action: D2PriceDetailUiAction | None = None,
+    selected_price_select_action: D2PriceSelectUiAction | None = None,
+    selected_price_select_actions=(),
     selected_volume_price_task: _SelectedVolumePriceTask | None = None,
     selected_service_id: str | None = None,
 ) -> D2DialogueTurn:
@@ -660,19 +677,23 @@ def _run_reserved_d2_dialogue_turn(
             raise ValueError("d2_ui_service_task_missing")
         if selected_service_id not in view.active_service_catalog.active_service_ids:
             raise ValueError("d2_ui_service_selection_mismatch")
-        # A verified click completes the task as a regular operation,
-        # rather than retaining the narrower unresolved-price subtype.
-        task_type = D2ExplanationTask if isinstance(pending, PendingExplanationOperation) else D2DialogueResult
-        known_task = task_type.model_validate({"outcome": "dialogue", "blocks": [{
+        # A verified click executes the saved price with the selected service.
+        known_task = D2DialogueResult.model_validate({"outcome": "dialogue", "blocks": [{
             **pending.model_dump(exclude={"clarification"}),
             "target": {"type": "service", "id": selected_service_id},
         }]})
+    elif selected_price_select_action is not None:
+        descriptor = selected_price_select_action.discussion_scope
+        known_task = D2DialogueResult(outcome="dialogue", blocks=(PriceOperation(
+            request_id="r1", kind="price", target=descriptor.target,
+            volume=descriptor.volume, brand_id=descriptor.brand_id,
+        ),))
     elif selected_volume_price_task is not None:
         known_task = _volume_price_task(selected_volume_price_task)
     elif selected_document_action is not None:
         known_task = build_d2_document_task(tenant, selected_document_action)
     elif selected_price_detail_action is not None:
-        known_task = D2DialogueResult(outcome="dialogue", blocks=(DetailOperation(
+        known_task = D2ParsedDialogueResult(outcome="dialogue", blocks=(DetailOperation(
             request_id="r1", kind="price_detail",
             target=(ServiceTarget(type="service", id=selected_price_detail_action.service_id)
                     if selected_price_detail_action.service_id else None),
@@ -692,7 +713,13 @@ def _run_reserved_d2_dialogue_turn(
             descriptor = source_parts[0].discussion_scope
             # Execute the scope captured by the shown source, not a semantic carry.
             task = known_task.blocks[0].model_copy(update={"target": descriptor.target, "volume": descriptor.volume, "brand_id": descriptor.brand_id})
-            known_task = type(known_task).model_validate({"outcome": "dialogue", "blocks": [task.model_dump()]})
+            if selected_price_detail_action is not None:
+                known_task = D2ParsedDialogueResult(outcome="dialogue", blocks=(task,))
+            else:
+                known_task = type(known_task).model_validate({"outcome": "dialogue", "blocks": [task.model_dump()]})
+    from contracts.d2_dialogue import D2PriceToolReply
+    from contracts.d2_dialogue_result import split_d2_text_reply
+    price_reply = None
     needs_explanation = isinstance(known_task, D2ExplanationTask)
     if known_task is not None and not needs_explanation:
         result = known_task
@@ -707,12 +734,14 @@ def _run_reserved_d2_dialogue_turn(
         raw = provider.generate(provider_input)
         full_audit("raw_model_response", raw=raw)
         diagnostics.stage("parse")
-        result = parse_production_envelope_json(
-            raw, active_service_catalog=view.active_service_catalog,
-            service_reference_catalog=view.service_reference_catalog,
-            commercial_fact_catalog=view.commercial_fact_catalog,
-            known_task=known_task, d2_contract=True,
-        )
+        if isinstance(raw, D2PriceToolReply):
+            price_reply = raw
+            result = raw.result
+        else:
+            result = parse_d2_text_reply(
+                raw, active_service_ids=view.active_service_catalog.active_service_ids,
+                known_task=known_task,
+            )
     full_audit("parsed_result", result=result)
     commit_args = dict(
         session_key=session_key, store=store, snapshot=snapshot, context=context,
@@ -729,7 +758,8 @@ def _run_reserved_d2_dialogue_turn(
         return _commit_non_price_d2_turn(response=response, **commit_args)
     if context.retained_terminal_state not in {"none", "clarify", "spam_warn", "medical_terminal"}:
         raise ValueError("d2_experiment_terminal_session_unsupported")
-    booking_blocks = tuple(block for block in result.blocks if block.kind == "booking")
+    booking_blocks = tuple(block for block in result.blocks
+        if block.kind == "booking" and not isinstance(block, D2RejectedOperation))
     if lead_bridge:
         if not d2_lead_session_client_matches(session_key):
             raise ValueError("d2_lead_session_client_required")
@@ -741,15 +771,27 @@ def _run_reserved_d2_dialogue_turn(
 
     operations, contact_blocks, policy_blocks = [], [], []
     exact_text, exact_parts, extra_ui, deferred = [], [], [], []
-    exact_deferred = []
+    exact_failures = []
+
+    def reject_part(block):
+        kind = block.kind if block.kind in {"price", "price_detail", "content", "contact"} else "reference"
+        exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
+            kind=kind, status="unavailable", scope="clinic", failure_reason="d2_operation_invalid"))
+        exact_failures.append(D2PartFailureBlock(request_id=block.request_id,
+            source_client_id=session_key.client_id, reason="d2_operation_invalid",
+            message_id="d2-operation-invalid",
+            display_text=D2_OPERATION_FAILURE_TEXT))
+
     pending = None
     first_price_seen = False
     contact_button = canonical_contact = None
-    commercial_operations = []
-    directory_cta = None
     suppress_forbidden_booking_cta = False
     policy_keys = d2_authored_policy_answers(tenant)
     for block in result.blocks:
+        if isinstance(block, D2RejectedOperation):
+            first_price_seen |= block.kind == "price"
+            reject_part(block)
+            continue
         if block.kind == "booking":
             continue
         is_price = isinstance(block, PriceOperation)
@@ -757,21 +799,6 @@ def _run_reserved_d2_dialogue_turn(
             deferred.append(block)
             continue
         first_price_seen |= is_price
-        if isinstance(block, DoctorsOperation):
-            answer = build_d2_directory_response(
-                tenant, session_key=session_key, kind="doctors_for_service",
-                service_id=block.service_id, as_of=now.date(),
-            )
-            exact_text.append(D2ExactTextBlock(request_id=block.request_id,
-                source_client_id=session_key.client_id, display_text=answer.rendered_text))
-            exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
-                kind="doctors", status="answered", scope="service", service_id=block.service_id,
-                discussion_scope=DiscussionScope(target=block.target),
-                topic_id=resolve_d2_clarify_service_topic(tenant, (block.service_id,))))
-            directory_cta = directory_cta or next(
-                (button for button in answer.resolved.ui_plan.buttons if button.action_kind == "cta"), None,
-            )
-            continue
         if isinstance(block, OffTopicOperation):
             answer = build_d2_offtopic_response(tenant, session_key=session_key)
             exact_text.append(D2ExactTextBlock(request_id=block.request_id,
@@ -781,16 +808,9 @@ def _run_reserved_d2_dialogue_turn(
             continue
         clarification = getattr(block, "clarification", None)
         if clarification is not None:
-            # For price, only unresolved service/term tasks reach this branch.
-            # Content/detail also keep their agreed parameter clarifications.
+            # Only unresolved price service/term tasks reach this branch.
             if pending is not None:
-                if is_price:
-                    deferred.append(block)
-                else:
-                    exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
-                        kind="clarification", status="deferred", scope="clinic"))
-                    exact_deferred.append(D2PartDeferredBlock(request_id=block.request_id,
-                        source_client_id=session_key.client_id, display_text=D2_CLARIFICATION_DEFERRAL_TEXT))
+                deferred.append(block)
                 continue
             pending = block
             answer = build_d2_focus_clarify_response(
@@ -800,37 +820,21 @@ def _run_reserved_d2_dialogue_turn(
             exact_text.append(D2ExactTextBlock(request_id=block.request_id,
                 source_client_id=session_key.client_id, display_text=answer.rendered_text))
             exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
-                kind="price_clarification" if is_price else "clarification", status="answered", scope="clinic"))
+                kind="price_clarification", status="answered", scope="clinic"))
             extra_ui.extend(answer.resolved.ui_plan.quick_replies)
             continue
         if isinstance(block, ContactOperation):
-            text, button, canonical = build_d2_contact_fact_block(
-                tenant, session_key=session_key, request_id=block.request_id,
-                contact_fields=block.contact_fields, contact_branch_id=block.contact_branch_id,
-            )
+            try:
+                text, button, canonical = build_d2_contact_fact_block(
+                    tenant, session_key=session_key, request_id=block.request_id,
+                    contact_fields=block.contact_fields, contact_branch_id=block.contact_branch_id,
+                )
+            except D2ContactReferenceError:
+                reject_part(block)
+                continue
             contact_blocks.append(text)
             contact_button = contact_button or button
             canonical_contact = canonical_contact or canonical
-            continue
-        if isinstance(block, PolicyOperation):
-            policy = resolve_clinic_policy_operations(client_id=session_key.client_id,
-                operations=(block,), policy_keys=policy_keys)
-            suppress_forbidden_booking_cta |= policy.suppress_forbidden_booking_cta
-            answer = build_d2_clinic_policy_response(
-                tenant, session_key=session_key, request=block, policy_result=policy,
-            )
-            # Rules have already been applied to this local operation. The final
-            # renderer receives code-owned text, not a second route decision.
-            exact_text.append(D2ExactTextBlock(request_id=block.request_id,
-                source_client_id=session_key.client_id, display_text=answer.rendered_text,
-                policy_ids=tuple(dict.fromkeys(d.policy_key for d in policy.decisions
-                    if d.outcome == "allowed_by_known_rules" and d.policy_key))))
-            exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
-                kind="clarification" if answer.resolved.route == "CLARIFY" else "reference",
-                status="answered", scope="clinic"))
-            continue
-        if isinstance(block, CommercialOperation):
-            commercial_operations.append(block)
             continue
         if isinstance(block, PriceOperation):
             policy = resolve_clinic_policy_operations(client_id=session_key.client_id,
@@ -838,16 +842,16 @@ def _run_reserved_d2_dialogue_turn(
             suppress_forbidden_booking_cta |= policy.suppress_forbidden_booking_cta
             blocked = tuple(d.policy_key for d in policy.decisions if d.outcome == "blocked" and d.policy_key)
             if blocked:
-                rule = PolicyOperation(request_id=block.request_id, kind="clinic_policy",
-                    policy_ids=blocked, age_group=block.age_group, context=block.context)
                 answer = build_d2_clinic_policy_response(tenant, session_key=session_key,
-                    request=rule, policy_result=policy)
+                    request=block, policy_result=policy)
                 exact_text.append(D2ExactTextBlock(request_id=block.request_id,
                     source_client_id=session_key.client_id, display_text=answer.rendered_text,
                     policy_ids=blocked))
                 exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
                     kind="price_reference", status="answered",
                     scope="clinic",
+                    source_results=tuple(D2SourceResult(source_ref=f"policy:{policy_id}", outcome="answered")
+                        for policy_id in blocked),
                     discussion_scope=DiscussionScope(target=block.target, volume=block.volume, brand_id=block.brand_id)
                         if isinstance(block.target, (ServiceTarget, TopicTarget)) else None))
                 continue
@@ -863,6 +867,9 @@ def _run_reserved_d2_dialogue_turn(
                     discussion_scope=DiscussionScope(target=block.target, volume=block.volume, brand_id=block.brand_id)
                         if isinstance(block.target, (ServiceTarget, TopicTarget)) else None))
                 continue
+        if isinstance(block, ExplanationOperation):
+            operations.append(block)
+            continue
         target = getattr(block, "target", None)
         brand = getattr(block, "brand_id", None)
         reference_response = None
@@ -881,12 +888,19 @@ def _run_reserved_d2_dialogue_turn(
                 kind="price_reference" if is_price else "reference", status="answered",
                 scope="service" if isinstance(target, ServiceTarget) else "clinic",
                 service_id=target.id if isinstance(target, ServiceTarget) else None,
-                brand_id=brand))
+                topic_id=target.id if isinstance(target, TopicTarget) else None,
+                brand_id=brand,
+                source_results=tuple(s for part in reference_response.resolved.d2_request_parts for s in part.source_results),
+                discussion_scope=(context.ordinary.discussion_scope
+                    if isinstance(target, (ServiceTarget, TopicTarget))
+                    and context.ordinary.discussion_scope is not None
+                    and target == context.ordinary.discussion_scope.target else None)))
             # These producers publish an exact availability/reference fact,
             # with no service-choice UI. Only explicit clarification owns a task.
             continue
         if isinstance(block, PriceOperation) and block.target is None:
-            raise ValueError("d2_price_target_required")
+            reject_part(block)
+            continue
         if isinstance(block, PriceOperation) and selected_volume_price_task is not None and selected_volume_price_task.extent == "unknown":
             exact_text.append(D2ExactTextBlock(request_id=block.request_id,
                 source_client_id=session_key.client_id,
@@ -900,23 +914,38 @@ def _run_reserved_d2_dialogue_turn(
         operations.append(block)
     sources = build_d2_snapshot_sources(
         tenant, model_view=view, operations=tuple(operations), session_key=session_key,
-        shown_promo_fact_ids=context.retained_shown_ids.promo_fact_ids,
+        shown_promo_fact_ids=(() if selected_price_select_action is not None
+                              else context.retained_shown_ids.promo_fact_ids),
         shown_secondary_ref_ids=context.retained_shown_ids.secondary_ref_ids,
     )
-    render_order = tuple(b.request_id for b in result.blocks if b.kind != "booking")
+    render_order = tuple(b.request_id for b in result.blocks
+        if b.kind != "booking" or isinstance(b, D2RejectedOperation))
+    def complete_price(outcome):
+        raw = provider.complete_price(price_reply, outcome)
+        full_audit("price_completion", outcome=outcome, raw=raw)
+        if raw.strip() == "<NO_TEXT>":
+            return D2ParsedDialogueResult("dialogue", ())
+        _, metadata = split_d2_text_reply(raw)
+        if metadata and metadata.get("actions"):
+            raise ValueError("d2_completion_action_forbidden")
+        return parse_d2_text_reply(raw, active_service_ids=view.active_service_catalog.active_service_ids)
+
     response = resolve_d2_operations(
         tuple(operations), sources, as_of=now.date(),
+        complete_price=complete_price if price_reply is not None else None,
+        source_claims=getattr(result, "source_claims", None),
         common_route_content_lookup=bool(operations) and all(isinstance(p, ExplanationOperation) for p in operations),
         exact_contact_blocks=tuple(contact_blocks), exact_policy_blocks=tuple(policy_blocks),
         exact_contact_button=contact_button, exact_canonical_contact=canonical_contact,
         exact_text_blocks=tuple(exact_text), exact_parts=tuple(exact_parts),
         extra_ui=tuple(extra_ui), deferred_price_parts=tuple(deferred),
-        exact_deferred_blocks=tuple(exact_deferred),
+        exact_failure_blocks=tuple(exact_failures),
         d2_request_order=render_order,
         shown_price_offer_refs=context.ordinary.d2_shown_price_offer_refs,
         selected_price_detail_action=selected_price_detail_action,
-        commercial_operations=tuple(commercial_operations),
-        directory_cta=directory_cta,
+        selected_price_offer_id=(selected_price_select_action.offer_id
+                                if selected_price_select_action is not None else None),
+        selected_price_select_actions=selected_price_select_actions,
         suppress_forbidden_booking_cta=(suppress_forbidden_booking_cta
             or all(isinstance(block, OffTopicOperation) for block in result.blocks)),
     )
@@ -924,11 +953,11 @@ def _run_reserved_d2_dialogue_turn(
         # Resolve siblings before the existing lead owner mutates intake state.
         booking = resolve_d2_booking_lead_entry(
             snapshot=tenant, session_key=session_key,
-            operations=tuple(p for p in result.blocks if p.kind in {"booking", "price", "clinic_policy"}),
+            operations=tuple(p for p in result.blocks if p.kind in {"booking", "price"}
+                and not isinstance(p, D2RejectedOperation)),
         )
-        booking_part = D2ResolvedRequestPart(request_id=booking_blocks[0].request_id,
-            kind="clarification" if booking.kind == "unclear" else "reference",
-            status="answered", scope="clinic")
+        booking_part = booking.response.resolved.d2_request_parts[0].model_copy(
+            update={"request_id": booking_blocks[0].request_id})
         values = response.resolved.model_dump()
         values.update(
             attribution_kind=booking.response.resolved.attribution_kind,
@@ -961,20 +990,6 @@ def _run_reserved_d2_dialogue_turn(
         "topic_id": part.topic_id or (resolve_d2_clarify_service_topic(tenant, (part.service_id,)) if part.service_id else None),
     }) if part.kind == "price" and part.request_id in price_operations_by_id else part
         for part in response.resolved.d2_request_parts)
-    # A targetless detail resolves the verified displayed offers, not a new topic.
-    # Freeze their captured descriptor with the completed publication.
-    contextual_details = {p.request_id for p in operations if isinstance(p, DetailOperation)
-        and p.target is None and p.volume is None and p.brand_id is None}
-    scope = context.ordinary.discussion_scope
-    input_refs = {(r.source_client_id, r.offer_id, r.service_id)
-        for r in context.ordinary.d2_shown_price_offer_refs}
-    captured_details = {b.request_id for b in response.resolved.d2_price_detail_blocks
-        if b.request_id in contextual_details and b.rows and all(
-            (r.source_client_id, r.offer_id, r.service_id) in input_refs for r in b.rows)}
-    if scope is not None:
-        parts = tuple(part.model_copy(update={"discussion_scope": scope,
-            "brand_id": scope.brand_id, "topic_id": scope.topic_id or part.topic_id})
-            if part.request_id in captured_details else part for part in parts)
     # Freeze proven source IDs, without changing published text or repricing.
     enriched = type(response.resolved).model_validate({**response.resolved.model_dump(), "d2_request_parts": parts})
     response = replace(response, resolved=enriched)

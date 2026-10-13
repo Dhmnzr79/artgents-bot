@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
-from contracts.response_schema import ResponseSchemaBundle
+from contracts.response_schema import ResponseDataCatalog
 
 _SERVICE_REFERENCE_CATALOG_HEADER = "=== SERVICE_REFERENCE_CATALOG ==="
 
@@ -20,7 +20,7 @@ class ServiceReferenceCatalogSnapshot:
     inactive_service_ids: frozenset[str] = field(default_factory=frozenset)
 
     @classmethod
-    def from_bundle(cls, bundle: ResponseSchemaBundle) -> ServiceReferenceCatalogSnapshot:
+    def from_bundle(cls, bundle: ResponseDataCatalog) -> ServiceReferenceCatalogSnapshot:
         rows: list[dict[str, object]] = []
         all_ids: list[str] = []
         active_ids: list[str] = []

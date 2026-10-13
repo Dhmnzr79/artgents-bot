@@ -9,7 +9,7 @@
     "billing_unit": "tooth"
   },
   "package": {
-    "label": "за одну постоянную коронку на уже установленном импланте (абатмент/основание, изготовление и фиксация включены)",
+    "label": "за одну постоянную коронку на уже установленном импланте (абатмент/основание, изготовление и фиксация включены); хирургическая установка импланта — отдельно",
     "includes": [
       "необходимый абатмент/основание",
       "изготовление и фиксация постоянной коронки"
@@ -20,14 +20,16 @@
     ]
   },
   "fact_refs": [
+    "tax_deduction",
+    "installment_12",
     "free_implant_consult",
-    "installment_12"
+    "payment_stages",
+    "fixed_price"
   ],
   "followups": [],
   "applies_to_extents": [
     "one_tooth",
-    "few_teeth",
-    "full_arch"
+    "few_teeth"
   ],
   "required_conditions_metadata": {
     "completeness": "complete",

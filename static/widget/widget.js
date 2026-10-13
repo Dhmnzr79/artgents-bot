@@ -158,31 +158,30 @@ function fillHeaderStatus(el, config) {
 }
 
 
-/** @param {unknown} meta */
-function leadMetaPhoneStep(meta) {
-  return Boolean(
-    meta && typeof meta === "object" && meta.lead_flow && meta.lead_step === "phone"
-  );
-}
-
 /** @param {unknown} payload */
 function isActiveLeadFlowPayload(payload) {
   return Array.isArray(payload?.ui?.quick_replies) &&
     payload.ui.quick_replies.some((item) => String(item?.reply_id || "").startsWith("lead:"));
 }
 
-/** 10 цифр после «7» (пользователь может ввести 9… или 8… или уже +7…) */
-function extractNational10Digits(raw) {
-  let d = String(raw || "").replace(/\D/g, "");
-  if (!d.length) return "";
-  if (d.startsWith("8")) d = "7" + d.slice(1);
-  if (d.startsWith("7")) return d.slice(1, 11);
-  return d.slice(0, 10);
+/** Phone-shaped input only; ordinary questions stay available during intake. */
+function isPhoneInput(raw) {
+  return Boolean(String(raw || "").trim()) && /^[\d+()\s-]+$/.test(String(raw || ""));
 }
 
-/** Отображение: +7(000) 000-00-00 */
-function formatRuMobileDisplay(nationalUpTo10) {
-  const n = nationalUpTo10.replace(/\D/g, "").slice(0, 10);
+function extractNational10Digits(raw) {
+  const value = String(raw || "").trim();
+  const digits = value.replace(/\D/g, "");
+  if (value.startsWith("+7") || ((digits.length < 10 || digits.length === 11) && /^[78]/.test(digits))) {
+    return digits.slice(1);
+  }
+  return digits;
+}
+
+/** Display: +7(999) 999-99-99. Never discard excess digits. */
+function formatRuMobileDisplay(national) {
+  const n = national.replace(/\D/g, "");
+  if (n.length > 10) return n;
   if (!n.length) return "+7";
   let s = "+7(" + n.slice(0, 3);
   if (n.length <= 3) return s;
@@ -190,14 +189,15 @@ function formatRuMobileDisplay(nationalUpTo10) {
   if (n.length <= 6) return s;
   s += "-" + n.slice(6, 8);
   if (n.length <= 8) return s;
-  s += "-" + n.slice(8, 10);
-  return s;
+  return s + "-" + n.slice(8, 10);
 }
 
 function ruPhoneToBackendE164(inputVal) {
-  const n = extractNational10Digits(inputVal);
-  if (n.length !== 10) return "";
-  return "+7" + n;
+  if (!isPhoneInput(inputVal)) return "";
+  const value = String(inputVal).trim();
+  if (value.startsWith("+") && !value.startsWith("+7")) return "";
+  const n = extractNational10Digits(value);
+  return n.length === 10 ? "+7" + n : "";
 }
 
 /**
@@ -250,6 +250,7 @@ function botTurnFromPayload(data, expectedClientId) {
   return {
     role: "bot",
     text: String(data.answer || "").trim(),
+    bodyParts: Array.isArray(ui.body_parts) ? ui.body_parts : [],
     followups: [],
     quickReplies,
     revision: data.revision,
@@ -685,6 +686,7 @@ export function mountWidget(root, config) {
     messages: [],
     lastPayload: null,
     retryBody: null,
+    priceUpdate: null,
     pending: false,
     /** @type {"searching"|"writing"} */
     typingPhase: "searching",
@@ -835,7 +837,6 @@ export function mountWidget(root, config) {
           <div class="clinic-shell__feed" data-clinic-feed></div>
         </main>
         <form class="clinic-shell__composer" data-clinic-composer-form>
-          <div class="clinic-shell__error" data-clinic-err hidden></div>
           <div class="clinic-shell__composer-inner">
             <textarea class="clinic-shell__textarea" rows="1" data-clinic-input placeholder="Введите сообщение" aria-label="Введите сообщение"></textarea>
             <button type="submit" class="clinic-btn-send" data-clinic-send disabled aria-label="Отправить сообщение">${SEND_BTN_SVG}</button>
@@ -868,7 +869,6 @@ export function mountWidget(root, config) {
   const input = root.querySelector("[data-clinic-input]");
   const sendBtn = root.querySelector("[data-clinic-send]");
   const composerForm = root.querySelector("[data-clinic-composer-form]");
-  const errBox = root.querySelector("[data-clinic-err]");
   const unreadDot = root.querySelector("[data-clinic-unread]");
   const btnClose = root.querySelector("[data-clinic-close]");
   const launcherTeaserEl = root.querySelector("[data-clinic-launcher-teaser]");
@@ -1131,6 +1131,7 @@ export function mountWidget(root, config) {
     state.messages = [];
     state.lastPayload = null;
     state.retryBody = null;
+    state.priceUpdate = null;
     state.typingPhase = "searching";
     state.started = false;
     state.unread = false;
@@ -1302,7 +1303,7 @@ export function mountWidget(root, config) {
     state.statusMessage = null;
     renderFeed();
     updateTypingIndicatorText();
-    if (!leadRequest) {
+    if (!leadRequest && !state.priceUpdate) {
       // Cosmetic waiting sequence, not backend stages or a second model check.
       for (const [delay, phase] of [[1500, "checking"], [3500, "writing"]]) {
         waitingLabelTimers.push(window.setTimeout(() => {
@@ -1418,6 +1419,7 @@ export function mountWidget(root, config) {
 
     const commitFinalTurn = () => {
       if (turnFinalized) return;
+      let preserveScroll = state.priceUpdate?.requestId === body.request_id;
       turnFinalized = true;
       clearStreamTimers();
       const streamedText = fullText.trim();
@@ -1425,8 +1427,53 @@ export function mountWidget(root, config) {
         if (uiData.sid) setSid(uiData.sid);
         const turn = botTurnFromPayload(uiData, clientId);
         if (turn) {
-          state.messages.push(turn);
+          const update = state.priceUpdate;
+          if (update?.requestId === body.request_id) {
+            const old = update.message;
+            const cardIndex = old.bodyParts.findIndex((part) => part.kind === "price_card");
+            const nextCardIndex = turn.bodyParts.findIndex((part) => part.kind === "price_card");
+            const oldCard = old.bodyParts[cardIndex];
+            const nextCard = turn.bodyParts[nextCardIndex];
+            const volumeChange = String(body.ref).startsWith("volume:")
+              && old.volumeNavigation?.choices.some(choice => choice.reply_id === body.ref);
+            const publishedOfferChoice = [...(oldCard?.choices || []), ...(oldCard?.service_choices || [])]
+              .some(choice => choice.reply_id === body.ref);
+            const offerChange = nextCard?.price?.rows?.length === 1
+              && body.ref === `price_select:${nextCard.price.rows[0].offer_id}`
+              && publishedOfferChoice;
+            const textOfferChange = publishedOfferChoice && String(body.ref).startsWith("price_select:")
+              && uiData.ui?.projected_commercial_ids?.price_offer_ids
+                ?.includes(body.ref.slice("price_select:".length));
+            if (state.messages.includes(old) && oldCard && !nextCard && (volumeChange || textOfferChange)) {
+              // Accepted choices may return clarification or approved text
+              // without a numeric price. Publish that response as a normal turn.
+              state.messages.push(turn);
+              preserveScroll = false;
+            } else if (!state.messages.includes(old) || !nextCard || !oldCard
+                || (!volumeChange && !offerChange)) {
+              setError("Не удалось отобразить ответ. Попробуйте ещё раз.");
+            } else {
+              // Replace price-owned content at its existing anchors. Independent
+              // text (e.g. an address between price and promotion) stays in place.
+              const before = turn.bodyParts.slice(0, nextCardIndex).filter(p => p.price_owned);
+              const after = turn.bodyParts.slice(nextCardIndex + 1).filter(p => p.price_owned);
+              const merged = [];
+              let beforeInserted = false, afterInserted = false;
+              old.bodyParts.forEach((part, index) => {
+                if (part.price_owned) {
+                  if (index < cardIndex && !beforeInserted) { merged.push(...before); beforeInserted = true; }
+                  if (index > cardIndex && !afterInserted) { merged.push(...after); afterInserted = true; }
+                } else if (index === cardIndex) {
+                  if (!beforeInserted) { merged.push(...before); beforeInserted = true; }
+                  merged.push(nextCard);
+                } else merged.push(part);
+              });
+              if (!afterInserted) merged.push(...after);
+              Object.assign(old, turn, {bodyParts: merged});
+            }
+          } else state.messages.push(turn);
         }
+        state.priceUpdate = null;
         state.lastPayload = uiData;
         state.retryBody = null;
         if (!state.isOpen) state.unread = true;
@@ -1450,7 +1497,7 @@ export function mountWidget(root, config) {
       liveBubble = null;
       endPendingRequest();
       if (state.unread && !state.isOpen) unreadDot?.classList.add("is-visible");
-      renderFeed();
+      renderFeed({preserveScroll});
       syncSendState();
     };
 
@@ -1507,6 +1554,12 @@ export function mountWidget(root, config) {
       }
       const turn = botTurnFromPayload(uiData, clientId);
       const finalText = turn ? String(turn.text || "") : "";
+      // A card is complete structured content, not prose to type and replace.
+      if (turn?.bodyParts.some((part) => part.kind === "price_card")) {
+        if (fullText.trim() && !finalText.startsWith(fullText.trim())) commitStreamMismatch();
+        else commitFinalTurn();
+        return;
+      }
       if (!finalText) {
         commitFinalTurn();
         return;
@@ -1585,47 +1638,63 @@ export function mountWidget(root, config) {
       },
       onError(msg, retryable) {
         if (turnFinalized) return;
+        const preserveScroll = state.priceUpdate?.requestId === body.request_id;
         streamAborted = true;
         clearStreamTimers();
         state.retryBody = retryable ? body : null;
+        if (!retryable) state.priceUpdate = null;
         setError(msg);
         endPendingRequest();
-        renderFeed();
+        renderFeed({preserveScroll});
         syncSendState();
       },
     });
   }
 
   function setError(msg) {
-    const displayMessage = friendlyErrorMessage(msg);
-    state.errorLine = displayMessage || "";
-    if (msg) {
-      errBox.textContent = displayMessage;
-      if (state.retryBody) {
-        const retry = document.createElement("button");
-        retry.type = "button";
-        retry.textContent = "Повторить запрос";
-        retry.addEventListener("click", () => {
-          const body = state.retryBody;
-          if (!body || state.pending) return;
-          setError("");
-          beginPendingRequest(body);
-          void runStreamAsk(feed, apiBase, body);
-        });
-        errBox.appendChild(retry);
-      }
-      errBox.hidden = false;
-      if (clientId === "demo") {
-        const fresh = document.createElement("button");
-        fresh.type = "button";
-        fresh.textContent = "Новая беседа";
-        fresh.addEventListener("click", resetSession);
-        errBox.appendChild(fresh);
-      }
-    } else {
-      errBox.textContent = "";
-      errBox.hidden = true;
+    state.errorLine = friendlyErrorMessage(msg) || "";
+  }
+
+  function renderErrorTurn() {
+    if (!state.errorLine) return;
+    const wrap = document.createElement("div");
+    wrap.className = "clinic-turn clinic-turn--error";
+    wrap.setAttribute("data-clinic-err", "");
+    wrap.setAttribute("aria-live", "polite");
+    wrap.appendChild(createPlainAttributionEl(config.botName));
+    const bubble = document.createElement("div");
+    bubble.className = "clinic-msg clinic-msg--bot";
+    const text = document.createElement("div");
+    text.className = "clinic-msg__body";
+    text.textContent = state.errorLine;
+    bubble.appendChild(text);
+    wrap.appendChild(bubble);
+    const controls = document.createElement("div");
+    controls.className = "clinic-turn__error-actions";
+    if (state.retryBody) {
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "clinic-btn-ghost";
+      retry.textContent = "Повторить запрос";
+      retry.addEventListener("click", () => {
+        const body = state.retryBody;
+        if (!body || state.pending) return;
+        setError("");
+        beginPendingRequest(body);
+        void runStreamAsk(feed, apiBase, body);
+      });
+      controls.appendChild(retry);
     }
+    if (clientId === "demo") {
+      const fresh = document.createElement("button");
+      fresh.type = "button";
+      fresh.className = "clinic-btn-ghost";
+      fresh.textContent = "Новая беседа";
+      fresh.addEventListener("click", resetSession);
+      controls.appendChild(fresh);
+    }
+    if (controls.children.length) wrap.appendChild(controls);
+    feed.appendChild(wrap);
   }
 
   /**
@@ -1635,7 +1704,15 @@ export function mountWidget(root, config) {
    */
   function renderInlineLinks(bubble, m, msgIndex) {
     if (m.linksDismissed || m.revision !== state.lastPayload?.revision) return;
-    const items = m.quickReplies || [];
+    const cardRows = (m.bodyParts || []).filter(part => part.kind === "price_card")
+      .flatMap(part => part.price?.rows || []);
+    const items = (m.quickReplies || []).filter((it) => {
+      if (String(it.ref).startsWith("price_select:") && cardRows.length) return false;
+      if (String(it.ref).startsWith("volume:") && m.volumeNavigation) return false;
+      if (it.ref === "price_detail:includes" && cardRows.some(row => row.includes?.length)) return false;
+      if (it.ref === "price_detail:stages" && cardRows.some(row => row.stages?.length)) return false;
+      return true;
+    });
     if (!items.length) return;
 
     const box = getOrCreateLinksBox(bubble);
@@ -1697,7 +1774,11 @@ export function mountWidget(root, config) {
     if (trail.children.length) wrap.appendChild(trail);
   }
 
-  function renderFeed() {
+  function renderFeed({preserveScroll = Boolean(state.priceUpdate)} = {}) {
+    // Updating an existing card is not a new turn. Keep the reader's viewport
+    // through both the pending render and the confirmed replacement.
+    const scroller = preserveScroll ? getChatScroller(feed) : null;
+    const scrollTop = scroller?.scrollTop;
     const prevWelcome = feed.querySelector(".clinic-shell__welcome-screen");
     const keepWelcome = prevWelcome && !state.started;
 
@@ -1805,7 +1886,9 @@ export function mountWidget(root, config) {
       const bubble = document.createElement("div");
       bubble.className = "clinic-msg clinic-msg--bot";
       const text = String(m.text || "").trim();
-      if (text) {
+      if (m.bodyParts?.some((part) => part.kind === "price_card")) {
+        renderPriceBody(bubble, m);
+      } else if (text) {
         const body = document.createElement("div");
         body.className = "clinic-msg__body";
         setBotAnswerBody(body, text);
@@ -1818,6 +1901,7 @@ export function mountWidget(root, config) {
       feed.appendChild(wrap);
     });
 
+    renderErrorTurn();
     const typingWrap = document.createElement("div");
     typingWrap.className = "clinic-shell__typing-wrap";
     fillTypingLabel(typingLabel, typingLabelForPhase(state.typingPhase));
@@ -1825,19 +1909,159 @@ export function mountWidget(root, config) {
       state.typingPhase === "writing" ? WRITE_SVG
       : state.typingPhase === "checking" ? CHECK_DOCUMENT_SVG : SEARCH_SVG;
     typingWrap.appendChild(typing);
-    typingWrap.classList.toggle("is-visible", state.pending);
+    typingWrap.classList.toggle("is-visible", state.pending && !state.priceUpdate);
     feed.appendChild(typingWrap);
 
     const lastMsg = state.messages.length
       ? state.messages[state.messages.length - 1]
       : null;
-    if (lastMsg && lastMsg.role === "bot") {
+    if (scroller) {
+      scroller.scrollTo({top: scrollTop, behavior: "instant"});
+    } else if (lastMsg && lastMsg.role === "bot") {
       requestAnimationFrame(() => scrollToLastTurnStart(feed));
     } else {
       scrollChatPaneToEnd(feed, { force: state.messages.length > 0 });
     }
     syncComposerLeadUi();
     syncSendState();
+  }
+
+  function renderPriceBody(bubble, message) {
+    let texts = [];
+    let financialCard = null;
+    const sections = new Map();
+    let promotionCount = 0;
+    const svg = (name) => {
+      const paths = {layers:'m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5',
+        check:'m5 12 4 4 10-10',clock:'M12 7v5l4 2',info:'M12 11v6M12 7v1',
+        gift:'M3 9h18v4H3ZM5 13v8h14v-8M12 9v12M12 9C5 9 5 3 8 3c3 0 4 6 4 6s1-6 4-6c3 0 3 6-4 6Z',
+        chevron:'m9 5 7 7-7 7',extent:'m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3ZM4 7.5l8 4.5 8-4.5M12 12v9'};
+      const el = document.createElementNS('http://www.w3.org/2000/svg','svg');
+      el.setAttribute('viewBox','0 0 24 24'); el.setAttribute('aria-hidden','true');
+      el.classList.add('clinic-price-card__icon');
+      if (name === 'info' || name === 'clock') {
+        const circle = document.createElementNS(el.namespaceURI,'circle');
+        circle.setAttribute('cx','12');circle.setAttribute('cy','12');circle.setAttribute('r','9');el.appendChild(circle);
+      }
+      const path = document.createElementNS(el.namespaceURI,'path');path.setAttribute('d',paths[name]);el.appendChild(path);
+      return el;
+    };
+    const flushText = () => {
+      if (!texts.length) return;
+      const body = document.createElement('div');body.className='clinic-msg__body';
+      setBotAnswerBody(body,texts.join('\n\n'));bubble.appendChild(body);texts=[];
+    };
+    const detail = (key, label, icon) => {
+      if (sections.has(key)) return sections.get(key);
+      const el=document.createElement('details');el.className='clinic-price-card__detail';
+      el.dataset.priceSection=key;
+      const summary=document.createElement('summary');summary.appendChild(svg(icon));
+      const title=document.createElement('span');title.textContent=label;summary.appendChild(title);
+      const arrow=svg('chevron');arrow.classList.add('clinic-price-card__chevron');summary.appendChild(arrow);
+      el.appendChild(summary);financialCard.appendChild(el);sections.set(key,el);return el;
+    };
+    const addText = (target,text) => {
+      const body=document.createElement('div');body.className='clinic-price-card__detail-body';
+      setBotAnswerBody(body,text);target.appendChild(body);
+    };
+    const disabled = () => state.pending || Boolean(state.retryBody) || isActiveLeadFlowPayload(state.lastPayload);
+    const select = (choice, revision) => void sendAsk({ref:choice.reply_id,ui_revision:revision,q:'',priceMessage:message});
+    for (const part of message.bodyParts) {
+      if (part.kind==='text' && part.price_owned && part.price_section && financialCard) {
+        flushText();
+        if (part.price_section==='promotion' && promotionCount++===0) {
+          const promo=document.createElement('section');promo.className='clinic-price-card__promotion';
+          promo.appendChild(svg('gift'));
+          const content=document.createElement('div');addText(content,part.text);promo.appendChild(content);financialCard.appendChild(promo);
+        } else {
+          const payment=part.price_section==='consultation';
+          addText(detail(payment?'payment':'conditions',payment?'Как оплачивается лечение':'Условия и преимущества',payment?'clock':'info'),part.text);
+        }
+        continue;
+      }
+      if(part.kind==='text'){texts.push(part.text);continue;}
+      if(part.kind!=='price_card'||part.price?.source_client_id!==clientId)continue;
+      flushText();
+      const rows=part.price.rows||[];
+      if(!rows.length||rows.some(row=>row.source_client_id!==clientId))continue;
+      const card=document.createElement('section');card.className='clinic-price-card';
+      const overview=Boolean(part.overview);
+      card.setAttribute('aria-label',overview?'Варианты лечения':rows[0].service_name);
+      financialCard=card;sections.clear();promotionCount=0;
+      if(!message.volumeNavigation&&part.overview?.volume_choices?.length){
+        message.volumeNavigation={revision:message.revision,choices:part.overview.volume_choices.map(choice=>choice.candidate)};
+      }
+      if(overview&&message.volumeNavigation?.choices.length){
+        const nav=document.createElement('div');nav.className='clinic-price-card__tabs clinic-price-card__volumes';
+        for(const choice of message.volumeNavigation.choices){
+          const button=document.createElement('button');button.type='button';button.className='clinic-price-card__tab';
+          button.textContent=choice.label;button.disabled=disabled();
+          button.addEventListener('click',()=>select(choice,message.volumeNavigation.revision));nav.appendChild(button);
+        }
+        card.appendChild(nav);
+      }
+      const title=document.createElement('h3');title.className='clinic-price-card__title';
+      title.textContent=overview?'Варианты лечения':rows[0].service_name;card.appendChild(title);
+      if(!overview&&(part.choices||[]).length>1){
+        const tabs=document.createElement('div');tabs.className='clinic-price-card__tabs';tabs.setAttribute('role','group');tabs.setAttribute('aria-label','Вариант');
+        for(const choice of part.choices){
+          const active=choice.reply_id===`price_select:${rows[0].offer_id}`;
+          const tab=document.createElement('button');tab.type='button';tab.className='clinic-price-card__tab';
+          tab.textContent=choice.label;tab.setAttribute('aria-pressed',String(active));tab.disabled=disabled();
+          tab.addEventListener('click',()=>{if(!active||message.revision!==state.lastPayload?.revision)select(choice,message.revision)});tabs.appendChild(tab);
+        }card.appendChild(tabs);
+      }
+      if(!overview&&(part.choices||[]).length<=1&&rows[0].variant_label){
+        const label=document.createElement('p');label.className='clinic-price-card__selected-variant';
+        label.textContent=rows[0].variant_label;card.appendChild(label);
+      }
+      const allChoices=[...(part.choices||[]),...(part.service_choices||[])];
+      for(const row of rows){
+        const choice=allChoices.find(choice=>choice.reply_id===`price_select:${row.offer_id}`);
+        const item=document.createElement(overview&&choice?'button':'div');
+        item.className=overview?'clinic-price-card__overview-row':'clinic-price-card__price-area';
+        if(overview&&choice){item.type='button';item.disabled=disabled();item.addEventListener('click',()=>select(choice,message.revision));}
+        if(overview){const name=document.createElement('span');name.className='clinic-price-card__overview-name';name.textContent=row.service_name;item.appendChild(name);}
+        const amount=document.createElement('strong');amount.className='clinic-price-card__amount';
+        amount.textContent=row.mode==='no_public_price'?row.display_text:row.price_display_text;
+        if(row.mode==='no_public_price')amount.classList.add('clinic-price-card__amount--description');
+        else if(!overview)amount.classList.add('clinic-price-card__amount--single');item.appendChild(amount);
+        if(overview&&choice){const arrow=svg('chevron');arrow.classList.add('clinic-price-card__row-arrow');item.appendChild(arrow);}
+        if(row.scope_text){const caption=document.createElement('p');caption.className='clinic-price-card__caption';if(!overview)caption.appendChild(svg('extent'));const scope=document.createElement('span');scope.textContent=row.scope_text;caption.appendChild(scope);item.appendChild(caption);}
+        // Overview is a compact preview; full authored conditions stay in detail.
+        for(const term of (overview ? [] : [...new Set(row.condition_texts||[])])){
+          if(term===row.scope_text)continue;
+          const note=document.createElement('p');note.className='clinic-price-card__condition';note.appendChild(svg('info'));
+          const text=document.createElement('span');text.textContent=term.charAt(0).toUpperCase()+term.slice(1);note.appendChild(text);item.appendChild(note);
+        }
+        card.appendChild(item);
+      }
+      bubble.appendChild(card);
+      if(!overview&&rows.length===1){
+        const row=rows[0];
+        if(row.includes?.length){
+          const el=detail('includes','Что входит в стоимость','layers');
+          const list=document.createElement('ul');list.className='clinic-price-card__check-list';
+          for(const line of row.includes){const li=document.createElement('li');li.appendChild(svg('check'));const text=document.createElement('span');text.textContent=line;li.appendChild(text);list.appendChild(li);}el.appendChild(list);
+          if(row.excludes?.length){const heading=document.createElement('p');heading.className='clinic-price-card__detail-heading';heading.textContent='Оплачивается отдельно';el.appendChild(heading);const exclusions=document.createElement('ul');for(const line of row.excludes){const li=document.createElement('li');li.textContent=line;exclusions.appendChild(li);}el.appendChild(exclusions);}
+        }
+        if(row.stages?.length){
+          const el=detail('payment','Как оплачивается лечение','clock');
+          for(const line of row.stages){
+            // Frozen stage formatter separates its heading/amount from timing with '. '.
+            const separator=line.indexOf('. ');
+            const body=document.createElement('div');body.className='clinic-price-card__detail-body';
+            const heading=document.createElement('strong');heading.className='clinic-price-card__stage-title';
+            heading.textContent=separator<0?line:line.slice(0,separator+1);body.appendChild(heading);
+            if(separator>=0){const timing=document.createElement('p');timing.textContent=line.slice(separator+2);body.appendChild(timing);}
+            el.appendChild(body);
+          }
+        }
+      }
+    }
+    // Commercial parts may arrive after the promotion; keep the open promo last.
+    for(const card of bubble.querySelectorAll('.clinic-price-card')){const promo=card.querySelector('.clinic-price-card__promotion');if(promo)card.appendChild(promo);}
+    flushText();
   }
 
   /**
@@ -1862,6 +2086,7 @@ export function mountWidget(root, config) {
       typeof extra.userEcho === "string" ? extra.userEcho.trim() : "";
     const apiFields = { ...extra };
     delete apiFields.userEcho;
+    delete apiFields.priceMessage;
 
     if (userEcho) {
       const applyUserEcho = () => {
@@ -1895,6 +2120,7 @@ export function mountWidget(root, config) {
       ...apiFields,
     };
     if (body.q === undefined) body.q = "";
+    state.priceUpdate = extra.priceMessage ? {message: extra.priceMessage, requestId: body.request_id} : null;
 
     setError("");
     beginPendingRequest(body);
@@ -1913,7 +2139,7 @@ export function mountWidget(root, config) {
     let q = raw;
     let userBubbleText = q;
 
-    if (isLeadPhoneStep()) {
+    if (isLeadPhoneStep() && isPhoneInput(raw)) {
       const backend = ruPhoneToBackendE164(input.value);
       if (backend.length !== 12) return;
       q = backend;
@@ -1950,24 +2176,39 @@ export function mountWidget(root, config) {
   }
 
   function isLeadPhoneStep() {
-    const m = state.lastPayload?.meta;
-    return leadMetaPhoneStep(m);
+    return state.lastPayload?.ui?.composer_input_mode === "phone";
   }
 
   function syncComposerLeadUi() {
     const phone = isLeadPhoneStep();
-    input.inputMode = phone ? "numeric" : "text";
+    input.inputMode = phone ? "tel" : "text";
     input.classList.toggle("clinic-shell__textarea--phone", phone);
-    input.placeholder = phone ? "+7(900) 000-00-00" : "Введите сообщение";
+    input.placeholder = phone ? "+7(999) 999-99-99" : "Введите сообщение";
   }
 
-  function onComposerInput() {
-    if (isLeadPhoneStep()) {
+  function onComposerInput(event) {
+    // Leave deletions natural, including clearing the prefix and separators.
+    if (isLeadPhoneStep() && isPhoneInput(input.value) &&
+        !String(event?.inputType || "").startsWith("delete")) {
       const nat = extractNational10Digits(input.value);
-      const next = formatRuMobileDisplay(nat);
-      if (next !== input.value) {
-        input.value = next;
-        input.selectionStart = input.selectionEnd = next.length;
+      const foreignPrefix = input.value.trim().startsWith("+") && !input.value.trim().startsWith("+7");
+      if (nat.length <= 10 && !foreignPrefix) {
+        const old = input.value;
+        const caret = input.selectionStart;
+        const digitsBefore = old.slice(0, caret).replace(/\D/g, "").length;
+        const next = formatRuMobileDisplay(nat);
+        if (next !== old) {
+          input.value = next;
+          const prefixAdded = !old.trim().startsWith("+7") && old.replace(/\D/g, "").length !== 11;
+          const wanted = digitsBefore + (prefixAdded ? 1 : 0);
+          let seen = 0;
+          let pos = 0;
+          while (pos < next.length && seen < wanted) {
+            if (/\d/.test(next[pos])) seen++;
+            pos++;
+          }
+          input.selectionStart = input.selectionEnd = caret === old.length ? next.length : pos;
+        }
       }
     }
     autoResizeTextarea(input);
@@ -1979,8 +2220,8 @@ export function mountWidget(root, config) {
       sendBtn.disabled = true;
       return;
     }
-    if (isLeadPhoneStep()) {
-      sendBtn.disabled = extractNational10Digits(input.value).length !== 10;
+    if (isLeadPhoneStep() && isPhoneInput(input.value)) {
+      sendBtn.disabled = !ruPhoneToBackendE164(input.value);
       return;
     }
     sendBtn.disabled = !input.value.trim();

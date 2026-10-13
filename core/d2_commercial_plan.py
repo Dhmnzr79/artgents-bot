@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
+
+from contracts.response_schema import ResponseDataCatalog
+from core.response_plan_fact_projection import fact_active_as_of
 
 from contracts.response_plan import D2CommercialPackageBlock, D2CompatibilityBlock, ResolvedFactBlock
 from contracts.response_plan_materialization import D2CommercialAuthority
@@ -18,51 +22,42 @@ class D2ResolvedCommercialPlan:
 def resolve_d2_commercial_plan(
     *,
     authority: D2CommercialAuthority | None,
+    bundle: ResponseDataCatalog,
+    as_of: date,
     service_id: str | None,
+    topic_id: str | None = None,
     include_packages: bool,
     shown_promo_fact_ids: tuple[str, ...] = (),
     promo_form: str = "short",
     promotion_scope: str = "service",
     skip_shown: bool = True,
-    max_promo: int = 2,
-    active_promo_ids: frozenset[str] | None = None,
+    max_promo: int | None = 2,
 ) -> D2ResolvedCommercialPlan:
     if authority is None:
         return D2ResolvedCommercialPlan()
     client_id = authority.source_client_id
-    promos = {item.fact_id: item for item in authority.promo_facts}
     profiles = {item.service_id: item for item in authority.service_profiles}
     profile = profiles.get(service_id) if service_id else None
-    if promotion_scope == "general":
-        candidate_ids = tuple(item.fact_id for item in authority.promo_facts)
-    elif promotion_scope == "shown":
-        allowed = set(profile.promo_refs) if profile is not None else set(promos)
-        candidate_ids = tuple(
-            fact_id for fact_id in shown_promo_fact_ids
-            if fact_id in promos and fact_id in allowed
-        )
-    else:
-        if profile is None:
-            return D2ResolvedCommercialPlan()
-        candidate_ids = profile.promo_refs
     shown = set(shown_promo_fact_ids) if skip_shown else set()
     promo_blocks = []
-    for fact_id in candidate_ids:
-        promo = promos.get(fact_id)
-        if promo is None or fact_id in shown:
+    for fact_id, fact in sorted(bundle.facts.items()):
+        if fact.kind != "promo" or not fact_active_as_of(fact, as_of) or fact_id in shown:
             continue
-        if active_promo_ids is not None and fact_id not in active_promo_ids:
+        if promotion_scope == "shown" and fact_id not in shown_promo_fact_ids:
             continue
-        display_text = promo.full_text if promo_form == "full" else promo.short_text
-        promo_blocks.append(
-            ResolvedFactBlock(
-                fact_id=fact_id,
-                display_text=display_text,
-                role="promo",
-                source_client_id=client_id,
-            )
-        )
-        if len(promo_blocks) >= max_promo:
+        if promotion_scope != "general":
+            if service_id is not None:
+                if service_id not in fact.allowed_service_ids or service_id in fact.excluded_service_ids:
+                    continue
+            elif topic_id is None or topic_id not in fact.allowed_topics:
+                continue
+        display_text = fact.text_fact if promo_form == "full" else fact.microfact_text
+        if not display_text:
+            raise ValueError("commercial_promo_short_missing")
+        promo_blocks.append(ResolvedFactBlock(
+            fact_id=fact_id, display_text=display_text, role="promo", source_client_id=client_id,
+        ))
+        if max_promo is not None and len(promo_blocks) >= max_promo:
             break
     booster = None
     also = None

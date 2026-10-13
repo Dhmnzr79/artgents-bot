@@ -5,7 +5,6 @@ topic: implantation
 subtopic: implant_vs_bridge
 
 aliases:
-  - "имплант или мост"
   - "мост или имплант"
   - "что лучше имплант или мост"
   - "чем мост отличается от импланта"

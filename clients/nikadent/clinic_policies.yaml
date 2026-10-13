@@ -39,8 +39,7 @@ policies:
       - "ребён"
       - "детей"
       - "детям"
-    answer: >-
-      Мы работаем только со взрослыми пациентами — детскую стоматологию в клинике не ведём.
+    text_ref: clinic__info__policies.md#no_pediatric_dentistry
 
 service_alternatives: []
 

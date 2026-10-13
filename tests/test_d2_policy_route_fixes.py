@@ -4,9 +4,10 @@ import json
 import pytest
 import yaml
 
-from contracts.d2_dialogue_result import D2DialogueResult, PolicyOperation
+from contracts.d2_dialogue_result import D2DialogueResult, BookingOperation
 from tests.d2_ci_http import FakeProvider, http_env, send, raw, explanation
 from core.d2_live_provider import build_d2_d1r_messages
+from core.clinic_policies_loader import resolve_policy_text
 
 
 def update_rules(tmp, mutate):
@@ -24,7 +25,7 @@ def next_pair(client, fake, transport):
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
-@pytest.mark.parametrize("kind", ["clinic_policy", "price", "booking"])
+@pytest.mark.parametrize("kind", ["price", "booking"])
 def test_captured_child_rule_owns_text_ui_and_memory(http_env, monkeypatch, transport, kind):
     client, _, use, tmp = http_env
     import core.clinic_policy_resolver as resolver
@@ -37,35 +38,36 @@ def test_captured_child_rule_owns_text_ui_and_memory(http_env, monkeypatch, tran
         block["target"] = {"type": "service", "id": "caries"}
     fake = use(FakeProvider(raw(block)))
     first = send(client, transport, request_id="first", q="Лечение ребёнка")
-    approved = rules["policies"]["no_pediatric_dentistry"]["answer"].strip()
+    approved = resolve_policy_text(rules["policies"]["no_pediatric_dentistry"],
+        lambda name: (tmp / "clients/demo/md" / name).read_text(encoding="utf-8"))
     assert first["answer"].count(approved) == 1
     assert not any(b["action_kind"] == "cta" for b in first["ui"]["buttons"])
     assert send(client, transport, request_id="first", q="Лечение ребёнка") == first
     assert len(fake.inputs) == 1
     pair = next_pair(client, fake, transport)
     assert pair.policy_ids == ("no_pediatric_dentistry",)
-    assert pair.assistant_text == ""
+    assert pair.assistant_text == first["answer"]
 
 
 def test_explicit_empty_policy_registry_never_falls_back(monkeypatch):
     import core.clinic_policy_resolver as resolver
     monkeypatch.setattr(resolver, "_pack_policy_keys", lambda _: (_ for _ in ()).throw(AssertionError("fallback")))
-    block = PolicyOperation(kind="clinic_policy", request_id="r1", policy_ids=("no_oms",))
+    block = BookingOperation(kind="booking", request_id="r1", payment_scheme="oms", payment_scheme_intent="requested_payment")
     result = resolver.resolve_clinic_policy_operations(client_id="demo", operations=(block,), policy_keys=())
-    assert result.decisions[0].reason_code == "policy_not_in_pack"
+    assert result.decisions[0].reason_code == "payment_rule_absent"
     assert not result.suppress_forbidden_booking_cta
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
 def test_ambiguous_policy_is_clarification_with_history_not_new_pending_axis(http_env, transport):
     client, _, use, _ = http_env
-    fake = use(FakeProvider(raw({"kind": "clinic_policy", "request_id": "r1"})))
+    fake = use(FakeProvider(raw(explanation("Вы имеете в виду ОМС или ДМС?"))))
     first = send(client, transport, request_id="first", q="По полису можно?")
     assert "ОМС или ДМС" in first["answer"]
-    assert first["ui"]["buttons"] == []
+    assert not first["ui"]["quick_replies"]
     pair = next_pair(client, fake, transport)
     assert "ОМС или ДМС" in pair.assistant_text
-    assert pair.parts[0].kind == "clarification"
+    assert pair.parts[0].kind == "content"
     assert fake.inputs[-1].context.ordinary.clarify_task is None
 
 
@@ -84,7 +86,7 @@ def test_explicit_payment_without_rule_is_gap_not_price_or_false_policy(http_env
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
-@pytest.mark.parametrize("kind", ["content", "price", "price_detail"])
+@pytest.mark.parametrize("kind", ["price", "price_detail"])
 def test_inactive_service_keeps_identity_and_captured_alternatives(http_env, transport, kind):
     client, _, use, _ = http_env
     block = {"kind": kind, "request_id": "r1", "target": {"type": "service", "id": "braces"}}
@@ -97,7 +99,7 @@ def test_inactive_service_keeps_identity_and_captured_alternatives(http_env, tra
     assert "Брекеты мы не устанавливаем" in first["answer"]
     assert "бесплатно" not in first["answer"]
     pair = next_pair(client, fake, transport)
-    assert pair.assistant_text == ""
+    assert pair.assistant_text == first["answer"]
     catalog = json.loads(fake.inputs[-1].model_view.clinic_policy_catalog_json)
     assert {"requested_service_id": "braces", "alternative_service_ids": ["aligners"]} in catalog["service_alternatives"]
     assert pair.parts[0].service_id == "braces"
@@ -120,34 +122,37 @@ def test_prompt_explains_inactive_target_without_phrase_specific_branch(http_env
     fake = use(FakeProvider(raw(explanation())))
     send(client)
     system = build_d2_d1r_messages(fake.inputs[0])[0]["content"]
-    assert "known inactive service" in system
-    assert "Do not turn a proposed alternative" in system
-    assert "A single alternative is not a choice menu" in system
+    assert "price/price_detail" in system
+    assert "Never invent prices" in system
+    assert "Ordinary doctor, clinic-policy, brand and marketing questions" in system
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
-def test_price_and_commercial_text_still_excluded_from_ordinary_history(http_env, transport):
+def test_price_and_commercial_text_included_in_ordinary_history(http_env, transport):
     client, _, use, _ = http_env
     fake = use(FakeProvider(raw({"kind": "price", "request_id": "r1",
         "target": {"type": "service", "id": "classic"}, "volume": {"extent": "one_tooth"}})))
     first = send(client, transport, request_id="first", q="Цена одного импланта?")
     assert "76" in first["answer"]
     pair = next_pair(client, fake, transport)
-    assert "76" not in pair.assistant_text and "₽" not in pair.assistant_text
+    assert pair.assistant_text == first["answer"]
     assert pair.offers
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
-def test_authored_availability_amount_stays_out_of_ordinary_memory(http_env, transport):
+def test_authored_availability_cannot_replace_ordinary_prose(http_env, transport):
     client, _, use, tmp = http_env
-    update_rules(tmp, lambda rules: rules["service_alternatives"][0].update(
-        approved_text="Брекеты не устанавливаем. Элайнеры — 123456 рублей."))
+    path = tmp / "clients/demo/md/clinic__info__policies.md"
+    text = path.read_text(encoding="utf-8")
+    rules = update_rules(tmp, lambda rules: None)
+    approved = resolve_policy_text(rules["service_alternatives"][0], lambda name: text)
+    path.write_text(text.replace(approved, "Брекеты не устанавливаем. Элайнеры — 123456 рублей."), encoding="utf-8")
     fake = use(FakeProvider(raw({"kind": "content", "request_id": "r1",
         "target": {"type": "service", "id": "braces"}, "content_text": "ignored"})))
     first = send(client, transport, request_id="first", q="Хочу брекеты")
-    assert "123456" in first["answer"]
+    assert first["answer"] == "ignored"
     pair = next_pair(client, fake, transport)
-    assert pair.assistant_text == "" and pair.parts[0].service_id == "braces"
+    assert pair.assistant_text == "ignored"
     catalog = fake.inputs[-1].model_view.clinic_policy_catalog_json
     assert "123456" not in catalog
     assert '"alternative_service_ids":["aligners"]' in catalog
@@ -163,4 +168,4 @@ def test_booking_refusal_with_independent_answer_retains_policy_ids(http_env, tr
     assert not any(b["action_kind"] == "cta" for b in first["ui"]["buttons"])
     pair = next_pair(client, fake, transport)
     assert pair.policy_ids == ("no_pediatric_dentistry",)
-    assert "дет" not in pair.assistant_text.lower()
+    assert pair.assistant_text == first["answer"]

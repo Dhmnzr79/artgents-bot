@@ -10,11 +10,18 @@
   },
   "package": {
     "label": "за один протез; частичное восстановление, вариант на кламмерах или замках",
-    "includes": []
+    "includes": [
+      "планирование конструкции и получение слепков или сканов",
+      "изготовление одного бюгельного протеза",
+      "примерка, установка и первичная коррекция"
+    ]
   },
   "fact_refs": [
+    "tax_deduction",
+    "installment_12",
     "free_implant_consult",
-    "installment_12"
+    "payment_stages",
+    "fixed_price"
   ],
   "followups": [],
   "applies_to_extents": [

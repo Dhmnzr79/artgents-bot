@@ -34,7 +34,6 @@ from core.d2_tenant_snapshot import build_d2_bundle
 from core.response_plan_fact_projection import fact_active_as_of
 from core.response_plan_fact_policy import evaluate_requested_fact_display
 from contracts.response_plan_fact_policy import RequestedFactPolicyContext
-from contracts.target_service_content_topic import parse_service_catalog_content_topic
 from core.response_plan_resolver import resolve_response_plan
 from core.response_text_renderer import render_response_text
 from core.response_ui_projection import project_response_ui
@@ -139,8 +138,7 @@ def resolve_d2_lead_cta_button(
     button_id = cta_key if cta_key in labels else "booking"
     bundle = build_d2_bundle(snapshot)
     fact = bundle.facts.get(_FREE_CONSULT_FACT_ID)
-    service = bundle.services.get(service_id) if service_id else None
-    topic = parse_service_catalog_content_topic(service.content_ref) if service else None
+    topic = snapshot.service_topics.get(service_id) if service_id else None
     context = RequestedFactPolicyContext(
         response_scope="service" if service_id else "clinic",
         reference_service_id=service_id, resolved_topic_id=topic,
@@ -148,7 +146,8 @@ def resolve_d2_lead_cta_button(
     )
     if (prefer_free_consult and fact is not None and fact_active_as_of(fact, as_of)
         and evaluate_requested_fact_display(fact=fact, context=context, bundle=bundle,
-                                            evaluation_purpose="automatic") == "allowed"):
+                                            evaluation_purpose="automatic",
+                                            service_topics=snapshot.service_topics) == "allowed"):
         free_label = _ui_free_book_label(snapshot)
         if free_label:
             label = free_label
@@ -266,6 +265,10 @@ def build_d2_contact_fact_block(
     )
 
 
+class D2ContactReferenceError(ValueError):
+    """A model-selected branch is absent; tenant/data errors stay fatal."""
+
+
 def _d2_contact_text(
     snapshot: D2TenantSnapshot,
     *,
@@ -288,7 +291,7 @@ def _d2_contact_text(
         if contact_branch_id is not None:
             branch = branch_by_id(facts, contact_branch_id)
             if branch is None:
-                raise ValueError("d2_contact_branch_unknown")
+                raise D2ContactReferenceError("d2_contact_branch_unknown")
             branches = (branch,)
         else:
             branches = facts.branches
@@ -315,7 +318,7 @@ def _d2_contact_text(
         return "\n".join(dict.fromkeys(lines)), phone
 
     if contact_branch_id is not None:
-        raise ValueError("d2_contact_branch_unknown")
+        raise D2ContactReferenceError("d2_contact_branch_unknown")
     for field in wanted:
         attr = _FIELD_TO_ATTR.get(field)
         if attr is None:

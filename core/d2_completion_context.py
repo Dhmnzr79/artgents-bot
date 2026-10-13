@@ -2,6 +2,7 @@
 
 from contracts.d2_session_context import D2ProjectedDialoguePair
 from contracts.response_plan_session import D2DialogueReceiptRef, D2ShownPriceOfferRef
+from core.response_text_renderer import render_response_text
 from core.user_text_privacy import mask_phones_in_text, mask_emails_in_text
 
 
@@ -27,37 +28,20 @@ def _receipt(store, key, request_id, revision, turn=None):
     return result
 
 
-def _project_pair(ref, result, limit):
+def _project_pair(ref, result):
     resolved = result.response.resolved
-    # Do not copy rendered_text: it also contains money, promotions and lead UI.
-    # Code-owned financial text stays in the replay receipt, not ordinary memory.
-    safe_prose = lambda text: mask_emails_in_text(mask_phones_in_text(text))
-    by_request = {b.request_id: safe_prose(b.display_text)
-        for b in resolved.information_blocks if b.publication == "model_prose"}
-    # Authored reference text can contain amounts, so keep its typed identity only.
-    # This fixed policy clarification has known nonfinancial provenance.
-    from core.d2_snapshot_sources import _POLICY_CLARIFY
-    reference_ids = {p.request_id for p in resolved.d2_request_parts
-        if p.kind == "clarification"}
-    by_request.update({b.request_id: safe_prose(b.display_text)
-        for b in resolved.d2_exact_text_blocks if b.request_id in reference_ids
-        and b.display_text == _POLICY_CLARIFY
-        and not (b.policy_ids or b.requested_fact_ids or b.promo_fact_ids)})
-    by_request.update({b.request_id: b.display_text for b in resolved.d2_contact_blocks})
-    doctor_ids = {p.request_id for p in resolved.d2_request_parts if p.kind == "doctors"}
-    by_request.update({b.request_id: safe_prose(b.display_text)
-        for b in resolved.d2_exact_text_blocks if b.request_id in doctor_ids})
-    text = []
-    for part in resolved.d2_request_parts:
-        if part.kind == "price" and resolved.patient_text:
-            text.append(safe_prose(resolved.patient_text))
-        if part.request_id in by_request:
-            text.append(by_request[part.request_id])
-    if not resolved.d2_request_parts and resolved.patient_text:
-        text.append(safe_prose(resolved.patient_text))
-    if resolved.route == "ADMIN" and resolved.mode == "medical_terminal" and resolved.terminal_text:
-        text.append(safe_prose(resolved.terminal_text))
-    safe_text = "\n\n".join(dict.fromkeys(text))[:limit].strip()
+    # Read the same frozen publication as the widget; intake has explicit provenance.
+    def safe(text):
+        return mask_emails_in_text(mask_phones_in_text(text)) if text else text
+
+    # Mask untrusted prose, not published clinic data (dates can resemble phones).
+    public_plan = resolved.model_copy(update={
+        "information_blocks": tuple(b.model_copy(update={"display_text": safe(b.display_text)})
+            if b.publication == "model_prose" else b for b in resolved.information_blocks),
+        "patient_text": safe(resolved.patient_text),
+        "terminal_text": safe(resolved.terminal_text),
+    })
+    safe_text = render_response_text(public_plan, include_lead=False, include_card_details=True)
     price_blocks = (*((resolved.d2_price_block,) if resolved.d2_price_block else ()),
         *resolved.d2_price_detail_blocks)
     offers = tuple({(row.source_client_id, row.offer_id, row.service_id):
@@ -67,7 +51,7 @@ def _project_pair(ref, result, limit):
     return D2ProjectedDialoguePair(
         patient_text=ref.patient_text, selected_ui_ref=ref.selected_ui_ref,
         committed_at_turn=ref.committed_at_turn, assistant_text=safe_text,
-        parts=resolved.d2_request_parts, price_scope=discussion_scope(resolved), offers=offers,
+        parts=tuple(p for p in resolved.d2_request_parts if p.kind != "lead"), price_scope=discussion_scope(resolved), offers=offers,
         detail_aspects=tuple(block.aspect for block in resolved.d2_price_detail_blocks),
         policy_ids=tuple(dict.fromkeys(i for b in (*resolved.d2_policy_blocks, *resolved.d2_exact_text_blocks) for i in b.policy_ids)),
         fact_ids=tuple(dict.fromkeys((
@@ -129,7 +113,7 @@ def project_completed_dialogue(context, snapshot, store, policy):
         if not isinstance(ref, D2DialogueReceiptRef):
             raise ValueError("d2_history_receipt_required")
         result = _receipt(store, key, ref.request_id, context.source_revision, ref.committed_at_turn)
-        pairs.append(_project_pair(ref, result, policy.history_text_max_chars))
+        pairs.append(_project_pair(ref, result))
     scope = None
     reference = snapshot.state.discussion_request_id
     if reference is not None:
@@ -148,8 +132,12 @@ def retain_discussion_reference(state, previous, context, resolved, request_id):
     scope = discussion_scope(resolved)
     if scope is not None:
         reference = request_id
-    elif resolved.response_scope != "clinic" or any(p.discussion_scope is not None for p in resolved.d2_request_parts):
-        reference = None
-    else:
+    elif resolved.d2_request_parts and all(
+        p.kind in {"contact", "clinic_policy", "clarification", "price_clarification"}
+        or (p.source_results and all(s.source_ref.startswith("policy:") for s in p.source_results))
+        for p in resolved.d2_request_parts
+    ) and not any(p.discussion_scope is not None for p in resolved.d2_request_parts):
         reference = previous.discussion_request_id if context.freshness == "fresh" else None
+    else:
+        reference = None
     return state.model_copy(update={"discussion_request_id": reference})

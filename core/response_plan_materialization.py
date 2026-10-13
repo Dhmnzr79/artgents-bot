@@ -17,6 +17,7 @@ from contracts.response_plan import (
     ComposerSelectedRouteAuthority,
     D2PartDeferredBlock,
     D2PartFailureBlock,
+    D2_OPERATION_FAILURE_TEXT,
     D2ContactFactBlock,
     D2ExactTextBlock,
     D2FrozenPriceBlock,
@@ -24,6 +25,7 @@ from contracts.response_plan import (
     D2FrozenPriceDetailRow,
     D2FrozenPriceRow,
     D2PriceDetailUiAction,
+    D2PriceSelectUiAction,
     D2PolicyFactBlock,
     D2PriceScopeDecision,
     D2PriceScopeChoice,
@@ -98,8 +100,6 @@ from core.response_plan_fact_projection import (
     fact_explicit_only,
     project_commercial_fact_candidate,
 )
-from contracts.response_plan_fact_policy import RequestedFactPolicyContext
-from core.response_plan_fact_policy import evaluate_requested_fact_display
 from core.response_plan_production_adapter import (
     billing_unit_phrase,
     format_frozen_price_row_display,
@@ -305,130 +305,29 @@ def resolve_d2_operations(
     exact_contact_blocks=(), exact_policy_blocks=(),
     exact_contact_button=None, exact_canonical_contact=None,
     d2_request_order=(), shown_price_offer_refs=(), selected_price_detail_action=None,
+    selected_price_offer_id=None, selected_price_select_actions=(),
     promotion_scope="none", requested_fact_ids=(), legacy_patient_text=None,
     exact_text_blocks=(), exact_parts=(), extra_ui=(), deferred_price_parts=(),
-    exact_deferred_blocks=(),
-    commercial_operations=(),
-    directory_cta=None,
-    suppress_forbidden_booking_cta=False,
+    exact_deferred_blocks=(), exact_failure_blocks=(),
+    suppress_forbidden_booking_cta=False, source_claims=None, complete_price=None,
 ):
     """Resolve already-decided operations; never reconstruct a semantic envelope."""
     client_id = sources.material_authority.source_client_id
     if client_id != sources.session_key.client_id:
         raise MaterializationOwnershipError("materialization_client_mismatch")
-    commercial_failures = []
-    prepared_commercial = []
-    for operation in commercial_operations:
-        texts = []
-        missing_fact = False
-        topic = operation.topic_id or (unambiguous_topic_for_service_ids(
-            sources.material_authority.bundle, (operation.service_id,)
-        ) if operation.service_id else None)
-        fact_context = RequestedFactPolicyContext(
-            response_scope="service" if operation.service_id else "topic" if topic else "clinic",
-            resolved_topic_id=topic, reference_service_id=operation.service_id,
-            implant_context_confirmed=topic == "implantation",
-        )
-        fact_ids = []
-        bundle = sources.material_authority.bundle
-        for fact_id in operation.fact_ids:
-            fact = bundle.facts.get(fact_id)
-            if fact is None:
-                raise MaterializationContractError("d2_commercial_fact_unknown")
-            if not fact_active_as_of(fact, as_of):
-                missing_fact = True
-                continue
-            outcome = evaluate_requested_fact_display(
-                fact=fact, context=fact_context, bundle=bundle, evaluation_purpose="requested",
-            )
-            if outcome == "allowed":
-                texts.append(fact.text_fact)
-                fact_ids.append(fact.id)
-            elif operation.service_id in fact.excluded_service_ids:
-                # An authored negative answer is not a published positive benefit.
-                texts.append(fact.excluded_scope_text)
-            else:
-                missing_fact = True
-        prepared_commercial.append((operation, texts, fact_ids, missing_fact))
-
-    # Reserve only applicable direct facts, across the whole response, before
-    # assigning promotional roles. Each operation keeps its own scope checks.
-    direct_ids = {i for _, _, ids, _ in prepared_commercial for i in ids}
-    recorded_requested = {i for b in exact_text_blocks for i in b.requested_fact_ids}
-    direct_ids.update(recorded_requested)
-    recorded_promos = {i for b in exact_text_blocks for i in b.promo_fact_ids}
-    for operation, fact_texts, fact_ids, missing_fact in prepared_commercial:
-        texts = []
-        promo_ids = ()
-        if operation.promotion_scope != "none":
-            if operation.promotion_scope == "service" and operation.service_id is None:
-                raise MaterializationContractError("d2_promotion_service_required")
-            local = resolve_d2_commercial_plan(
-                authority=sources.d2_commercial, service_id=operation.service_id,
-                include_packages=False, shown_promo_fact_ids=sources.shown_promo_fact_ids,
-                promo_form="full", promotion_scope=operation.promotion_scope,
-                skip_shown=False, max_promo=4,
-                active_promo_ids=frozenset(f.id for f in sources.material_authority.bundle.facts.values() if fact_active_as_of(f, as_of)),
-            )
-            missing_fact = missing_fact or not bool(local.promo_blocks)
-            visible_promos = tuple(b for b in local.promo_blocks
-                if b.fact_id not in direct_ids and b.fact_id not in recorded_promos)
-            texts.extend(b.display_text for b in visible_promos)
-            promo_ids = tuple(b.fact_id for b in visible_promos)
-            recorded_promos.update(promo_ids)
-            # A separate, fully covered request may repeat approved prose;
-            # it must not invent a gap or register the same fact a second time.
-            if not texts and not fact_texts:
-                texts.extend(b.display_text for b in local.promo_blocks)
-        texts.extend(fact_texts)
-        published_fact_ids = tuple(dict.fromkeys(i for i in fact_ids if i not in recorded_requested))
-        recorded_requested.update(published_fact_ids)
-        if not texts or missing_fact:
-            texts.append("У меня пока недостаточно информации по этому вопросу")
-            commercial_failures.append(D2PartFailureBlock(
-                request_id=operation.request_id, source_client_id=client_id,
-                message_id="d2-commercial-unavailable", reason="d2_commercial_fact_unavailable",
-                display_text="\n\n".join(texts),
-            ))
-            missing_fact = True
-        exact_text_blocks = (*exact_text_blocks, D2ExactTextBlock(
-            request_id=operation.request_id, source_client_id=client_id,
-            display_text="\n\n".join(texts),
-            requested_fact_ids=published_fact_ids, promo_fact_ids=promo_ids,
-        ))
-        exact_parts = (*exact_parts, D2ResolvedRequestPart(
-            request_id=operation.request_id, kind="commercial_fact",
-            status="unavailable" if missing_fact else "answered", scope="clinic",
-            failure_reason="d2_commercial_fact_unavailable" if missing_fact else None,
-        ))
-
+    # This projection uses captured MD metadata, including an authoritative
+    # empty map. D2 never infers service membership from document filenames.
+    service_topics = {
+        service_id: sources.d2_content_topics_by_ref[service.content_ref]
+        for service_id, service in sources.material_authority.bundle.services.items()
+        if service.content_ref in sources.d2_content_topics_by_ref
+    }
     price_parts = tuple(item for item in operations if item.kind == "price")
     content_parts = tuple(item for item in operations if item.kind == "content")
     detail_parts = tuple(item for item in operations if item.kind == "price_detail")
     direct_promotion = promotion_scope != "none"
     direct_fact = bool(requested_fact_ids)
 
-    # Keep the existing marketing policy for multi-part answers. Source UI
-    # below uses verified documents, not the number of content operations.
-    multiple_content_parts = len(content_parts) > 1
-    ready_comparison = (
-        len(content_parts) == 1
-        and content_parts[0].content_ref is not None
-        and content_parts[0].content_ref.startswith("comparison__")
-    )
-    auto_promo = (
-        common_route_content_lookup
-        and not direct_promotion
-        and not direct_fact
-        and not commercial_operations
-        and not multiple_content_parts
-        and not ready_comparison
-        and not price_parts
-        and not detail_parts
-    )
-    # A direct commercial fact is an exact addition, not a replacement for
-    # ordinary FullContext prose in the same turn. Promotions remain code-only.
-    code_owned_null_content = False
     unsupported = tuple(
         item.request_id
         for item in operations
@@ -436,44 +335,16 @@ def resolve_d2_operations(
     )
     if unsupported:
         raise MaterializationContractError("d2_request_kind_unsupported")
-    if not (price_parts or content_parts or detail_parts or exact_contact_blocks or exact_policy_blocks or exact_text_blocks or direct_promotion or direct_fact):
+    if not (price_parts or content_parts or detail_parts or exact_contact_blocks or exact_policy_blocks or exact_text_blocks or exact_failure_blocks or direct_promotion or direct_fact):
         raise MaterializationContractError("d2_price_or_content_part_required")
     if direct_promotion and promotion_scope not in {"general", "service", "shown"}:
         raise MaterializationContractError("d2_promotion_scope_invalid")
 
-    # Resolve content first. Wrong/missing refs soft-fail as part gaps (D2-078);
-    # foreign tenant material remains fatal and must not hide behind price recovery.
-    # FullContext prose is the ordinary answer path.  A content_ref remains
-    # useful provenance for source UI, but it does not decide whether the user
-    # asked an informational question or whether the prose may be published.
-    allow_missing_content_ref = True
-    information_blocks, content_realizations = _d2_information_blocks(
-        content_parts=content_parts,
-        client_id=client_id,
-        sources=sources,
-        allow_missing_content_ref=allow_missing_content_ref,
-        code_owned_null_content=code_owned_null_content,
-    )
-    content_blocks_by_id = {block.request_id: block for block in information_blocks}
-    content_part_scopes = tuple(
-        _d2_content_scope(
-            part,
-            client_id=client_id,
-            sources=sources,
-            allow_missing_content_ref=allow_missing_content_ref,
-            allow_missing_content_authority=(
-                part.content_ref is not None
-                and (
-                    part.request_id not in content_blocks_by_id
-                    or content_blocks_by_id[part.request_id].content_ref is None
-                )
-            ),
-        )
-        for part in content_parts
-    )
-
     price_block: D2FrozenPriceBlock | None = None
-    failure_blocks: list[D2PartFailureBlock] = list(commercial_failures)
+    price_tab_rows = ()
+    price_selected_scope = None
+    scope_decision = None
+    failure_blocks: list[D2PartFailureBlock] = list(exact_failure_blocks)
     deferred_blocks: list[D2PartDeferredBlock] = [D2PartDeferredBlock(request_id=p.request_id, source_client_id=client_id) for p in deferred_price_parts]
     price_failure_reason: str | None = None
     price_scopes_by_id: dict[str, tuple[tuple[str, ...], str, str | None]] = {}
@@ -482,15 +353,11 @@ def resolve_d2_operations(
             price_scopes_by_id[part.request_id] = ((), "clinic", None)
             continue
         deferred_scope = _d2_price_scope(part, client_id=client_id, sources=sources)
-        _d2_validate_price_scope_ownership(deferred_scope[0], bundle=sources.material_authority.bundle)
         price_scopes_by_id[part.request_id] = deferred_scope
     if price_parts:
         price_part = price_parts[0]
         for part in price_parts:
             price_scope = _d2_price_scope(part, client_id=client_id, sources=sources)
-            _d2_validate_price_scope_ownership(
-                price_scope[0], bundle=sources.material_authority.bundle
-            )
             price_scopes_by_id[part.request_id] = price_scope
         service_ids, response_scope, selected_topic_id = price_scopes_by_id[price_part.request_id]
         deferred_blocks.extend(
@@ -502,6 +369,13 @@ def resolve_d2_operations(
         )
         applied_extent = price_part.volume.extent if price_part.volume is not None and price_part.volume.extent != "unknown" else None
         try:
+            # An absent ordinary model ID is unavailable data, not proof of
+            # another tenant. Keep low-level offer/detail ownership strict.
+            if not service_ids or any(
+                service_id not in sources.material_authority.bundle.services
+                for service_id in service_ids
+            ):
+                raise MaterializationContractError("d2_no_price_candidates")
             direct_service_only = price_part.service_id is not None
             direction_order = next(
                 (
@@ -520,6 +394,8 @@ def resolve_d2_operations(
                 applied_extent=applied_extent,
                 ordered_offer_ids=direction_order,
                 direct_service_only=direct_service_only,
+                selected_offer_id=selected_price_offer_id,
+                selected_option_id=price_part.option_id,
             )
         except MaterializationContractError as error:
             price_failure_reason = str(error)
@@ -545,6 +421,21 @@ def resolve_d2_operations(
             scope_decision = None
             volume_choices = ()
         else:
+            if direct_service_only:
+                # A named variant selects its eligible row; otherwise open the first. Keep
+                # alternatives as UI actions, not as published financial refs.
+                price_tab_rows = price_block.rows
+                selected_row = next(row for row in price_block.rows if any(
+                    offer.offer_id == row.offer_id and offer.option_id == price_part.option_id
+                    for offer in sources.material_authority.bundle.offers
+                )) if price_part.option_id is not None else price_block.rows[0]
+                price_block = price_block.model_copy(update={"rows": (selected_row,)})
+                trace = replace(trace, selected_offers=tuple(
+                    offer for offer in trace.selected_offers if offer.offer_id == selected_row.offer_id))
+                offer = next(item for item in sources.material_authority.bundle.offers
+                             if item.offer_id == selected_row.offer_id)
+                price_selected_scope = DiscussionScope(target=price_part.target,
+                    volume=price_part.volume, brand_id=offer.brand_id)
             scope_decision, volume_choices = _d2_price_scope_decision(
                 part=price_part,
                 client_id=client_id,
@@ -553,21 +444,80 @@ def resolve_d2_operations(
                 applied_extent=applied_extent,
                 selected_offer_ids=tuple(row.offer_id for row in price_block.rows),
             )
-    else:
+    if complete_price is not None:
+        outcome = {
+            "price": price_block.model_dump(mode="json") if price_block else None,
+            "scope": scope_decision.model_dump(mode="json") if price_parts and scope_decision else None,
+            "exact_text": [b.model_dump(mode="json") for b in exact_text_blocks],
+            "contacts": [b.model_dump(mode="json") for b in exact_contact_blocks],
+            "policies": [b.model_dump(mode="json") for b in exact_policy_blocks],
+            "parts": [p.model_dump(mode="json") for p in exact_parts],
+            "failures": [b.model_dump(mode="json") for b in failure_blocks],
+            "deferred": [b.model_dump(mode="json") for b in deferred_blocks],
+            "clarification_choices": [b.model_dump(mode="json") for b in extra_ui],
+        }
+        reply = complete_price(outcome)
+        if reply.outcome != "dialogue" or any(p.kind != "content" for p in reply.blocks):
+            raise MaterializationContractError("d2_completion_action_forbidden")
+        operations = (*reply.blocks, *operations)
+        source_claims = reply.source_claims
+        d2_request_order = (*[p.request_id for p in reply.blocks], *d2_request_order)
+        # Guard decisions/provenance remain in exact_parts. Only their final prose
+        # belongs to completion; clarification prompts remain code-owned.
+        refusal_ids = {p.request_id for p in exact_parts if p.kind == "price_reference"}
+        if refusal_ids and not reply.blocks:
+            raise MaterializationContractError("d2_completion_refusal_text_required")
+        exact_text_blocks = tuple(b for b in exact_text_blocks if b.request_id not in refusal_ids)
+
+    mixed_source_scope = False
+    if source_claims is not None:
+        operations, mixed_source_scope = _d2_bind_source_claims(
+            operations, source_claims, client_id=client_id, sources=sources,
+        )
+    content_parts = tuple(item for item in operations if item.kind == "content")
+    # Keep the existing marketing policy for multi-part answers. Source UI
+    # below uses verified documents, not the number of content operations.
+    content_part_count = (max(1, len(source_claims)) if source_claims is not None else len(content_parts))
+    multiple_content_parts = content_part_count > 1
+    ready_comparison = (
+        content_part_count == 1
+        and content_parts[0].content_ref is not None
+        and content_parts[0].content_ref.startswith("comparison__")
+    )
+    auto_promo = (
+        common_route_content_lookup
+        and not direct_promotion
+        and not direct_fact
+        and not multiple_content_parts
+        and not ready_comparison
+        and not price_parts
+        and not detail_parts
+    )
+    # A direct commercial fact is an exact addition, not a replacement for
+    # ordinary FullContext prose in the same turn. Promotions remain code-only.
+    code_owned_null_content = False
+    # Bind final prose to captured sources. Wrong/missing refs soft-fail (D2-078);
+    # foreign tenant material remains fatal and must not hide behind price recovery.
+    # FullContext prose is the ordinary answer path.  A content_ref remains
+    # useful provenance for source UI, but it does not decide whether the user
+    # asked an informational question or whether the prose may be published.
+    information_blocks, content_realizations, content_scopes_by_id = _d2_information_blocks(
+        content_parts=content_parts,
+        client_id=client_id,
+        sources=sources,
+        code_owned_null_content=code_owned_null_content,
+    )
+    if mixed_source_scope:
+        # A single publication does not turn several subjects into the first one.
+        for part in content_parts:
+            content_scopes_by_id[part.request_id] = None
+    content_blocks_by_id = {block.request_id: block for block in information_blocks}
+
+    if not price_parts:
         if content_parts:
             first = content_parts[0]
-            service_ids, response_scope, selected_topic_id = _d2_content_scope(
-                first,
-                client_id=client_id,
-                sources=sources,
-                allow_missing_content_ref=allow_missing_content_ref,
-                allow_missing_content_authority=(
-                    first.content_ref is not None
-                    and (
-                        first.request_id not in content_blocks_by_id
-                        or content_blocks_by_id[first.request_id].content_ref is None
-                    )
-                ),
+            service_ids, response_scope, selected_topic_id = (
+                content_scopes_by_id[first.request_id] or ((), "mixed", None)
             )
         else:
             service_ids, response_scope, selected_topic_id = (), "clinic", None
@@ -578,47 +528,10 @@ def resolve_d2_operations(
         )
         scope_decision = None
         volume_choices = ()
-    detail_blocks: list[D2FrozenPriceDetailBlock] = []
-    detail_failures: dict[str, str] = {}
-    for detail_part in detail_parts:
-        effective_refs = (
-            tuple(D2ShownPriceOfferRef(
-                source_client_id=row.source_client_id, offer_id=row.offer_id,
-                service_id=row.service_id,
-            ) for row in price_block.rows)
-            if price_block is not None else shown_price_offer_refs
-        )
-        named_content_services = {
-            part.service_id for part in content_parts if part.service_id is not None
-        }
-        if (
-            (named_content_services and (
-                len(named_content_services) != 1
-                or any(ref.service_id not in named_content_services for ref in effective_refs)
-            ))
-            or (detail_part.service_id is not None and any(
-                ref.service_id != detail_part.service_id for ref in effective_refs
-            ))
-        ):
-            effective_refs = ()
-        try:
-            detail_blocks.append(_d2_price_detail_block(
-                detail_part, sources=sources,
-                shown_price_offer_refs=effective_refs, selected_action=selected_price_detail_action,
-            ))
-        except MaterializationContractError as error:
-            if str(error) not in {"d2_price_detail_context_ambiguous", "d2_no_price_candidates", "d2_no_scope_price_candidates"}:
-                raise
-            reason = str(error)
-            detail_failures[detail_part.request_id] = reason
-            ambiguous = reason == "d2_price_detail_context_ambiguous"
-            failure_blocks.append(D2PartFailureBlock(
-                request_id=detail_part.request_id, source_client_id=client_id,
-                message_id="d2-price-detail-clarify" if ambiguous else "d2-price-detail-unavailable",
-                reason=reason,
-                display_text=("Уточните, для какой услуги или варианта показать детали." if ambiguous
-                    else "Для этого варианта детали не указаны."),
-            ))
+    detail_blocks = [
+        _d2_price_detail_block(part, sources=sources, selected_action=selected_price_detail_action)
+        for part in detail_parts
+    ]
     details_by_id = {block.request_id: block for block in detail_blocks}
     if detail_blocks and not price_parts and not content_parts:
         detail_services = {row.service_id for block in detail_blocks for row in block.rows}
@@ -641,7 +554,13 @@ def resolve_d2_operations(
                             price_scopes_by_id[item.request_id][2])
             for item in (*price_parts, *deferred_price_parts)
         )
-    part_identities.extend(_scope_identity(scope, part.service_id, topic) for part, (_, scope, topic) in zip(content_parts, content_part_scopes))
+    for part in content_parts:
+        verified_scope = content_scopes_by_id[part.request_id]
+        if verified_scope is None:
+            part_identities.append(("mixed", None))
+        else:
+            _, scope, topic = verified_scope
+            part_identities.append(_scope_identity(scope, part.service_id, topic))
     for detail_block in detail_blocks:
         detail_services = {row.service_id for row in detail_block.rows}
         detail_service = next(iter(detail_services)) if len(detail_services) == 1 else None
@@ -661,7 +580,6 @@ def resolve_d2_operations(
         scope=price_scopes_by_id[p.request_id][1], service_id=p.service_id,
         topic_id=price_scopes_by_id[p.request_id][2], discussion_scope=_discussion_descriptor(p),
     ) for p in deferred_price_parts]
-    content_scopes_by_id = {part.request_id: scope for part, scope in zip(content_parts, content_part_scopes)}
     for part in operations:
         if part.kind == "price":
             _, part_scope, part_topic_id = price_scopes_by_id[part.request_id]
@@ -674,13 +592,15 @@ def resolve_d2_operations(
                 failure_reason=(
                     price_failure_reason if part.request_id == price_part.request_id else None
                 ),
-                discussion_scope=_discussion_descriptor(part),
+                discussion_scope=(price_selected_scope if part.request_id == price_part.request_id
+                                  and price_selected_scope is not None else _discussion_descriptor(part)),
                 scope=part_scope,
                 service_id=part.service_id,
                 topic_id=part_topic_id,
             ))
         elif part.kind == "content":
-            _, scope, topic = content_scopes_by_id[part.request_id]
+            verified_scope = content_scopes_by_id[part.request_id]
+            _, scope, topic = verified_scope or ((), "mixed", None)
             realization = content_realizations[part.request_id]
             if realization.outcome == "unavailable":
                 assert realization.reason is not None
@@ -696,13 +616,13 @@ def resolve_d2_operations(
                 kind="content",
                 status=realization.outcome,
                 failure_reason=realization.reason,
-                discussion_scope=_discussion_descriptor(part),
+                discussion_scope=_discussion_descriptor(part) if verified_scope is not None else None,
                 scope=scope,
-                service_id=part.service_id,
+                service_id=part.service_id if verified_scope is not None else None,
                 topic_id=topic,
                 content_ref=(
                     content_blocks_by_id[part.request_id].content_ref
-                    if part.request_id in content_blocks_by_id else part.content_ref
+                    if part.request_id in content_blocks_by_id else (part.content_ref if verified_scope is not None else None)
                 ),
                 content_section_refs=realization.section_refs,
                 content_publication=realization.publication,
@@ -712,14 +632,12 @@ def resolve_d2_operations(
                 ),
             ))
         elif part.kind == "price_detail":
-            detail_block = details_by_id.get(part.request_id)
-            detail_failure_reason = detail_failures.get(part.request_id)
-            detail_services = {row.service_id for row in detail_block.rows} if detail_block is not None else set()
+            detail_block = details_by_id[part.request_id]
+            detail_services = {row.service_id for row in detail_block.rows}
             detail_service = next(iter(detail_services)) if len(detail_services) == 1 else None
             request_parts.append(D2ResolvedRequestPart(
                 request_id=part.request_id, kind="price_detail",
-                status="unavailable" if detail_failure_reason is not None else "answered",
-                failure_reason=detail_failure_reason,
+                status="answered",
                 discussion_scope=_discussion_descriptor(part),
                 scope="service" if detail_service is not None else "mixed",
                 service_id=detail_service,
@@ -777,10 +695,6 @@ def resolve_d2_operations(
             requested_fact_ids,
             sources,
         )
-    elif len(commercial_operations) == 1 and not multiple_content_parts:
-        source_content_ref = _d2_direct_fact_source_ref(
-            tuple(i for block in exact_text_blocks for i in block.requested_fact_ids), sources,
-        )
     shared_content_source = source_content_ref is not None and all(
         part.request_id in content_blocks_by_id
         and content_blocks_by_id[part.request_id].content_ref == source_content_ref
@@ -799,7 +713,6 @@ def resolve_d2_operations(
         source_ui=source_ui,
         sources=sources,
         request_parts=tuple(request_parts),
-        directory_cta=directory_cta,
         suppress_forbidden_booking_cta=suppress_forbidden_booking_cta,
         suppress_secondary=(
             bool(price_parts or detail_parts)
@@ -840,6 +753,52 @@ def resolve_d2_operations(
         )
     if extra_ui:
         ui_candidates = ui_candidates.model_copy(update={"quick_replies": tuple(extra_ui), "price_detail_actions": ()})
+    if price_block is not None and not extra_ui:
+        offers_by_id = {offer.offer_id: offer for offer in sources.material_authority.bundle.offers}
+        replies, actions = [], []
+        if scope_decision is not None:
+            # Keep the configured overview's services/order/cap; prepare only
+            # their eligible exact-service variants before any UI selection.
+            price_tab_rows = tuple(row for service_id in dict.fromkeys(
+                row.service_id for row in price_block.rows
+            ) for row in _d2_price_block(bundle=sources.material_authority.bundle,
+                client_id=client_id, service_ids=(service_id,),
+                published_terms=sources.d2_published_terms_by_offer,
+                brand_id=price_part.brand_id, applied_extent=applied_extent,
+                direct_service_only=True)[0].rows)
+        for row in price_tab_rows:
+            offer = offers_by_id[row.offer_id]
+            reply_id = f"price_select:{row.offer_id}"
+            replies.append(UiQuickReplyCandidate(source_client_id=client_id,
+                reply_id=reply_id, label=_offer_tab_label(sources.material_authority.bundle, offer) or row.service_name))
+            actions.append(D2PriceSelectUiAction(source_client_id=client_id,
+                reply_id=reply_id, offer_id=row.offer_id, service_id=row.service_id, service_name=row.service_name,
+                discussion_scope=DiscussionScope(target=ServiceTarget(type="service", id=row.service_id),
+                    volume=price_part.volume, brand_id=offer.brand_id)))
+        if selected_price_select_actions:
+            actions = list(selected_price_select_actions)
+            replies = []
+            for index, action in enumerate(actions):
+                offer = offers_by_id.get(action.offer_id)
+                service = sources.material_authority.bundle.services.get(action.service_id)
+                extent = action.discussion_scope.volume.extent if action.discussion_scope.volume else None
+                if (action.source_client_id != client_id or offer is None or not offer.active
+                        or service is None or not service.active or offer.service_id != action.service_id
+                        or offer.brand_id != action.discussion_scope.brand_id
+                        or action.offer_id not in sources.d2_published_terms_by_offer
+                        or (offer.option_id is not None and not any(
+                            option.option_id == offer.option_id and option.active is not False
+                            for option in service.options))
+                        or (extent not in {None, "unknown"} and not _d2_offer_applies(offer, service, extent))):
+                    raise MaterializationOwnershipError("d2_price_select_offer_unavailable")
+                actions[index] = action.model_copy(update={"service_name":service.name})
+                replies.append(UiQuickReplyCandidate(source_client_id=client_id,
+                    reply_id=action.reply_id, label=_offer_tab_label(sources.material_authority.bundle, offer) or service.name))
+        if actions and (len(actions) > 1 or scope_decision is not None or selected_price_select_actions):
+            ui_candidates = ui_candidates.model_copy(update={
+                "quick_replies": (*ui_candidates.quick_replies, *replies),
+                "price_select_actions": tuple(actions),
+            })
     unavailable_count = sum(part.status == "unavailable" for part in request_parts)
     deferred_count = sum(part.status == "deferred" for part in request_parts)
     result_status = (
@@ -847,38 +806,34 @@ def resolve_d2_operations(
         else "failed" if unavailable_count == len(request_parts)
         else "degraded"
     )
+    commercial_topic_id = None
     if price_parts:
-        commercial_service_id = (
-            None if price_block is None and price_parts[0].brand_id is not None
-            else price_parts[0].service_id
-        )
-    elif direct_promotion and promotion_scope == "general":
-        commercial_service_id = None
+        published_services = tuple(dict.fromkeys(row.service_id for row in price_block.rows)) if price_block else ()
+        commercial_service_id = published_services[0] if len(published_services) == 1 else None
     elif direct_promotion or auto_promo:
         commercial_service_id = content_parts[0].service_id if content_parts else None
+        commercial_topic_id = selected_topic_id
     else:
         commercial_service_id = None
-    active_promo_ids = frozenset(
-        fact.id
-        for fact in sources.material_authority.bundle.facts.values()
-        if fact_active_as_of(fact, as_of)
-    )
     commercial = resolve_d2_commercial_plan(
         authority=sources.d2_commercial,
+        bundle=sources.material_authority.bundle,
+        as_of=as_of,
         service_id=commercial_service_id,
+        topic_id=commercial_topic_id,
         include_packages=price_block is not None and not direct_promotion and not direct_fact,
         shown_promo_fact_ids=sources.shown_promo_fact_ids,
         promo_form="full" if direct_promotion else "short",
         promotion_scope=promotion_scope if direct_promotion else "service",
-        skip_shown=not direct_promotion,
-        max_promo=4 if direct_promotion else 2,
-        active_promo_ids=active_promo_ids,
+        skip_shown=not direct_promotion and price_block is None,
+        max_promo=None if price_block is not None else (4 if direct_promotion else 2),
     )
     commercial_facts = _d2_requested_fact_candidates(
         requested_fact_ids,
         sources=sources,
         client_id=client_id,
         as_of=as_of,
+        service_topics=service_topics,
     )
     published_price_rows = price_block.rows if price_block is not None else ()
     published_ids = frozenset((
@@ -1027,69 +982,30 @@ def _d2_price_detail_ui(
 
 
 def _d2_price_detail_offer_ids(
-    part: RequestUnderstandingRequest,
+    part,
     *, sources: ResponsePlanMaterializationSources,
-    shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...],
     selected_action: D2PriceDetailUiAction | None,
 ) -> tuple[str, ...]:
+    """Only the authenticated published card action owns detail identity."""
     client_id = sources.session_key.client_id
     bundle = sources.material_authority.bundle
-    applied_extent = part.volume.extent if part.volume is not None and part.volume.extent != "unknown" else None
-    detail_service_id = part.service_id
-    if detail_service_id is None and shown_price_offer_refs and (part.brand_id is not None or applied_extent is not None):
-        services = {ref.service_id for ref in shown_price_offer_refs}
-        if len(services) == 1:
-            detail_service_id = next(iter(services))
-    if selected_action is not None:
-        if (
-            selected_action.source_client_id != client_id
-            or selected_action.aspect != part.price_detail_aspect
-            or part.price_detail_offer_id is not None
-            or part.price_detail_offer_ordinal is not None
-            or part.service_id not in {None, selected_action.service_id}
-        ):
-            raise MaterializationOwnershipError("d2_price_detail_action_mismatch")
-        offer_ids = selected_action.offer_ids
-    elif part.price_detail_offer_ordinal is not None:
-        if part.price_detail_offer_ordinal > len(shown_price_offer_refs):
-            raise MaterializationContractError("d2_price_detail_context_ambiguous")
-        ref = shown_price_offer_refs[part.price_detail_offer_ordinal - 1]
-        if part.service_id not in {None, ref.service_id}:
-            raise MaterializationContractError("d2_price_detail_context_ambiguous")
-        offer_ids = (ref.offer_id,)
-    elif part.price_detail_offer_id is not None:
-        offer_ids = (part.price_detail_offer_id,)
-    elif shown_price_offer_refs and part.brand_id is None and applied_extent is None and (
-        part.service_id is None or all(ref.service_id == part.service_id for ref in shown_price_offer_refs)
-    ):
-        if part.service_id is None and len({ref.service_id for ref in shown_price_offer_refs}) != 1:
-            raise MaterializationContractError("d2_price_detail_context_ambiguous")
-        offer_ids = tuple(ref.offer_id for ref in shown_price_offer_refs)
-    elif detail_service_id is not None:
-        price, _ = _d2_price_block(
-            bundle=bundle, client_id=client_id, service_ids=(detail_service_id,),
-            published_terms=sources.d2_published_terms_by_offer,
-            brand_id=part.brand_id, applied_extent=applied_extent,
-            direct_service_only=True,
-        )
-        offer_ids = tuple(row.offer_id for row in price.rows)
-    else:
-        raise MaterializationContractError("d2_price_detail_context_ambiguous")
-    by_id = {offer.offer_id: offer for offer in bundle.offers}
-    if len(set(offer_ids)) != len(offer_ids):
+    if (selected_action is None
+        or selected_action.source_client_id != client_id
+        or selected_action.aspect != part.price_detail_aspect
+        or part.service_id not in {None, selected_action.service_id}):
+        raise MaterializationOwnershipError("d2_price_detail_action_mismatch")
+    offer_ids = selected_action.offer_ids
+    if not offer_ids or len(set(offer_ids)) != len(offer_ids):
         raise MaterializationOwnershipError("d2_price_detail_offer_duplicate")
+    by_id = {offer.offer_id: offer for offer in bundle.offers}
     for offer_id in offer_ids:
         offer = by_id.get(offer_id)
-        if (
-            offer is None or not offer.active
-            or offer.service_id not in bundle.services
-            or not bundle.services[offer.service_id].active
+        service = bundle.services.get(offer.service_id) if offer else None
+        if (offer is None or not offer.active or service is None or not service.active
             or offer_id not in sources.d2_published_terms_by_offer
-            or (part.service_id is not None and offer.service_id != part.service_id)
-            or (selected_action is None and part.brand_id is not None and offer.brand_id != part.brand_id)
-            or (selected_action is None and applied_extent is not None
-                and not _d2_offer_applies(offer, bundle.services[offer.service_id], applied_extent))
-        ):
+            or (selected_action.service_id is not None and offer.service_id != selected_action.service_id)
+            or (offer.option_id is not None and not any(
+                option.option_id == offer.option_id and option.active is not False for option in service.options))):
             raise MaterializationOwnershipError("d2_price_detail_offer_foreign")
     return offer_ids
 
@@ -1097,13 +1013,12 @@ def _d2_price_detail_offer_ids(
 def _d2_price_detail_block(
     part: RequestUnderstandingRequest,
     *, sources: ResponsePlanMaterializationSources,
-    shown_price_offer_refs: tuple[D2ShownPriceOfferRef, ...],
     selected_action: D2PriceDetailUiAction | None,
 ) -> D2FrozenPriceDetailBlock:
     if part.price_detail_aspect is None:
         raise MaterializationContractError("d2_price_detail_aspect_required")
     offer_ids = _d2_price_detail_offer_ids(
-        part, sources=sources, shown_price_offer_refs=shown_price_offer_refs,
+        part, sources=sources,
         selected_action=selected_action,
     )
     bundle = sources.material_authority.bundle
@@ -1115,11 +1030,7 @@ def _d2_price_detail_block(
         variant = _offer_variant_label(bundle, offer)
         label = f"{service.name} — {variant}" if variant else service.name
         available = _d2_price_detail_has_data(offer, part.price_detail_aspect)
-        stages = tuple(
-            f"{stage.label} — {_format_d2_amount(stage.amount)}\u00a0{_d2_currency(stage.currency)}"
-            + (f". {stage.timing_text}" if stage.timing_text else "")
-            for stage in (offer.payment_stages or ())
-        ) if available and part.price_detail_aspect == "stages" else ()
+        stages = _d2_payment_stage_texts(offer) if available and part.price_detail_aspect == "stages" else ()
         rows.append(D2FrozenPriceDetailRow(
             source_client_id=sources.session_key.client_id,
             offer_id=offer.offer_id, service_id=offer.service_id,
@@ -1267,68 +1178,25 @@ def _d2_typed_content_scope_from_part(
     *,
     client_id: str,
     sources: ResponsePlanMaterializationSources,
-) -> tuple[tuple[str, ...], str, str | None]:
-    """Scope for a recoverable content gap — only typed IDs, never invented cards."""
+) -> tuple[tuple[str, ...], str, str | None] | None:
+    """Confirm the ordinary subject once; an absent ID is not foreign ownership."""
     if part.service_id is not None:
         if part.service_id not in sources.material_authority.bundle.services:
+            return None
+        return (part.service_id,), "service", part.topic_id
+    if part.topic_id is not None:
+        direction = next((item for item in sources.d2_directions
+                          if item.topic_id == part.topic_id), None)
+        if direction is not None and direction.source_client_id != client_id:
             raise MaterializationOwnershipError("materialization_foreign_material")
-        return (part.service_id,), "service", part.topic_id
-    if part.topic_id is not None:
-        for direction in sources.d2_directions:
-            if direction.topic_id == part.topic_id and direction.source_client_id == client_id:
-                return direction.service_ids, "topic", part.topic_id
-        return (), "topic", part.topic_id
-    return (), "clinic", None
-
-
-def _d2_content_scope(
-    part: RequestUnderstandingRequest,
-    *,
-    client_id: str,
-    sources: ResponsePlanMaterializationSources,
-    allow_missing_content_ref: bool = False,
-    allow_missing_content_authority: bool = False,
-) -> tuple[tuple[str, ...], str, str | None]:
-    canonical_topics = (
-        set(sources.d2_canonical_topic_ids)
-        if sources.d2_canonical_topic_ids
-        else {item.topic_id for item in sources.d2_directions if item.source_client_id == client_id}
-    )
-    if part.topic_id is not None and part.topic_id not in canonical_topics:
-        # Optional source provenance cannot authorize an unknown typed topic.
-        raise MaterializationOwnershipError("materialization_foreign_material")
-    if part.content_ref is None:
-        if not allow_missing_content_ref:
-            raise MaterializationContractError("d2_content_ref_required")
-        return _d2_typed_content_scope_from_part(
-            part, client_id=client_id, sources=sources
+        canonical_topics = (
+            set(sources.d2_canonical_topic_ids) if sources.d2_canonical_topic_ids
+            else {item.topic_id for item in sources.d2_directions
+                  if item.source_client_id == client_id}
         )
-    if allow_missing_content_authority:
-        # Recoverable content gap: never invent cards; scope only from typed IDs.
-        return _d2_typed_content_scope_from_part(
-            part, client_id=client_id, sources=sources
-        )
-    authority = next(
-        (item for item in sources.d2_authored_content if item.content_ref == part.content_ref),
-        None,
-    )
-    if authority is None or authority.source_client_id != client_id:
-        raise MaterializationOwnershipError("materialization_foreign_material")
-    if part.service_id is not None:
-        if part.service_id not in sources.material_authority.bundle.services:
-            raise MaterializationContractError("d2_content_service_mismatch")
-        if part.service_id not in authority.allowed_service_ids:
-            raise MaterializationContractError("d2_content_service_mismatch")
-        return (part.service_id,), "service", part.topic_id
-    if part.topic_id is not None:
-        for direction in sources.d2_directions:
-            if direction.topic_id == part.topic_id and direction.source_client_id == client_id:
-                return direction.service_ids, "topic", part.topic_id
-        if sources.d2_content_topics_by_ref.get(authority.content_ref) == part.topic_id:
-            return (), "topic", part.topic_id
-        if not authority.allowed_service_ids and not sources.d2_content_topics_by_ref:
-            return (), "topic", part.topic_id
-    # Provenance supports prose/UI without inventing a service focus.
+        if part.topic_id not in canonical_topics:
+            return None
+        return (direction.service_ids if direction is not None else ()), "topic", part.topic_id
     return (), "clinic", None
 
 
@@ -1343,19 +1211,11 @@ def _d2_price_scope(
     if part.topic_id is None:
         raise MaterializationContractError("d2_price_scope_required")
     for direction in sources.d2_directions:
-        if direction.topic_id == part.topic_id and direction.source_client_id == client_id:
+        if direction.topic_id == part.topic_id:
+            if direction.source_client_id != client_id:
+                raise MaterializationOwnershipError("materialization_foreign_material")
             return direction.service_ids, "topic", direction.topic_id
-    raise MaterializationOwnershipError("materialization_foreign_material")
-
-
-def _d2_validate_price_scope_ownership(
-    service_ids: tuple[str, ...],
-    *,
-    bundle: ResponseSchemaBundle,
-) -> None:
-    """Validate every deferred price reference without looking up its offers."""
-    if not service_ids or any(service_id not in bundle.services for service_id in service_ids):
-        raise MaterializationOwnershipError("materialization_foreign_material")
+    return (), "topic", part.topic_id
 
 
 def _d2_price_block(
@@ -1368,6 +1228,8 @@ def _d2_price_block(
     applied_extent: str | None = None,
     ordered_offer_ids: tuple[str, ...] = (),
     direct_service_only: bool = False,
+    selected_offer_id: str | None = None,
+    selected_option_id: str | None = None,
 ) -> tuple[D2FrozenPriceBlock, MaterializationTrace]:
     if brand_id is not None and brand_id not in bundle.brands.brands:
         raise MaterializationContractError("d2_no_price_candidates")
@@ -1425,6 +1287,12 @@ def _d2_price_block(
         raise MaterializationContractError(
             "d2_no_scope_price_candidates" if applied_extent is not None else "d2_no_price_candidates"
         )
+    if selected_offer_id is not None:
+        offers = [offer for offer in offers if offer.offer_id == selected_offer_id]
+        if len(offers) != 1:
+            raise MaterializationOwnershipError("d2_price_select_offer_unavailable")
+    if selected_option_id is not None and not any(offer.option_id == selected_option_id for offer in offers):
+        raise MaterializationContractError("d2_no_price_candidates")
     rows = tuple(
         _d2_frozen_price_row(
             offer,
@@ -1518,6 +1386,9 @@ def _d2_frozen_price_row(
     service = bundle.services.get(offer.service_id)
     if service is None or not service.active:
         raise MaterializationOwnershipError("materialization_foreign_material")
+    detail_fields = dict(includes=tuple(offer.package.includes),
+                         excludes=tuple(offer.package.excludes),
+                         stages=_d2_payment_stage_texts(offer))
     variant = _offer_variant_label(bundle, offer)
     service_name = f"{service.name} — {variant}" if variant else service.name
     price = offer.price
@@ -1539,6 +1410,7 @@ def _d2_frozen_price_row(
         mode = "range"
     elif isinstance(price, TargetNoPublicPrice):
         return D2FrozenPriceRow(
+            **detail_fields,
             source_client_id=client_id,
             offer_id=offer.offer_id,
             service_id=offer.service_id,
@@ -1558,6 +1430,7 @@ def _d2_frozen_price_row(
     package_scope = terms.package_label.strip()
     scope_text = package_scope.split(";", 1)[0].strip() if package_scope else unit
     return D2FrozenPriceRow(
+        **detail_fields,
         source_client_id=client_id,
         offer_id=offer.offer_id,
         service_id=offer.service_id,
@@ -1579,6 +1452,15 @@ def _d2_frozen_price_row(
         condition_texts=_d2_brief_price_conditions(
             offer, package_label=package_scope, already_shown=scope_text,
         ),
+    )
+
+
+def _d2_payment_stage_texts(offer: TargetOffer) -> tuple[str, ...]:
+    """One formatter for frozen card details and written detail responses."""
+    return tuple(
+        f"{stage.label} — {_format_d2_amount(stage.amount)}\u00a0{_d2_currency(stage.currency)}"
+        + (f". {stage.timing_text}" if stage.timing_text else "")
+        for stage in (offer.payment_stages or ())
     )
 
 
@@ -1655,6 +1537,7 @@ def _d2_requested_fact_candidates(
     sources: ResponsePlanMaterializationSources,
     client_id: str,
     as_of: date,
+    service_topics,
 ) -> tuple:
     if not fact_ids:
         return ()
@@ -1670,9 +1553,57 @@ def _d2_requested_fact_candidates(
                 fact,
                 source_client_id=client_id,
                 allowed_roles=("requested_fact",),
+                service_topics=service_topics,
             )
         )
     return tuple(candidates)
+
+
+def _d2_verified_content_claim(part, *, client_id, sources):
+    """Verify optional provenance, without reading or deciding answer text."""
+    authority = next((a for a in sources.d2_authored_content if a.content_ref == part.content_ref), None)
+    if authority is not None and authority.source_client_id != client_id:
+        raise MaterializationOwnershipError("materialization_foreign_material")
+    scope = _d2_typed_content_scope_from_part(part, client_id=client_id, sources=sources)
+    if scope is None or authority is None:
+        return scope, None, ()
+    if any(ref not in {s.section_ref for s in authority.sections} for ref in part.content_section_refs):
+        return scope, None, ()
+    if part.service_id is not None and part.service_id not in authority.allowed_service_ids:
+        return scope, None, ()
+    if part.topic_id is not None and authority.allowed_service_ids:
+        topics = {d.topic_id for d in sources.d2_directions if d.source_client_id == client_id
+                  and set(authority.allowed_service_ids).intersection(d.service_ids)}
+        if topics and part.topic_id not in topics:
+            return scope, None, ()
+    source_topic = sources.d2_content_topics_by_ref.get(authority.content_ref)
+    if part.topic_id is not None and source_topic is not None and part.topic_id != source_topic:
+        return scope, None, ()
+    service_ids, _, topic = scope
+    if service_ids and authority.allowed_service_ids and not set(service_ids).intersection(authority.allowed_service_ids):
+        return scope, None, ()
+    if (part.service_id is not None and part.service_id not in service_ids) or (part.topic_id is not None and part.topic_id != topic):
+        return None, None, ()
+    return scope, authority.content_ref, part.content_section_refs
+
+
+def _d2_bind_source_claims(operations, claims, *, client_id, sources):
+    """One prose publication, common verified provenance, original slot count elsewhere."""
+    if not claims:
+        return operations, False
+    checked = [_d2_verified_content_claim(c, client_id=client_id, sources=sources) for c in claims]
+    first = claims[0]
+    common_scope = checked[0][0] is not None and all(
+        check[0] == checked[0][0] and (c.target, c.volume, c.brand_id) == (first.target, first.volume, first.brand_id)
+        for c, check in zip(claims, checked)
+    )
+    common_ref = checked[0][1] if all(c[1] == checked[0][1] for c in checked) else None
+    sections = tuple(dict.fromkeys(ref for c in checked for ref in c[2])) if common_ref else ()
+    update = dict(content_ref=common_ref, content_section_refs=sections,
+                  target=first.target if common_scope else None,
+                  volume=first.volume if common_scope else None,
+                  brand_id=first.brand_id if common_scope else None)
+    return tuple(p.model_copy(update=update) if p.kind == "content" else p for p in operations), not common_scope
 
 
 def _d2_information_blocks(
@@ -1680,12 +1611,14 @@ def _d2_information_blocks(
     content_parts: tuple[RequestUnderstandingRequest, ...],
     client_id: str,
     sources: ResponsePlanMaterializationSources,
-    allow_missing_content_ref: bool = False,
     code_owned_null_content: bool = False,
-) -> tuple[tuple[InformationSourceBlock, ...], dict[str, D2ContentRealization]]:
-    by_ref = {item.content_ref: item for item in sources.d2_authored_content}
+) -> tuple[
+    tuple[InformationSourceBlock, ...], dict[str, D2ContentRealization],
+    dict[str, tuple[tuple[str, ...], str, str | None] | None],
+]:
     blocks: list[InformationSourceBlock] = []
     realizations: dict[str, D2ContentRealization] = {}
+    scopes: dict[str, tuple[tuple[str, ...], str, str | None] | None] = {}
 
     def unverified_source(part: RequestUnderstandingRequest) -> None:
         """Keep FullContext prose but grant no source citation or UI authority."""
@@ -1710,103 +1643,17 @@ def _d2_information_blocks(
             )
 
     for part in content_parts:
-        if part.content_ref is None:
-            if code_owned_null_content:
+        verified_scope, verified_ref, _ = _d2_verified_content_claim(
+            part, client_id=client_id, sources=sources,
+        )
+        scopes[part.request_id] = verified_scope
+        if verified_scope is None or verified_ref is None:
+            if part.content_ref is None and verified_scope is not None and code_owned_null_content:
                 realizations[part.request_id] = D2ContentRealization(
-                    outcome="answered",
-                    publication=None,
-                    display_text=None,
-                    section_refs=(),
-                )
-            elif not (part.content_text or "").strip():
-                # No prose and no optional provenance is still a real gap.
-                realizations[part.request_id] = D2ContentRealization(
-                    outcome="unavailable",
-                    publication=None,
-                    display_text=None,
-                    section_refs=(),
-                    reason="d2_content_source_missing",
+                    outcome="answered", publication=None, display_text=None, section_refs=(),
                 )
             else:
-                realization = realize_d2_unattributed_content(part)
-                realizations[part.request_id] = realization
-                if realization.outcome != "unavailable":
-                    assert realization.display_text is not None
-                    blocks.append(InformationSourceBlock(
-                        request_id=part.request_id,
-                        source_client_id=client_id,
-                        content_ref=None,
-                        display_text=realization.display_text,
-                        source_section_refs=(),
-                        publication="model_prose",
-                        snapshot_fingerprint=sources.d2_snapshot_fingerprint,
-                        replacement_reason=None,
-                    ))
-            continue
-        authority = by_ref.get(part.content_ref)
-        if authority is None:
-            # A name absent from this snapshot does not prove foreign ownership.
-            unverified_source(part)
-            continue
-        if authority.source_client_id != client_id:
-            raise MaterializationOwnershipError("materialization_foreign_material")
-        if part.service_id is not None and part.service_id not in sources.material_authority.bundle.services:
-            raise MaterializationContractError("d2_content_service_mismatch")
-        section_by_ref = {section.section_ref: section for section in authority.sections}
-        if any(ref not in section_by_ref for ref in part.content_section_refs):
-            unverified_source(part)
-            continue
-        if part.service_id is not None and part.service_id not in authority.allowed_service_ids:
-            unverified_source(part)
-            continue
-        if part.topic_id is not None and authority.allowed_service_ids:
-            content_topics = {
-                item.topic_id
-                for item in sources.d2_directions
-                if item.source_client_id == client_id
-                and set(authority.allowed_service_ids).intersection(item.service_ids)
-            }
-            if content_topics and part.topic_id not in content_topics:
                 unverified_source(part)
-                continue
-            known_topics = (
-                set(sources.d2_canonical_topic_ids)
-                if sources.d2_canonical_topic_ids
-                else {item.topic_id for item in sources.d2_directions if item.source_client_id == client_id}
-            )
-            if part.topic_id not in known_topics:
-                unverified_source(part)
-                continue
-        source_topic = sources.d2_content_topics_by_ref.get(authority.content_ref)
-        if part.topic_id is not None and source_topic is not None and part.topic_id != source_topic:
-            unverified_source(part)
-            continue
-        part_service_ids, _, part_topic_id = _d2_content_scope(
-            part,
-            client_id=client_id,
-            sources=sources,
-            allow_missing_content_ref=allow_missing_content_ref,
-        )
-        if part_service_ids and authority.allowed_service_ids and not set(part_service_ids).intersection(authority.allowed_service_ids):
-            unverified_source(part)
-            continue
-        if part.service_id is not None and part.service_id not in part_service_ids:
-            realizations[part.request_id] = D2ContentRealization(
-                outcome="unavailable",
-                publication=None,
-                display_text=None,
-                section_refs=(),
-                reason="d2_content_source_missing",
-            )
-            continue
-        if part.topic_id is not None and part.topic_id != part_topic_id:
-            realizations[part.request_id] = D2ContentRealization(
-                outcome="unavailable",
-                publication=None,
-                display_text=None,
-                section_refs=(),
-                reason="d2_content_source_missing",
-            )
             continue
         realization = realize_d2_content(part)
         realizations[part.request_id] = realization
@@ -1818,7 +1665,7 @@ def _d2_information_blocks(
             InformationSourceBlock(
                 request_id=part.request_id,
                 source_client_id=client_id,
-                content_ref=authority.content_ref,
+                content_ref=verified_ref,
                 display_text=realization.display_text,
                 source_section_refs=realization.section_refs,
                 publication=realization.publication,
@@ -1826,7 +1673,7 @@ def _d2_information_blocks(
                 replacement_reason=realization.reason,
             )
         )
-    return tuple(blocks), realizations
+    return tuple(blocks), realizations, scopes
 
 
 def _d2_source_ui(
@@ -1936,7 +1783,6 @@ def _d2_select_ui(
     source_ui: UiPlanCandidates,
     sources: ResponsePlanMaterializationSources,
     request_parts: tuple[D2ResolvedRequestPart, ...],
-    directory_cta=None,
     suppress_secondary: bool,
     suppress_forbidden_booking_cta=False,
 ) -> UiPlanCandidates:
@@ -1955,7 +1801,7 @@ def _d2_select_ui(
         part.kind in {"clarification", "price_clarification"} or part.status == "deferred"
         for part in request_parts
     )
-    selected_cta = None if pure_clarification or suppress_forbidden_booking_cta else source_cta or directory_cta or global_cta
+    selected_cta = None if pure_clarification or suppress_forbidden_booking_cta else source_cta or global_cta
     return UiPlanCandidates(
         quick_replies=() if suppress_secondary else source_ui.quick_replies,
         buttons=(selected_cta,) if selected_cta is not None else (),
@@ -2346,6 +2192,17 @@ def _offer_variant_label(bundle: ResponseSchemaBundle, offer: TargetOffer) -> st
                     if label:
                         return label
     return None
+
+
+def _offer_tab_label(bundle: ResponseSchemaBundle, offer: TargetOffer) -> str | None:
+    """Button-only authored caption; never replace canonical price or model labels."""
+    if not offer.brand_id and offer.option_id:
+        service = bundle.services.get(offer.service_id)
+        if service is not None:
+            for option in service.options:
+                if option.option_id == offer.option_id and option.tab_label:
+                    return str(option.tab_label)
+    return _offer_variant_label(bundle, offer)
 
 
 def _offer_distinguishing_label(bundle: ResponseSchemaBundle, offer: TargetOffer) -> str:

@@ -16,8 +16,11 @@
     ]
   },
   "fact_refs": [
+    "tax_deduction",
+    "installment_12",
     "free_implant_consult",
-    "installment_12"
+    "payment_stages",
+    "fixed_price"
   ],
   "followups": [],
   "applies_to_extents": [

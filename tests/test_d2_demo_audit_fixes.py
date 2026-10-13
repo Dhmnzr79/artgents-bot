@@ -103,10 +103,13 @@ def test_unfiltered_details_and_verified_click_keep_all_displayed_offers(http_en
     assert {r.offer_id for r in saved(db).response.resolved.d2_price_detail_blocks[0].rows} == expected
     fake.raw = raw(price('all_on_4', 'service'))
     priced = _body(send(client, sid='click-sid', request_id='price', q='Сколько стоит All-on-4?'), transport)
+    assert saved(db, 'click-sid').response.resolved.finalized_commercial_ids.price_offer_ids == ('all_on_4.jaw.implantium',)
+    assert {reply['reply_id'] for reply in priced['ui']['quick_replies'] if reply['reply_id'].startswith('price_select:')} == {
+        f'price_select:{offer_id}' for offer_id in expected}
     calls = len(fake.inputs)
     args = dict(sid='click-sid', request_id='click', q='', ref='price_detail:stages', ui_revision=priced['revision'])
     clicked = _body(send(client, **args), transport)
-    assert {r.offer_id for r in saved(db, 'click-sid').response.resolved.d2_price_detail_blocks[0].rows} == expected
+    assert {r.offer_id for r in saved(db, 'click-sid').response.resolved.d2_price_detail_blocks[0].rows} == {'all_on_4.jaw.implantium'}
     assert len(fake.inputs) == calls
     assert _body(send(client, **args), transport) == clicked
     assert 'Этапы оплаты' not in [q['label'] for q in clicked['ui']['quick_replies']]

@@ -23,7 +23,6 @@ from contracts.response_plan_session import (
 
 DEFAULT_D2_SESSION_IDLE_TTL_SECONDS = 30 * 60
 DEFAULT_D2_HISTORY_PAIR_LIMIT = 3
-DEFAULT_D2_HISTORY_TEXT_MAX_CHARS = 1000
 D2SessionContextFreshness = Literal["fresh", "expired", "unknown"]
 class D2SessionContextError(ValueError):
     """An activity record or snapshot cannot safely be projected for D2."""
@@ -34,9 +33,8 @@ class D2SessionTtlPolicy(ResponsePlanModel):
 
     idle_ttl_seconds: int = DEFAULT_D2_SESSION_IDLE_TTL_SECONDS
     history_pair_limit: int = DEFAULT_D2_HISTORY_PAIR_LIMIT
-    history_text_max_chars: int = DEFAULT_D2_HISTORY_TEXT_MAX_CHARS
 
-    @field_validator("idle_ttl_seconds", "history_pair_limit", "history_text_max_chars", mode="before")
+    @field_validator("idle_ttl_seconds", "history_pair_limit", mode="before")
     @classmethod
     def _require_strict_positive_int(cls, value: object) -> object:
         if type(value) is not int:
@@ -45,7 +43,7 @@ class D2SessionTtlPolicy(ResponsePlanModel):
 
     @model_validator(mode="after")
     def _validate_ttl(self) -> Self:
-        for field in ("idle_ttl_seconds", "history_pair_limit", "history_text_max_chars"):
+        for field in ("idle_ttl_seconds", "history_pair_limit"):
             if getattr(self, field) <= 0:
                 raise ValueError(f"{field}_not_positive")
         return self

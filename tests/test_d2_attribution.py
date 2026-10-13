@@ -13,7 +13,7 @@ from tests.test_d2_compound_answers import content, raw, saved
     ([content()], "content"),
     ([dict(kind="price", request_id="r1", target={"type": "service", "id": "classic"})], "content"),
     ([dict(kind="clinic_policy", request_id="r1", policy_ids=["no_oms"])], "content"),
-    ([dict(kind="commercial_fact", request_id="r1", promotion_scope="general")], "content"),
+    ([dict(kind="commercial_fact", request_id="r1", target={"type": "clinic"}, promotion_scope="general")], "content"),
     ([dict(kind="off_topic", request_id="r1")], "plain"),
     ([dict(kind="booking", request_id="r1", age_group="adult")], "lead"),
     ([content(), dict(kind="booking", request_id="r2", age_group="adult")], "lead"),

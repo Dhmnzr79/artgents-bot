@@ -1,10 +1,14 @@
 # D2 — интерфейс модели, контекст обсуждения и source UI
 
-Актуально: 2026-10-03. D2-119/120 и UI отмены на этапе телефона реализованы;
-scoped offline проверки и независимые review — §10.6–12. Полного live/widget
-PASS нет. Текущий шаг — сверка документов и разрешённые владельцем commit/push.
-§1–10.5 сохраняют историю прежних этапов и действовавших тогда разрешений.
-Новый runtime, live, merge/deploy и восстановление сессии в этот шаг не входят.
+> **Текущий статус 2026-10-11:** владелец согласовал новую дорожную карту свободного MD-разговора и точных ценовых карточек, разрешил checkpoint commit/push и начало реализации. Действующий ближайший этап — §42 в конце этого документа. Предыдущие §1–41 описывают историю; старые STOP/GO и 9-kind кандидат не отменяют новых решений. Подготовка Demo-базы закрыта отдельно и не аттестует runtime.
+
+
+Актуально: 2026-10-10. Текущий шаг — DOC-план пунктов 1–4 после независимого
+аудита, §38 ниже. Правило этапа 1 согласовано; форма нового wire и изменения базы
+ещё требуют указанного там согласования. Реализация, новые live calls,
+merge/deploy этим DOC не разрешены.
+Предыдущие разделы сохраняют историю checkpoint и действовавших разрешений.
+Scoped PASS относится к проверенному checkpoint, не ко всему боту.
 Единственный план работ — верх [Roadmap](DEMO_D2_DELIVERY_ROADMAP.md).
 Правила: [AGENTS](../../AGENTS.md), [Checker](../WORKFLOW_CHECKER.md),
 [контракт §3](DEMO_D2_TARGET_CONTRACT.md), [Acceptance](DEMO_D2_ACCEPTANCE.md).
@@ -272,6 +276,18 @@ allowlist. Выход за список сначала объяснить вла
 fixtures и посторонние baseline failures массово не переводить.
 
 ## 4. Строгая схема: отдельная проверка возможности
+
+Owner GO 2026-10-10: подготовить typed ordinary/known-task provider schemas и
+bounded capability script, проверить offline. Последующий owner GO разрешил
+4 live calls: все schemas приняты/parser accepted, бюджет исчерпан. HTTP
+был переключён на runtime json_schema strict. Allowlist, acceptance и evidence —
+раздел «Строгий формат D2» в [текущей карточке](DEMO_MODEL_PRICE_EXPERIMENT.md).
+Это format bug fix, не закрытие всего этапа: compound price/address в probe
+вернул только price; полнота смысла и публикация карточек не аттестованы live.
+Позднее owner GO paired6/layered48: rich schema strict ухудшает targeted decisions
+уже без full KB. По conditional approval HTTP возвращён к json_object, final39
+offline PASS/Checker focused PASS. Strict helper/types сохранены; root-array риск
+открыт. Текущий результат и пределы — верхний layered раздел указанной карточки.
 
 Фактически: Frankfurt MaaS compatible-mode/v1, qwen3.8-flash, thinking off,
 json_object, схема только текстом. Документация перечисляет модель как
@@ -2766,3 +2782,2297 @@ therefore not closed. Group 4 must address model-contract reliability and test
 context use without treating schema compliance as proof of semantic correctness.
 Checkpoint preserves this known debt; it does not authorize merge/deploy.
 Foreign widget HTML/CSS, data/ and SIM-0 remain excluded and untouched.
+
+## §38. План пунктов 1–4 после независимого аудита — 2026-10-10
+
+### Статус и единственный план
+
+Владелец поручил составить чёткий план пунктов 1–4, проверить документы и Git.
+Это DOC-подготовка, не реализованное упрощение и не аттестация всего бота.
+Позднейшее явное согласие владельца «с этим согласен» утверждает правило
+этапа 1 ниже. Остальные конкретные изменения wire/данных не утверждаются
+самой записью в карточке. Постоянная ответственность — Target Contract §3.
+Подробности исполнения вести здесь; Roadmap ссылается сюда. Старые отчёты
+и Model Price Experiment остаются историей и evidence, не отдельным планом.
+
+Root/Git top: C:/Cursor Projects/artgents-bot-active; branch
+codex/model-price-experiment. HEAD и GitHub branch совпали read-only ls-remote:
+9bcdbe34110df273e5a3d3f05909aac967ec4bb5. origin/main, GitHub main и merge-base:
+efa3f773bcf10891e2997addf8bbec38c7ae1317. Непушенных коммитов нет; staging пуст.
+Продолжение существующей задачи в той же папке/ветке, не новая задача от main.
+Историческое имя ветки не включает модельные цены; менять/переименовывать ветку
+или создавать checkout не требуется. Main не трогать.
+
+На входе WIP: core/one_call_prompt_contract.py (prompt44, editorial brand/direction,
+58 offline PASS + независимый scoped Checker PASS) и DEMO_MODEL_PRICE_EXPERIMENT.md
+(запись этой правки и подготовка пунктов 1–4). Foreign untracked prototypes/
+сохранить и не stage. .env, ignored logs, data/DB, сырые provider payloads и
+пользовательские разговоры не читать/публиковать для Git checkpoint.
+Текущий DOC allowlist: эта карточка; DEMO_D2_DELIVERY_ROADMAP.md;
+DEMO_MODEL_PRICE_EXPERIMENT.md (все docs/tasks). Prompt44 сохранить без новых edits.
+Exact runtime allowlist каждого этапа определить по call-path перед его правками.
+
+### Этап 0 — чистая точка сохранения
+
+1. Завершить DOC-план и независимый scoped Checker; проверить ссылки и отсутствие
+   противоречий с текущими решениями. Отдельно учесть уже проверенный prompt44.
+2. До реализации сохранить prompt44 + согласованную DOC-подготовку одним именованным
+   checkpoint. Запрос проверки Git не считать отдельной командой commit/push:
+   если разрешение публикации не дано явно, получить его перед Git mutation.
+3. Stage только exact четыре пути: core/one_call_prompt_contract.py и три DOC пути
+   текущего allowlist. Проверить staged names/stat/full diff/diff --check; commit,
+   push текущей ветки, сверить remote SHA. В отчёте назвать фактический новый SHA.
+4. Tracked tree и staging после сохранения пусты; prototypes/ отдельно и неизменен.
+   Не обещать полностью пустой status при сохранённом untracked прототипе.
+
+### Этап 1 — ошибка обычной ссылки не уничтожает независимый ответ
+
+Runtime preflight 2026-10-10: owner «Давай» разрешил реализацию этапа 1.
+Repository/Git top: C:/Cursor Projects/artgents-bot-active;
+branch codex/model-price-experiment; baseline HEAD/origin branch
+4e9bb7686b65789d6b2c84cd69ff322229b525a8; origin/main/merge-base
+efa3f773bcf10891e2997addf8bbec38c7ae1317. Tracked/staging пусты;
+foreign untracked prototypes/ вне задачи. Exact allowlist:
+core/response_plan_materialization.py; tests/test_d2_content_reference_gaps.py;
+tests/test_d2_multi_request.py; tests/test_d2_independent_request_parts.py;
+docs/tasks/DEMO_D2_INTERFACE_TASK.md.
+Классификация: bug fix, не аттестация упрощения всего бота.
+Единственный owner подтверждения ordinary content target — материализация;
+модель остаётся owner смысла. Удалить повторный _d2_content_scope и повторные
+membership checks; подтверждённый scope использовать в parts/detail filter.
+Неподтверждённый target получает existing unavailable/source_missing, scope mixed
+без descriptor/IDs/source, чтобы существующий completion reader не сохранял
+предыдущую тему как после clinic address. Context carry rules не менять.
+Existing source association и optional provenance behavior сохраняются.
+Provider/browser calls: 0; commit этого runtime после Checker/widget отдельно.
+
+Реализация этапа 1 (2026-10-10, checkpoint относительно 4e9bb76):
+- Удалены _d2_content_scope и его повторные вызовы/membership проверки.
+  _d2_typed_content_scope_from_part подтверждает предмет один раз; результат
+  используется для publication, part identity, descriptor и detail narrowing.
+- Unknown service/topic (включая направление в service namespace) получает
+  existing d2_content_source_missing + approved gap. Неподтверждённая prose,
+  IDs, source UI и discussion descriptor не публикуются. Existing mixed scope
+  очищает предыдущую discussion reference через прежний completion reader.
+- Valid optional/missing document provenance сохраняет model prose без source UI;
+  proven foreign source/direction остаются fatal раньше локального gap.
+  Независимые address/price/detail сохраняются в исходном порядке. Новых wire,
+  storage/context fields, memory, классификаторов, retry и model calls нет.
+- Новая HTTP JSON/SSE матрица: 54 PASS (unknown targets × source presence,
+  обе очередности address/price, replay, previous price → gap → next context,
+  independent detail, optional prose, foreign source/direction).
+- Итоговый d2-stage1-final-f.xml: 81 cases, 77 PASS / 4 FAIL, 186.17s.
+  Все четыре failures совпали по именам с чистым checkpoint 4e9bb76
+  (d2-stage1-baseline-g.xml: 33 cases, 11 PASS / 22 FAIL). Это прежние price
+  fixtures без подходящего overview/part-failure authority; новые регрессии
+  не обнаружены. Изменённые assertions unknown service/topic и foreign-source
+  guard исполняются на действующем wire. Два legacy content_realization поля
+  убраны только из тестовых payloads, assertions не ослаблены.
+- Ранний guards-d: 8 PASS / 10 FAIL; все десять старых wire-fixture failures
+  воспроизведены на чистом baseline. Setup-only baseline-e и первый прогон
+  новых тестов с ошибочными r-ID не считаются аттестацией runtime.
+- XML вне Git в Local/Temp. Provider/live/browser/SMTP: 0. CI целиком не запускался;
+  это offline execution evidence, не гарантия живого понимания моделью.
+  Independent Checker: PASS, blockers/test weakening/scope creep нет;
+  SAFE_TO_WIDGET_TEST=YES только для stage 1 bug fix. Checker прочитал XML,
+  pytest повторно не запускал. Владелец проверил widget; логи подтверждают
+  сохранение контактов и точной classic/Implantium цены при неподтверждённой
+  content-теме, а также корректный следующий includes по показанному offer.
+  Первоначальная root-array ошибка произошла до материализации и остаётся
+  открытой; неверный выбор topic моделью также не исправлен этим этапом.
+  Это ограниченный live результат защиты независимых частей, не полный
+  live PASS составных вопросов. Этап 1 принят владельцем в этих границах.
+  Widget: 6 provider attempts владельца; агент дополнительных live calls не делал.
+  Owner «Делай комит пуш» разрешил сохранение exact пяти файлов.
+  Staging перед сохранением пуст; предыдущий remote checkpoint 4e9bb76;
+  prototypes/ вне checkpoint. Фактический SHA/push проверить после commit.
+
+Тип: общий bug fix исполнения, не semantic repair. Правило утверждено владельцем.
+Если ordinary операция структурно прочитана, но её предмет нельзя подтвердить:
+проблемная часть получает спокойный gap по существующему approved failure text;
+независимые правильные parts сохраняются в исходном порядке. Не публиковать
+неподтверждённое объяснение как подтверждённое. Не выбирать другой target за модель.
+Настоящие tenant/source ownership, snapshot binding, UI authenticity и lead/privacy
+нарушения остаются строгими отказами. Неизвестный model ID сам по себе не доказывает
+foreign tenant. Пустой/обрезанный/непарсируемый общий ответ не позволяет выделить
+parts и не превращается в частичный успех. Новых retries/calls/classifiers нет.
+
+До → после: content с отсутствующим service/topic сейчас может обрывать весь turn
+и местами называется foreign_material; после ordinary reference failure локален,
+а trust violation отделён. Убирается ложная зависимость успешного адреса/цены
+от корректности unrelated informational target. Понимание остаётся у модели;
+код владеет проверкой ссылки и результатом исполнения. Не называть это удалением
+всего старого сборщика; точную классификацию checkpoint отразить по фактическому diff.
+
+Проверки: валидные content/service/topic; direction переданный как service;
+неизвестный service/topic; отдельно допустимое omission optional content_ref и
+неизвестный supplied document ref (не превращать omission в gap автоматически);
+content+address и content+price
+в обеих очередностях; honest gap/status/no bogus scope; finalized offers и следующий
+context; replay/один вызов; настоящие foreign source/snapshot/session/UI failures.
+Проверить /ask и /ask/stream на одном исполнителе, не только seam HTTP200.
+Объект проверки — весь класс неверных ordinary ссылок, без phrase-specific условий.
+
+### Этап 2 — один каталог сущностей и явных связей
+
+Сначала read-only карта существующих service/direction/material relationships:
+что задаётся явно, что выводится из frontmatter или имени файла, где есть дубли
+и неоднозначность. Охватить ссылки offers/brands/doctors/policies/commercial,
+не сводя разные предметные сущности в один тип и не меняя clinic selection policy.
+Показать владельцу конкретные изменения исходных файлов до KB edits.
+
+Цель: единый источник явных связей, из которого строятся code indexes и model
+projection. Filename не должен оставаться параллельным owner той же связи.
+Сначала использовать имеющиеся утверждённые данные; не начинать тотальный перенос
+всех JSON/YAML/MD. Форму authoritative registry и удаления прежних выводов определить
+на основании карты и отдельно согласовать, если нужны новые KB fields/files.
+Новый слой/параллельный registry, который повторяет старое решение, не цель этапа.
+
+Критерии: прежние canonical relationships/offer order/doctor links/applicability
+сохранены; новые indexes выводятся из одного owner; старые reachable способы
+получения заменённых связей удалены; ambiguity/битые связи обнаруживаются при
+проверке pack; tenant protections сохранены. Тексты, суммы и клинические утверждения
+не редактировать. До реализации exact allowlist и before/after/removal в этой карточке.
+
+#### Read-only карта этапа 2 — 2026-10-10
+
+Классификация checkpoint: documentation only, предложение до реализации.
+Owner «Делаем» разрешил продолжение этапа 2; изменения KB требуют отдельного
+согласования. Repository/Git top: C:/Cursor Projects/artgents-bot-active;
+branch codex/model-price-experiment; HEAD/origin branch baseline
+4fa440803d256a975414483d7b0013d670cff070 (этап 1 сохранён и pushed).
+origin/main и merge-base efa3f773bcf10891e2997addf8bbec38c7ae1317.
+Exact DOC allowlist: docs/tasks/DEMO_D2_INTERFACE_TASK.md.
+На входе tracked tree/staging пусты; foreign untracked prototypes/ сохранить.
+Runtime, wire, KB, суммы, тексты и выбор предложений не меняются этой записью.
+
+Карта владельцев существующих связей:
+
+| Связь | Текущий источник | Что обнаружено |
+| --- | --- | --- |
+| Услуга → основной документ | service_catalog.json: content_ref | Явная ссылка; сохранить |
+| Документ → направление | MD frontmatter: topic | Явное направление; subtopic не является canonical topic |
+| Услуга → направление | Topic основного MD в snapshot; префикс filename в commercial/CTA | Два способа получить один смысл |
+| Направление → услуги первого ценового обзора | d2_direction_prices.json: service_ids/offer_ids | Это выбор клиники для обзора, не полный состав направления |
+| Offer → услуга/вариант/бренд | target_response/pricebook/services/*.json | Явные типизированные ссылки |
+| Врач → услуги/профиль | doctor_catalog.json: service_ids/profile_ref | Явные связи; не заменять медицинским подбором модели |
+| Коммерческий факт → применимость/деталь | pricebook/facts.json | Явные ограничения и ссылки |
+| Автопоказ фактов/совместимость | d2_commercial.json | Другой предмет ответственности, не копия facts.json |
+| Политика услуги/бренда | clients/demo/clinic_policies.yaml | Для отсутствующего бренда есть конкурирующий legacy путь |
+| Название/страна бренда | brand_catalog.json | Явные данные; сохранить |
+
+Call-path evidence:
+- core/d2_tenant_snapshot.py строит service_topics через service.content_ref →
+  metadata.topic и allowed_service_ids документов. core/d2_snapshot_sources.py
+  повторно читает MD topic в resolve_d2_clarify_service_topic; build sources
+  заменяет состав d2_directions настроенным ценовым пулом для таких направлений.
+- contracts/target_service_content_topic.py выводит направление из filename.
+  Reachable потребители: core/response_plan_authored_alternative_policy.py →
+  response_plan_materialization.py (commercial scope); core/d2_contacts_cta.py;
+  response_plan_fact_policy.py и response_plan_fact_projection.py (warranty scope).
+  Перед реализацией повторно проследить каждый вызов; не чистить legacy код
+  только по текстовому совпадению.
+- core/d2_dialogue.py сначала направляет отсутствующий в brand_catalog бренд
+  в build_d2_unknown_brand_response. Эта функция в d2_snapshot_sources.py читает
+  legacy service_alternatives.match_keywords/note и привязана к конкретному
+  implant_systems document ref. Typed brand_alternatives.approved_text уже
+  передаётся модели, но другой reader используется позднее для известного бренда.
+
+Конкретные неоднозначности, не объявленные исправленными:
+1. tomography: content_ref diagnostics__service__tomography.md, MD topic=clinic,
+   filename-derived topic=diagnostics. Это доказанное расхождение источников,
+   не доказанный живой ошибочный ответ КТ. Не выбирать topic по family автоматически.
+2. implantation: 9 услуг с primary MD topic, в price overview — 4; prosthetics:
+   5 против 3. restoration содержит curated price overview classic +
+   removable_dentures, хотя их primary topics — implantation/prosthetics.
+   Не расширять обзор и не переносить primary topic из настроек обзора.
+   Разделение этих отношений не разрешает молча менять информационный охват
+   existing d2_directions или context carry; такие потребители проверить отдельно.
+3. Osstem: legacy note содержит «Osstem в ассортименте нет. Работаем с Implantium,
+   Impro и Nobel Biocare — могу рассказать про отличия систем и ориентиры по
+   стоимости «под ключ».» Typed approved_text заканчивается после Nobel Biocare.
+   Сведение к одному source требует согласовать, какой текст сохранить.
+
+Предлагаемый минимальный вариант (ещё не реализован):
+- Сохранить нынешние файлы владельцами своих данных. Не создавать editable
+  d2_entities.json и не дублировать в нём offers, doctors или commercial facts.
+- Sole owner primary topic услуги: topic её основного MD, найденного по явному
+  service_catalog.content_ref. Один проверенный производный индекс snapshot
+  используют потребители этой связи. До → после: разные MD/filename readers →
+  один MD owner через explicit content_ref → удалён вывод смысла из имени файла
+  и повторное самостоятельное чтение этой связи в runtime.
+  Это сохраняет зависимость primary topic от основного документа; не выдавать
+  вариант за независимый registry направлений. Отдельный topic_id в service_catalog
+  возможен, но означает новые KB/schema edits и сейчас не утверждён.
+- Настроенный ценовой обзор оставить отдельной явной связью и с прежним порядком.
+  Не добавлять новый selector, semantic repair, fallback или память.
+- Для отсутствующего бренда предложить один typed brand_alternatives owner,
+  удалив заменённый reachable legacy reader и его filename binding. Вариант
+  сохранения длинного нынешнего ответа: перенести legacy note дословно в typed
+  approved_text. Конкретные KB правки и удаление legacy записи — только после GO.
+
+Перед реализацией показать владельцу два решения: primary topic КТ (clinic либо
+diagnostics) и сохранение длинного Osstem текста в единственном typed источнике.
+После решений определить точный runtime/KB allowlist, cross-tenant coverage,
+before/after/removal и минимальную матрицу проверок. Не начинать этапы 3/4 попутно.
+
+Read-only evidence: demo содержит 23 услуги (22 active), 58 MD, 33 offers,
+3 бренда, 6 врачей, 10 коммерческих фактов. У всех active услуг основной MD найден;
+все MD имеют topic, doc_id совпадает с filename без расширения. Проверенные
+offer service/brand refs, doctor service/profile refs и fact service/detail refs
+существуют; broken links в этом проверенном наборе нет. Это статическая проверка
+названных связей, не полная аттестация pack, runtime или понимания моделью.
+Консультация Astra выполнена read-only; provider/live/browser/SMTP: 0.
+Bot tests не запускались ради документации. Independent DOC Checker: PASS;
+blockers нет, карта и reachable readers подтверждены. Это не аттестация
+реализованного архитектурного упрощения. Staging пуст; commit/push новой DOC
+записи пока не выполнялись.
+
+#### Реализация этапа 2 — согласование и preflight
+
+Owner «СОгласнен» утвердил primary topic КТ=diagnostics и перенос длинного
+Osstem текста дословно в typed brand_alternatives с удалением его legacy строки.
+Классификация: scoped architecture simplification + согласованные metadata edits.
+Root/Git top C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment;
+baseline HEAD/origin branch 4fa440803d256a975414483d7b0013d670cff070;
+main/base efa3f773bcf10891e2997addf8bbec38c7ae1317. На входе только DOC-карта
+этого этапа и foreign untracked prototypes/; staging пуст.
+Exact allowlist: contracts/d2_tenant_snapshot.py; core/d2_tenant_snapshot.py;
+core/d2_snapshot_sources.py; core/d2_contacts_cta.py;
+core/response_plan_authored_alternative_policy.py; core/response_plan_fact_policy.py;
+core/response_plan_fact_projection.py; core/response_plan_materialization.py;
+clients/demo/clinic_policies.yaml;
+clients/demo/md/diagnostics__service__tomography.md;
+tests/test_d2_primary_topic_links.py; docs/tasks/DEMO_D2_INTERFACE_TASK.md.
+
+До → после → удалённая зависимость: D2 commercial/CTA читают filename, content/context
+читают MD → primary topic принадлежит MD основного документа по content_ref →
+filename больше не определяет primary topic в D2. Snapshot хранит immutable derived
+service_topics; materialization использует существующую projection MD topics из sources.
+Общие helpers получают authoritative mapping, в том числе пустой; старое поведение
+None остаётся только для callers вне D2, не fallback D2. Wire/storage/model calls
+не меняются. Удаляется duplicate warranty derivation из fact projection, остаётся
+один fact-policy evaluator. Unknown brand reader больше не читает legacy keywords
+или фиксированное имя implant_systems; использует существующий typed policy reader.
+Price overview membership/order остаётся отдельным curated relation.
+Техническая консультация Astra выполнена; проверки и Checker записать по результатам.
+
+Результат реализации (2026-10-10):
+- Удалены filename-based primary topic на D2 commercial/CTA paths и повторное
+  чтение service topic в clarification/context helper; общий warranty policy
+  заменил дублированное вычисление в fact projection. Legacy callers вне D2
+  остаются вне этого checkpoint; отсутствие MD связи в D2 не вызывает их parser.
+- Snapshot index immutable; materialization projection строится из уже переданной
+  MD topic map по explicit content_ref. Новых KB fields, wire/storage fields,
+  semantic selectors, retries, provider calls и session memory нет.
+- КТ: только topic clinic → diagnostics. Osstem: длинный note перенесён дословно
+  в typed approved_text, legacy row и его runtime reader удалены. Unknown brand
+  без typed policy сохраняет прежний gap; другой brand price не подставляется.
+- Новые тесты намеренно расходят filename и MD topic и запрещают вызов parser:
+  commercial policy, warranty candidate, CTA, doctor completion, clarification
+  и следующий service context. Проверены empty authoritative map, JSON/SSE,
+  replay, exact typed Osstem text, отсутствие цены для отсутствующего бренда
+  и foreign session refusal. Price overview остаётся 4 services против 9
+  primary implantation members. Реальный model understanding не аттестуется.
+- d2-stage2-links-green.xml: 8 PASS, 13.48s. Коммерческие прежние сценарии:
+  38 PASS в d2-stage2-final.xml. Карточки и snapshot guards: 71 PASS в
+  d2-stage2-final-guards.xml (полный ранний XML: 79 cases, 77 PASS / 2 FAIL;
+  оба FAIL — новые неверные ожидания topic в service DiscussionScope, исправлены
+  и повторно проверены в links-green). Независимые guard suites не падали.
+  Итого 117 разных scoped cases PASS, не полный CI.
+- Ранний setup sandbox failure и промежуточные новые test/code failures не считаются
+  аттестацией; исправлены collision имени warranty helper и ошибки тестовой
+  contact operation/контекстных ожиданий. Существующие tests не ослаблены.
+  Полного baseline/CI прогона нет; прежний долг вне этих suites не закрыт.
+- Provider/live/browser/SMTP: 0; tests используют fake provider. Для widget нужна
+  новая беседа после изменения tenant fingerprint. Staging пуст; commit/push
+  не выполнялись. Foreign prototypes/ вне allowlist. Independent Checker: PASS;
+  blockers/test weakening/scope creep нет. SAFE_TO_WIDGET_TEST=YES для этого
+  scoped этапа 2; вся архитектура, этапы 3/4 и live understanding не аттестуются.
+  Checker прочитал XML, pytest повторно не запускал.
+
+Widget finding после этапа 2 (owner screenshot, 2026-10-10): КТ → свой КТ →
+Osstem availability → «Расскажите» возвращает описание КТ. В read-only последних
+логах (16:29 UTC) verified Osstem reply опубликован correctly, но следующий
+provider input содержит прежний discussion_scope service:tomography и пустой
+assistant_text для reference ответа про Osstem (brand_id в parts сохранён).
+Модель затем выбирает service:tomography. Это наблюдаемая ошибка whole dialogue,
+не неправильная сумма/карточка или потеря typed Osstem policy текста при публикации.
+Причина передачи: completion _project_pair не копирует этот authored reference,
+retain_discussion_reference сохраняет прежнюю тему при scope=clinic без descriptor.
+Этап 2 эти history/carry rules не менял. Scoped offline PASS не закрывает finding.
+Не исправлять phrase-specific prompt/regex на «Расскажите». Общий boundary для
+brand/service availability continuation, допустимой reference history и замены/
+очистки предыдущего scope предложить владельцу до изменения этих правил.
+Агент дополнительных provider calls не делал; сырые логи/разговоры не включены в Git.
+
+Сохранение checkpoint 2А: owner «Давай коим и пуш его» явно разрешил commit/push
+этого exact 12-file allowlist в текущую ветку. Этап 2А фиксируется в проверенных
+границах связей; выявленная ошибка продолжения остаётся открытой. Обсуждённый
+пункт 2Б про целостный контекст — предложение следующей работы, в этом checkpoint
+не реализован и не аттестован. Foreign prototypes/ не stage. Финальный SHA и
+совпадение remote сообщить после сохранения; merge/deploy не входят в команду.
+
+#### Подготовка 2Б — целостный контекст, 2026-10-10
+
+Классификация текущего checkpoint: documentation only. Owner «Давай дальше»
+разрешил подготовку следующего пункта после сохранённого 2А. Runtime и новые
+carry/product rules ещё не реализованы; ниже предложение для согласования.
+Root/Git top C:/Cursor Projects/artgents-bot-active; branch
+codex/model-price-experiment; baseline HEAD/origin branch
+723e6aaa203d1286898b22d3ad8ab634012c4dd6; origin/main/merge-base
+efa3f773bcf10891e2997addf8bbec38c7ae1317. На входе tracked/staging чисты,
+foreign untracked prototypes/ сохранить. Exact DOC allowlist:
+docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md.
+
+Read-only консультация Astra: существующий receipt/store остаётся sole memory
+owner по Target Contract §3. Причина шире пропуска текста: generic reference
+и commercial parts теряют source identity/исходный предмет; history исключает
+authored text и допускает policy clarification по точному совпадению строки;
+retain_discussion_reference удерживает прошлую тему для любого clinic scope.
+Нельзя восстанавливать пропущенный смысл анализом пользовательской фразы,
+rendered_text, отдельным summary, regex или дополнительным model call.
+
+Предлагаемая цель: producers сохраняют существенный завершённый результат
+в существующем completion; один projector передаёт предмет, опубликованный
+исход и проверенные источники в порядке частей. Цены/финансовые условия
+остаются через offer/fact references, не копируются в ordinary prose.
+До → после → удалённая зависимость: выборочная передача текста и generic
+результаты → projection завершённых частей с их происхождением и исходом →
+нет зависимости от происхождения текста модель/код, одной policy строки
+и broad clinic scope как универсального keep. Это цель будущей реализации,
+не доказанное упрощение текущего DOC checkpoint.
+
+Правила для owner agreement перед runtime:
+- Контакты/часы работы сохраняют обсуждаемую услугу в пределах прежнего TTL.
+- Однозначная новая scoped задача заменяет прежнюю; mixed/неоднозначность
+  не выбирает услугу по позиции. Существующие правила не расширяются молча.
+- Самостоятельный ответ о новом бренде/недоступной услуге не оставляет старую
+  КТ активным предметом. Если нового предмета нет в DiscussionScope, прежний
+  scope очищается, а предмет/результат остаются в history. Availability той же
+  услуги не считать автоматически новой темой только из-за наличия brand_id.
+- Scoped commercial результат сохраняет исходный service/topic; согласовать
+  его влияние на активный scope. Отрицательная применимость остаётся отдельным
+  исходом, не positive published fact ID. Отказ по недоступной услуге не означает
+  автоматический выбор предложенной альтернативы.
+- Смысл короткого продолжения определяет модель по переданному разговору.
+  При нескольких возможных предметах она уточняет, а не выбирает за человека.
+
+Граница полноты: Osstem approved answer уже есть в policy model catalog;
+source identity позволит связать его с опубликованным ответом. Service
+alternatives передают IDs без произвольного authored текста, который может
+содержать суммы. Нельзя обещать понимание любого приглашения из такого текста
+по одним IDs. Если для общей цели недостаточно существующих полей, предложить
+точную форму provenance/outcome/continuation в том же completion владельцу
+до реализации. Новые поля, KB правки и отдельный clear_context flag этой записью
+не разрешены; не обходить финансовый запрет другой секцией provider input.
+
+Будущие проверки: JSON/SSE completed turn → next provider input для смены
+предмета и availability той же услуги, альтернатив без автоматического выбора,
+commercial positive/negative/gap, policy/clarification, card → contacts → detail,
+mixed, TTL, foreign receipt, длинного ответа и authored текста с суммой/ПД.
+Лимиты 3 пары/1000 символов/30 минут сохранить. Fake provider проверяет передачу,
+не живое понимание. Live calls требуют отдельного hard budget; текущие старые
+бюджеты исчерпаны. Runtime allowlist определить после согласования границ.
+В подготовке tests/provider/browser/SMTP: 0; commit/push пока не выполнялись.
+
+Дополнение после owner «Ну окей тогда следующий давай. 2B тогда.»:
+общая работа 2Б согласована; точное расширение контракта ниже предложено,
+но отдельно ещё не согласовано. Astra подтвердила, что existing content_ref,
+brand_id и positive fact IDs не выражают provenance/outcome без искажения.
+Предлагается одно поле source_results на D2ResolvedRequestPart: tuple записей
+source_ref и outcome answered/excluded/unavailable. Код создаёт ссылку только
+на действительно использованный tenant источник: brand_policy, service_alternative,
+policy или fact. answered означает публикацию ответа источника, не доступность
+услуги и не разрешение политики. Отказ commercial не попадает в positive fact IDs.
+История уже передаёт parts, отдельная projection-копия не добавляется.
+Меняются форма сохранённого completion и provider input; model output schema,
+отдельный session state и KB не меняются. Исторические уточнения не маскировать
+под искусственный source namespace; текущая clarify_task сохраняется.
+Это не гарантирует восстановление любого authored приглашения service alternative:
+такое обещание потребовало бы отдельной согласованной KB identity продолжения.
+Runtime заблокирован только на согласование этого нового поля и точных carry
+границ, не на повторный аудит. Tests/provider calls: 0 в подготовке.
+
+Реализация 2Б: owner «Ок» согласовал source_results и продолжение работы.
+Классификация: scoped architecture simplification плюс исправление потерь
+provenance/outcome. Baseline/root/branch/main остаются указанными выше.
+Exact runtime/test/DOC allowlist: contracts/response_plan.py;
+core/d2_snapshot_sources.py; core/d2_dialogue.py;
+core/response_plan_materialization.py; core/d2_completion_context.py;
+core/d2_live_provider.py; tests/test_d2_completed_source_context.py;
+docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md.
+Pre-existing WIP — два DOC этой подготовки; prototypes/ foreign, не трогать.
+Before/after/removal и sole owner — предыдущая карточка 2Б. Model output,
+отдельная память, KB и дополнительные provider calls не меняются; completion
+и provider input расширяются ровно согласованным source_results.
+
+Allowlist дополнен tests/test_d2_primary_topic_links.py: утверждённый 2Б меняет
+ровно прежнее ожидание «commercial не устанавливает scope» на явный service
+classic после scoped commercial и контакта. Filename/topic/tenant guards
+этого теста сохраняются; это миграция согласованного поведения, не ослабление.
+
+Результат реализации 2Б перед Checker:
+- Удалено сравнение history с буквальной _POLICY_CLARIFY; отвеченное уточнение
+  проецируется по типу completed part, при отсутствии financial fact/policy IDs.
+  Code-owned answers не копируются в ordinary prose. Source/outcome остаются
+  в существующих ordered parts, отдельной памяти и projected копии нет.
+- Удалено universal keep по response_scope=clinic: contacts, policy и clarification
+  сохраняют прежний scope, новая scoped часть заменяет его; неоднозначный результат
+  без descriptor очищает. Availability нового предмета не оставляет КТ активной;
+  same-target availability сохраняет existing descriptor без выбора альтернативы.
+- Brand/service producers замораживают использованный источник с exact block.
+  Policy IDs связаны с частью; commercial сохраняет исходный service/topic и
+  answered/excluded/unavailable по факту. Scoped commercial той же услуги без
+  нового volume сохраняет проверенный brand/volume descriptor. Отрицательные
+  результаты не учитываются как published positive facts.
+- source_results добавлен только в completion/provider input; model output schema,
+  KB, финансовый selector, цена/CTA, lead store и отдельный session state не менялись.
+  Краткая provider инструкция описывает значение metadata, не исправляет route.
+- Финальные текущие scoped cases: 110 PASS в d2-2b-card-guards.xml; 46 PASS и
+  4 FAIL новых fixture assertions в d2-2b-final-source-policy.xml; исправленные
+  четыре случая 4 PASS в d2-2b-focused.xml. Итого 160 разных scoped cases green
+  для текущего runtime, не полный CI и не live. Новых cases в сумме 24.
+- Ранний run d2-2b-final.xml: 131 PASS/14 FAIL. Причина runtime failures —
+  producer добавил reference part без matching exact block (исправлено);
+  новый detail fixture использовал неверное поле aspect (исправлено).
+  Ранний green не заменяет финальную аттестацию. Setup sandbox temp failures
+  не являются runtime evidence. Test с inactive=false нарушал snapshot pack;
+  для unavailable fact используется валидный истёкший active_until.
+- New bounded-history test использует email с разделителем ';'. Прежний,
+  неизменённый mask_emails helper не маскирует email перед точкой; это отдельное
+  обнаруженное ограничение baseline, не исправление/гарантия этого checkpoint.
+  Телефон и email с указанным разделителем проверены; лимит 1000 сохраняется.
+- Старые completion без provenance задним числом не восстанавливаются. Для
+  widget начать новую беседу. Не гарантируется восстановление любых authored
+  service invitations, отсутствующих в допустимом model catalog/typed данных.
+  Clarify pending использует прежнюю задачу; новая незавершённая память не создана.
+- Provider/live/browser/SMTP: 0. Staging пуст; commit/push/merge/deploy не выполнялись.
+  Foreign prototypes/ сохранён. Independent Checker: PASS для checkpoint 2Б.
+
+Focused Checker findings исправлены в том же checkpoint:
+- Повтор fully-covered promo response сохраняет source_results каждой части;
+  used_promo_ids отражает реально показанный источник, promo_ids остаются
+  единственным deduplicated positive ledger. Recheck8PASS.
+- Известный факт не подтверждает неизвестную service/topic. Commercial descriptor
+  создаётся только по active tenant service или d2_canonical_topic_ids; price
+  direction membership не является registry всех тем. Foreign direction fatal.
+  Wrong namespace и clinic-wide fact с unknown service не дают active scope;
+  canonical clinic без price direction допустим. Membership recheck8PASS.
+- В составном price+commercial same-target ответе descriptor коммерческой части
+  берётся из matching опубликованной цены текущего completion, прежде прежнего
+  input. Разные descriptors не выбираются по позиции. Explicit volume не заменяется.
+  Новый composition fixture исправлен с ошибочного brand substring на exact
+  tenant offer_id classic.one_tooth.nobel; runtime selection не менялась.
+- Новый test module содержит 38 cases. Итоговый coherent run после всех code
+  исправлений — d2-2b-final-checkpoint.xml (new context, commercial, primary-topic),
+  итог: 84 PASS, 0 FAIL. Предыдущие 160 cases — промежуточные
+  scoped guards до focused findings; не заменяют аттестацию финального дерева.
+  KB/model calls/staging/foreign WIP не менялись. Checker focused recheck: PASS.
+
+Финальный runtime checkpoint 2Б: d2-2b-final-checkpoint.xml — 84 PASS,
+0 FAIL, pytest 108.14s: new context38 + commercial38 + primary-topic8.
+Код и tests старше этого прогона; предыдущие policy26/card64/session38 guards
+записаны отдельно, их не называть повторным полным CI финального дерева.
+Во время final run были неблокирующие Windows logging rotation errors:
+существующий app.jsonl занят локальным процессом (WinError32). Runtime tests
+не падали; logging setup не изменён этим этапом. Не выводить из scoped PASS
+полную аттестацию diagnostics/logging или живого понимания Qwen.
+Staging пуст, HEAD723e6aa, новая работа не committed/pushed; prototypes/ untouched.
+Independent Checker: PASS для checkpoint 2Б, включая focused recheck трёх
+findings. TEST_WEAKENING: нет. SAFE_TO_WIDGET_TEST=YES — новая беседа.
+Полный CI и живое понимание Qwen не аттестуются; provider/live/browser/SMTP0.
+
+### Актуализация §38 после аудита свободного диалога — 2026-10-10
+
+Owner поручил полную дорожную карту с учётом 2Б и внешних разборов. Классификация
+этого изменения: documentation only. Текущий порядок и acceptance записаны в
+[Roadmap](DEMO_D2_DELIVERY_ROADMAP.md), подраздел «Единый план после аудита свободного
+диалога — 2026-10-10» внутри канонического раздела 2026-10-02. Он уточняет будущие
+этапы 3/4 ниже; прежние идеи не автоматически approved implementation.
+
+2А committed/pushed723e6aa; 2Б implemented WIP, final84PASS и Checker PASS,
+live-open, не committed/pushed. Root-array Osstem failure не является доказательством
+неработающего 2Б: execution не начался. Одновременно целый живой диалог не принят.
+Точка отсчёта, существующий exact allowlist и чужой prototypes/ сохраняются.
+
+Новый порядок: сохранить честный checkpoint → 2В воспроизводимые input/privacy
+bug fixes → 3А согласованный design model wire + existing completion projection →
+3Б ограниченное факторное исследование Qwen → 3В replacement с удалением старого
+reachable boundary → 4 whole-dialogue/cards acceptance → 5 отдельная owner-approved
+KB cleanup → 6 integration/legacy/diagnostic debt. Никаких новых provider budgets
+этим документом не выдано. Exact schema/input/history limits и состав KB изменений
+показать владельцу до dependent edits. No new memory/secondcall/adapter/repair.
+
+Аудит read-only подтвердил: short <3 gate блокирует ordinary Да/Ок; ** gate
+блокирует содержательную разметку; email перед точкой не маскируется (user input
+затем блокируется @guard, assistant projection без такого guard); content_text
+обязателен до замены code-owned availability; structural validation атомарна;
+clarification до reference; technical snapshot в model input; bounded history
+1000chars/3pairs; output1024tokens при text4000chars. Причина последнего Osstem
+не доказана объёмом42000tokens. Не объявлять nine kinds или every validator лишними.
+Mixed booking потеря опровергнута: actual поздняя ветка966+ сохраняет запись.
+pending_question хранит unfinished task, не просто показанное уточнение.
+
+Результат упрощения проверяется снятыми независимыми решениями и удалёнными
+call paths, а не renamed parts, shorter JSON, prompt patch или tests count.
+Cursor/Checker трассирует actual path и adverse whole dialogues; offline и live
+статусы отдельно. Два полных одинаковых review не нужны. KB facts/numbers/medical
+wording не менять без exact owner согласования; не создавать гарантию правильности
+произвольной financial prose новым verifier. §3 остаётся владельцем ответственности.
+
+### 2В — входной privacy boundary, owner GO 2026-10-10
+
+Owner «Делай. Потом строгий промпт курсору...» разрешил этот bug-fix checkpoint.
+Root C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment;
+baseline056cac4cf3a7b9a4d54a041c8fbd8b897e95518e; origin/main/merge-base
+efa3f773bcf10891e2997addf8bbec38c7ae1317. Tracked checkout был чист, staging пуст;
+foreign prototypes/ сохранить. Exact allowlist: core/user_text_privacy.py;
+tests/test_user_text_privacy_contract_offline.py; tests/test_d2_input_boundary.py;
+docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md.
+
+Классификация bug fix, не общий architecture PASS. До: длина <3 и наличие **
+превращали содержательную обычную реплику в privacy-only; email перед точкой
+оставался без маски. После: существующий guard оценивает очищенный текст без
+двух этих gates; existing email boundary различает sentence dot и продолжение
+домена. Удалены length и Markdown barriers, не добавлены semantic rules.
+Meaning owner — модель; privacy owner — существующий helper. Проверки пустого/
+contact-only текста, немаскированного @, phone leak и bound lead name сохранены.
+Lead intake/pause, provider schema/context/calls, prices/UI/KB не меняются.
+Однобуквенный текст с буквами также проходит ordinary guard; это общая структурная
+граница, не whitelist Да/Ок. Разрешение input не гарантирует верный ответ Qwen.
+
+Проверки: positive short/formatted text, punctuation/plus/subdomain email,
+negative contact-only/unmasked @/phone leak/bound name; actual JSON/SSE следующий
+input, completed history и replay; existing lead interruption/cancel guards.
+Данные тестов синтетические; сеть/провайдер не вызываются. Не запускать browser
+для этой правки. Cursor должен отвергнуть phrase allowlists, новые states/fields,
+handlers/calls/repair adapters и ослабление privacy, и проследить actual path.
+Evidence: d2-2v-targeted.xml — 108 PASS, 0 FAIL, 85.72s; privacy contract,
+новый JSON/SSE boundary, existing lead_interrupt_http и lead_cancel_ui.
+Из них 42 новых cases и 66 прежних guards. Полный CI не запускался; известных
+падений в этих четырёх modules нет, чужой baseline debt этим не закрыт.
+Тестовые логи изолированы через BOT_LOG_DIR во временной папке, logging runtime
+не менялся. Provider/live/browser/SMTP: 0. Fake inputs доказывают ingress/privacy,
+не живое понимание короткого продолжения или устранение root-array Osstem.
+Чистые цифры/небуквенные реплики остаются blocked; active bound lead-name guard
+также не изменён и может отклонить короткое буквенное слово. Это прежние границы,
+не обещание свободного dialogue во всех lead phases. Независимый Checker:
+PASS scoped bug fix 2В; actual path/guards/отсутствие новых слоёв проверены,
+TEST_WEAKENING нет; final XML108PASS. SAFE_TO_WIDGET_TEST=YES. Staging пуст,
+commit/push не выполнялись. Cursor review по owner запросу — следующая внешняя
+проверка удаления причин и отсутствия возврата к усложнениям, не общий runtime PASS.
+
+### Предыдущее предложение этапа 3 — одна ссылка вместо независимых type и ID
+
+Предпочтительное предложение: canonical entity ref, чей тип определяет registry
+этапа 2. Представление, например direction:implantation/service:classic, — эскиз,
+не уже утверждённый новый wire. Перед кодом показать точный ordinary результат,
+завершённую операцию, уточнение и known-task reply; согласовать форму/границы.
+Не менять определение clinic-wide commercial scope, unknown brand, inactive
+service, volume/count, policy precedence, first-price/deferred или product limits.
+
+Цель: удалить возможность независимо прислать несовместимые type и ID.
+Не обещать устранения выбора неверной существующей сущности. Заменить старую
+wire форму и её reachable readers; не сохранять постоянный new-to-old converter,
+dual contracts или вторую память. Серверные actions/receipts/следующий context
+должны использовать один согласованный reference boundary.
+Один model call и ordinary json_object сохраняются; strict activation не входит.
+Существующие локальные DB не мигрировать/удалять автоматически; перед widget
+указать необходимость новой беседы, если локальные frozen receipts несовместимы.
+
+Проверки: все operation kinds/completed/clarification формы; known task identity;
+неверная/неизвестная ref и trust negatives; direction overview + brand, concrete
+service prices, volume, detail, promotions, doctors, policy, clinic contacts;
+mixed части, historical tabs после адреса, дальнейшие текстовые includes/stages;
+replay/context/один вызов и price click без модели. Не заменить их schema collection.
+
+### Этап 4 — компактное представление модели и оставшиеся aliases
+
+4A: из проверенной базы построить одно модельное представление с полезным
+содержанием и необходимыми IDs/связями. Убрать доказанные дубли каталогов и
+служебный MD шум из model input, не из исходной базы автоматически. Перед исключением
+frontmatter/aliases/comments проверить, не несут ли они единственную информацию
+для понимания; полезные сведения явно сохранить в projection. Сначала показать
+владельцу точный список исключаемых/сохраняемых/переносимых model-input данных
+и получить согласование до изменения его состава — даже без edits исходных MD.
+Не удалять clinical
+content по случайному top-k; не вводить RAG/второй вызов/новый semantic selector.
+Начальные измерения audit: system153454 chars, corpus112068; это диагностика,
+не доказанный причинный вклад в сбои. Сравнить размер и фактический content coverage.
+
+4B: report оставшихся Markdown alias дублей по DEMO_KB_EDITOR_AGENT.md, вместе
+проверить шапку, comments, headings и body. Пример: extraction__service__tooth_extraction.md,
+mozhno-li-srazu-implant — exact heading duplicate «можно ли сразу поставить имплант»,
+пересказ «удалить зуб и сразу имплант», широкое «имплантация после удаления».
+Предложить удаление комментария, не выполнять без согласования списка владельцем.
+Предыдущие 83 удалённых вхождения не означают полную чистку. Не переносить правило
+на aliases каталогов services/brands/doctors. Утверждённые удаления исходных MD —
+отдельный data checkpoint от изменения модельного представления.
+Сохранить видимый текст/цифры/факты/силу обещаний/медицинские формулировки, anchors,
+suggest_h3, CTA и ссылки. Никакого медицинского/юридического сглаживания.
+
+4A проверять на единой неизменной матрице вопросов с этапом 3, отдельно measurement
+и смысловую корректность; offline coverage, scoped model-input и runtime проверки.
+Для live сравнения заранее предложить owner бюджет и hard cap; все прошлые бюджеты
+исчерпаны. Не выдавать уменьшение chars или fake-provider PASS за live reliability.
+4B: exact deletion list и preservation guard; не запускать большой runtime CI ради
+комментариев. Fingerprint change явно сообщить, widget начать новой беседой.
+
+### Процесс каждого checkpoint и границы
+
+Порядок: exact preflight/allowlist → реализация в согласованных границах → минимальные
+offline проверки → один independent Checker → owner widget → явный commit/push GO
+→ exact staging и проверка → checkpoint commit/push + remote SHA. После REJECT —
+focused recheck, не новый полный аудит. Cursor — независимый review на существенных
+границах 1 и 3, вместо дублирующего полного Checker; если нужен второй, обосновать
+конкретную непокрытую границу. Мелкое UI проверяет владелец; browser automation
+только для сложного interaction/auth/context риска. Full CI перед merge, не каждым
+малым edit. Baseline failures сверять с чистой точкой, не скрывать/ослаблять tests.
+
+Отчёт этапа: что убрано/добавлено, owner, affected path, changed behavior, tests,
+baseline failures, live budget usage, staging/commit/push и foreign WIP. Каждый
+следующий baseline — сохранённый предыдущий checkpoint, проверенный на GitHub.
+При паузе named checkpoint должен быть сохранён и pushed по явной команде владельца.
+Новый чат/ветка/папка не нужны. Merge/deploy/destructive cleanup не разрешены.
+За рамками: новый выбор лечения/предложений, цены через model prose, содержание
+акций, redesign виджета, compiled pack/caching, тотальная legacy cleanup, новый
+summary/patient state/second memory. Эти audit предложения не добавлять попутно.
+
+
+## §39. 3А — переработка проекта после Cursor REJECT, 2026-10-10
+
+Статус: revised design, НЕ implemented; Cursor REJECT исходного §39 принят.
+Ни сравнение3Б, ни runtime3В не начинать до закрытия перечисленных design gates.
+Предыдущий documentation Checker PASS означал честность статуса и scope, но не
+полноту архитектурной замены. Называть такой PASS готовностью проекта было неверно.
+
+Root C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment;
+baseline/HEAD и remote340fd771e38d9bb80ececb01bac99e8c326972e1; origin/main/merge-base
+ efa3f773bcf10891e2997addf8bbec38c7ae1317. 2В сохранён/pushed, scoped Cursor PASS,
+108 offline cases. WIP только этот файл и DEMO_D2_DELIVERY_ROADMAP.md, staging пуст,
+foreign prototypes/ сохраняется. Allowlist этой доработки — ровно два документа.
+Классификация documentation/design. Это НЕ implementation architecture PASS.
+Table §3 DEMO_D2_TARGET_CONTRACT.md не меняется. Предложения не дают себе owner GO.
+
+### 39.1. Ответ на blockers и единый владелец
+
+1. История должна включать фактически опубликованный текст brand/service policy
+   из completion, в паре с соответствующим вопросом. Source ID и lookup в текущем
+   каталоге не заменяют показанную реплику. Invitation не сочиняется projection.
+2. Предложение availability ОТОЗВАНО. Новый kind не нужен; существующие девять
+   operations сохраняются. Approved brand/service precedence общий для content,
+   price и price_detail, согласно core/d2_dialogue.py reference_response901–926.
+   Эта ветка — владелец exact ответа, а не лишний semantic route. Удаляем требование
+   обязательного черновика перед ней, НЕ её бизнес-правила. Нельзя дублировать её
+   отдельным content resolver, price resolver и новым availability resolver.
+3. Canonical target требует прямой замены всех readers ниже, включая clinic,
+   unresolved, doctors, detail и clarification. String→old {type,id} adapter запрещён.
+4. Model-generated ordinary IDs нужны joins, но их генерация не обязана лежать
+   на модели. Полная схема identity ниже включает filtered/deferred/pending/known
+   paths. Недоказанную идентичность нельзя объявлять удалённой dependency.
+
+### 39.2. Кандидат wire и структурная форма
+
+Сохранить корень outcome/ordered blocks и существующие девять kinds. Ни phrase
+allowlist, ни новый discriminator/realization/availability field не вводится.
+Смысл определяет один model call; code-owned факты — прежние владельцы.
+
+Content имеет две непересекающиеся структурные формы, отражённые в одной
+генерируемой JSON Schema и тех же Python types:
+- Completed request: content_text optional; pending_question/clarification absent
+  или null; target/content_ref/sections/brand сохраняют свои прежние ограничения.
+- Unfinished request: clarification и pending_question required/nonblank,
+  content_text absent/null. Не менять смысл pending_question на displayed question.
+
+Удалить explanation_form hidden requirement completed_explanation_text_required
+и зависимости от model_fields_set для absent/null optional fields. Actual typed
+alternatives должны выдавать ту же валидность в schema и parser; не поддерживать
+вторую вручную исправляющую schema. Kind=content у alternatives одинаковый:
+не лечить техническое ограничение discriminator добавлением нового model field.
+Пустая строка не означает пригодный ответ; supplied text сохраняет nonblank/length
+checks. Для optional clarification/selector отсутствие и null эквивалентны;
+volume absent/null и volume.extent=unknown НЕ эквивалентны.
+Service clarification сохраняет choices2–3 unique active service refs;
+term/parameter не требуют бессодержательного choices:[].
+
+Execution completed content:
+existing exact brand/service owner → найденный approved block публикуется;
+если такого ответа нет → existing ordinary prose materialization;
+нет пригодного ответа → existing per-part unavailable, не выдуманный текст.
+Это предложенное изменение ошибки missing content: structurally valid request
+может не иметь ответа, вместо прежнего rejection всего model result. Этот пункт
+ТРЕБУЕТ OWNER СОГЛАСОВАНИЯ; malformed root JSON не становится valid part.
+Existing _d2_information_blocks1779 уже умеет gap без prose, но новая structural
+граница сделает этот путь достижимым шире. Не объявлять это отсутствием поведения.
+
+Короткие примеры будущего ordinary wire (catalog placeholders, НЕ live payload):
+Osstem:
+{"outcome":"dialogue","blocks":[{"kind":"content","brand_id":"<osstem_id>"}]}
+Цена Osstem:
+{"outcome":"dialogue","blocks":[{"kind":"price","target":"service:<service_id>","brand_id":"<osstem_id>"}]}
+Price_detail с тем же брендом применяет ту же действующую precedence; отсутствующая
+цена не подменяется ценой альтернативного бренда. New availability не используется.
+Osstem+адрес:
+{"outcome":"dialogue","blocks":[{"kind":"content","brand_id":"<osstem_id>"},
+{"kind":"contact","contact_fields":["contact_address"]}]}
+Обычный ответ без обязательной ссылки на документ:
+{"outcome":"dialogue","blocks":[{"kind":"content","content_text":"<ответ из FullContext>"}]}
+Source-aware ordinary ответ может дополнительно иметь content_ref и section refs.
+Genuine service уточнение:
+{"outcome":"dialogue","blocks":[{"kind":"price","clarification":
+{"missing":"service","choices":["service:<id1>","service:<id2>"]}}]}
+Information clarification:
+{"outcome":"dialogue","blocks":[{"kind":"content","pending_question":"<неотвеченная задача>",
+"clarification":{"missing":"term"}}]}
+Age/context/payment, volume/count/jaw, facts/policy IDs и offer selectors остаются
+в нужных видах операций. Короткие примеры не являются сокращённой полной schema.
+
+### 39.3. Target replacement: значение, readers, removal
+
+Одна native scalar reference выбирается из списка captured tenant snapshot;
+нет нового файла KB, regex по user text или второго semantic registry.
+Derived index связывает exact ref с уже существующей сущностью, проверяет scope.
+
+| Путь | Допустимая native target и смысл |
+|---|---|
+| content/price/detail/policy/booking | service:<id>, topic:<id>, unresolved, либо отсутствие там, где допустимо сейчас |
+| doctors | Только active service:<id> |
+| commercial_fact | service/topic, clinic либо unresolved с прежними pending restrictions |
+| DiscussionScope | Только service/topic; clinic/unresolved запрещены |
+| service choices | Только active service refs; после click тот же native target |
+| offer ID/ordinal | Отдельный прежний selector; ref не подменяет offer/ordinal |
+
+clinic не совпадает с topic:clinic; unresolved не совпадает с отсутствием.
+Volume:null vs {extent:unknown} сохраняется. Unknown service/topic, inactive service,
+unknown brand, missing price и foreign source не объединяются в один outcome.
+Ссылка не гарантирует верного model выбора существующей сущности.
+
+Прямые заменяемые readers/constructors:
+- contracts/d2_dialogue_result.py: ServiceTarget/TopicTarget/ClinicTarget/
+  UnresolvedTarget, Target union, ScopedOperation и DiscussionScope properties,
+  DoctorsOperation.target, CommercialOperation.target, clarification/price validators.
+- core/d2_dialogue.py:_volume_price_task; _run_reserved_d2_dialogue_turn:
+  service/doc/price/detail known-task constructors, price-policy discussion scope,
+  reference target branches, scope equality и commercial carry joins.
+- core/d2_snapshot_sources.py:build_d2_document_task и source-target binding.
+- core/response_plan_materialization.py:resolve_d2_operations commercial scope,
+  selected frozen price DiscussionScope; _discussion_descriptor,
+  _d2_price_scope_decision и content scoped resolution.
+- contracts/d2_session_context.py:clarify_task и projected discussion scope;
+  contracts/response_plan.py и contracts/response_plan_session.py captured scope
+  on parts/actions: сохраняют единственную новую reference, не вторую old форму.
+- prompt/derived catalogs/schema: target examples, choices, known-task input.
+- core/one_call_envelope_protocol.py D2 parser сразу выдаёт новый domain.
+
+Из ordinary model path удаляются old target classes/unions и reachable old
+constructor/type branches. service_id/topic_id как readonly доступ к native ref
+может сохраниться, но не создаёт old targets. Старый non-D2 legacy protocol не
+удаляется автоматически; доказать отсутствие нового D2→legacy semantic adapter.
+
+### 39.4. Ordinary identity: producer/consumer карта
+
+Три разных identity НЕ смешивать:
+HTTP request_id/replay receipt — прежний server key;
+ordinary block key — серверный rN по исходной позиции;
+known-task echo — уже назначенный сервером key, модель только повторяет.
+
+Исполнение назначает key при первом обходе полного blocks ДО booking skip,
+first-price deferral и разделения exact/content/commercial/detail. Каждая
+дальнейшая рабочая часть несёт пару key+native operation. Это transient data
+текущего вызова, НЕ новая persisted memory и не wrapper поверх старого domain.
+Не добавлять request_id в raw payload и не валидировать обогащённый JSON старым
+D2DialogueResult. Existing native executor functions напрямую принимают key
+от server owner вместо чтения model operation.request_id.
+
+| Producer/consumer | Прямое изменение / сохранённая связь |
+|---|---|
+| contracts/d2_dialogue_result.py Operation/shape | ordinary request_id и duplicate model IDs удаляются; ordered blocks authoritative |
+| core/d2_dialogue.py:_run_reserved_d2_dialogue_turn | enumerate complete blocks once; exact_text/parts/deferred/contact/booking и render_order сохраняют исходный key |
+| core/response_plan_materialization.py:resolve_d2_operations | коммерческие, price/content/detail scopes и failures получают bound key, не перенумеровывают filtered tuples |
+| _d2_information_blocks / _d2_price_detail_block / _d2_price_scope_decision | key передаётся к information/price/detail/failure, UI source_request_id остаётся тем же |
+| core/clinic_policy_resolver.py:resolve_clinic_policy_operations | policy decisions/ledger/active_booking связываются server key, не model ID |
+| core/d2_snapshot_sources.py:build_d2_clinic_policy_response/build_d2_clinic_policy_fact_block | key для exact response и policy decision join задаёт вызывающий executor |
+| core/d2_lead_bridge.py:resolve_d2_booking_lead_entry | booking_request_id использует bound source key; lead effect/PII rules прежние |
+| core/response_text_renderer.py:render_response_parts | result IDs/order остаются; модельной operation identity не читает |
+| core/d2_completion_context.py:_project_pair | join опубликованных blocks/parts по server key; receipt HTTP key не меняется |
+| contracts/response_plan.py part/result validators | unique/failure/deferred/order checks для server result остаются |
+| contracts/response_plan_session.py action validators | UI source_request_id остаётся server-owned authenticated reference |
+| core/d2_dialogue.py:run_d2_dialogue_turn | price volume/source/action joins читают frozen completion IDs, не ordinary model payload |
+| known-task validate_d2_payload | expected server key/count проверяются; создаётся новый native completed domain, не old wire |
+
+Сценарий filtered/deferred: blocks [booking, content, price, price] получают
+[r1,r2,r3,r4]. Published text r2, first price r3, deferred r4; booking r1 не
+превращает r2 в r1. Renderer/next history/UI должны сохранить это равенство.
+
+Pending clarification — конкретная согласуемая native форма того же clarify_task:
+{"request_id":"r3","operation":{"kind":"price_detail","price_detail_aspect":"includes",
+"clarification":{"missing":"service","choices":["service:<id1>","service:<id2>"]}}}
+request_id — существующая identity, теперь server-owned по исходной позиции;
+operation — native unfinished block нового ordinary domain без model-generated ID.
+Wrapper разделяет владельцев identity и meaning. Это изменение формы одного
+существующего слота, не новая память/queue/state или model discriminator.
+Owner GO2026-10-10: после подробного объяснения server number + native task
+в existing slot владелец ответил «Ладно делаем». Точная server-bound wrapper
+форма39.4 согласована. Повторное согласование этой формы не требуется.
+Это design GO, а не обход последовательности3А→3Б→3В или разрешение любых states.
+Не использовать пример placeholders как клинически выбранные реальные alternatives.
+
+Прямой путь записи/исполнения:
+1. _run_reserved_d2_dialogue_turn назначает key ДО любой фильтрации. Первая
+   активная clarification получает {request_id:key,operation:native_pending}.
+   Остальные остаются deferred, не становятся очередью автоматического исполнения.
+2. _commit_non_price_d2_turn записывает это в прежний clarify_task; clarify_pending,
+   TTL и очистка остаются прежними. D2SessionState и D2OrdinarySessionContext читают
+   одну server-bound форму; project_d2_session_context не интерпретирует её смысл.
+3. Service click проходит существующие tenant/revision/ownership проверки, читает
+   clarify_task.operation и проверяет выбранную услугу из clarification choices.
+   Меняются только native target и завершённость этого уточнения.
+4. Kind, detail aspect, brand/volume/payment/age/context и исходный информационный
+   pending_question сохраняются. Executed part/known-task echo используют r3,
+   даже если остальные blocks раньше отфильтрованы.
+5. Price/detail выполняются без модели; content даёт один narrow known-task call
+   для объяснения исходного вопроса по выбранной услуге. Модель не выбирает kind
+   заново. Старый task_type.model_validate с **pending.model_dump и {type,id}
+   в d2_dialogue688–692 удаляется; legacy wire не восстанавливается.
+6. Свободный текст после уточнения — ordinary meaning path. Input содержит native
+   pending целиком, включая исходный вопрос/aspect и варианты. Модель понимает
+   продолжение/поправку/новую тему; сервер НЕ вставляет old kind в произвольный
+   новый ответ. Новые ordinary IDs локальны для нового хода. Между текстовыми
+   ходами не добавляется автоматический identity-link или второй классификатор.
+
+Приёмка той же кнопки услуги для разных задач:
+- price → выбранная услуга → price card, не includes;
+- price_detail/includes → выбранная услуга → exact includes, не новая цена;
+- price_detail/stages → выбранная услуга → exact stages;
+- content → выбранная услуга → объяснение исходного pending_question, не цена.
+Это общая task conservation, не словарь сценариев коронки/имплантации.
+Коронка «на свой зуб/на имплант» — объясняющий пример, не новая KB или policy.
+Tests должны использовать реально существующие active services из snapshot.
+
+Минимальные future offline guards: все четыре pending формы JSON/SSE;
+third-position r3 через filter/deferred/click/completion/history; price/detail
+zero provider, content one known call и reject wrong echo; foreign/stale/TTL,
+choices validation/replay/clear; fake input полного pending и независимой новой
+темы. Existing test_d2_clarification_scope_http сохраняет scope/brand/payment;
+test_d2_operation_unification — старые формы storage. Их assertions не ослаблять
+без объяснения direct replacement и эквивалентной проверки нового native slot.
+Live понимание свободного текста отдельно на3Б; fake не аттестует Qwen/DeepSeek.
+
+Не удаляются HTTP request_id, D2CompletedTurn identity, D2DialogueStore replay,
+D2DialogueReceiptRef, response/UI source IDs и known-task echo. Глобальная замена
+всех строк request_id была бы поломкой контрактов, не упрощением.
+
+### 39.5. История фактически показанного диалога
+
+Пара получает ordered опубликованные body blocks ИЗ СОХРАНЁННОГО COMPLETION.
+Не делать lookup современного approved_text по source_id вместо frozen ответа.
+Обычная assistant prose отдельно; published exact text отдельно с source/outcome;
+card отдельно с captured rows/conditions/includes/stages и выбранным offer.
+Не складывать financial text в ordinary assistant_text и не пересчитывать суммы.
+source/outcome поясняют published/excluded/unavailable, не заменяют текст.
+Не создавать событие/summary store или модель пересказа.
+
+Конкретная обязательная пара Osstem:
+patient_text: А Osstem у вас есть?
+published_exact: source=brand_policy:<id>, outcome=answered,
+text=<дословный display_text опубликованного exact block с приглашением продолжить>.
+Следующее Расскажите/Да интерпретирует модель по этой паре, без phrase handlers.
+
+| Класс опубликованного результата | Откуда брать содержание / граница |
+|---|---|
+| model prose | information_blocks.display_text с publication=model_prose, фактический порядок |
+| brand/service alternative | exact block display_text + matching part.source_results; approved invitation целиком |
+| clinic policy, включая отказ | exact/policy display_text, matching part и policy IDs; не только список IDs |
+| unknown reference/brand, generic gap | тот же exact/failure display_text, даже при пустом source_results; требуется доказать ordinary origin |
+| off-topic | _run_reserved OffTopicOperation branch exact_text; не маскировать как предыдущую тему |
+| contacts/doctors | published contact/exact blocks; clinic contacts не patient contact intake |
+| price/detail/card | captured financial typed blocks и facts/conditions; UI selected offer из existing authenticated action |
+| commercial/promo/consultation additions | реально published finalized blocks, не все доступные fact IDs каталога |
+| clarification/deferred/unavailable | displayed question/deferral/gap и unfinished task; не выдавать их за ответ |
+| medical admin | published terminal/handoff из completion; сохранённый medical subject и privacy |
+| lead/pause/name/phone | existing lead owner; PII/intake данные НЕ ordinary history |
+| transport/root parse failure | нет успешного completion — не создавать fictitious answered pair |
+
+Финансовый approved_text альтернатив допускается только как exact structured
+publication; это предложенное расширение model input, требует owner GO.
+Нельзя проецировать все exact_text_blocks: mixed booking создаёт generic
+reference/clarification (d2_dialogue972–983), а generic gaps имеют тот же kind.
+Existing source IDs достаточны для source-bound cases, недостаточны для universal
+origin claim. ОТКРЫТЫЙ GATE: для mixed lead нужно явно разделить происхождение
+в том же completion у producer. Кандидат — изменить server-owned part kind для
+lead/intake части вместо generic reference; это новый внутренний enum value,
+не модельный kind/state, но требует отдельного owner согласования. Без него
+не обещать полный safely-all projection и не вводить фильтр по тексту/фразам.
+При отклонении такого изменения надо спроектировать иной доказуемый existing-data
+путь, а не молча исключить целый mixed turn вместе с полезной карточкой.
+
+Оба источника обрезания включены в removal list:
+core/d2_completion_context.py:_project_pair assistant_text[:limit];
+core/d2_dialogue.py:_commit_non_price_d2_turn patient_text=_bounded_d2_text(...).
+Нельзя восстановить уже обрезанный patient_text из несуществующего полного receipt.
+Новые turns должны фиксировать безопасный вопрос полностью в existing receipt;
+старые local incomplete receipts не аттестуются как magically repaired.
+
+Candidate input сохраняет: whole approved corpus, все business catalogs,
+current safe user text, ordered completed pairs, discussion_scope,
+shown/selected offers, explicit pending/known task и необходимые source outcomes.
+Исключает только model-facing session_key/SID, revision, timestamps,
+receipt/fingerprint IDs, suppression ledger. Они остаются на сервере.
+Финальный exact removal/preservation list ещё нужно согласовать.
+
+### 39.6. Неохваченные обязанности — явный статус
+
+- content_ref остаётся OPTIONAL source attribution/UI metadata. General content
+  пример без него разрешён. Удалить prompt blanket требование возвращать документ
+  на каждый grounded answer, сохранив source-auth проверки, sections и UI.
+  Модель выбирает документ для source UI, но отсутствие ref не ломает полезную prose.
+  Не выводить ref из prose и не добавлять второй document selector.
+- Target для connected general prose OPTIONAL; для typed price/doctors/facts
+  нужны точные сущности. Не требовать одновременно target+doc+text каждому ответу.
+- JSON Schema/Python должны совпадать по completed/pending/null формы. Dynamic
+  tenant/reference checks неизбежно выполняются executor по captured data;
+  не путать их со скрытыми purely structural правилами.
+- Рассрочка: general useful explanation, direct requested exact fact и payment
+  stage breakdown — разные requested actions, не три попытки одной задачи.
+  У текущего D2 есть свои exact-operation инструкции. Cursor ссылки126–141
+  относятся к ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS, которые build_d2_d1r_messages
+  НЕ включает: one_call_contract_header152–157 только version/model markers.
+  Это не доказательство live тройного prompt. Однако actual D2 messages нужно
+  свести к одной недублирующей meaning→operation таблице и проверить конкретные
+  общие payment questions/условия/«этапы оплаты» на3Б. Не claim all existing
+  payment semantics resolved только удалением старого unreachable prompt.
+- Повтор brand/volume на продолжении остаётся model meaning responsibility;
+  новый автоперенос кодом не разрешён. Readable selected-offer/scope уменьшает
+  двусмысленность, но не гарантирует inference. Отдельно проверять «А рассрочка?»
+  после смены бренда, topic switch, явный новый бренд и настоящую неоднозначность.
+- Ordinary model-generated IDs убрать только после focused proof карты39.4,
+  включая pending slot. Пока это candidate removal, не выполненное упрощение.
+- Auto marketing, price/detail exclusions и CTA остаются product policies,
+  не удалять их попутно под видом свободного диалога.
+
+### 39.7. Бюджеты и приёмка — до запуска эксперимента
+
+Три пары и TTL30min сохраняются. Предложение whole-turn budget: newest complete
+pair сохраняется полностью в пределах существующих ingress/output bounds;
+ещё две старые пары добавляются целиком, если помещаются в согласованный общий
+budget. Нет обрезания внутри текста; oversized newest turn требует явного
+решения, не silent drop. Точное число budget и overflow НЕ выбраны/не согласованы.
+Output1024 tokens при допустимых4000 chars/нескольких blocks также требует
+явного candidate budget, сопоставимого между Qwen/DeepSeek. Не обещать closure
+этих числовых решений документом без owner GO.
+
+3Б пока НЕ READY. Pending identity теперь имеет concrete candidate39.4,
+и explicit owner GO2026-10-10. Wrapper больше не открытый approval gate.
+Сначала закончить lead origin representation,
+выбрать whole-turn/output budget, согласовать wire/model input/error semantics.
+Далее temporary isolated harness с одинаковым synthetic input и facts:
+current vs candidate, Qwen vs DeepSeek Flash disabled thinking. Сравнивать
+structure/meaning/completeness/continuation/facts/latency/tokens, не лишь parse200.
+JSON mode/strict отдельная ось; root array не извлекать догадками. Новый hard
+call/cost budget ещё не дан. Credentials locally prepared, API live не проверен.
+
+Focused review после REJECT проверяет именно findings/removal maps, не новый
+полный аудит и не повторную историю108offline. Перед implementation Cursor
+должен получить complete executable design и отвергнуть new-to-old adapter,
+retained hidden structural validation, newkind availability, phrase handlers,
+parallel memory и потери цельного диалога. Adverse matrix включает mixed booking,
+unknowns, compound/deferred order, genuine clarification, next «Да/Расскажите»,
+Nobel→адрес→includes, смену бренда→рассрочка и два исторических предмета.
+Astra пересмотрела availability recommendation и поддерживает optional completed
+content + existing exact owner; её консультация не заменяет owner decision.
+Runtime/tests/KB не менялись. Provider/live/browser/SMTP0, staging пуст,
+commit/push этих двух draft документов не делались.
+
+
+### 39.8. Контрольный свободный FullContext, owner GO 2026-10-10
+
+Owner после обсуждения «всё дать модели и общаться» разрешил добавить такой
+контроль в эксперимент; после annotation также подтвердил task conservation
+через уточнение. Это GO на preparation/design, не отмена этапов3А→3Б→3В и не
+числовой hard live budget. Runtime/KB/основная модель не переключаются.
+
+Контрольный вариант получает те же synthetic patient questions, frozen factual
+corpus/catalogs и те же полные readable history pairs, что candidate structured
+variant. У control нет обязательных operations/IDs/schema и обязанности рисовать
+карточки: он пишет естественный ответ. Clinical/admin/privacy ограничения
+сохраняются. Не объявлять diagnostic prose финансовым publication path бота.
+
+Различать:
+A — текущий договор и его текущий input: локальная baseline точка;
+B — тот же текущий договор с целой readable history: вклад истории;
+C — свободный ответ с той же readable history: вклад командного договора;
+D — proposed compact native contract с той же history: будущая замена.
+Не менять history, facts, output budget и instructions одновременно и затем
+приписывать эффект модели. Сравнение B/C не делает current runtime автоматически
+пригодным; C не доказывает точность карточек или authentication. D запускается
+только после design GO. Выбор Qwen/DeepSeek — отдельная ось.
+
+Предварительный различающий набор, без вызовов:
+- Osstem первый самостоятельный вопрос: структурная упаковка и правильный факт.
+- КТ→Osstem approved invitation→Расскажите: правильный referent, не КТ.
+- То же приглашение→Да: используется предыдущая фактическая реплика.
+- Typed includes task→genuine service clarification→выбор: сохранение includes.
+- Карточка Nobel→адрес→Что входит в Nobel: offer/service binding.
+- Selected brand→А рассрочка: нужный смысл и scope без автопереноса кодом.
+- Осstem+адрес: полнота обеих частей, ошибка одной не скрывает другую.
+
+Набор и subsets/call count сначала фиксируются, а не автоматически7×4×2.
+Использовать frozen synthetic history: цена/бренд/приглашение берутся из demo
+approved фактов, не генерируются предварительными платными calls и не содержат
+реальные logs/личные данные. Отдельно отличать одношаговую diagnostic проверку
+от end-to-end новых диалогов, где ошибки предыдущего хода влияют на следующий.
+Метрики: формат, предмет, полнота, continuation, нужные/лишние уточнения,
+факты/claims, calls/tokens/latency. Ожидания фиксируются до response.
+Если C верен, B неверен — evidence в пользу влияния договора при одинаковой
+истории. Если B и C верны, A неверен — evidence в пользу input/history. Одна
+попытка не является надёжным доказательством; повторы требуют общего hard budget.
+DeepSeek Flash thinking disabled, Qwen параметры отдельно зафиксированы;
+retries0, failures входят в cap. Provider calls пока0. Хранить artifacts вне Git,
+ключи не читать в вывод/отчёт. Free control не встраивается в runtime как fallback.
+
+
+### 39.9. Пакет перед 3Б — owner GO 2026-10-11
+
+Pending wrapper39.4 уже согласован; не спрашивать его повторно.
+Owner GO2026-10-11: ответ «Да» на общий пакет в разговоре разрешает whole3pairs
+без обрезания фраз, ordinary server identity вместо model IDs, отдельную
+server-owned метку служебных lead parts, output4096 и per-part gap с сохранением
+остальных ответов. Это design GO для подготовки3Б, не runtime replacement,
+не разрешение paid calls и не blanket approval всех исторических предложений.
+Технические изменения должны оставаться в границах39.3–39.6 и TargetContract§3.
+
+Lead origin: использовать новый server-owned result part kind=lead в существующем
+D2ResolvedRequestPart, без нового поля/памяти/модельного kind. Назначает producer
+по уже исполненной lead ветке, не classifier и не история по тексту.
+
+| Existing producer | Предлагаемый результат / history |
+|---|---|
+| d2_lead_bridge._name_prompt_response/_phone_prompt_response | lead: name/phone requests и повторные slot prompts; не ordinary history |
+| resolve_d2_lead_pre_provider resume/retry/continue | lead: исполненный intake prompt, прежние UI/auth rules |
+| resolve_d2_lead_pre_provider cancel/defer/submitted | lead acknowledgement из того же owner; исключён из ordinary history, lead owner знает исход |
+| pending_interrupt и paused intake prompt | lead; ordinary вопрос после verified answer-ref идёт отдельно прежним safe boundary |
+| resolve_d2_booking_lead_entry booking_blocked | PUBLIC policy/reference, approved text/source остаётся видимым в history, не помечать автоматически lead |
+| booking policy gap/unclear без запуска intake | PUBLIC authored gap, не путать с повторным вопросом имени/телефона |
+| mixed booking siblings + collecting_name/phone | обычные siblings сохраняются; добавляется отдельный lead part с его server key |
+| apply_d2_lead_pause_ui | меняется UI существующей lead flow; ordinary answer не перекрашивается целиком в lead |
+
+_plain_answer сейчас ставит attribution_kind=lead всему ответу, а mixed merge
+помещает generic reference/clarification в exact_text. Это presentation-признак,
+не достаточная provenance. Не использовать его как whole-turn history filter.
+В revised result источник intake на уровне части задаётся её producer; публичный
+policy/gap берёт origin из booking outcome, не из слов отображаемого текста.
+Для public booking policy сохранить источник в existing source_results/IDs.
+Нужны direct callers updates _plain_answer и mixed merge972–983, validators
+contracts/response_plan.py, render_response_parts и history projection.
+Renderer читает явный lead kind и ставит prompt после siblings; удалить нынешний
+trailing generic reference/clarification эвристический цикл. History исключает
+только intake parts; не теряет карточку/адрес в mixed response. Новый enum согласован в пакете owner GO2026-10-11.
+This change is origin fidelity, not model routing expansion.
+
+History candidate для сравнительного эксперимента: прежние последние3пары,
+TTL30min, каждая пара целиком, без отдельного character cap/нового отбора старых
+пар по бюджету. Это минимальный removal двух1000slices без новой soft-budget
+политики. Current discussion и card selection сохраняются по прежним правилам.
+Provider-facing projection включает safe user text, ordinary prose и ordered
+published exact/card data; policy alternative invitation находится в самой паре.
+
+Это count bound, НЕ доказанный hard token bound. До каждого isolated live case
+harness обязан измерить полный prepared input и проверить применимость реального
+model/endpoint context limit с reserved output. Если case выходит за range —
+не вызывать provider, не обрезать реплики и не делать fallback; показать конкретный
+непомещающийся case. Исполнимый method/tokenizer/endpoint limits фиксируется в
+3Б harness перед call budget GO; approximate chars не выдавать за точный token count.
+Для unrestricted runtime3В эта overflow граница требует отдельной приёмки: нельзя
+распространить evidence малого набора на любой длинный input.
+
+Output candidate4096 tokens на вызов, одинаковый у Qwen/DeepSeek и сравниваемых
+вариантов. Current baseline1024 выделяется отдельной budget axis, а не скрыто
+сравнивается с4096 вместе с другим prompt. Существующий cap4000Unicodechars
+НА CONTENT BLOCK сохраняется; новый суммарный cap прозы не добавляется.
+Truncated/invalid root не чинить repair/retry. Бюджет повышает доступное место,
+не гарантирует верный смысл или JSON.
+
+Пакет owner decisions теперь конкретен: native pending wrapper (уже GO),
+lead result provenance enum, whole3pairs/nocharcut window, output4096,
+missing completed content как structurally valid/per-part gap, canonical refs,
+ordinary server identity и точный input preservation/removal list39.3–39.6.
+Пять перечисленных выше решений согласованы; подготовка3Б candidate разрешена.
+Смысл canonical refs не меняется этим GO: применять только уже согласованные
+ответственности и домены39.3, без самостоятельного расширения product semantics.
+Hard live call/cost budget — отдельно по конкретному subset, до первого вызова.
+Не превращать каждую routine technical detail в отдельный permission round.
+
+Current evidence этого documentation checkpoint: Astra consult; staged empty,
+только2docs WIP, runtime/KB/tests неизменны, provider/live/browser/SMTP0.
+Diff check чист. Никакого architecture runtime PASS не объявляется.
+
+
+### 39.10. Первый различающий subset 3Б — выполнен 2026-10-11
+
+Классификация: изолированный live diagnostic, не runtime-изменение. Runtime
+baseline340fd77 остаётся нетронутым. По GO39.11 выполнены 24 попытки на модель
+(12 ячеек × 2 прогона), retries0; все 48 запросов получили ответ. Остаётся
+по 6 попыток в согласованном лимите. Денежный cap отдельно не задан.
+
+Три frozen synthetic cases, одинаковые approved facts и ожидаемые смыслы:
+1. «А у вас есть Osstem?» без истории. Ожидается отсутствие бренда и доступные
+   альтернативы из approved demo данных; не отсутствие предмета вопроса.
+2. История КТ, затем вопрос Osstem и фактически опубликованное приглашение
+   рассказать про доступные бренды; новый вопрос «Расскажите». Ожидается
+   продолжение последнего приглашения, не возврат к КТ.
+3. «Какие корейские импланты у вас есть и где вы находитесь?» Ожидаются обе
+   части по approved данным. Оценивать формат, оба предмета, полноту и факты
+   отдельно; один верный фрагмент не является PASS всего ответа.
+
+Каждый case: A/B/C/D из39.8 × Qwen/DeepSeek =8 attempts; всего3×8=24.
+Один повтор на ячейку отсутствует: это диагностический screening, не оценка
+частоты ошибок и не доказательство надёжности. Повторы — только новым subset GO.
+Для этих24 output4096 одинаков у всех вариантов. A сохраняет current input и
+current contract, но output переопределён на4096: называть его controlled baseline,
+не exact runtime baseline1024. Влияние1024 отдельно этим subset не измеряется.
+Температура, facts, история B/C/D и остальные поддержанные параметры одинаковы;
+различия API/support явно записываются, а не скрываются под «одинаковые условия».
+
+Подготовка исполнимого harness требует следующего конкретного allowlist до edits:
+изолированный экспериментальный runner и synthetic fixtures; runtime files не
+редактировать. Проверить существующие runners перед созданием нового, не
+дублировать provider adapters и не добавлять candidate→old runtime converter.
+Ожидания/frozen inputs фиксируются до responses. Raw provider artifacts вне Git,
+ключи не выводятся. Offline подготовка не доказывает живое понимание.
+
+Этот subset НЕ покрывает end-to-end verified clarification click, selected card
+после адреса, lead flow или unrestricted runtime overflow. Сохранение задач и
+точных карточек проверяется отдельным минимальным offline набором при3В;
+живые multi-turn проверки требуют отдельного bounded subset, не объявлять их
+закрытыми по трём случаям. Эксперимент не подменяет готовность всех ценовых карточек.
+
+
+### 39.11. Hard provider budget — owner GO 2026-10-11
+
+Owner: «Можешь брать больше вызовов если нужно я даю добро. До30 на модель можно».
+Разрешено до30 attempts Qwen и до30 attempts DeepSeek, максимум60 суммарно,
+для3Б comparison39.8–39.10 и нужных диагностических повторов/дополнительных cases.
+Это отдельное live GO, не runtime replacement, не переключение local widget.
+Не переносить неиспользованные attempts одной модели в другую.
+Ошибки/timeouts/повторы включены в лимит; automatic transport retries0.
+Начальный subset24 был запущен в двух прогонах: израсходовано24 attempts на
+модель, осталось6 на Qwen и6 на DeepSeek. Не требуется тратить остаток.
+Все attempts считаются одним cumulative ledger для этого approved experiment;
+restart runner не обнуляет бюджет. Считать также неуспешные отправленные запросы.
+До live проверить provider capability/context window и prepared inputs; если
+измерение недоступно, не выдавать approximate count за exact и не заявлять
+доказанную применимость. Thinking DeepSeek disabled. Ключи/сырые payloads вне Git.
+Отдельный денежный cap owner не задавал: не придумывать денежное разрешение,
+не делать пополнение баланса и не расширять scope за пределы этих attempts.
+Budget GO39.11 использован для указанного screening. Остаток:6 attempts/model.
+Текущие harness offline проверки прошли; live results записаны в§41.
+
+
+## 40. 3Б — isolated comparison harness, preparation checkpoint 2026-10-11
+
+Classification: experimental implementation, not runtime architecture simplification.
+Baseline340fd77, branch codex/model-price-experiment; origin/main/merge-base efa3f77.
+Owner GO39.9/39.11; allowlist expanded before edits to these exact paths:
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md
+- docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md
+- scripts/d2_context_candidate_protocol.py
+- scripts/experiment_d2_interface_comparison.py
+- tests/test_d2_interface_comparison_offline.py
+Foreign prototypes preserved; staging empty; no KB/runtime edits/commit/push.
+
+Candidate native9-kind wire directly typed in scripts, including completed vs
+unfinished content alternatives, canonical target refs, no ordinary model IDs.
+Its parser returns native objects, never old operations; no materialization,
+offer selection, server memory, model-output repair or second semantic call.
+Shared DiscussionVolume preserves baseline domain constraints. Cross-field and
+source checks not fully expressible in schema are domain checks, not evidence
+of provider structured-output failure. This is trial removal of wire duties,
+not proof that the reachable bot dependency was removed (that belongs to3В).
+
+A actual current prompt/input, output4096 controlled baseline. B same exact
+system and non-history context, replacing ONLY published history text from
+frozen completions. C/D same B user segment and byte-identical factual suffix.
+C free prose; D full candidate wire. No tiny schema tailored to the3questions.
+History prepared using synthetic offline turns. The Osstem turn uses the
+owner-provided observed widget answer inviting the visitor to hear about
+Implantium/Impro/Nobel differences; this is frozen dialogue context, not a new
+clinic claim or a content approval. No paid pre-generation, patient logs, or live
+bot state.
+A/B current parser; D direct native parser/reference checks; C manual prose rubric.
+No candidate→old converter, endpoint import, HTTP route replacement or auth bypass.
+
+C/D instructions are a manual compact interface rewrite. Mapping of preserved
+product obligations: medical/admin and clinic boundary; factual/no invention;
+identified direction overview and volume/brand preservation; independent
+questions/order; age/payment semantics; scope-sensitive follow-up; inactive
+services/brand precedence; contact scope; doctors ownership; commercial scope;
+privacy/no PII collection. Native wire requirements are separately named.
+These are NOT byte-identical semantic paragraphs to B: B/C/D measures the
+interface+instruction package, NOT pure JSON-format causality. Never conclude
+that any structured answer intrinsically prevents free dialogue from these cells.
+All9kinds remain exposed; no extra Osstem/Расскажите hint in candidate prompt.
+
+Live: official documented1M windows for qwen3.8-flash and deepseek-flash.
+Model/endpoint configuration checked before calls; DeepSeek thinking disabled,
+Qwen enable_thinking false; supported generation settings temperature0/output4096.
+A/B/D json_object, C unrestricted prose; strict schema transport not mixed in.
+Official offline estimators: QwenCloud documented o200k_base and DeepSeek
+cdn.deepseek.com/api-docs/deepseek_v4_tokenizer.zip. These are ESTIMATES, not
+exact API counts. Measured complete serialized messages with 4x estimate +
+32768 template reserve +4096 output, must remain under1M before calls.
+This technical screening margin is not a proven hard bound for3В runtime.
+Exact usage is reported from provider response. No truncation/fallback if
+estimator unavailable or margin fails. Sources:
+https://docs.qwencloud.com/developer-guides/run-and-scale/token-counting
+https://www.alibabacloud.com/help/en/model-studio/qwen3-8-flash
+https://api-docs.deepseek.com/quick_start/token_usage/
+https://api-docs.deepseek.com/quick_start/pricing/
+
+Cumulative ledger outside Git:30attempts/model, reservation persisted BEFORE
+transport, exclusive lock, atomic replacement, retries0. Re-running existing
+job skips it; explicit repeat consumes remaining budget. No counter reset on
+new artifact directory. Auth/quota failure stops that provider's batch. All
+raw synthetic payloads/results and isolated SQLite are outside repository.
+No changes to .env, widget runtime provider, prices or approved formulations.
+
+Preparation evidence:12cells/model, largest prepared input237069UTF8bytes,
+provider0. Official tokenizer preflight prepared outsideGit, no patient data;
+max estimated input48,140 Qwen /54,153 DeepSeek. The script applies an explicit
+4× estimate +32,768 template reserve +4,096 output margin, resulting maximum
+screening reserves229,424 /253,476 respectively. Estimates are not API counts.
+45 offline tests passed in5.99s, including budget restart/cap/failure/lock and
+published invitation continuation. The sandbox run had3 Windows PermissionError
+failures at atomic temp rename (42 passed); outside sandbox all45 passed. Not a
+baseline bot regression.
+No browser checks/SMTP, no runtime architecture PASS or live dialogue PASS.
+Independent Checker: scoped PASS after tracing preparation/parser/transport/
+ledger paths; canonical topic binding fixed. Owner has approved up to30 calls per
+model and explicit transmission of synthetic demo-clinic facts to Qwen/DeepSeek.
+Live screen can start within that hard cumulative cap; no further approval round.
+
+
+### 41. 3Б — результаты первого live comparison, 2026-10-11
+
+Отправлены synthetic demo facts и три истории в Qwen3.8-Flash и DeepSeek-Flash;
+пользователь отдельно разрешил передачу этих данных. По каждой модели выполнены
+12 ячеек A/B/C/D и их один повтор:24 attempts/model из разрешённых30. Итого48
+ответов получено, timeout/HTTP/provider failures0, automatic retries0. Реальные
+API usage: Qwen945,174 input +3,435 output tokens; DeepSeek1,142,752 input +3,844
+output tokens. Raw ответы и полный локальный summary находятся вне репозитория.
+Вход содержал только frozen demo facts/synthetic dialogue, без patient logs/PII.
+
+A/B — единственное различие для follow-up case: в A assistant_text последнего
+показанного ответа пуст; B получает фактический ответ с приглашением рассказать
+про Implantium/Impro/Nobel. C — свободная проза с полной историей; D — компактный
+native protocol с той же полной историей. Температура0, output4096, retries0.
+B/C/D меняют interface instructions пакетом; разница B/C не изолирует одну только
+JSON-форму.
+
+- «Расскажите»: Qwen A дважды не попал в вопрос (один раз ответил о КТ, один —
+  о клинике); DeepSeek A дважды вернулся к КТ. B обе модели рассказали про системы
+  имплантов в обоих прогонах. Это evidence в пользу передачи видимой реплики в
+  provider history именно для этого frozen диалога.
+- C: DeepSeek дал обзор в2/2; Qwen — полноценный обзор в1/2, в другом вместо него
+  попросил уточнить объём. Свободный текст сам по себе не устраняет нестабильность.
+- D: Qwen дважды вернулся к КТ. DeepSeek оба ответа не прошли domain validation:
+  выбрал незарегистрированные section refs, а один ответ был ещё и без текста.
+  JSON object и принятие части D результатов parser-ом не гарантируют правильную
+  тему: семантика и каталожные значения всё ещё расходятся.
+- Прямой Osstem: DeepSeek prose A/B/C правильно сообщает об отсутствии Osstem;
+  D содержит тот же смысл, но дважды использует незарегистрированный topic ID.
+  Qwen стабильность не показал: C/D ответили верно, A пустой, B один из двух
+  завершён, другой запросил ненужное уточнение.
+- Двойной вопрос «корейские импланты + адрес»: обе модели во всех вариантах
+  распознали Implantium; A/B/D выбрали отдельное поле contact_address. В C обе
+  модели не назвали конкретный адрес. Поле D проверено только структурно,
+  кодом оно не исполнялось.
+
+Из18 structured outputs у Qwen typed/domain parser принял14; у DeepSeek12.
+Отказы: неполный explanation или несовместимые target/section IDs. Это реальные
+response validation failures, а не transport failures. Частый target tomography
+в D Qwen проходил структуру и был семантически неверен.
+
+Вывод ограничен3 synthetic cases и2 samples/cell. Он не оценивает частоту ошибок
+во всём боте, не аттестует текущую runtime архитектуру и не разрешает подключать
+D к виджету. Данные напрямую показывают конкретный дефект A: текущая projection
+иногда отдаёт модели пустой assistant turn, хотя пользователь видел приглашение.
+До новой архитектурной задачи нужно separately decide/implement the agreed
+history projection change; не обобщать этот screening на все dialogue types.
+Остаток hard cap —6 attempts/provider; дополнительный screening не обязателен.
+
+## 42. Свободный разговор и общая история — owner GO 2026-10-11
+
+Классификация: **архитектурное упрощение**, реализация начинается после проверки опубликованного checkpoint данных/документов в Cursor и виджете и подтверждения владельца (последующее решение об остановках). Основание: прямое поручение владельца «Давай зафиксируем всё это… И начинаем вот это всё делать» после подробного 12-пунктного плана. Канонический порядок — актуальный верх Roadmap. Сохраняется единственная таблица ответственности Target Contract §3.
+
+До → после → удаляемая зависимость:
+- Обычный вопрос требует информационных kinds/ID и может попадать в кодовый шаблон → связное объяснение по MD → удалить обязательность информационных commands и их старые достижимые ветки, без нового-to-old adapter.
+- Следующий вызов видит только выбранные категории текста и теряет показанное предложение продолжить → читает достоверный завершённый разговор из существующего receipt → удалить перечни специальных разрешённых происхождений ответа. Новая memory/summarizer/model call не создаётся.
+- Врачи дублируются в MD/JSON и шаблонах → один фактический источник MD для обычного разговора → удалить старых потребителей и каталог вместе, а не скрыть их prompt-инструкцией.
+
+Реализация идёт проверяемыми последовательными checkpoint. Первый точный runtime allowlist и конкретное изменение формы фиксируются здесь до редактирования после Astra-разбора потребителей. Это не повод повторно спрашивать согласие на уже утверждённые обязанности; новый неутверждённый механизм отдельно обсуждается. Прежние native scalar refs/server identity из экспериментального §39 не внедряются автоматически ради упрощения, если не нужны актуальному результату.
+
+Поведение: свободные продолжения и смена темы; исходная задача сохраняется при проверенном уточнении; видимые ответы/предложения и выбранные карточки доступны следующему ходу; прошлые суммы не являются источником новой цены. История использует существующий store, TTL, проверки принадлежности receipt и privacy. Ранее согласованный design whole последних 3 пар без произвольного посимвольного обрезания не заменяется новым лимитом молча. Lead-контакты и служебные данные не уходят провайдеру.
+
+Приёмка первого этапа включает обычный текст, кодовый ответ, отказ по наличию, уточнение, смешанный ответ и последующий ход; price card/selected tab контекст, source UI, lead/privacy и replay. Проверки направлены на классы запросов, не на особый список реплик. Форматные и adverse-output проверки обязательны; точные цены и проверенные кнопки остаются кодовыми.
+
+### Checkpoint подготовки данных и документации
+
+Root/top: C:/Cursor Projects/artgents-bot-active. Branch: codex/model-price-experiment. Baseline HEAD340fd771e38d9bb80ececb01bac99e8c326972e1; fetched origin/main и merge-base efa3f773bcf10891e2997addf8bbec38c7ae1317. Разрешён commit/push текущего подготовленного этапа. Runtime до него не меняется.
+
+Allowlist: изменённые существующие clients/demo/md/*.md и новый clinic__info__policies.md; doctor_catalog.json; target_response/service_catalog.json, d2_direction_prices.json, pricebook/facts.json и существующие pricebook/services/*.json; tests/test_demo_target_service_catalog.py, test_demo_target_price_offers.py, test_demo_doctor_catalog.py; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md, DEMO_D2_INTERFACE_TASK.md, DEMO_D2_TARGET_CONTRACT.md, DEMO_D2_OWNER_DECISIONS.md, DEMO_D2_DEMO_BASE_REVIEW.md, DEMO_D2_RULES_INVENTORY_AUDIT.md. Включение исторического аудита — документация, не runtime-изменение. Содержимое разрешённых ранних DOC WIP сохраняется как история.
+
+Исключённый WIP: prototypes/, scripts/d2_context_candidate_protocol.py, scripts/experiment_d2_interface_comparison.py, tests/test_d2_interface_comparison_offline.py. Не удалять и не переносить в другую ветку. Ключи, логи, локальные БД и сырые разговоры не публиковать.
+
+### 42.1. Проект первого runtime checkpoint — достоверная история
+
+Подготовка опубликована: `f9b2b84` в origin/codex/model-price-experiment. Root/top/branch прежние; origin/main/merge-base efa3f77. Staging пуст. Исключённый прежний WIP: prototypes/ и три экспериментальных файла из §42. Часть MD может отображаться Git как stat/line-ending dirty без содержательного diff; не включать это в runtime-изменение.
+
+Astra consultation: сначала заменить выборочную history projection, затем отдельно удалять информационные kinds и их потребителей. Это последовательные части одного согласованного этапа, не объявление всего диалога готовым после первой.
+
+**Точный allowlist:** core/d2_completion_context.py, core/d2_dialogue.py, core/d2_lead_bridge.py, core/d2_live_provider.py, core/response_text_renderer.py; contracts/response_plan.py, contracts/d2_session_context.py; tests/test_d2_sim3_completion_context.py, tests/test_d2_completed_source_context.py, tests/test_d2_lead_interrupt_http.py, tests/test_d2_live_provider_offline.py, tests/test_d2_session_context.py; docs/tasks/DEMO_D2_INTERFACE_TASK.md, DEMO_D2_DELIVERY_ROADMAP.md, DEMO_D2_TARGET_CONTRACT.md.
+
+До: _project_pair собирает model_prose и отдельные виды exact, обрезает до1000символов; receipt capture обрезает вопрос; provider просит восстанавливать ответ по source ID. После: безопасная текстовая проекция упорядоченного опубликованного результата того же completion, целые последние3пары, без реконструкции по текущему каталогу. Единственный владелец — существующий completion/store/projection. Удаляются whitelist происхождений, обе1000slices/настройка cap, инструкция реконструкции.
+
+Защита lead: ранее согласованный §39.9 server result kind=lead, без нового model kind/state/field. Назначает существующий producer служебного запроса/ack. Public booking-blocked policy и public gap остаются обычными частями. Mixed merge сохраняет provenance каждой части; renderer заменяет эвристику хвостового reference/clarification на явный lead. В историю не попадают intake-текст и contactslots; siblings сохраняются. Existing receipt ownership/revision, TTL, выбранные UI и структурные ссылки не меняются. Phone/email masking сохраняется.
+
+Новая цена всегда читается из прайса. Цифры ранее показанной карточки в истории — только содержимое прошлого ответа, не authority новой цены. Контекст3пар — countbound, не обещание любого tokenbudget. Новые livecalls/overflowfallback не добавляются. Provider settings/model/outputbudget не меняются этим checkpoint.
+
+Тесты: сравнение реально опубликованного ответа и следующего provider input JSON/SSE; code invitation, policy/fact/gap, price/detail/tab, mixedlead+price/contact, pureintakeexcluded/publicbookingdenialretained, длинная реплика, privacy, replay, TTL. Затем независимый Checker и commit/push. Тесты данных уже приняты, повторять их без причины не требуется.
+
+### 42.2. STOP после каждого этапа — последнее решение владельца
+
+Классификация текущего изменения: только документация. Данные опубликованы commit `f9b2b846e48ab7f6e435174e33eb40bc1c8575e8`; runtime §42.1 ещё не реализован. После каждого этапа и промежуточного checkpoint обязательны отдельные Cursor review и проверка владельцем в виджете. До результатов обеих проверок и подтверждения владельца следующий шаг не начинать. Подготовленный allowlist §42.1 не является подтверждением прохождения этой остановки.
+
+Текущий allowlist документации: DEMO_D2_DELIVERY_ROADMAP.md, DEMO_D2_INTERFACE_TASK.md, DEMO_D2_TARGET_CONTRACT.md. Корень, ветка, origin/main и merge-base прежние; baseline этого doc-delta — f9b2b84. Прежний исключённый WIP сохранён. Новых provider/browser/SMTP вызовов нет.
+
+Дополнительный offline baseline перед будущим изменением истории: test_d2_sim3_completion_context.py, test_d2_completed_source_context.py, test_d2_lead_interrupt_http.py, test_d2_live_provider_offline.py, test_d2_session_context.py — 147 PASS / 3 FAIL. Все три FAIL в test_d2_live_provider_offline.py: ожидание v19 вместо текущего v44, старой инструкции content_ref и секции D2_DIRECTION_PRICE. Это результат до runtime-изменений, не приёмка этапа истории; отдельного сравнения этих трёх с чистым старым HEAD не делали. Он не заменяет 40 целевых PASS данных и не скрывается в отчёте об успешной подготовке базы.
+
+### 42.3. Принятие подготовки и начало истории — 2026-10-11
+
+Owner подтвердил Cursor PASS и виджет (кроме известного старого doctor route) и разрешил работать. Последний порядок отменяет STOP после каждой малой части: связанные шаги можно объединять, на значимой границе Cursor/widget review, затем commit/push. Архитектурные отклонения отдельно согласовать. §42.2 сохраняется как история.
+
+Начинается архитектурное упрощение истории §42.1, exact allowlist там не расширяется. Baseline a0042624486fb19acb05b37d9ba4f456584e05f6; root/top C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment; origin/main/merge-base efa3f773bcf10891e2997addf8bbec38c7ae1317. Staging пуст. Прежний untracked WIP и stat-only MD сохранены. Содержательных предшествующих правок нет. До → после → удалённая зависимость и владелец описаны в §42.1. Provider calls этого изменения: 0.
+
+Уточнение отчёта данных: 33 теста — три изменённых файла; 40 — те же три плюс неизменённый test_d2_tenant_snapshot.py. Allowlist редактирования не равен списку запуска тестов. Замечание Cursor о применимости скидки к bone_graft сохраняется для этапов 3–4; здесь данные не меняются.
+
+### 42.4. Отчёт реализации истории — рабочее дерево, ещё без commit/push
+
+Классификация: архитектурное упрощение истории, не завершение всего свободного диалога. Единственный владелец истории — существующий completion/store и его read projection. Реальный путь: /ask и /ask/stream → run_d2_ask_json → run_d2_dialogue_turn → commit receipt ref → project_completed_dialogue → render_response_text по frozen plan → D2ProviderInput.context.
+
+Удалено: ручной whitelist частей для assistant_text, дедупликация/сборка второго текста истории, обе обрезки до 1000 символов, настройка history_text_max_chars, prompt-восстановление пропущенного ответа по текущему каталогу, эвристика хвостового clinic reference/clarification в renderer. Последние три целые пары, TTL, receipt ownership/revision, выбранные UI/offer refs остаются.
+
+Добавлено: ранее согласованный server result kind=lead у существующего producer приёма контактов; модель его не выдаёт. Public booking denial остаётся reference, public gap — clarification, mixed merge сохраняет producer kind/source_results. Renderer показывает intake последним; история использует тот же renderer без intake. Pure intake не добавляет ordinary receipt. Новых model fields, состояний, вызовов, fallback, parallel memory и правил по фразам нет.
+
+Privacy: прежние маски применяются к model_prose, patient_text и terminal_text во временной read projection. Публичные frozen exact/contact/card данные не маскируются как личные контакты: иначе существующий phone regex превращает дату31.12.2026 в телефон. Сам regex не менялся. Служебные lead parts исключаются структурно. Сохранённая цена описывает прошлое; новый price materializer использует текущие tenant data.
+
+Изменение поведения: следующий ход видит показанный отказ по бренду/услуге, политику, факт, цену, состав и коммерческие вставки; длинные вопросы и ответы не теряют конец. Это передача контекста, не гарантия правильного решения живой модели. DoctorsOperation и другие информационные команды пока остаются; пример об Орлове не объявлен исправленным.
+
+Дополнительные проверки к §42.1: публичная дата и контакт сохраняются; модельный phone/email маскируется; mixed price/contact+booking, pure intake, публичный запрет/неясность записи; исторический таб без provider-call; неверная сумма в модельной прозе истории не подменяет новый кодовый прайс. Попытка менять весь tenant pack внутри существующей сессии блокируется прежним fingerprint guard; этот guard не ослаблен ради теста.
+
+Проверка этапа остановлена перед следующим архитектурным шагом для Cursor и виджета. Commit/push до этих проверок не делаются по последнему указанию владельца. Foreign WIP прежний; временный .tmp-history-tests.txt — только локальный вывод тестов, будет удалён, не публикация.
+
+Расширение test-only allowlist: tests/test_d2_code_answer_fixes.py, одна assertion в параметризованном тесте effective_policy_is_in_next_provider_context (6 случаев). Старое требование пустого assistant_text заменено точным совпадением с опубликованным ответом; policy IDs, запрет CTA и соседние проверки не ослаблены. Это тот же утверждённый контракт истории, без расширения runtime.
+
+Результаты offline: основной расширенный прогон семи файлов (пять из §42.1 плюс test_d2_compound_answers.py и test_d2_code_answer_fixes.py) — 191 PASS/9 FAIL. Шесть FAIL требовали прежнюю пустую историю политики; после замены на точное совпадение опубликованного ответа focused recheck — 6 PASS. Четыре дополнительно добавленных случая (JSON/SSE неверная сумма в истории и исторический таб) — 4 PASS отдельными прогонами. Таким образом, остаются только три заранее наблюдавшихся FAIL старых prompt expectations в test_d2_live_provider_offline.py; их assertions не менялись. Полный набор повторно после test-only замены не запускался. Независимый Checker отдельно выполнил 11 PASS (10 новых lead cases и history prompt). git diff --check PASS. Live/provider/browser/SMTP: 0. Staging пуст, baseline/HEAD a004262, commit/push/PR не делались; исключённый WIP сохранён.
+
+Для Cursor: read-only проверить весь рабочий diff относительно a004262, точный allowlist §42.1 + test-only расширение выше; прочитать тесты прежде runtime. Проследить реальный путь JSON/SSE → receipt → projection → renderer → provider context, удаление обеих обрезок, whitelist и реконструкции; сохранить TTL/tenant/privacy, целые 3 пары, выбранный tab, публичные отказы и mixed lead siblings. Проверить, что server kind=lead не добавлен в модельный контракт. Не аттестовать свободный диалог и удаление DoctorsOperation. Не изменять код/Git, не делать live/provider вызовов, не читать .env и сырые разговоры. Прежние untracked вне scope. Выдать PASS/REJECT с конкретными доказательствами и ограничениями.
+
+## 43. Обычный текст без информационных команд — owner GO 2026-10-11
+
+История опубликована в5f47ee6 по прямому поручению владельца; разрешён следующий этап. Root/top C:/Cursor Projects/artgents-bot-active, branch codex/model-price-experiment, baseline5f47ee6, origin/main/merge-base efa3f773bcf10891e2997addf8bbec38c7ae1317. Staging пуст; foreign WIP прежний. Astra consulted, архитектурных вопросов владельцу нет.
+
+Классификация: архитектурное упрощение. До: информационные doctors/clinic_policy/commercial_fact команды и перехват обычного текста по бренду/услуге, отказ публикации из-за неверного optional target. После: existing content_text — единый обычный ответ по FullContext; optional метаданные предоставляют только проверенные UI/context/marketing права. Единственный владелец смысла — существующий один вызов модели. Удаляется весь достижимый путь трёх команд и ordinary authored interception, без адаптера старого формата. Цена/detail сохраняют проверки бренда/услуги, code prices; medical/lead/privacy/tenant и известные задачи кнопок сохранены. Естественный уточняющий вопрос допустим обычным текстом; существующая typed service-choice задача остаётся для проверенных кнопок. Парсер отсутствующего текста и новый формат envelope не входят в этот шаг.
+
+Exact runtime allowlist: contracts/d2_dialogue_result.py; core/d2_dialogue.py; core/one_call_prompt_contract.py; core/d2_live_provider.py; core/response_plan_materialization.py; core/d2_snapshot_sources.py; core/d2_tenant_snapshot.py; core/d2_directory.py; contracts/response_plan.py; core/response_text_renderer.py; core/d2_completion_context.py.
+Test allowlist: tests/test_d2_operation_unification.py, test_d2_sim2_contract.py, test_d2_sim2_dialogues.py, test_d2_live_provider_offline.py, test_d2_r3_free_dialogue.py, test_d2_code_answer_fixes.py, test_d2_policy_route_fixes.py, test_d2_commercial_route_fixes.py, test_d2_commercial_scope.py, test_d2_completed_source_context.py, test_d2_sim3_completion_context.py, test_d2_availability_scenarios.py, test_d2_content_reference_gaps.py, test_d2_document_click_task_http.py, test_d2_demo_snapshot.py; новый tests/test_d2_ordinary_prose_http.py для совместной приёмки. Документы: этот файл, DEMO_D2_DELIVERY_ROADMAP.md, DEMO_D2_TARGET_CONTRACT.md.
+
+Ограничения: doctor_catalog.json имеет non-D2 consumers; здесь убирается активный D2 dependency, физическое удаление позже без MD→legacy adapter. YAML action rules пока защищают цену/запись; единый источник политики ещё не объявляется готовым. Автовставки акций сохраняются, единый маркетинговый источник/применимость и взаимодействие свободного прямого ответа с автопромо — этапы3–4, без нового классификатора прозы. Provider calls0.
+
+Test-only расширение §43: tests/test_d2_directory_scenarios.py и tests/test_d2_offtopic_overview_scenarios.py — убрать импорт удалённого D2 directory/classifier и заменить проверку классификатора проверкой обычной content-операции. Остальные старые envelope-сценарии этих файлов не объявляются мигрированными.
+
+
+### 43.1 Реализация и проверка checkpoint
+
+Удалено: три model-operation типа doctors/clinic_policy/commercial_fact, их обработчики и коммерческий scope carry; весь D2 directory module и его CTA; doctor_catalog.json из D2 snapshot; перехват обычной прозы по unavailable service/brand; отказ публикации обычной прозы по неверному optional target; старые команды из обоих участков собранного промпта. Нет новых runtime полей, состояний, обработчиков, адаптеров, памяти, retry или вызовов. Sole semantic owner — существующий model call. Опциональный source/target по-прежнему проверяется для UI/контекста/автопромо, а не переписывает смысл ответа. Кодовый price/detail путь, медицинский handoff, контакты и lead/privacy остаются.
+
+Поведение: «Расскажите об Орлове» публикует модельное объяснение по MD вместо списка врачей услуги. «Есть Osstem/брекеты/ОМС/рассрочка?» — обычная проза, не заполнение отдельной команды. Естественный уточняющий вопрос допускается content_text; сохранённые задачи проверенных кнопок не переопределяются. Цены отсутствующего бренда по-прежнему не публикуются. Автоматическая акция остаётся один раз за беседу, прямой текстовый вопрос может повторить её. Полное устройство маркетинга/обязательность акции в карточке — дальнейшие этапы, не результат §43.
+
+Offline evidence:
+- ordinary prose + operation unification + sim2 contract: 109 PASS/2 FAIL; оба FAIL — цифровая дата в новой model-prose fixture маскировалась существующей privacy-функцией в истории. В fixture дата написана словами; privacy-код не менялся. Ограничение цифровых дат в модельной истории остаётся и не скрывается заявлением о полной точности истории.
+- policy routes + document-click + operation unification: 57 PASS/5 FAIL. Три обновлённых assertion относились к удалённой policy operation/обычному уточнению; повторно проверены в следующем наборе. Два legacy authored-source FAIL воспроизведены на baseline.
+- итоговый набор ordinary_prose_http, policy_route_fixes, code_answer_fixes, live_provider_offline, demo_snapshot: **96 PASS/7 FAIL**. Все семь FAIL в demo_snapshot воспроизведены на чистом `git archive 5f47ee6`: три старых ожидания пары extraction offers, одно прежнего short price, одно authored-текста и два порядка price/section. Вместе с двумя legacy authored-source — baseline **9 FAIL/23 deselected**, без копирования .env, с offline-placeholder key и fake provider.
+- дополнительные HTTP JSON/SSE случаи: неизвестный/отсутствующий бренд после обычной прозы не создаёт цену; auto promo один раз, прямой повтор разрешён — **6 PASS**.
+
+Это targeted offline evidence, не проверка качества живых Qwen/DeepSeek и не полный CI. Остальные исторические тесты старого envelope/удалённых информационных команд не объявляются мигрированными или зелёными. Перед merge требуется общий CI и разбор его результатов. В ходе тестов были logging warnings о ротации общего локального app.jsonl; логика ответа проверялась fake-provider в изолированных БД, сеть запрещена fixture.
+
+Git: branch codex/model-price-experiment; HEAD/baseline 5f47ee6, предыдущий этап уже pushed. Этот checkpoint не staged/committed/pushed; merge/PR нет. Live/provider/browser/SMTP текущего этапа: **0**. Foreign WIP и line-ending-only MD сохранены. Doctor JSON физически остаётся из-за non-D2 consumer; YAML action rules остаются для цены/записи. Новую архитектуру целиком и roadmap 2–4 завершёнными не объявляем.
+
+### 43.2 Проверка Cursor и виджета
+
+Cursor: read-only проверить рабочий diff против 5f47ee6, AGENTS.md, WORKFLOW_CHECKER.md, текущий верх Roadmap и Target §3, allowlist §43 + test-only расширение. Прочитать changed tests до кода. Проследить /ask и /ask/stream → model schema/prompt → ordinary content → materializer → published receipt/history. Проверить физическое удаление трёх информационных команд, отсутствие обходного адаптера/классификатора/новых состояний или вызовов; ordinary source/target не должен заменять прозу кодовым ответом. Обязательно проверить price/detail brand/service protections, child/payment booking guards, проверенные document buttons и replay, tenant/privacy. Новые проверки: tests/test_d2_ordinary_prose_http.py; связанные guard tests — policy_route_fixes/code_answer_fixes; schema — operation_unification/sim2_contract; полный источник и инструкции — live_provider_offline. Отличать старые воспроизведённые FAIL от регрессий. Не менять файлы/Git, не читать .env/raw conversations, не делать live calls. Выдать PASS/REJECT с конкретными причинами и пределами evidence; не аттестовать весь бот.
+
+После Cursor — перезапустить локальный сервер существующим scripts/start_local_widget.ps1, открыть новую беседу (старые receipts специально не мигрируются). Проверить: КТ → «Есть Osstem?» → «Расскажите»; All-on-4 цена → «А кто делает?» → «Расскажите об Орлове»; «Детей принимаете?» и «Работаете по ОМС?»; «Есть рассрочка?»; страх боли → follow-up ссылка; услуга с акцией → продолжение без повторной автопромо → прямой вопрос об акции. Отдельно цена Osstem и запись ребёнка не должны создавать неподходящие карточки/заявку. Любой сбой расследуется по реальному request_id, без добавления сценария под фразу. До этой приёмки следующий маркетинговый этап не начинается.
+
+Независимый Checker §43: 43 ordinary HTTP + 6 source-follow-up/tenant проверок = **49 PASS**. Проверка runtime не обнаружила достижимого прежнего информационного handler/adapter; прежние direct_fact/promotion аргументы shared materializer не задаются единственным D2 caller и не являются параллельным информационным путём. Итоговый verdict Checker — **PASS, только checkpoint §43** после сверки документов. Блокирующих замечаний нет; повторный live/CI прогон не выполнялся.
+
+### 43.3 Приёмка владельцем
+
+Cursor PASS получен: 186 PASS/10 legacy FAIL (8 старых directory/offtopic envelope и 2 ранее воспроизведённых authored-source), весь бот этим не аттестуется. После перезапуска текущего локального сервера владелец проверил виджет и подтвердил: «Все ок. Давай дальше». Checkpoint §43 принят для commit/push; разрешено продолжение актуальной дорожной карты. Исполнитель новых provider-вызовов не делал; ручные диалоги владельца не считаются проведённым автоматическим сравнением моделей.
+
+## 44. Этап 2: единый источник врачей и политики
+
+Preflight: root/top C:/Cursor Projects/artgents-bot-active, branch codex/model-price-experiment, HEAD/baseline/upstream0b9d26c, origin/main/merge-base efa3f77. Staging пуст; прежний foreign WIP неизменен. §43 опубликован после Cursor/виджета. Astra consult выполнен. Маркетинг3–4 не начинается, пока не разобран оставшийся этап2.
+
+44А — архитектурное упрощение источника врачей, уже разрешённое владельцем. До: D2 читает MD, но штатный pack validator требует параллельный doctor JSON, а legacy marketing ссылается на doctor IDs. После: профили только MD, валидатор проверяет KB-ссылки без doctor index; старые doctor refs удалены. Единственный источник врачебных фактов — MD. Удалить Demo JSON и его обязанность в валидаторе, без MD→catalog adapter. Старый target_runtime_client_context и его инструменты не являются поддерживаемым normal-dialogue runtime; их невозможность загрузить Demo после удаления JSON не обходится fallback. Другие tenant JSON не удаляются.
+
+Exact allowlist44А: clients/demo/doctor_catalog.json; clients/demo/target_response/marketing.yaml; scripts/validate_client_pack.py; tests/test_validate_client_pack.py; tests/test_d2_ordinary_prose_http.py; docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md. MD-профили сохраняются без изменения. Нет новых runtime fields/states/model calls.
+
+Baseline перед правкой: tests/test_validate_client_pack.py —3PASS/2FAIL, оба FAIL из-за md/clinic__info__contacts.md:duplicate_contact_facts_forbidden. Это существующий отдельный долг, проверки не ослаблять.
+
+44Б — пока предложение, не runtime GO: единственный policy MD с отдельными разделами и явное новое поле text_ref в существующих YAML-правилах вместо answer/approved_text. Существующие машинные правила цены/записи сохраняются, код берёт утверждённый текст из указанного раздела captured MD. Неверная ссылка — ошибка базы, без YAML fallback/поиска по словам/скрытой таблицы. Контакты, spam/offtopic, medical handoff вне этой замены. Новая связь требует отдельного решения владельца по AGENTS.md; зависимая реализация остановлена. Удаление physician JSON от этого решения не зависит.
+
+44А allowlist дополнен core/target_client_data.py: тест HTTP выявил обязательное чтение doctor JSON на реальном startup_check→load_target_client_data→_validate_external_refs, до входа в D2. Удаляется этот read/index, общая проверка KB-ссылок сохраняется. Первые два HTTP setup ERROR отражали найденную зависимость и требуют успешного повторного прогона; это не baseline.
+
+
+44А targeted recheck: **8 PASS/2 baseline FAIL**, setup ERROR устранены удалением реальной startup-зависимости. Старые assertions не ослаблены. Новые проверки: шесть MD-профилей без JSON, нормальный HTTP JSON/SSE и полный корпус, отклонение отсутствующих doctor/KB refs без doctor index. Startup зависит от MD/KB, не от скрытого адаптера. Изменения 44А ещё не staged/committed/pushed; код политики 44Б не тронут; provider/live calls — 0. Маркетинг ещё не начат. Локальный сервер, остановившийся при обнаруженной startup-ошибке, повторно запущен после исправления через штатный launcher.
+
+Независимый Checker 44А выполнил **5 PASS**: три проверки MD/reference в валидаторе и два HTTP startup/fullcontext случая JSON/SSE. Достижимый путь startup_check → load_target_client_data → KB-only index проверен. Неверные doctor/KB refs по-прежнему отклоняются; содержательных изменений MD нет. Итоговый verdict Checker — PASS только 44А после сверки документов; блокирующих замечаний нет. Следующую внешнюю проверку Cursor можно объединить с политикой после решения владельца; этот результат не разрешает добавление text_ref без согласования.
+
+### 44Б — owner GO для text_ref
+
+Владелец подтвердил явную ссылку text_ref в существующих правилах. До: MD/YAML содержат копии текста, lead отдельно читает YAML answer. После: единственный текст в MD, правила указывают точный раздел, все потребители читают его; YAML answer/approved_text и отдельный lead reader удалены. Единственный источник текста — MD; запретом действия владеет прежний resolver. Не добавляются модельные команды, состояния, fallback или поиск по словам.
+
+Preflight root/top/branch/HEAD прежние: C:/Cursor Projects/artgents-bot-active, codex/model-price-experiment,0b9d26c; origin/main/merge-base efa3f77. WIP44А и чужие файлы сохранены. Exact дополнительный allowlist: clients/demo/clinic_policies.yaml; clients/demo/md/clinic__info__policies.md; clients/nikadent/clinic_policies.yaml; clients/nikadent/md/clinic__info__policies.md (новый, дословный перенос существующего правила для общего reader); core/clinic_policies_loader.py; core/d2_snapshot_sources.py; core/d2_tenant_snapshot.py; core/d2_lead_bridge.py; scripts/validate_client_pack.py; tests/test_d2_policy_route_fixes.py; tests/test_clinic_policies_loader.py; tests/test_validate_client_pack.py; tests/test_d2_live_provider_offline.py; tests/test_d2_policy_text_refs.py (новый); три текущих документа Interface/Roadmap/Target. Поля/данные контактов и медицинского handoff не меняются. Неверная ссылка — ошибка данных, без старого текстового fallback.
+
+
+### 44Б. Реализация и границы проверки
+
+Классификация — архитектурное упрощение источников, без изменения владельца смыслового решения. Удалены YAML answer/approved_text/legacy keyword note в Demo, отдельный lead _authored_policy_answer, повторный текст из provider policy catalog. Полный текст читается из captured MD через точный text_ref. Старые keyword alternative rows больше не являются источником Demo; их сведения о базальных/мини-имплантах остаются в MD. Legacy helper без Demo-строк больше не выдаёт эти заготовки; normal D2 их не вызывает. Старые тесты этого поведения заменены явными проверками отсутствия параллельных строк, остальные assertions сохранены.
+
+Добавлен один согласованный text_ref и его проверка: корректный файл/единственный непустой H3; нет inline fallback и перехода к другому tenant. Никadent: дословно перенесено одно существующее правило, нового поведения нет. Служебные output dataclasses по-прежнему содержат разрешённый текст (answer/approved_text); это результат чтения, не второй редактируемый источник.
+
+Предварительный targeted результат: 67 PASS, 2 старых FAIL контактов в validate_client_pack. Дополнительные негативные HTTP проверки сначала имели ошибку тестовой привязки session_client_scope; поправлена только fixture-подобная обвязка, assertions не ослаблены. Итоговый набор в работе. Live/provider/SMTP вызовов — 0. Новых model states/команд/вызовов/слоёв памяти нет. Свободное понимание живой моделью и маркетинг этим этапом не аттестуются.
+
+
+### 44В. Итоговый checkpoint и внешняя проверка
+
+Основной targeted набор из пяти файлов (policy_text_refs, policy_route_fixes, clinic_policies_loader, validate_client_pack, ordinary_prose_http): **119 PASS / 2 baseline FAIL**. Только прежние test_demo_pack_passes_validator и test_validator_cli_demo_exit_zero: duplicate_contact_facts_forbidden в clinic__info__contacts.md. До изменения44А эти же два теста падали по той же причине. Вне этого набора исторические тесты старых informational kinds/doctor JSON не объявляются мигрированными; общий CI нужен перед merge.
+
+Дополнительные четыре HTTP JSON/SSE теста меняют только MD-текст отсутствующего бренда/услуги и требуют его точного показа без ценового offer. Первое ожидание для braces не учитывало прежний суффикс названия разрешённой альтернативы; тест скорректирован на точный полный ответ с этим суффиксом, runtime не менялся. Никadent перенесён дословно; сведения Demo о диагностике, оплате и применимости бренда сохранены отдельным общим разделом.
+
+Изменённые paths — объединение точных allowlist44А/Б выше (core/target_client_data.py включён пояснением44А). tests/test_d2_live_provider_offline.py фактически не менялся. Риски: модель по-прежнему может ошибиться в обычном ответе; этот checkpoint убирает дубли источников, не обещает безошибочную модель. Битая ссылка — диагностируемая ошибка базы до model call, а не разрешение цены/записи. Отдельные template/contact/medical тексты не переносились. Marketing/card-поведение не менялось.
+
+Git: codex/model-price-experiment, HEAD/baseline/pushed0b9d26c; текущие44А/Б не staged/committed/pushed, PR/merge/deploy нет. Foreign WIP: prototypes/, scripts/d2_context_candidate_protocol.py, scripts/experiment_d2_interface_comparison.py, tests/test_d2_interface_comparison_offline.py;14 прежних MD line-ending-only сохранены. Provider/live/SMTP вызовы исполнителя и Checker:0. Static виджет вернул HTTP200; это доступность страницы, не живой функциональный прогон.
+
+**Промпт Cursor:** проведи read-only проверку объединённого рабочего diff44А/Б против0b9d26c в codex/model-price-experiment. Прочти AGENTS.md, WORKFLOW_CHECKER.md, актуальный Roadmap, Interface§44 и единственную таблицу Target§3. Exact allowlist44А/Б указан выше, включая пояснение startup consumer. Сначала changed tests, затем trace startup→/ask и /ask/stream→capturedMD/modelview→policy/brand/service price guards→lead→receipt/history. Убедись, что Demo doctorJSON/index и двеdoctor refs удалены, шестьMD доступны, KB validation сохранена. У политики единственный полный текст MD; YAMLtext_ref явно согласован владельцем. Нет inline answer/approved_text fallback, скрытой карты, нового классификатора/команды/modelcall/memory. Неверныеrefs и tenantescape отвергаются. Обычную прозу не подменяет код; цены/booking child/ОМС/ДМС сохраняют прежнюю защиту, Osstem/braces не создают offer. Проверь что nikadent-текст дословно перенесён. Запусти пропорциональные offline tests выше, отдели известные2contactFAIL. Не ослабляй tests, не читай .env/rawconversations, не делайprovidercalls/commit/push. Дай PASS/REJECT с конкретными расхождениями, сохрани границы evidence: свободный диалог и маркетинг целиком не аттестуются.
+
+**После Cursor — новая беседа в виджете:** ценаAll-on-4 → «А кто делает?» → «Расскажите об Орлове»; «Принимаете детей?» → «Запишите ребёнка»; «Работаете по ОМС?» → «Сколько стоит лечение по ОМС?»; «У вас есть Osstem?» → «Сколько он стоит?»; «Ставите брекеты?» → «Сколько стоят?»; обычная услуга → follow-up. Проверить разговорный текст, отсутствие неподходящей цены/записи и сохранение follow-up. Маркетинговые дубли и обязательные акции каждой карточки — следующий этап3–4, не объявлять закрытыми. Commit/push после принятия checkpoint.
+
+Независимый Checker: **PASS объединённого checkpoint44А/44Б**, блокирующих замечаний нет. Самостоятельно34PASS, дополнительные4price-ref tests прочитаны и4PASS подтверждены. Итог исполнителя **123PASS/2baselineFAIL**. Старые источники/lead-reader удалены, capturedMD и прежние price/booking guards проверены. Полный этап2, live/widget и маркетинг этим не аттестуются. git diff --check прошёл, staging пуст; HEAD/upstream0b9d26c. Следующая остановка — Cursor и виджет по44В выше.
+
+### 44Г. Приёмка владельцем
+
+Cursor PASS получен:123PASS/2прежних contactFAIL. Владелец подтвердил виджет: «Идем дальше, ответы в боте вроде нормально пока». Checkpoint44А/Б принят для commit/push и перехода к этапам3–4. Это не аттестация всех будущих карточек/маркетинга. Исполнитель provider calls не делал.
+
+
+## 45. Единственная применимость акций — owner GO
+
+Классификация: архитектурное упрощение. 44А/Б опубликован e744ab7 после Cursor/widget. Root/top C:/Cursor Projects/artgents-bot-active, branch codex/model-price-experiment, baseline e744ab78a6e2887033f21f76b3b20bbd5cc4321a, origin/main/merge-base efa3f77; staging пуст. Прежний foreign WIP и14 line-ending MD сохранены.
+
+Astra consult: удалить promo_facts/profile.promo_refs, использовать captured facts; не создавать новый-to-old adapter. Последнее решение владельца отменяет правило пересечения общих акций: ориентир — вкладки с одним выбранным предложением, акции принадлежат выбранному варианту. Старый обзор нескольких разных услуг пока остаётся навигацией без выбранного предложения; акции появятся после выбора, без union/intersection. Перестройка начального обзора под визуал — следующий UI checkpoint. Неповтор обычного текста не подавляет акции карточки. Тема получает только явное allowed_topics, не union услуг. Прямой вопрос остаётся свободной прозой. Цены/бренды/объём/кнопки/lead/privacy не меняются.
+
+До → после → удалённая зависимость: facts плюс ручные списки в d2_commercial → факты напрямую определяют активность и применимость → удалить обе promo-структуры и их промежуточные authority-копии. Sole owner применимости — существующий commercial resolver по captured bundle. Профили остаются для оформления/detail UI. Порядок фактов детерминированный по id; обычный текст сохраняет лимит2, карточка публикует все подходящие акции согласно owner решению. Существующий ledger остаётся, нового нет.
+
+Точный allowlist этого checkpoint: contracts/d2_tenant_snapshot.py; contracts/response_plan_materialization.py; core/d2_tenant_snapshot.py; core/d2_snapshot_sources.py; core/d2_commercial_plan.py; core/response_plan_materialization.py; clients/demo/target_response/d2_commercial.json; tests/test_d2_commercial_contract.py; tests/test_d2_commercial_plan.py; tests/test_d2_ordinary_prose_http.py; tests/test_d2_promo_authority.py (новый); docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md. Нет новых полей модели/состояний/вызовов. Следующий связанный проход — полные factual данные модели и MD-дедупликация с точным списком файлов; этот checkpoint сам по себе не объявляет все маркетинговые дубли удалёнными.
+
+Allowlist45 расширен только tests/test_d2_price_cards.py: старое ожидание отсутствия коммерческих секций у All-on-4 заменяется ожиданием согласованных акций из facts. Остальные exact/UI/tenant/receipt assertions сохраняются. Baseline основной тройки tests:67PASS.
+
+
+### 45.1 Реализация и проверка
+
+Удалены D2CommercialPromoFact/D2CommercialPromoAuthority, pack.promo_facts и profile.promo_refs вместе с чтением/валидацией старых списков. Старые поля теперь отклоняются закрытой схемой, а не преобразуются. Применимость вычисляет resolve_d2_commercial_plan прямо по captured bundle.facts: kind, active/date, allowed_service_ids/excluded_service_ids либо явный allowed_topics. offer.fact_refs не является вторым разрешающим списком D2-промо. Профиль не нужен для акции; его прежние packages/detail остаются.
+
+Дата проверяется существующим fact_active_as_of. Только карточка игнорирует прежний shown-ledger; обычный автоматический текст ограничен двумя акциями и неповтором. Прямой вопрос остаётся ordinary content_text, без нового recognizer. Выбор price_select сохраняет существующую проверку принадлежности/revision и обход modelcall. Нет автоматического пересчёта цены/скидки.
+
+Граница UI: этот checkpoint не меняет widget/prototypes. Точный service-card использует реально опубликованную услугу. Старый multi-service overview без выбранного предложения не добавляет общий рекламный хвост. Нет алгоритма пересечения/union акций; после выбора применяется правило конкретного варианта. Промо по бренду отдельно пока не моделируются текущими facts; настраивать новый brand/offer scope здесь не пытались. Для Demo существующие акции применимы к услуге целиком.
+
+Baseline67PASS. Первый post-change прогон66PASS/1FAIL: оставшаяся assertion удалённой authority-копии; заменена проверкой того же captured bundle. Новые7PASS/2ошибки тестовых данных (отсутствующий clients_root и обязательное excluded_scope_text) исправлены без runtime fallback. Recheck27PASS; ещё1PASS подтверждает третью акцию без offer-ref и без обрезания карточки. Итог карточных тестов и Checker ожидается. Изменённые старые тесты запрещают старые поля и сохраняют проверки текста/пакетов/tenant/incompatibility. Ранее ожидаемый неповтор карточки заменён требованием её повторного показа по решению владельца.
+
+Весь этап3–4 не завершён: перед удалением коммерческих условий из MD нужно передать полный текст/сроки/исключения из captured facts в существующую factual проекцию модели. Затем проверить все33предложения и реализовать визуал. Существующие2baselineFAIL контактов из§44 не исправлялись; в набор§45 они не входят. Provider/live/browser/SMTP:0. HEAD/pushed e744ab7; новые изменения пока не staged/committed/pushed, foreign WIP сохранён.
+
+
+### 45.2 Итог и следующая остановка
+
+Итог целевых прогонов с исправленными assertions/fixture: **138 PASS / 4 baseline FAIL** (18 commercial_contract + 4 commercial_plan + 45 ordinary_prose + 11 promo_authority + 60 price_cards). Четыре FAIL — обе consultation-параметризации двух тестов free_text_can_repeat_information_after_card_selection / historical_tab_returns_scope_after_other_turns_and_supports_text. Они отправляют удалённый ранее kind commercial_fact. Все четыре воспроизведены на чистом archive e744ab7 тем же Python: 4 FAIL / 60 deselected. Это не регрессия45; тесты не исправлялись и не пропускались. Общий CI не заявлен.
+
+Checker заметил остаточную зависимость fact-validation от наличия optional d2_commercial: проверка перенесена перед ранним return. Новый negative HTTP подтверждает ошибку до provider при missing config + invalid short text. Дополнительный тест подтверждает третью акцию без offer ref и без card cap. Независимый Checker выполнил 11 PASS; окончательный verdict ожидается после документов. git diff --check PASS, staging пуст. Static widget HTTP200; живые ответы/визуал не проверялись. Provider/live calls: 0. Foreign WIP прежний; commit/push45 ещё нет, HEAD/upstream e744ab7.
+
+**Cursor:** read-only проверить рабочий diff против e744ab7, AGENTS/WORKFLOW_CHECKER/Interface§45/актуальный Roadmap/Target§3. Changed tests перед кодом. Trace /ask + SSE → snapshot facts → materializer → commercial resolver → price-owned promo → receipt/ledger → verified tab/replay. Проверить удаление promo_facts/promo_refs/authority-копий без адаптера, отсутствие зависимости от profile/offer refs; даты, исключения, explicit allowed_topics, все акции выбранной карточки независимо от ledger, ordinary once/direct prose. Старый multi-service overview без выбранного предложения не выбирает метод ради акции; intersection/union нет. UI-дизайн, brand-specific promo, новая память и model calls не добавлялись. Exact allowlist§45 + price_cards test extension. Запустить пропорциональные offline-наборы, отделить четыре воспроизведённых baseline FAIL. Не редактировать, не делать Git/provider операции, не читать .env/raw conversations. Дать PASS/REJECT. Этот checkpoint не аттестует полный маркетинг или живую модель.
+
+**Виджет после Cursor:** новая беседа «Расскажите об All-on-4» → «Подробнее» → «Сколько стоит?» → переключить бренд → ещё раз цену. Акция после обычного текста один раз, в каждой ценовой карточке снова. Прямой вопрос «Какая акция?» — обычный текст. Отбеливание получает свою акцию, кариес не получает имплантационные. Контроль цены Osstem/брекетов и follow-up сохраняется. Точный текст живой модели не предписывается. Затем owner-приёмка и commit/push; следом полные facts модели, MD cleanup и UI по макету.
+
+Независимый Checker: **PASS только §45**, блокирующих замечаний нет. Самостоятельно11PASS; итог138PASS/4воспроизведённых baselineFAIL проверен. Удаление старых структур, реальные HTTP/tab/replay и исправление независимой валидации подтверждены. Полные facts для модели, MD-дедупликация и визуал остаются следующей работой. Документное замечание Roadmap о номере текущего этапа исправлено.
+
+
+### 45.3 Приёмка и уточнение карточек владельцем
+
+Владелец подтвердил виджет и Cursor: «В курсоре всё хорошо, идём дальше». После обсуждения структуры карточек разрешил зафиксировать решения и продолжить. §45 принят для commit/push. Новые UI-решения ниже — согласованная будущая работа, не часть реализованного promo checkpoint.
+
+Сложная карточка: «Что входит в стоимость» (работы/материалы), «Как оплачивается лечение» (этапы, скидка, рассрочка и их совместимость), «Гарантия и преимущества» (только применимые условия). Пустые разделы и прочерки не показывать. Простая карточка использует те же смыслы, но только имеющиеся разделы. Гарантия и вычет не являются оплаченным составом. Отдельный видимый блок акции ориентирован на выбранную вкладку; «Сравнить три варианта» не нужно.
+
+Тип факта и место показа различаются: скидка остаётся акцией, даже если расположена внутри оплаты. Настройки клиники определяют главную выделенную акцию и места остальных фактов, код исполняет их после проверки применимости/сроков. Новая применимость в настройках оформления не создаётся. Один факт не повторяется в карточке вторым рекламным блоком; необходимые условия совместимости остаются понятными. Если главная акция неприменима, её не показывать; автоматическую замену другой акцией без решения не придумывать. Прямой вопрос об акциях включает скидку независимо от её UI-раздела.
+
+Одна запись содержит заголовок, краткий текст и полные условия одной акции. Полные условия — основа; краткая версия не меняет смысл («до15%» не превращается в «15%»). Каждый отображаемый текстовый блок — цельная формулировка одного источника, не склейка предложений из разных файлов. В базовых строках не должно быть случайных переносов, разорванных слов и технических разделителей; осмысленную структуру разделов/списков задаёт renderer. После переноса источников обязательно пройти все Demo-формулировки: грамматика, полнота условий, краткая/полная версии, даты, исключения и внешний вид. Это не новая маршрутизация модели.
+
+
+## 46. Полные коммерческие факты в контексте и удаление MD-дублей
+
+Архитектурное упрощение источников: thin ID/label projection + повторённые условия в MD → полная существующая fact-проекция из captured bundle в ordinary и known-task контексте → удалить thin whitelist и числовые/условные MD-дубли. Единственный источник коммерческих условий — facts.json; MD хранит объяснения процесса и прежние якоря. Не создавать второй serializer, memory, model call, модельные команды или clock field. Astra consulted: known_task до изменения не получал факты, этот путь включён в тот же checkpoint. Передача дат не является доказательством живого понимания «сегодня»; кодовый показ акций проверяет срок как прежде.
+
+Preflight: root/top C:/Cursor Projects/artgents-bot-active, branch codex/model-price-experiment, HEAD/baseline/upstream fe1ec48, origin/main/merge-base efa3f77. §45 опубликован после Cursor/widget. Staging пуст, foreign WIP прежний.
+
+Exact allowlist: core/one_call_exact_commercial_catalog.py; core/one_call_commercial_fact_catalog.py; core/d2_live_provider.py; clients/demo/target_response/pricebook/facts.json; clients/demo/md/clinic__info__payment_terms.md; clients/demo/md/clinic__info__warranty.md; clients/demo/md/clinic__info__consultation.md; clients/demo/md/clinic__info__promo__implant_same_day_discount.md; clients/demo/md/clinic__info__promo__professional_whitening_discount.md; clients/demo/md/clinic__info__promo__free_implant_consult.md; tests/test_commercial_fact_catalog_snapshot.py; tests/test_d2_full_commercial_context.py (новый); docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md.
+
+Сохранить уникальные сведения о диагностике, процессе консультации/оплаты, вычете, договоре и обращении по гарантии; все MD frontmatter/CTA/H3/follow-up остаются. Публикационные формулировки фактов цельные, без переносов внутри строк. UI highlight/placement поля пока не реализуются: они требуют отдельного согласованного дизайна данных в рамках принятого поведения45.3.
+
+
+### 46.1 Результат реализации и проверка
+
+Удалены thin whitelist фактов и повторные условия в шести MD; один существующий serializer теперь сохраняет полные тексты, короткие формы, сроки, исключения, применимость и несовместимость. Одна и та же captured fact projection включена в ordinary и known-task prompt. Новых runtime-полей/состояний/вызовов/маршрутов нет. Модель по-прежнему владеет смыслом обычной прозы; код владеет точными карточками по §3 Target Contract. Наличие полного текста в prompt не доказывает точность живого ответа.
+
+Три полные формулировки facts дополнены прежними MD-условиями: ограничения налогового вычета, применимость скидки к подготовительной хирургии и базовая цена до скидки, отдельная оплата подготовки к отбеливанию. Цены/проценты/сроки/списки применимости не менялись. Frontmatter/CTA/H3/follow-up шести документов сохранены; уникальные объяснения процесса оставлены. Новая текстовая склейка не добавлена.
+
+Offline: targeted18PASS (snapshot9 + fullcontext3 + live-provider6); regression54PASS/8FAIL. Всего72PASS/8baselineFAIL. Шесть document-click отказов воспроизведены ДО edits (logs/stage46-baseline.txt:19PASS/6FAIL): четыре ожидают отсутствие впервые применимой автоакции, два legacy authored-source. Ещё два exact-commercial теста воспроизведены в чистом git archive fe1ec48 (logs/stage46-clean-baseline/baseline-result.txt): устаревшие offers32 вместо33 и promptversion13 вместо44. Они не исправлялись и не объявлены зелёными. Новые HTTP JSON/SSE проверки проверяют реальные ordinary→verified follow-up→replay, целые условия из изменённого fixture-source, один model call на ход. Не подтверждают живое понимание модели. Все публикационные строки Demo facts проверены на случайные переводы строк/табуляцию/двойные пробелы; полный редакторский/визуальный проход всех данных ещё впереди.
+
+Branch codex/model-price-experiment, baseline/HEAD fe1ec48.14 содержательно изменённых/новых файлов по allowlist. Staging пуст; §46 commit/push пока нет. Provider/live/browser calls0. Foreign14EOL MD, prototypes/ и три experiment untracked сохранены. §45 уже commit/push fe1ec48 принятого checkpoint. Следующая работа после проверки: настройки/вид карточек по45.3, затем общий проход формулировок и виджета.
+
+Cursor: read-only проверить diff к fe1ec48 в allowlist46, §3 Target Contract, удаление thin копии и получение полных captured фактов в обеих ветках build_d2_d1r_messages. Проследить JSON/SSE→snapshot→modelview→prompt, verified follow-up/replay. Проверить сохранность шестиMD ссылок, перенос всех удалённых условий в facts, отсутствие новых семантических слоёв/вызовов/публикационной склейки. Сверить baselineFAIL отдельно; не ослаблять тесты и не делать live calls/commit/push. Вердикт относится только46, не всему диалогу/UI.
+
+Виджет: «Какая рассрочка?»→«А на удаление зуба?»; новая беседа «Консультация бесплатная?»→«А КТ входит?»; «Какая скидка на отбеливание?»; «Какая гарантия?»→follow-up «Что делать, если возникла проблема». Проверить условия из facts, сохранность follow-up и отсутствие рваных формулировок. Точная модельная проза не предписывается. Аккордеоны/главная акция в этом checkpoint не менялись.
+
+Независимый Checker: PASS только46, blockers нет. Самостоятельно12PASS; подтвердил единыйserializer/обеpromptветки,14fileallowlist, перенос условий без потери anchors/CTA/follow-up и baseline evidence. Живая модель/виджет/новыйUI/полныйредакторскийпроход не аттестуются. Стоп на Cursor и виджет перед фиксацией46.
+
+
+## 47. Полный аудит цепочки после инцидента консультации — 2026-10-11
+
+**Классификация: аудит и документация, без реализации.** Владелец попросил сначала полный независимый аудит на Astra и разбор результатов. Эта запись не разрешает новые runtime-поля, состояния, сценарии, слои, retries или изменение продуктовых правил. Исправления и визуальный этап приостановлены до обсуждения аудита. Предыдущие scoped PASS не равны общей приёмке свободного диалога.
+
+Preflight: repository/top C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment; HEAD/baseline fe1ec48a63c60195bac874452924cb48124b8231; origin/main и merge-base efa3f773bcf10891e2997addf8bbec38c7ae1317. Проверялось текущее дерево с §46 WIP, а не только чистый HEAD. Allowlist изменений ЭТОГО аудита — только docs/tasks/DEMO_D2_INTERFACE_TASK.md. Предыдущий §46 WIP сохранён; foreign14EOL MD, prototypes/ и три экспериментальных untracked сохранены. Staging пуст. Runtime/tests/client data в ходе аудита не редактировались.
+
+Три независимых прохода gpt-6-astra high: вся серверная цепочка; история/виджет/транспорт; цены/бренды/объёмы/33 предложения. Root проверил входные gates, provider contract и существующие логи. Покрытие: /ask и /ask/stream → input/privacy/lead/UI binding → tenant snapshot → history/model view → ordinary/known-task prompt → provider → parser → resolver/materialization → renderer/UI → commit/replay/next-turn context. Исторические недостижимые маршруты не объявлены причинами текущего D2. Нет полного CI или доказательства отсутствия всех возможных ошибок.
+
+### 47.1 Подтверждённые проблемы
+
+**A1 · P1. Пригодный обычный текст зависит от всей технической оболочки.** contracts/d2_dialogue_result.py:13,44–50,121–146,237–243; core/d2_dialogue.py:734. Общие extra=forbid и model_validate отклоняют всё до публикации. Read-only probes с одним и тем же пригодным текстом подтвердили отказы: чужое age_group; content_ref без .md; sections без ref; противоречивый optional volume; clarification:null; текст4001 символ. Неверная optional ссылка missing.md может пережить позднюю проверку, а missing без суффикса — нет. Реальный случай18:44:07: модель правильно ответила о консультации, но пять ненужных полей уничтожили ответ. Принцип исправления: отдельно пригодность текста и права необязательных metadata; без глобального отключения проверок цены/записи и без списка исключений под сегодняшние пять полей.
+
+**A2 · P1. Локальная ошибка команды отменяет независимую часть даже после успешного parse.** core/d2_dialogue.py:885–886; core/response_plan_materialization.py:517–519,1033–1045,1279–1281; core/d2_contacts_cta.py:292–295,317–318. Price без target вызывает исключение; good content + detail offer_id=does_not_exist → d2_price_detail_offer_foreign; good content + detail service:does_not_exist → materialization_foreign_material. Неизвестный branch в ordinary contact тоже fatal. Отсутствующая модельная ссылка текущей клиники здесь смешана с нарушением ownership. Пример: нормальный ответ о консультации + ошибочная ссылка на состав цены → пользователь теряет обе части. Настоящие tenant/auth нарушения нельзя ослаблять. Предлагается общая согласованная граница локального отказа части, без поиска замены и угадывания команды.
+
+**A3 · P1. Новое направление игнорируется при выборе состава цены.** core/response_plan_materialization.py:491–511,981–1046,636. После classic/Nobel/one_tooth валидный price_detail(topic:prosthetics,includes), равно как topic:orthodontics, выбирает classic.one_tooth.nobel. При этом discussion_scope уже записан новым направлением. Helper читает service, но не topic; historical refs оказываются сильнее явно нового предмета. Пример: «Цена Nobel на один зуб?» → «А что входит в протезирование?» → состав прежнего импланта. Подтверждено pure execution, не предположение о модели. Исправление должно согласовать предмет выбора и предмет сохранённого результата, не выбирать за человека конкретную услугу нового направления.
+
+**A4 · P1. Явный вариант простой услуги нельзя передать в текущем ценовом контракте.** contracts/d2_dialogue_result.py:96; core/response_plan_materialization.py:1299 и первый selected row; core/d2_dialogue.py:914–917. PriceOperation передаёт service/brand/volume, но не option/offer. «Открытый синус-лифтинг» сводится к sinus_lift: по умолчанию открывается закрытый42тыс., а не открытый68тыс. «Сложное удаление» — обычное5тыс., вместо сложного8тыс. Другие варианты доступны во вкладках, но исходный явный запрос не выбирает их. Probe: server selected open показывает open; следующий price по sinus_lift даже с shown refs open возвращается к closed. Модельное option_id=open отвергается как extra. Это не ошибка прайса и не оформление вкладок. Нужен минимальный согласованный способ передать уже понятый вариант; добавление нового поля не разрешается одним этим отчётом.
+
+**A5 · P1/P2. История не включает весь доступный пользователю состав карточки.** core/response_plan_materialization.py:1423–1425; static/widget/widget.js:2065–2093; core/d2_completion_context.py:44; core/response_text_renderer.py:15–25,243+; core/d2_live_provider.py:113–134. В frozen row есть includes/excludes/stages, но projection истории использует plain rendered_text. У classic.one_tooth.nobel четыре includes и два stages; все шесть отсутствуют в этом тексте. Аккордеоны раскрываются локально; ordinary prompt не содержит полного offer/package/stages каталога. «Почему второй платёж такой?» после раскрытия этапов может не иметь в контексте самих этапов. Предлагается проверить полноту существующей projection из frozen completion, без второй памяти и без нового модельного вызова. Это не доказательство, что модель обязательно ошибётся: price_detail может повторно дать данные кодом.
+
+**A6 · P2. Сохранение выбранного предложения всё ещё зависит от optional metadata обычного текста.** core/d2_completion_context.py:9–17,76–95,130–146; core/response_plan_materialization.py:610. После classic/Nobel/one_tooth ordinary «Есть рассрочка…» без target очищает scope; с target classic, но без brand/volume — заменяет его урезанным. Три последние пары временно помогают модели, но deterministic targetless detail лишается текущего offer. Старый тест сохранения предложения через факт tests/test_d2_completed_source_context.py:90+ по-прежнему использует удалённый commercial_fact. Нельзя лечить автоматическим переносом темы на любой текст: это вернёт залипание после смены темы. Требуется единое согласованное правило ответственности существующей истории/выбранной карточки.
+
+**A7 · P1. При переключении бренда текст рядом с карточкой может относиться к прежнему варианту.** static/widget/widget.js:1458–1473. Реальный HTTP offline probe: price classic без brand + связанная ordinary prose о корейской системе → три tabs; click Nobel меняет карточку без модели, но сохраняет prose price_owned=false. Фраза «Эта система производится в Южной Корее» визуально остаётся рядом с Nobel. Для explicit single-brand price проблема не воспроизведена: там один offer. Это mismatch принадлежности текста и изменяемой карточки. Не исправлять генерацией новой prose при каждом tab и не изобретать новые semantic flags без решения; определить, какая часть видимого ответа принадлежит неизменному сообщению, а какая карточке.
+
+**A8 · P1. После некоторых транспортных ошибок теряется возможность повторить тот же незавершённый запрос.** static/widget/api.js:128,176; static/widget/widget.js:1477,1644; app.py:355,380. Node offline probe: network break → повтор получает request_in_progress → onError(retryable:false); аналогично d2_stream_transport_failed. Widget сбрасывает retryBody. Первый запрос может позже завершиться на сервере, но следующий ввод пойдёт с новым request_id; результат останется невидимым пользователю, хотя попадёт в history. Нужен корректный транспортный replay существующего request_id, не дополнительный модельный retry и не скрытая повторная отправка заявки.
+
+**A9 · архитектурная область отказа. Ошибка оформления одной акции блокирует любой вопрос до модели.** core/d2_dialogue.py:202; core/d2_tenant_snapshot.py:147–148,364–407. In-memory probe: активный free_implant_consult без microfact_text → commercial_promo_short_missing. Это происходит при загрузке общего snapshot, до обычного ответа «Расскажите об Орлове». Валидировать данные необходимо; вопрос — делать ли весь pack недоступным на любом ходе. Это существующая связность, не регрессия46. Не предлагается молча пропускать ошибочные данные или добавлять fallback; политика области отказа/момента валидации требует отдельного решения.
+
+**A10 · вопрос продуктовой границы, P2. Booking не проверяет доступность явно названной услуги.** core/d2_dialogue.py:757–766,775–777; core/clinic_policy_resolver.py:104–165; core/d2_lead_bridge.py:253–285. Валидные booking service:braces и service:does_not_exist дают active_booking=r1,suppress=False,decisions0, после чего путь начинает intake. Это не доказывает, что общая консультация о проблеме должна быть запрещена. Но нельзя считать resolver полной кодовой защитой записи на отсутствующую услугу. Требуется различить общую консультацию и обещание отсутствующей услуги; без самовольного запрета общей консультации.
+
+### 47.2 Сохранённые ограничения и риски, не новые регрессии
+
+- История: DEFAULT_D2_HISTORY_PAIR_LIMIT=3 и idle TTL30мин (contracts/d2_session_context.py:25–26). FullContext относится к базе, а не бесконечной истории. В §42.1 целые три пары были явно сохранены; это не скрытая новая обрезка.
+- Вход: «Да», «Ок», «Расскажите» проходят; «2», «35», «4000», 👍 получают spam/privacy rejection. «Даааааа» попадает под repeated-character spam. Подтверждено чистыми helper probes. Повтор noise может закрыть беседу. Numeric-only запрет уже был сохранён прошлыми этапами. Пример ограничения: естественное «Сколько зубов?» → «2» до модели не доходит. Изменение фильтра/границ privacy требует отдельного согласования.
+- Изменение клиентского pack в ходе беседы: fingerprint mismatch → d2_experiment_tenant_changed (core/d2_dialogue.py:209–210). Реальное событие16:43:08UTC в логах. При разработке/редактировании базы нужен новый чат; обычное обновление страницы не обязательно создаёт новую серверную сессию. Это существующая защита согласованности, не доказательство нужды в production migration.
+- Provider: действующий D2HttpProvider запрашивает json_object, а не provider-enforced strict schema; max_completion_tokens1024 (core/d2_live_provider.py:215–246). finish_reason не проверяется. Offline fake finish_reason=length с оборванным JSON возвращается дальше как raw. Это риск обрыва/плохой диагностики, а не причина консультационного incident: среди29 реальных provider responses за11октября до аудита достижения1024 не найдено. Не предлагать automatic retry или смену модели/формата без отдельного сравнения.
+- Даты: code-owned promo проверяет сроки; наличие dates в fullfacts не доказывает корректное живое понимание «сегодня». Новый clock field не добавлялся.
+- Демо имеет явные лимиты вызовов (core/d2_demo_limits.py):10на sid, IP-window,200за24ч; ошибки провайдера тоже расходуют бюджет. Это ограничение demo, не ошибка диалогового понимания.
+
+### 47.3 Что подтверждено работающим и что не следует удалять
+
+Кодовые клики выбранной цены/объёма исполняют известную задачу без повторной классификации моделью. Follow-up known-task использует определённый документ и текущие fullfacts. Для точного server-selected offer проход snapshot→sources→resolve→render→UI проверен по всем33 предложениям: identity, includes, excludes, stages, обязательные условия —33/33 без расхождений. Это подтверждает основу данных и исполнения выбранной карточки, но не правильность выбора по свободному вопросу (A3/A4).
+
+Tenant/UI ownership, privacy/lead protections, медицинская граница и проверка точных цен остаются необходимыми. Остаточный риск свободной финансовой prose явно принят; аудит не разрешает semantic verifier, второй вызов, шаблонную подмену или обрезку текста. Mixed booking не объявлен silently dropped: siblings обрабатываются до lead mutation. Согласованный будущий визуал45.3/редакторский проход ещё не реализован и не исправит A1–A8 автоматически.
+
+### 47.4 Почему прежние проверки не закрыли эти случаи
+
+Scoped PASS доказывали удаление команд/дублей и работу конкретных fixtures, но не устойчивость всего ответа к неблагоприятному output и переходам между предметами. Часть прежних тестов продолжения всё ещё использует удалённые commercial_fact/clinic_policy. Новое обычное content-поведение нельзя считать проверенным таким тестом. Структурно валидная новая тема отдельно не была достаточным acceptance case для detail selector. Нужны полные цепочки и негативные входы на действующем формате; не ослабление assertions и не ещё один слой, который исправляет решение другого.
+
+### 47.5 Предлагаемый порядок, пока НЕ реализация
+
+1. Согласовать общую границу отказа: текст / optional UI-context metadata / исполнимая команда. Закрывать A1+A2 единым механизмом, включая mixed outputs и повреждённый текст, без списка частных фраз.
+2. Согласовать точный выбор уже названного варианта и смену предмета цены (A3+A4). Полные33offer данные уже исправны; нельзя подменять отсутствующий вариант первым дешёвым.
+3. Свести содержимое видимой карточки, её соседней prose и существующей истории (A5+A6+A7), без второй памяти и дополнительных вызовов на tab.
+4. Исправить transport replay A8 отдельно от модельных retries. A9/A10 и input/history ограничения обсудить как продуктовые/эксплуатационные решения, не смешивать с механическим удалением checks.
+5. Общая регрессия на действующем формате: ordinary/price/booking mixed, плохие refs, смена направления, явный вариант, card→follow-up, tab→короткий вопрос, transport break→same request replay. После offline/независимой проверки — ограниченный live/widget. Затем оформление и редакторский проход.
+
+Никакое «если других находок нет, сразу исправить» не применяется: дополнительные существенные находки есть. Аудит останавливается на отчёте владельцу. Отсутствие других ошибок не гарантируется.
+
+
+### 47.6 Итог доказательств и состояние работы
+
+Astra pricing:33/33 точных server-selected offers сохранены; дополнительно8комбинаций обзора имплантации/протезирования по объёмам; Nobelclassic101200, unavailable/unknownbrand не подставляет чужую цену; промо соответствуют данным услуг. Для A4 суммы обозначают «от»: закрытый синус-лифтинг от42000 против открытого от68000; обычное удаление от5000 против сложного от8000. Сам выбор по свободному названному варианту сломан, хотя выбранная кнопкой строка исполняется правильно.
+
+Astra history/widget:132PASS/4FAIL в tests/test_d2_price_cards.py, tests/test_d2_ordinary_prose_http.py, tests/test_d2_source_followup_http.py (259.36s). Четыре consultation fixtures возвращают удалённый commercial_fact; parser/schema наHEAD уже не допускают его. Эти отказы совпадают с ранее отмеченными §45 baseline failures; отдельный clean-baseline прогон в этом аудите не запускался. Их не исправляли, не пропускали и не объявляли новыми регрессиями. Дополнительные доказательства: Node mockedfetch replay probe, HTTP fake-provider mixedcard→tab, in-memory invalidmarketing snapshot. MainAstra: три read-only Python группы для parser/detail/history/booking. Root: helper input probes, fake provider finish_reason=length, анализ существующих логов. Это не полныйCI и не live-model acceptance.
+
+Во время существующих pytest logging_setup записывал синтетическую диагностику в локальный logs/app.jsonl; при rotation наблюдался WinError32. Эти записи не являются пользовательскими/live evidence. SQLite/tenant fixtures использовали временные каталоги. Исходные29providerresponse и3уникальныхfailure событий за11октября root сосчитал ДО этих прогона/синтетическихзаписей: дваparseотказа (pending_explanation_question_required и extra_forbidden), одинtenant_changed. Новых внешних provider/live/browser calls0; никакие исходные разговоры или секреты в Git не добавлены.
+
+**Итог: общий PASS устойчивости диалога не получен.** Найдены восемь конкретных функциональных областей A1–A8; A9–A10 — вопросы области отказа/продуктовой границы. Цены как данные и исполнение точной выбранной строки подтверждены; выбор и контекст ещё требуют исправлений. Root сохраняет только данный отчёт. Branch/HEAD прежние, staging пуст, новых commit/push/PR нет; §46 WIP/foreign WIP сохранены. Следующий шаг — обсуждение владельцем этого списка и минимального плана, не автоматическая реализация предложений аудита.
+
+
+## 48. Порядок работ и документальный checkpoint после аудита
+
+Классификация: только документация. Пользователь попросил упорядочить дорожную карту, документы и Git, уточнить остаток работ. Root переносит обсуждённую группировку A1–A8 в актуальный верх Roadmap. Это не реализация и не принятие ещё не показанного формата/поведения. Обсуждение перед изменениями A4/A6/A7 сохраняется. Исторический статус «следующий шаг — обсуждение списка» в47.6 дополнен этим порядком, но продуктовые вопросы не закрыты автоматически.
+
+Preflight: root/top C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment; HEAD/baseline fe1ec48; origin/main и merge-base efa3f77; upstream синхронизирован (0/0), staging пуст. Exact allowlist документального checkpoint: docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md, docs/tasks/DEMO_D2_INTERFACE_TASK.md. Эти два документа включают ранее подготовленные отчёты46/47 и последние решения по UI45.3; они фиксируют WIP честно, не объявляют соответствующий код опубликованным. Runtime/data/tests46 и foreign14EOL MD/prototypes/три experiments не stage/commit.
+
+Порядок: I=A1–A2 устойчивость текста/частей; II=A3–A4 выбор цены; III=A5–A7 карточка/история с особым контролем A6; IV=A8 transport replay и общий прогон. Внутри — целевые offline и один независимый Checker на связный checkpoint; повторная проверка по замечаниям. После этапа — Cursor/виджет владельца, затем отдельный commit/push. Если появляется архитектурный вопрос, зависимая работа останавливается до обсуждения. Изменения схемы варианта II и поведения III сначала показываются на простых примерах.
+
+Статус46: scoped Checker PASS, результаты72PASS/8baselineFAIL; Cursor-подтверждение и успешная widget-приёмка не получены. Ошибка консультации стала основанием аудита47. Поэтому runtime46 не включается в документальный commit. Последний опубликованный runtime — fe1ec48 (§45). Сохранение отчёта46 в Git не означает сохранение его реализации в том же commit.
+
+Четыре этапа закрывают найденные существенные разрывы основного пути, но не весь Roadmap. Затем ещё реализация согласованного UI/маркетинговых настроек45.3, цельные краткие/полные тексты и редакторский проход, остатки/актуализация тестов, общая приёмка. A9/A10 и ограничения истории/ввода остаются вопросами, не скрытыми новыми задачами. Нельзя объявлять основную перестройку завершённой до этих работ и обязательных проверок. Последующая настройка качества живой модели может идти отдельно после приёмки.
+
+В этом checkpoint новых provider/live/browser calls0, runtime/tests не изменяются; тесты бота не запускаются для редакции документов. Проверка — согласованность статусов/границ, ссылки и staged diff --check. Перед commit нужен независимый read-only Checker документации. Никакие сырые логи, payload, .env и local DB не включаются.
+
+## 49. Этап I — независимая приёмка частей ответа (A1–A2)
+
+Owner GO: начать этап устойчивости ответа, затем строгая проверка Cursor на возврат сложности. Классификация: упрощение границы приёмки плюс исправление классификации локальных ошибок ссылок. До: whole-list model_validate и отдельные fatal model-reference ошибки отменяют пригодный соседний ответ. После: единственный parser принимает операции независимо, существующий исполнитель публикует принятые части и существующий результат unavailable для отклонённой части. Удаляемая зависимость — принятие обычной prose от optional metadata и корректности независимой команды. Владельцы смысла/цен/истории остаются по Target Contract §3.
+
+Preflight: root/top C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment; baseline/HEAD 1975eb3; origin/main/merge-base efa3f77; staging пуст. Exact allowlist: contracts/d2_dialogue_result.py; contracts/response_plan.py; core/d2_dialogue.py; core/d2_contacts_cta.py; core/response_plan_materialization.py; tests/test_d2_response_resilience.py (новый); docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md; docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md. §46 WIP, 14 EOL-only MD, prototypes/ и три экспериментальных файла остаются вне этапа.
+
+Astra consultation: внутренний результат разбора должен представлять как принятую операцию, так и локальный отказ; это необходимая реализация уже согласованного partial-answer, не новый модельный формат или состояние беседы. Wire outcome/blocks/kinds прежний. Ordinary identity принадлежит серверному порядку; verified known-task identity остаётся строгой. Content-text проверяется отдельно от source/scope claims; неподтверждённые claims не дают UI/контекста/промо. Команды не чинятся и не расширяются удалением неверных параметров. Existing unavailable расширяется технической причиной invalid operation. Нет catch-all recovery, повторного parser, модели, адаптера назад к whole-list, semantic regex или новой памяти. Лимит отдельной ordinary prose 4000 удаляется при сохранении общего raw-envelope лимита; текст не обрезается. Настоящее clarification вместе с готовым content остаётся противоречием, не выбираем одно за модель. Все непригодные части, повреждённый JSON/root/admin conflict и tenant/auth/UI нарушения не превращаются в успешный ответ.
+
+Пример: пригодный ответ о консультации + неверная команда цены → ответ сохраняется, ошибочная часть получает нейтральный технический отказ без чужой цены/кнопки. Проверки: JSON/SSE, исходный порядок, следующая история/replay, плохие metadata/команды, пустой текст, реальные UI/tenant/lead ограничения. Baseline до edits: test_d2_sim2_contract.py + test_d2_commercial_scope.py — 55 passed / 33 failed; failures старого commercial_fact в текущем дереве до изменений, отдельно от новых регрессий. Runtime ещё не изменён на момент записи. Provider calls0. Приёмка: targeted offline → независимый Checker → Cursor/виджет → commit/push после принятия.
+
+### 49.1 Реализация и доказательства
+
+Allowlist расширен до edits теста: tests/test_d2_price_reference_gaps.py. В нём request_id проверяется по серверному порядку; unknown detail теперь проверяется как failed completion без карточки/деталей/UI, а не как глобальный HTTP отказ. Tenant/source guards не ослаблены. Иные старые assertions не переписаны и не скрыты.
+
+Удалено: обязательная whole-list приёмка ordinary результата, зависимость prose от optional claims, лимит4000 на content_text, глобальный отказ при missing price target и unknown ordinary detail/branch. Добавлено: внутренние D2ParsedDialogueResult/D2RejectedOperation (не wire и не память), одна техническая причина existing unavailable, существующие linkage-проверки учитывают unavailable contact/reference. Единственный parser принимает части, не повторяет валидацию всего результата после ремонта. Для content отдельно проверяются текст/уточнение и необязательные claims; при непригодных claims никакие их поля не переходят в UI/контекст. Цена/запись/контакты остаются строго типизированными; неверные параметры не удаляются для исполнения. Known-task binding и root/admin/tenant/auth остаются строгими. Ordinary request_id задаётся порядком сервера, не влияет на смысл. Первая отклонённая цена сохраняет ограничение первой цены: следующая откладывается, а не продвигается. Новых model calls, сценарных словарей, prompt repair, memory/state и converter обратно в старый envelope нет.
+
+Итоговые наборы: logs/stage49-focused-final.txt —119PASS/2FAIL (42 новых,50 parser,29 price-reference); оба FAIL — прежнее ожидание трёх rows вместо выбранного таба. Чистый fe1ec48 (runtime идентичен1975eb3) в logs/stage49-baseline-gaps.txt воспроизвёл их:50FAIL/33PASS в старых content/price-reference наборах; остальные48 относятся к старым запретам ordinary prose и не чинятся этим этапом. logs/stage49-guards.txt —30PASS: foreign source/direction, source-follow-up, price-detail без модели, known-task binding, input boundary, lead cancel. В logs/stage49-final-targeted.txt ordinary-prose45PASS; там была одна регрессия alias requests, исправлена и перепроверена в последующих50 parser tests. Промежуточные падения из-за типизации claims исправлены, не объявлены baseline. Совокупность последних проверок по этим группам194PASS/2known baselineFAIL. Не полный CI, не живая модель/виджет. Fake-provider network запрещён фикстурами. Логи тестов/БД — локальные; начальный прогон выявил прежний WinError32 rotation, дальнейшие запуски имеют отдельный BOT_LOG_DIR. Сырые логи не коммитятся.
+
+Независимый Checker запрошен; Cursor/widget ещё впереди. Staging пуст; provider/live/browser calls0. Код §46 не смешивается с итогом этого этапа и остаётся отдельно не принятым. Commit/push49 пока не делались.
+
+### 49.2 Строгий Cursor review
+
+Read-only, baseline1975eb3, branchcodex/model-price-experiment. Проверить exact allowlist49 и его test-only расширение, не включать §46/foreign WIP. Сначала тесты, затем обе HTTP цепочки до parser→executor→frozen response→history/replay. По AGENTS/WORKFLOW_CHECKER/TargetContract§3 проверить полное удаление ordinary whole-list зависимости, не только текущую фразу. REJECT при новом semantic gate/regex/списке фраз, дополнительном model call, второй памяти, fallback/repair/adapter назад к старому envelope, скрытом ослаблении цены/lead/privacy/tenant/UI и молчаливом выполнении испорченной команды. Проверить root/admin конфликт, полностью непригодный результат, ошибки command и optional claims, обе стороны mixed response, порядок, первую цену, rejected booking, известную кнопку/подмену её задачи, историю/replay. Проверить, что internal result не попадает в модельную схему, сессия не получила новых управляющих полей, а правила A3–A10 не реализованы скрыто. Не ослаблять assertions и не называть obsolete test зелёным; сравнить с baseline evidence. Не делать edits/provider/browser/SMTP/commit/push. Вердикт PASS/REJECT только49 с конкретными путями, удалённой зависимостью, рисками, тестами и WIP; полная архитектура этим не аттестуется.
+
+Виджет после Cursor: новая беседа «Консультация бесплатная?»→«А КТ входит?»; новая «У вас есть Osstem?»→«Расскажите»; «Сколько стоит Nobel на один зуб?»→«Что входит?»; «Вы принимаете детей?»→«Сколько стоит лечение ребёнку?». Проверить связность ответа, exact карточку/отказ, follow-up, отсутствие лишнего начала записи. Эти вопросы не заменяют offline adverse-output проверки и не обещают исправления контекстных A3–A7.
+
+### 49.3 Исправления по независимому Checker
+
+Первый verdict REJECT: (1) optional-claims приёмка ошибочно распространялась на unfinished content task и могла удалить brand/volume/target перед сохранением уточнения; (2) несовместимость brand/extent для ordinal detail ещё отменяла весь ответ, в отличие от explicit offer_id. Оба исправлены в той же границе: мягкая приёмка только completed prose; unfinished content целиком проверяется прежним строгим operation type. У detail отдельно проверены captured source/action ownership и ограничения ordinary selector: несовместимый model selector локален независимо от формы, настоящая чужая привязка fatal.
+
+Добавлены14 проверок:4HTTP JSON/SSE для pending (нет кнопок и сохранённой урезанной задачи);8HTTP для ID/ordinal и brand/extent конфликта;2pure foreign history/action. Recheck logs/stage49-recheck.txt:104PASS/2FAIL — два FAIL были ошибкой импорта в новых тестах, не runtime; исправлены, точечный повтор2PASS (logs/stage49-ownership-recheck.txt, затем прямой импорт из response_plan_session также2PASS). Совокупность последних групп208PASS/2known baselineFAIL. Старые assertions не ослаблены. Повторный Checker — только findings и затронутые защиты; до его вердикта этап не принят. Provider/live/browser calls0, staging пуст, commit/push нет.
+
+Итог независимого focused Checker: PASS только§49, оба P1 закрыты. Собственные12read-only probes PASS (корректная pending-задача, оба selector, локальные конфликты, чужие history/action); test weakening не найден. Подтверждено удаление ordinary whole-list зависимости, отсутствие repair/fallback/model calls/wire-полей/памяти. Cursor и виджет остаются обязательной следующей остановкой; A3–A10 и весь D2 не аттестуются. Код после recheck не менялся, только записан вердикт. Commit/push49 не выполнялись.
+
+### 49.4 Приёмка Cursor и владельца
+
+Владелец подтвердил: «В виджете ок». Получен Cursor PASS только§49(A1–A2): удалена общая зависимость ordinary списка от ошибки одной части; внутренние dataclass не входят в model schema/session; строгие pending/price/booking и ownership сохранены. Новых сценариев, памяти, fallback, model fields/calls и скрытых A3–A10 нет.
+
+По отчёту Cursor: основной offline-набор232PASS/3FAIL, отдельные guards50PASS/1FAIL. Два price-reference FAIL — прежнее ожидание трёх rows вместо выбранного таба; structured-output FAIL — прежнее ожидание9kind вместо6; detail known-action FAIL — проверка подстроки «входит» при ответе «В стоимость входят», HTTP200 и запрете provider. Это не зелёный полный CI; старые проверки остаются долгом. Новые resilience проверки прошли. Новых provider/live/browser/SMTP вызовов со стороны агентов0; пользовательская проверка виджета учтена отдельно.
+
+Приёмка разрешает отдельный commit/push exact allowlist49 от1975eb3. §46, прочие MD, prototypes и экспериментальные файлы исключены. Следующий этапII требует согласования способа передачи явно названного варианта; этим PASS весь бот не закрыт.
+
+## 50. Явный вариант услуги открывает соответствующую вкладку (A4)
+
+Owner GO: общий вопрос об услуге сохраняет начальную вкладку; явно названный вариант сразу выбирает его вкладку, остальные остаются доступны. Согласован optional option_id из существующего каталога в PriceOperation. Классификация: bug fix выбора, не заявление о новом архитектурном упрощении. Владелец смысла — модель; соответствие каталогу, цена/состав и UI — код по Target Contract§3. Нет распознавания фраз кодом, дополнительной памяти или вызовов модели. Старый выбор первого варианта сохраняется только для запроса без варианта. A3 и A5–A10 этим checkpoint не закрываются.
+
+Preflight: root/top C:/Cursor Projects/artgents-bot-active, branch codex/model-price-experiment, HEAD/baseline211ef55, origin/main/merge-base efa3f77, staging empty. Allowlist: contracts/d2_dialogue_result.py; core/response_plan_materialization.py; tests/test_d2_price_option_selection.py; docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md; docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md. §46 WIP, EOL-only MD, prototypes и эксперименты вне этапа. Проверки: JSON/SSE default/explicit variant, сохранность вкладок и их кликов/replay без модели, последующий состав, неизвестный/неактивный/чужой вариант без подстановки начальной цены; schema и действующие price cards. Суммы, UI-контракт и база не меняются. Вариант принадлежит конкретной услуге, не направлению. Существующий результат отсутствия подходящей цены сохраняется для отсутствующего соответствия; ошибочный тип поля не смягчается. После offline — независимый Checker, Cursor/виджет; commit/push после приёмки.
+
+Allowlist до изменения расширен: core/one_call_active_service_catalog.py. Существующий captured справочник передаёт активные option_id/name, без второго каталога и загрузки с диска. Astra consultation подтвердила минимальную реализацию, сохранение всех вкладок, выбранного trace и отсутствие нового состояния. Неизвестный/неактивный вариант или отсутствие подходящего предложения не заменяются первым; используется существующий отказ отсутствия цены. Контракт option только concrete service; clarification с ним недопустим.
+
+### 50.1 Реализация и приёмка
+
+Добавлено только согласованное optional option_id в PriceOperation и активные ID/названия вариантов в существующую проекцию каталога. Изменён выбор открытой строки и соответствующего trace: названный вариант выбирается среди допустимых строк, набор/порядок вкладок сохраняется. Для общего запроса начальный вариант прежний. option_id не добавляется в DiscussionScope/session/UI actions; клик использует прежний проверенный offer_id без модели. Все суммы/составы/акции берутся из прежних источников. Удалён безусловный выбор первой строки при явно названном варианте. Это bug fix, не аттестация архитектуры целиком.
+
+### 50.2 Cursor и виджет
+
+Read-only review от211ef55, ветка codex/model-price-experiment. Exact allowlist50 + расширение active-service-catalog: три runtime, новый test_d2_price_option_selection.py, Interface/Roadmap/Ledger. §46/прочие MD/prototypes/эксперименты исключены. Читать AGENTS, WORKFLOW_CHECKER, Target Contract§3, текущую Roadmap и§50. Сначала новые тесты, потом реальный JSON/SSE путь до parser, catalog, selected row, trace, frozen refs, history/detail, UI click/replay. Проверить отсутствие возврата сценариев/semantic regex/дополнительной модели/памяти/адаптера; option только service, неверные/неактивные/несовместимые варианты не подставляют начальную цену; альтернативные tabs/order сохранены; generic запрос сохраняет прежнее поведение. Строгие tenant/lead/privacy/price/UI guards не ослаблены. Изменение общего ActiveServiceCatalog не должно ломать существующих потребителей. Не аттестовать A3 или весь этапII; не включать §46 вPASS. No edits/provider/browser/SMTP/commit/push. Вердикт PASS/REJECT с путями, проверками, baseline failures и remaining WIP.
+
+Виджет: новая беседа «Сколько стоит открытый синус-лифтинг?» — открытый от68000, обе вкладки; клик закрытого — от42000; «Что входит?» соответствует выбранному. Новая «Сколько стоит сложное удаление зуба?» — сложное от8000, обычное доступно от5000. Новая «Сколько стоит удаление зуба?» — прежняя начальная вкладка обычного. Не считать fake-provider пониманием живой модели.
+
+### 50.3 Итог offline и Checker
+
+Основной прогон logs/stage50-regression.txt:139PASS/4FAIL (29 новых A4, price cards, parser). Дополнительно3PASS active_service_catalog (logs/stage50-catalog.txt). Все4FAIL — consultation fixtures двух JSON/SSE тестов: test_free_text_can_repeat_information_after_card_selection и test_historical_tab_returns_scope_after_other_turns_and_supports_text. Отдельный чистый архив211ef55 воспроизвёл те же4FAIL,60deselected (logs/stage50-baseline-result.txt); они не регрессияA4. Тесты не ослаблялись. Временный архив/логи игнорируемые, не для Git. Не полныйCI.
+
+Независимый Astra Checker PASS толькоA4/§50:29PASS +15schema/materialization probes, actual JSON/SSE call path проверен, guards/trace/history/tab order сохранены; сценарных правил, дополнительных model calls, session state, памяти, retry не найдено. Общая архитектура и A3 не аттестованы. Классификация bug fix. Provider/browser/SMTP0; виджет и Cursor ещё впереди. HEAD211ef55, stagingempty; commit/push этого этапа не выполнены. §46 и foreignWIP сохранены.
+
+### 50.4 Приёмка владельца и Cursor
+
+Владелец подтвердил работу вкладок в виджете. Cursor PASS только§50/A4:141PASS/4прежних consultationFAIL (два теста активного каталога вместо трёх в прогоне исполнителя). Фикстуры четырёх отказов передают удалённый commercial_fact; воспроизведены на чистом211ef55. Общий этапII/A3/бот не закрыты. Новых provider/browser/SMTP вызовов агентов0. Принят отдельный commit/push семи файлов allowlist50, §46 и foreignWIP исключены.
+
+Замечание виджета для будущего этапа карточек/редактуры: в открытом синус-лифтинге дважды показано «Имплант, коронка и КТ — отдельно». Проверить источники и сборку: одно условие должно показываться один раз, без потери обязательного исключения. Не исправлялось вA4; остаётся явным долгом UI/текстов.
+
+## 51. A3 — предмет нового вопроса ограничивает источник состава цены
+
+Owner GO после обсуждения: модель понимает продолжение/новый предмет, код учитывает её существующий target; без новых меток темы, памяти, сценариев или вызовов. Target отсутствует — прежнее продолжение по показанной карточке; назван новый предмет — чужой состав не используется; verified click старой карточки остаётся привязан к ней. Классификация bug fix. Если topic не позволяет определить состав, применяется существующий ambiguous detail, без нового обзора/подбора услуги. Модель владеет смыслом, код принадлежностью источника по Target Contract§3.
+
+Preflight: root/top C:/Cursor Projects/artgents-bot-active, branch codex/model-price-experiment, baseline/HEAD23d9b40; origin/main/merge-base efa3f77; stagingempty. Allowlist: core/response_plan_materialization.py; tests/test_d2_detail_topic_boundary.py (new); docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md; docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md. §46/MD/experiments/prototypes foreign WIP unchanged. Проверки: JSON/SSE old price→new topic, implicit/same-topic continuation, conflicting ID/ordinal, brand/extent inference, same-turn price+detail, explicit new service, verified old card click/replay, history and foreign ownership. No live/provider. До принятия Cursor/виджета нет commit/push.
+
+Astra consult: достаточно одной финальной проверки принадлежности каждого offer явно указанному topic по existing d2_content_topics_by_ref и service.content_ref; directions не использовать как полный список принадлежности. Не менять refs/порядок ordinal, не создавать новый подбор. Несовпадение — existing context_ambiguous, verified action исключён из model-topic проверки.
+
+Начальный тест прямого detail-клика с устаревшей revision после другой темы выявил existing d2_stale_ui_action на ingress, до изменённого resolver. Защиту не меняем. Поддержанный возврат — историческая вкладка цены, затем detail по её актуальной revision; тест уточнён под этот путь, а не расширяет разрешения старых действий. Прежняя формулировка «клик старой карточки» не означает отмену revision guard.
+
+### 51.1 Реализация и проверки
+
+Runtime diff: одна финальная проверка topic принадлежности выбранного offer по service.content_ref→captured d2_content_topics_by_ref, перед возвратом состава. Она применяется ко всем ordinary selectors; verified action остаётся прежним. Не меняются model schema, память, порядок refs, подбор направления, prose и UI. При несовпадении existing d2_price_detail_context_ambiguous. Это bug fix, не глобальное упрощение.
+
+Основной прогон logs/stage51-final.txt:105PASS/2FAIL (22A3+56resilience+29option); два FAIL относятся к новой проверке возврата, которая пыталась нажать неопубликованную вкладку единственного Nobel. Исправлена тестовая подготовка: genericclassic с настоящими вкладками, явный assert публикации Nobel. Runtime для этого не менялся. Focused logs/stage51-click-fixed.txt:4PASS/18deselected (return2 и explicitnewID2). Совокупность последних результатов107PASS, не один повторный полный прогон. Первый эксперимент с obsolete detail revision отражён выше; ограничения не ослаблены. Независимый Checker pending. Provider/live/browser/SMTP0, stagingempty, commit/push нет. Известные четыре прежних consultation fixtureFAIL из§50 здесь не включались и не объявлены исправленными.
+
+### 51.2 Cursor review и виджет
+
+Read-only, baseline23d9b40, branchcodex/model-price-experiment. Allowlist51: core/response_plan_materialization.py; tests/test_d2_detail_topic_boundary.py; Interface/Roadmap/Ledger. §46 и foreignWIP не входят. AGENTS/WORKFLOW_CHECKER/TargetContract§3/currentRoadmap. Сначала тесты, затем actual ask JSON/SSE→parse→resolve detail→freeze/render→history/UI/replay. Проверить все selectors (нет/brand/extent/ordinal/ID), new topic и correct explicit ID нового направления, same-topic/targetless, same-turn mixed, сохранение независимой prose и прежних exact guards. Проверить authoritative MD-topic, не directionpricepool. Запретить semantic heuristics, phrase branches, новые поля/память/вызовы/retry/fallback, скрытую реализациюA5–A10. Исторический возврат только через реально опубликованную вкладку→актуальный detail; stale/unauthorized actions не разрешать. Offline proportional; no edits/provider/browser/SMTP/Git writes. PASS/REJECT толькоA3 с evidence и limitations, A4 уже принят отдельно.
+
+Виджет: Nobel один зуб→«Что входит?» (состав Nobel); новая беседа Nobel→«А что входит в стоимость протезирования?» (ответ/уточнение про протезирование, не состав Nobel); Nobel→«Что входит в отбеливание?»; общая цена имплантации→другая тема→вернуться вкладкой к Nobel→открыть состав. Эти проверки не обещают точную prose модели и не снимают ограничения истории/старых кнопок.
+
+### 51.3 Независимый Checker
+
+Astra PASS только§51/A3: actual call path и шесть runtime строк проверены, blockers нет. Все22актуальных HTTP cases покрыты (20PASS + focused2PASS после исправления fixture);9независимых probes PASS, включая missing topic authority и foreign ownership. Новых wire/state/memory/model calls/heuristics/подбора нет, tenant/revisionguards сохранены. ПолныйCI/live не выполнялись. Cursor/виджет pending; HEAD23d9b40, stagingempty, no commit/push. Только документация изменена после Checker.
+
+## 52. Аудит границы «модель → цена → состав → продолжение»
+
+Owner GO: «Делаем» после повторных отказов виджета. Это аудит и документация, не разрешение нового runtime-решения. Cursor PASS §51 принят как узкая проверка A3; общая widget-приёмка остаётся открытой. Проверены текущий код, сохранённые live traces и независимые offline probes Astra. Новых provider/browser/SMTP calls 0. Полный CI не запускался. Ни runtime, ни тесты этим аудитом не редактируются.
+
+Preflight: root/top C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment; HEAD/baseline23d9b40b11a5a6c2282cfea2a69ec34aca821e30; origin/main и merge-base efa3f773bcf10891e2997addf8bbec38c7ae1317; staging пуст. Exact documentation allowlist: этот файл, DEMO_D2_DELIVERY_ROADMAP.md, DEMO_D2_CHECKPOINT_LEDGER.md. Существующие §51 runtime/test WIP, §46, MD, prototypes и экспериментальные файлы сохранены. Сырые логи и разговоры не включаются в Git.
+
+### 52.1 Подтверждённые разрывы
+
+1. **Правильная команда в неправильной внешней форме отменяет ответ.** Trace a434605b3b2243be8bf2a21abbe54b0b, вопрос о Nobel на один зуб: модель вернула список с правильными service/brand/volume, но без корня outcome/blocks. `_loads_strict_json_object` отверг его как envelope_not_object до независимой приёмки операций. Это старое ограничение, явно оставленное §49, а не регрессия A3. Текущий HTTP provider запрашивает json_object, не строгую схему; наличие функции генерации json_schema не означает её использования этим путём. Исправление внешнего формата требует отдельного выбора; автоматически добавлять adapter/retry не разрешено.
+
+2. **Названный вариант представим для цены, но не для состава.** Trace 8788e23525ff4fcb9949857b7013bbd2: после удаления пользователь спрашивает состав открытого синус-лифтинга. Модель правильно указала sinus_lift и option_id=open. DetailOperation запрещает option_id, поэтому единственная операция отвергнута. PriceOperation этот параметр принимает с A4. Это неполнота охвата A4: проверялось «цена варианта → состав», но не «сразу состав названного варианта». Модельный каталог сообщает option_id, а точный offer_id этого ещё не показанного варианта в проверенных системных блоках отсутствует. Совет модели использовать offer_id не устраняет пробел данных. Предложение: согласовать применение того же каталожного варианта к detail, без второго справочника и памяти.
+
+3. **Повтор объёма может расширить состав выбранной вкладки.** Offline: после выбранного открытого синус-лифтинга detail той же услуги без дополнительных параметров возвращает только open; тот же detail с volume.extent=one_tooth возвращает closed и open. `_d2_price_detail_offer_ids` использует показанный offer только при отсутствии brand/extent, иначе повторяет подбор по услуге. Это старый путь, не шесть строк A3. Предложение для согласования: совместимые повторённые параметры сохраняют выбранный offer; действительно изменённые параметры требуют явно определённого поведения, без угадывания по фразам.
+
+4. **Независимый текст вмешивается в источник состава.** Offline Astra: показан Nobel; targetless detail отдельно даёт Nobel. Добавление независимого content про отбеливание даёт ambiguous; detail с явным service=classic в той же комбинации выдаёт состав всех трёх брендов. В resolve_d2_operations блок named_content_services очищает effective_refs по теме соседней prose. Код присутствует в HEAD до A3. Предложение: удалить эту конкурирующую зависимость; источник detail определяется его собственным target/selector и проверенной карточкой. Пример для приёмки: «Что входит в эту цену и как проходит отбеливание?» — два независимых ответа без расширения состава.
+
+5. **Точный ID состава обходит отключение варианта.** Изолированная копия Demo: option open отключён, offer и service активны. Цена исключает open, но detail по его явному offer_id возвращает состав. Финальная проверка detail проверяет offer/service, но не активность option; цена проверяет её. Это прежний пробел защиты, не регрессия A3. Предложение: одинаковая проверка доступности исходного предложения, без нового смыслового решения. Не воспроизводилось изменением рабочей базы.
+
+6. **Внешняя упаковка всё ещё ограничивает локальную устойчивость.** Offline: лишний ключ корня направляет ответ в whole-result validation, минуя независимую приёмку; completed prose с необязательным лишним полем проходит при правильном корне и может упасть вместе с лишним ключом корня. Detail также отвергает явный clarification=null и поля оплаты. Это старые ограничения, не доказательство того, что их все нужно ослабить: противоречивые управляющие данные нельзя молча исполнять. Форматную политику следует решить вместе с пунктом 1. Инструкция о сохранении применимых payment fields рядом с price/detail требует сверки с реальными разными схемами; это риск несогласованности, не установленная причина конкретного live отказа.
+
+### 52.2 Отдельно: ошибка понимания модели
+
+Trace ddd628e1b1ce4f53b379c525bdc14a98: на вопрос о составе протезирования модель выбрала service=classic и Nobel. Код выполнил указанный моделью предмет. A3 не может определить, что модель неверно поняла человека: его задача — запретить чужой состав при явно новом topic. В trace a9e3577cc3014ad792d45de0fa5b3130 модель назвала topic=prosthetics, и A3 действительно не выдал старый Nobel, а запросил уточнение. Причина внутреннего решения модели не установлена; нельзя приписывать её опечатке или обещать, что исправление parser решит понимание.
+
+### 52.3 Вывод и предлагаемая последовательность
+
+Ждать окончания A5–A10 для этих разрывов не требуется: причины формата и выбора состава уже подтверждены. Новый полный аудит всего проекта сейчас не нужен. Предлагается сначала согласовать единое поведение selectors цены/состава и внешнего формата, затем выполнить один связный checkpoint с проверкой полных диалогов и неблагоприятных ответов модели. Отдельно продолжить существующие A5–A7 про видимость карточки в истории и сохранение контекста; текущий аудит не закрывает их.
+
+Нельзя ограничиваться новым тестом конкретной фразы. Приёмка должна охватить прямую цену/прямой состав варианта, продолжение выбранной вкладки с повторёнными параметрами, смену услуги, независимый текст рядом с detail, отключённые варианты, malformed output, JSON/SSE, историю и проверенные клики. Текущие PASS A3/A4 остаются узкими; связная ценовая беседа пока не принята. Предложения этого раздела не являются самостоятельным разрешением новых полей, adapters, state или model calls. Commit/push аудита и §51 не выполнялись.
+
+
+## 53. Свободное объяснение показанной карточки — owner GO 2026-10-12
+
+Архитектурное упрощение. Владелец отменил ремонт/расширение ordinary price_detail: модель отвечает по базе и показанной карточке; код сохраняет точные цены, вкладки и проверенные кнопки состава/оплаты. До: модельная команда состава → повторный выбор источника по selectors и контексту → кодовый текст. После: обычный content_text по существующей истории; exact detail только по проверенному UI action. Удаляемая зависимость — обычное объяснение от параметров команды состава. Единственный владелец смысла prose — модель, остальные границы Target Contract §3 сохраняются.
+
+Baseline23d9b40, root/top C:/Cursor Projects/artgents-bot-active, branch codex/model-price-experiment, origin/main/merge-base efa3f77, stagingempty. Allowlist: contracts/d2_dialogue_result.py; core/d2_dialogue.py; core/response_plan_materialization.py; core/d2_completion_context.py; core/response_text_renderer.py; core/one_call_prompt_contract.py; tests/test_d2_card_conversation.py (new); tests/test_d2_detail_topic_boundary.py (superseded A3); Interface Task/Roadmap/Ledger/Target Contract. §46/MD/prototypes/experiments preserved. A3 ordinary topic guard is superseded with its removed path, not silently retained as a parallel mechanism.
+
+Remove price_detail from model Block/ClarifiedOperation/schema/prompt; remove ordinary offer/ordinal/service/brand/extent resolution, content-derived clearing of detail refs and contextual-detail enrichment. Keep minimal server-owned click operation outside wire schema, execute existing verified offer IDs only. History reads frozen published card includes/excludes/stages through existing projection; no second storage, catalog reread, model summarizer or new TTL. Root-format failure from§52 is separate and remains open. Tests: JSON/SSE selected card→prose→other topic→new price, tab→history, detail click/replay/no provider, malformed removed command, privacy/tenant/UI guards, schema and prompt removal. Offline then independent Checker then Cursor/widget; no commit/push before acceptance.
+
+
+### 53.1 Реализация и доказательства
+
+Allowlist расширен до изменения tests/test_d2_price_option_selection.py и tests/test_d2_response_resilience.py: первое продолжение теперь content с проверкой exact offer и всего frozen состава в следующем input; второй файл сохраняет foreign-action guard и проверяет отсутствие action вместо удалённого history selector. 20 ordinary A3 cases в untracked test_d2_detail_topic_boundary.py заменены новым требованием удаления команды; 2 historical click cases сохранены. Старое поведение отменено владельцем, это не baseline failures и не заявление, что старые ordinary detail suites зелёные.
+
+Удалено: price_detail из model Block и ClarifiedOperation, selectors ID/ordinal/clarification, действующие prompt-инструкции, ordinary повторный подбор услуги/бренда/объёма и A3 topic guard, named_content_services очистка refs, ambiguous-detail handler, contextual_details enrichment. Оставшийся DetailOperation — server-only тип существующей проверенной кнопки, вне wire schema; результат использует существующий D2ParsedDialogueResult. Кнопки сохраняют exact offer IDs и прежний ingress. Новая память, model calls, fallback, repair и phrase rules отсутствуют.
+
+История: существующий renderer получает projection-only флаг include_card_details из _project_pair; для single-row карточки включены frozen includes/excludes/stages, как в виджете. Excludes внутри disclosure передаются только при наличии includes, как в текущем widget. Обзор не разворачивает непоказанные составы альтернатив. UI/ответ цены не получает дубли текстом. Маркетинг уже входит в существующее текстовое представление. Каталог при чтении истории не перечитывается; TTL и предел последних трёх пар не менялись. Содержимое карточки доступно в раскрывающихся разделах даже если пользователь их не раскрывал — отдельного tracking открытия нет.
+
+Первый прогон 40PASS/2FAIL: новый тест менял файл прайса, а затем продолжал HTTP беседу, что закономерно отверг tenant fingerprint guard. Fixture исправлен: frozen projection проверяется отдельно на изменённом файле, исходник восстановлен перед следующим HTTP turn. Runtime-защиту не меняли. Затем основной набор card conversation+A3 historical clicks+A4+input boundary:52PASS (logs/stage53-final.txt). Resilience без восьми устаревших ordinary selector cases:48PASS (logs/stage53-resilience.txt). Это не полный CI.
+
+Независимый Astra Checker обнаружил P1 в новой проверке доступности кнопки: generic offer и option.active=None ошибочно отклонялись. Исправлено: наличие варианта проверяется только при offer.option_id, активность — is not False, как в каталоге. Добавлены3отдельные проверки. Root focused card-conversation:14PASS (logs/stage53-correction.txt); независимый focused recheck PASS. Astra итог PASS только§53:42tests +17focused tests,10+4независимых probes; без ослабления действующих guards. Никаких новых provider/live/browser/SMTP вызовов. Внешний root-format, качество живой модели, весь D2 и будущие этапы не закрыты.
+
+### 53.2 Cursor и виджет
+
+Cursor read-only: branchcodex/model-price-experiment, baseline23d9b40; exact allowlist53 плюс два test-only расширения53.1. Читать AGENTS/WORKFLOW_CHECKER, Target§3 с owner override2026-10-12, Roadmap и§53. Сначала тесты, затем actual /ask,/ask/stream→schema/parser→resolver→frozen publication→history→следующий input. Проверить удаление ordinary detail, отсутствие его приёма через pending или скрытого adapter, сохранение prose при неверной соседней команде. Проверить, что сохранён только exact verified click, нет ordinary selectors/повторного подбора/content interference. Проверить историю выбранного таба, состав/исключения/этапы, frozen source, privacy и прежнюю глубину истории. Проверить generic/default-active/disabled options, tenant/revision/replay, source follow-up, заявку. REJECT при новой памяти/semantic rules/retry/model call, ослаблении точных цен или UI guards. Не смешивать §46 и foreign WIP, не называть obsolete tests baselineзелёными, не аттестовать rootformat/live/весь бот. No edits/provider/browser/SMTP/Git writes.
+
+Виджет в новой беседе: цена Nobel один зуб→«Это всё включено?»→«А гарантия?»; общая цена с вкладками→выбрать другой бренд→«Что входит в эту цену?»; затем другая тема и новая цена. Отдельно кнопки состава/оплаты и follow-up ссылки. Ожидается prose по базе и показанной карточке без новой карточки на обычное объяснение; цена — по прежней кодовой карточке. Не обещается точная формулировка или отсутствие ошибок модели. Успешный offline не заменяет widget-проверку. До Cursor/widget commit/push не выполняются.
+
+
+§53 итог дополнительного guard-прогона:76PASS/19deselected (logs/stage53-guards.txt): source follow-up, lead cancel, актуальные действия/публикация/границы price cards. Исключены четыре группы price-card fixtures, использующие отменённый ordinary detail либо прежний commercial_fact; они не объявлены зелёными или неизменными baseline failures. Вместе с52основными,48resilience и3новыми guard cases покрыто179различных cases; focused14 повторяет11основных плюс3новых. Полный CI и миграция всех исторических fixtures не выполнены. Финальный diff --check по allowlist PASS, staging пуст, HEAD23d9b40 прежний, commit/push/PR нет.
+
+
+### 53.3 Разрешение checkpoint — 2026-10-12
+
+Владелец явно разрешил commit/push §53 сообщением «давай» после вопроса о фиксации. Сохраняем результат как отдельный checkpoint, не объявляя отсутствующий Cursor PASS или общую widget-приёмку. На живом ходе «А гарантия?» модель получила полный состав карточки и сформировала content, но общий parser отверг корневой список (envelope_not_object). Это открытый root-format долг§52, не возврат ordinary detail. Следующая работа — согласованное минимальное разделение текста и действий; добавлять repair/retry автоматически не разрешено.
+
+Git preflight перед фиксацией: root/top C:/Cursor Projects/artgents-bot-active, branch codex/model-price-experiment, baseline23d9b40, origin/main/merge-base efa3f77. В checkpoint только14файлов allowlist53 с test-only расширениями; исторические§51–52 документы включены как объяснение замены. §46/MD/prototypes/experiments остаются вне staging. Runtime после проверки не менялся; повторные тесты только ради commit не запускаются. Evidence179offline cases и scoped Astra PASS сохранены; полныйCI/живое качество не аттестованы. Новых provider/browser/SMTP0.
+
+
+## 54. Native text/actions — owner GO 2026-10-12
+
+Architecture simplification. Owner approved native prose, separate structured actions and optional source metadata, one connected text before code blocks. Before: whole reply requires outcome/blocks JSON. After: message.content independent of tool_calls validation. Removed dependency: prose publication on root JSON and sibling commands. Model owns meaning; Target Contract §3 remains authoritative. Handoff exclusive; known document click receives plain text without reclassification. No retry, repair, fallback, second call or native-to-old envelope adapter.
+
+Preflight: root/top C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment; HEAD/baseline e4a098a72c1faa6b987ee1b9d9ce8c7c2bc051b1; origin/main/merge-base efa3f773bcf10891e2997addf8bbec38c7ae1317; staging empty. Exact allowlist: contracts/d2_dialogue.py; contracts/d2_dialogue_result.py; core/d2_live_provider.py; core/d2_dialogue.py; core/response_plan_materialization.py; core/one_call_prompt_contract.py; tests/test_d2_native_reply.py (new); tests/test_d2_native_http.py (new); docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md; docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md; docs/tasks/DEMO_D2_TARGET_CONTRACT.md. Existing §46 one-line provider addition preserved, not checkpoint work. Marketing/catalog/MD/tests, fourteen EOL-only MD, prototypes and experimental scripts remain foreign WIP.
+
+Astra consulted. Source slots preserve multiplicity (same document repeated and invalid slots included), prior multi-content promo/source policy; prose once. Price/contact/booking/off_topic/handoff and existing typed clarification retain ownership. Two authorized synthetic network attempts: connection failure then successful Qwen text plus show_price in one response. SDK retries disabled; no clinic/private data, no action execution. Budget exhausted. Offline evidence must include real JSON/SSE path, text with malformed actions, multi-source, known clicks, history, admin and lead/privacy. Independent Checker then Cursor/widget. No commit/push yet.
+
+
+### 54.1 Реализация и текущие проверки
+
+D2HttpProvider и bounded CP3 provider возвращают native text/tool_calls; response_format=json_object и D2_RESULT_SCHEMA убраны из их запросов. D2 turn больше не вызывает parse_production_envelope_json. Действия проверяются по прежним domain-типам; ID/kind задаёт сервер, source claims не обязательны для текста. Known task получает одну строку, источник неизменен. Внутри публикации один ExplanationOperation, без восстановления общего envelope. Optional metadata slots проверяются прежней authority, общий source и общий scope считаются отдельно; неоднозначные scopes не становятся первым предметом. Старый d2_strict_response_format оставлен только для исторических offline experiments, ни один provider его не вызывает. Исторические fixtures с JSON строкой не поддерживаются новым runtime; их полная миграция не объявлена выполненной.
+
+Основной native набор: 59 PASS (logs/stage54-third.txt), реальные Flask JSON/SSE, FakeProvider, сети запрещены. Дополнительные guards: 6 PASS, 2 ошибки теста обращения к несуществующему state.ordinary; исправлено на state.clarify_task, focused повтор pending. Ранние ошибки тестов: длинный parametrization id превысил Windows environment limit; попытка нажать отсутствующую detail-кнопку sinus tabs исправлена на проверку реально опубликованного detail Nobel и отдельную проверку tab history. Runtime guards ради тестов не ослаблялись. Provider shape probe — две попытки ранее, новых вызовов при тестах 0. Полный CI, качество живой модели и widget ещё не аттестованы. Независимый Checker pending; staging пуст, commit/push отсутствуют.
+
+
+Focused logs/stage54-focused.txt:3PASS (two corrected clarification cases + provider test extended to known-task no tools/no response_format). Distinct current coverage67cases. All fixtures use native channels, no test adapter in runtime. Astra independent Checker running; no additional live calls.
+
+### 54.2 Cursor и виджет после Checker
+
+Cursor read-only: baseline e4a098a, branch codex/model-price-experiment, exact allowlist54. Read AGENTS/WORKFLOW_CHECKER, Target§3 and current Roadmap. Trace actual /ask,/ask/stream provider text/tool_calls→native parsing→action owners→materialization→history. Verify root JSON is no longer needed for prose; no hidden reserialization, repair, fallback, retry, second classifier or model call. Adverse tool arguments and invalid/mixed source metadata must not cancel valid text. Source slots retain multiplicity: same doc twice suppresses auto-promo but may retain follow-up; different/unverified source suppresses follow-up; mixed subject must not become first subject in memory. Verify text once and before actions, admin exclusive, known document task plain text with fixed source, card tab/detail buttons bypass model, exact prices and policy/lead/privacy/tenant/revision/replay remain. Run new native tests offline; historical wire fixtures are obsolete, not claimed baseline failures or green. Do not count preserved §46 line/catalog/MD/prototypes as this work. No edits/provider/browser/SMTP/Git writes. PASS only§54, separate architecture evidence from live-model quality and whole roadmap.
+
+Widget after server reload, new conversation: fear of pain→authored follow-up→Nobel availability→price for one tooth→all included?→warranty→address→whitening price. Check native text, exact card, tab change then follow-up, source links, policy question and child booking refusal. No required exact prose. This manual review remains pending.
+
+
+### 54.3 Независимая проверка
+
+Astra independently:67/67 native tests PASS, additional offline HTTP/SSE probes for clarification→published service choice→known-task plain text despite unsolicited model tools, contacts and off_topic pass. No blocking runtime finding. P2 prompt wording corrected: code-action order preserves existing booking/intake prompt last. No runtime order changed. Final verdict pending confirmation of this wording. Historical old-envelope tests/probes remain outside native certification; no legacy adapter restored. Live widget remains required.
+
+
+Final independent verdict: PASS scoped§54;67tests and6additional offline HTTP/SSE probes. P2 prompt wording confirmed closed by focused read-only recheck, no runtime edit or repeated test run. No P0/P1 blockers. Full CI/historical fixture migration/live quality/widget acceptance excluded. Final git diff --check PASS, staging empty, HEAD e4a098a unchanged, no new commit/push/PR. Existing server command verified as Flask on9001 with --reload; no restart/stop/provider request performed by this check.
+
+
+### 54.4 Обычное уточнение — owner GO 2026-10-12
+
+Архитектурное упрощение в текущем §54. До: информационное уточнение требовало clarify_content, pending_question, clarification и сохранённой задачи выбора услуги. После: модель задаёт вопрос обычным текстом, ответ пользователя понимает по существующей истории. Удаляется зависимость обычного уточнения от команды, параметров и pending-состояния. Единственный владелец смысла — модель; ответственность остальных путей по Target §3. Удаляются native tool, schema/prompt-инструкции, pending-content и исполнение его service-choice. Ценовые уточнения и серверная задача проверенного document follow-up сохраняются. Новых полей, памяти, retry, вызовов и адаптеров нет.
+
+Baseline e4a098a, branch codex/model-price-experiment, root/top C:/Cursor Projects/artgents-bot-active; origin/main/merge-base efa3f77; staging пуст. Allowlist прежний §54. Для этого продолжения: contracts/d2_dialogue_result.py; core/d2_dialogue.py; core/one_call_prompt_contract.py; tests/test_d2_native_reply.py; tests/test_d2_native_http.py; четыре документа §54. Остальной WIP сохраняется. Astra уже консультировала именно это удаление. Проверки: обычный вопрос-уточнение → ответ в истории без pending/UI выбора услуги; удалённая команда не принимается; цена сохраняет параметры и verified service click; authored follow-up работает. Offline, затем focused Checker, Cursor и виджет. Прежний PASS §54 не заменяет проверку этого удаления.
+
+
+### 54.5 Проверка удаления и ручная приёмка
+
+Удалены clarify_content из native registry/schema/prompt, поля ordinary explanation pending_question/clarification, информационный вариант ClarifiedOperation, восстановление content-task по service click и его deferral-ветка. Добавлена только короткая инструкция задавать обычный вопрос текстом. Source metadata остаются необязательными; не добавлены память, вызовы, fallback, repair или новые управляющие поля. Поведение меняется для информационных уточнений: вместо кодовых кнопок обычная реплика. Ценовые уточнения и authored document action сохранены.
+
+Независимый Astra focused Checker: PASS §54.4. Восемь focused cases (первый прогон 6PASS/2ошибки тестового атрибута, исправленный focused recheck2PASS); три дополнительных offline probes для старой команды JSON/SSE и отклонения старого persisted content task. Исправление теста читает реальные projected offers, не ослабляет защиту. Цена Nobel/one_tooth и verified click без модели подтверждены; document follow-up/history проверены обоими транспортами. Provider/browser/SMTP0. Это не live/widget/fullCI приёмка.
+
+Cursor: read-only §54 целиком, включая54.4; baseline e4a098a, allowlist54. В дополнение к54.2 проверить, что clarify_content отсутствует в доступных tools, ordinary schema, session pending и service-choice исполнении; обычное уточнение сохраняется только текстом в истории. Цена сохраняет свои параметры при выборе услуги. Не удалять server-owned pending_question документа. Старый malformed tool не должен создавать pending или отменять пригодный текст. Проверить реальный HTTP/SSE путь, tenant/revision/lead guards, отсутствие адаптера старого envelope, нового классификатора/памяти/retry. Запустить два native файла offline с отдельными BOT_LOG_DIR и basetemp. Не менять файлы, не делать provider calls или Git writes. PASS только текущему checkpoint.
+
+Виджет после перезагрузки сервера, новая беседа: «А Nobel ставите?» → «А сколько стоит на один зуб?» → «А гарантия?»; «Как это делают?» в новой беседе → ответить на вопрос бота, если он уточнит; страх боли → follow-up; сменить ценовую вкладку → «Это всё включено?». Проверять свободный текст, нужную карточку и ссылки. Модель может ответить сразу вместо уточнения — обязательного scripted вопроса нет. До Cursor/widget commit/push не выполнять.
+
+
+Итог §54.4: общий native набор 68PASS/2FAIL на уже загруженной старой версии тестового assert; обе ошибки — несуществующее поле d2_shown_price_offer_refs. Независимый Checker на исправленном тесте:2PASS, включая реальные offers следующей истории. Итого70различных актуальных cases покрыты успешно, без повторного полного прогона; дополнительно3независимых probes. Первоначальный запуск с redirect не дал вывода и был остановлен; отдельный запуск без basetemp имел25setup errors из-за sandbox tempdir, не ошибок runtime. Успешный общий прогон использовал workspace basetemp .pytest_tmp_native54remove2. diff --check PASS; staging пуст; HEAD e4a098a; commit/push/PR нет. Живых provider/browser/SMTP вызовов в продолжении0. Остальные исторические fixtures/полныйCI не аттестованы. Остановка на Cursor/виджет; §46 и прочий foreign WIP сохранён.
+
+
+### 54.6 Живой сравнительный эксперимент — owner GO 2026-10-12
+
+Диагностический эксперимент, не runtime-исправление. Владелец явно разрешил до10 вызовов каждой модели Qwen/DeepSeek. Жёсткий общий бюджет20, SDK retries0. Baseline/HEAD e4a098a, ветка codex/model-price-experiment, root/top C:/Cursor Projects/artgents-bot-active; origin/main/merge-base efa3f77. Allowlist: scripts/probe_d2_native_models.py (new), этот документ, Roadmap/Ledger для результата. Отчёт и ответы только в ignored logs/native-model-probe-20261012; ключи/личные разговоры не сохраняются. Foreign WIP §54/§46/MD/experiments сохранить.
+
+Две конфигурации: действующие tools+prompt и удаление только content_source tool/инструкции. По5 одинаковых cases: два написания Nobelavailability, чистая цена, смешанный вопрос, гарантия после синтетической истории выбранной карточки с составом из Demo-pricebook. База и реальный builder fullcontext одинаковы; история гарантии синтетическая, не доказательство widget/replay. Измерять raw text/tools/finish_reason, валидность аргументов, длительность/usage и ошибку действующего parser; не исполнять действия. Источники/follow-up без source-tool этим экспериментом не реализуются. Изменения поведения/выбор модели требуют отдельного согласования по результатам.
+
+
+#### 54.6 Результат — 20 живых вызовов, повторов0
+
+Все20 ответов received: Qwen10/10, DeepSeek10/10. Runtime/config/widget не менялись, цены/ссылки/заявки не исполнялись. Qwen parser:current1/5, безsource2/5. DeepSeek parser:5/5 в обоих вариантах. Это не20 успешных диалогов: DeepSeek на обоих mixed написал английское обещание «I'll answer about Nobel implants and ... price», а не объяснение; Qwen mixed не дал текста. Qwen при удалённом source-tool на NObelavailability вызвал show_price, цены отвергались из-за строковых target/volume. Удаление только source-маршрута не устраняет неверный выбор других инструментов.
+
+DeepSeekavailability/гарантия содержательны; аргументы цены — корректные объекты, source warranty и mixed существуют и указанные MD-якоря проверены offline. Возможность prose+tools продемонстрирована, устойчивость не аттестована. Нельзя объявлять10/10parser полноценным успехом. Ни перенос формата в JSON, ни переключение runtime не выполнены. FullContext builder/tenant один для моделей, известный prompt header model_snapshot сохраняет Qwen как в текущем builder; history гарантии синтетическая с JSON Demo-offer. Глубину истории/UI/replay/price materialization этот эксперимент не проверяет.
+
+Astra независимая проверка: лимит/изоляция текущего запуска соблюдены, вывод о неготовности обоих вариантов подтверждён. Ablation удаляет весь source-абзац, включая соседние инструкции про ads/directmarketing, поэтому не доказывает строгую причинность одного tool. SDK direct max_tokens1024/timeout45s/thinkingoff вместо runtime max_completion_tokens/timeout20s; сравнение внутри провайдера одинаково, точная runtime-эквивалентность не заявлена. Счётчик source в script проверяет форму, не authority/UI. Одна попытка на case/variant — диагностическая выборка, не процент надёжности.
+
+Artifacts ignored logs/native-model-probe-20261012/manifest.json и attempts.json; синтетические вопросы/ответы, ключи не сохраняются. Всего Qwen409724tokens, DeepSeek484528tokens; стоимость не оценивалась. Бюджет20 исчерпан. Решение: §54 не закрывать на основании offlinePASS, не внедрять tinyJSON автоматически; DeepSeek перспективнее для следующей согласованной runtime-проверки, но смешанный ответ/source-механика остаются открытыми. Stagingempty, HEAD e4a098a, commit/push/PR нет, foreignWIP сохранён.
+
+
+### 54.7 Аудит общей недоступности ordinary диалога — owner GO 2026-10-12
+
+Владелец сообщил сбои pain/survival/anesthesia, явно разрешил полноценный Astra audit, дополнительные логи и живые вызовы. Это диагностический аудит/эксперимент, не изменение runtime. Branch/baseline/root прежние e4a098a / codex/model-price-experiment / C:/Cursor Projects/artgents-bot-active; origin/main/mergebase efa3f77, stagingempty. Allowlist: scripts/probe_d2_outage_chain.py(new), Interface/Roadmap/Ledger. §54runtime и foreign§46/MD/experiments сохранить. Новые данные в ignored logs/outage-chain-20261012, без keys/личной истории.
+
+Жёсткий бюджет25:20Qwen (5synthetic cases×4варианта),5DeepSeek current. Варианты Qwen:current native, безtools с неизменным prompt, native tools с раскрытием локальных $ref и прямым type:object для объектных полей (экспериментальная проекция с сужением explicit null; omission остаётся, runtime-схемы не меняются), pre54 JSON transport/schema/instructions из Git baseline с текущими Demo-фактами. Это не полный исторический runtime snapshot и не предложение вернуть envelope. 5cases:Nobelavailability, fearpain, implanthealingduration, anesthesiapain, one-toothNobelprice. No retries/actions/HTTPbotcalls. SDKwire записывает tools+messages hashes и schemas, usage/finish/rawoutput; parser отдельно от semanticquality. Сравнение исторического формата изменяет prompt/schema вместе, causalclaim только всей формы подключения. Затем actualpath/offlineaudit и независимый вывод Astra.
+
+§54.7 allowlist дополнен core/d2_diagnostics.py и tests/test_d2_diagnostics.py. Bug fix observability: известные native ошибки добавить в закрытый перечень причин, чтобы source-only не назывался invalid_envelope. Новых логовых управляющих полей, текста/ключей/PII нет; принятие ответа/HTTP/память не меняются. Старые reason defaults сохраняются для неизвестных ошибок, полный исторический suite не мигрируется в этом исправлении.
+
+
+#### 54.7 Итог полного audit и причинного эксперимента
+
+Подтверждена общая регрессия ordinary пути при native tools §54, не пустота корпуса и не устаревший runtime. Последние actual traces2b638e3c3d5b409182773a066e6362fc (healing) и14400e3d653b4d1f8406f18a52fa7e14 (pain/anesthesia) fresh turn0/pairs0, текущий prompt, около41kinput; provider textempty +content_source, finish_reasontool_calls,90/98outputtokens. До materialization/history/commit не доходит; rollback→SSEerror→widgetgenericmessage. Существующие app.jsonl и full_audit достаточны; private/newpayloadlogging не добавлялось.
+
+25новых живых попыток received, retries0:20Qwen+5DeepSeek, общийusage1057169tokens. Qwencurrent1/5parser и1/4ordinary; Qwentools_off5/5parser и4/4ordinaryсодержательно; Qweninlined1/5parser и0/4ordinary; baselineJSON5/5parser и4/4ordinary; DeepSeekcurrent4/5parser и3/4ordinary, anesthesiasource-onlyFAIL. Tools-off сохраняет весь текущий prompt/corpus, изменена только доступностьtools. Это сильное свидетельство, что fullcontext/modelordinaryспособность работает, а новый interface/channelprotocol не обеспечивает конечный текст. Исчезновение tools не готовая runtimeзамена: нет источников/прайскарточек; tools-offprice просит уже заданный объём. Один case/variant неоценкадолгосрочнойнадёжности.
+
+Вторая проблема — schemas: experimentalinline/$ref/discriminator removal+directobjecttype превратило target/volume из строк в объекты. Менялись несколько представлений одновременно и narrowedexplicitnull, поэтому конкретный providerparser неизвестен, API-safeproductionprojection не утверждена. InlinedQwenprice дополнительно выдумалoption_idone_tooth, не существующий уclassic. Parseraccept не карточка. Первичный источник гипотезы directtype→conversion: официальный опубликованный Qwen3CoderToolParser, но не доказательство использования этого кода DashScopeqwen3.8flash. Утверждать «модель сама не умеет оформить объект» по этому симптому нельзя.
+
+BaselineJSON — кодschema/instructions изGit e4a098a с текущимиfacts; показывает различие способовподключения, не полныйhistoricalruntime и не разрешение вернутьоболочку/старые решения. DeepSeek не устранениеобщего sourceonly. Финальное архитектурное заключение Astra: REJECT readiness§54. Нативная передача не гарантирует конечную prose вместе с metadata/action tools при одномвызове; второйвызов/repair/fallback/новыйoutputcontract автоматическинеразрешены. Цельfullcontext/модельные смыслы не отменены; сменить нужноспособпередачи, новыйканал/пометки требуютсогласования, не внедрялись.
+
+ActualHTTP/SSE replay захваченныхответов offline12PASS:sourceonly→400/SSEerror; валиднаяproseсохраняется; DeepSeekprice даётclassic.one_tooth.nobel101200; inlinedQwenpriceне даёткарточку. Действующаямодель не вызывалась повторно, входыsyntheticDemo, localisolatedDB. Artifact logs/outage-chain-20261012/test_recorded_chain.py и attempts.json, schemas.json, manifest.json ignored. НеliveUIсертификация, неCI.
+
+Изменение runtime толькоobservabilitybug:3finite nativecodes в_REASONS, не новые управляющиеполя/ответы. Root3PASS и independentfocusedAstra3PASS; SECRETневыводится, diagnosticcontextreleased. AstraPASS толькоэтомуloggingfix, nativeготовностьREJECT. finish_reason на самомделе уже был вapp.jsonl; первая формулировкааудитора о егоотсутствии исправлена. Старыйinvalid_envelope остаётсяdefaultдляunknownerrors, известныйsourceonlyтеперьлогируетсяточно.
+
+FinaldiffcheckPASS, stagingempty, HEADe4a098a, commit/push/PRнет. ОстальнойWIP§54/§46/MD/prototypes/experimentsсохранён. Новыхruntimeformat/memory/providerendpointchanges нет. Требуется решение озаменеsource-as-tool канала с сохранениемprice/UIauthenticity иполноценнойprose; текущий§54закрыватьнельзя.
+
+
+### 54.8 Изолированный text-tail прототип — owner GO 2026-10-12
+
+Владелец разрешил приступить к решению/тестовым правкам после предложения native plain prose +optional trailing metadata безAPItools/rootwrapper. Изолированный прототип replacement, runtime-упрощение ещё не реализовано: действующийnative путь покаreachable и не подменяется. Цель:до ordinarypublication зависит от получения prose одновременно сAPItoolcalls; послеодин обычныйтекст вmessage.content иoptional< D2_META >tail, domainactions/sourceclaims разбираются отдельно отprose. Удаляемая зависимость впрототипе — API function-call завершениеordinaryответа. Единственныйвладелец смысла модель, §3не меняется; price/source/UI/leadguard владельцы прежние. Никаких новыхsemanticfields/classifier/memory/retry/repair/secondcall/new-to-old adapter.
+
+Preflight root/topC:/Cursor Projects/artgents-bot-active, branchcodex/model-price-experiment, HEADbaselinee4a098a, origin/main/mergebaseefa3f77, stagingempty. Exactallowlist: scripts/d2_text_tail_protocol.py(new); scripts/probe_d2_text_tail.py(new); tests/test_d2_text_tail_protocol.py(new); Interface/Roadmap/Ledger. ОстальнойWIP§54/§46/MD/scripts/prototypes сохранить. Astra ужеconsulted: boundaryGOoffline, no runtimeauthorization fromagent. Бюджет первогоowner-authorizedliveэтапа12:6Qwen+6DeepSeek, retries0; результатыignoredlogs/text-tail-probe-20261012. ТолькоsyntheticDemo; ключи/личныечаты не сохранять.
+
+Format один exact reserved openerнаотдельнойстроке <D2_META>, closing </D2_META>, объектсoptional sources/actions. Keysконкретизируют ownerapproved source/actionроли, безновыхсемантическихрешений; actionname/arguments существующиеdomains, serverIDsсам. Повреждённый/незакрытый/повторный хвост сохраняетproseprefix, неисполняетхвост. Неугаданныеопечаткимаркер не распознаются (известноелимитационное поведение, неheuristics). StrictduplicateJSONkeys. Structurallyvalidtail:invalidprice сохраняет rejectedpriceвпорядке; invalidsourceсохраняетempty slot/multiplicity; handoffvalidexclusive. Plainproseбезtailуспех; priceonlyvalidallowed; sourceonly/empty/allrejected безproseFAIL. Verifieddocument server task сохраняетисточник/идентичность. Никакогоprice/sourceauthority/leadrouting вparser.
+
+Offlineadverse parsercases→realHTTP/SSEisolated downstreamtests→independentChecker→liveprotocolprobe. CasesNobel,pain,healing,price,mixed,warrantyafter syntheticcardcontext. Источники/codeprice исполнение надо проверить separately;parseraccept неwholebotPASS. Исправление runtime будетследующим checkpoint толькопоследоказательств, с удалениемnative reachableструктур, не параллельнымfallback.
+
+
+#### 54.8 Итог прототипа
+
+Изолированный parser и actualFullContext prompt-builder реализованы в scripts/d2_text_tail_protocol.py; liveharness scripts/probe_d2_text_tail.py. Runtime не импортирует их. tests/test_d2_text_tail_protocol.py заменяет только parserboundary в изолированной fixture, создавая domainresult напрямую, не tool/envelopeadapter. Обычныйtext незалежим отвалидностихвоста. Metadata shape/firstprice/order/multiplicity/handoff/knowndoc сохраняются. Exactclose-line уточнение добавлено поCheckerP2, focused7PASS; markerопечатки не угадываются и могут отображаться какplaintext — ограничение, не скрытаяrepairветка.
+
+Первыйrootrun21PASS/1teststripFAIL/6missingfixtureERROR: исправленfixtureimport и сравнениеtext.strip, runtimeне менялся. Затем24PASS/4FAILиз-за неверныхтестовыхIDценовойкнопки/ссылки, исправлены толькоtestsнареальныеpublishedrefs, focused4PASS. НезависимыйAstra28PASS; новыйclose-linecasefocusedPASS, всего29distinctofflinecases, без повторногоfullrun. Deepprice101200, exactbutton withoutmodel, history, sourcefollowup и adversetail выполнены действующимdownstream. CheckerPASS толькоprototype, не runtime replacement.
+
+Живыхcalls12(6Qwen6DeepSeek), attemptsreceived12, finishstop12, retries0, tokens509475. Каждыйинформационный/смешанныйcase содержит настоящуюрусскуюprose, английскогообещаниянет. Все4 priceactions правильноуказываютclassic,nobel_biocare,extentone_tooth, безвыдуманногоoption. Все12parsed,0rejectedactions;price-onlyQwen допустимо безprose. Corpus/realbuilder общий;warrantyhistory syntheticJSONDemooffer,неwidgetprojection. NativeAPItools иresponse_format не переданы. Это 1case/model, неоценкадолговременнойнадёжности;card/authority изparseracceptневыводятся.
+
+Далееcapturedlive12replay черезactualHTTP/SSE24PASS:price/mixedexactofferclassic.one_tooth.nobel101200,ordinaryproseсохранена,markersневиднывanswer/history,fearlinks обоихmodelsведутвknownserverdocumenttask, следующийinputполучаетpublishedhistory иshownofferIDs. Ниодногоновогоprovidercall приreplay. FixtureisolatedlocalDB, networkblocked. Artifacts ignoredlogs/text-tail-probe-20261012/attempts.json,manifest.json,test_live_tail_replay.py;no keys/privatechat.
+
+Astra liveassessment: всеуказанныефайлы/якорясуществуют, 1годгарантии/странаNobel groundedDemo. Qwenwarranty имеетневернуюserviceпривязкуclinicMD, mixedwarranty неверныйtopic; existingauthorityguardrejectssource,proseсохраняется. Healingнесколькоразныхsources → commonfollow-upне выводится какраньше. DeepSeekчастоопускаетtarget,currentguardпринимаетsourceasclinic; это не proofструктурированнойserviceпамяти. Этиlimitationsненормализуются/нечинятсяскрыто. Полнаяlead/privacy/medicalматрица иstale/foreign/replay будутнужны вruntimecheckpoint,неаттестованыprototypePASS.
+
+Следующийэтап:перенестиодинtext-tail путь вactualprovider/parser, убратьnativeAPItools иихобычнуюreachableобработку, обновить§3/interface/currenttestsпоownerрешению безfallback/параллельногоформата. Nativeлокальныйботпока прежний,не объявлять егоисправленным. Не создаватьновыесценарии илиsourceподборкодом. Послеcoherentimplementation targetedoffline+Checker, затемCursor/widget/commitpush. HEAD e4a098a/stagingempty/commitpushнет,foreignWIPсохранён.
+
+
+## 55. Один рабочий text-tail путь — owner GO 2026-10-12
+
+Владелец разрешил проверить Git/docs и, если всёвпорядке, выполнятьruntimeперенос. GitHubHEADtask e4a098a совпал сlocal, main/mergebase efa3f77; unmerged/stagingempty. Root/topC:/Cursor Projects/artgents-bot-active; branchcodex/model-price-experiment; taskbaseline e4a098a, не новаяветка. Backup49WIPfileszip+hashmanifest+trackedpatch вignoredlogs/pre-stage55-20261012. Старыйkilo worktree иcheckout не трогаются. §53pushed, §54native не принят/не committed,§54.8prototype отдельноPASS; несмешивать статусы.
+
+Архитектурное упрощение replacement:до API native tools+отдельный providerreply объект, требованиеготовойproseодновременносtoolcall; послеproviderplainstr+optionalmetadata tail иодинparse_d2_text_reply напрямую вexistingdomainresult. Удаляемзависимостьordinaryпубликацииотtoolcallканала, classesD2ProviderReply/D2ToolCall, native tools/parser/schema ивызовыtools/tool_choice изactualprovider. Модельsolemeaningowner; Target§3 authoritative, price/UI/sourceauthority/lead/resolversне меняются. Версияprompt45. Предыдущиеprototypeconditions/JSON wrapperнеfallback и неparallelruntime. Historicalnativecodeкарантинтолькоscriptsarchive, изcore/contracts/routesнеимпортируется. Непроверенныеsourcebindingsнечинятсяheuristics.
+
+Exactallowlist: contracts/d2_dialogue.py; contracts/d2_dialogue_result.py; core/d2_live_provider.py; core/d2_dialogue.py; core/one_call_prompt_contract.py; core/d2_diagnostics.py; core/response_plan_materialization.py (existing§54 WIP толькоsourcehandling); scripts/native_transport_archive.py(new); scripts/d2_text_tail_protocol.py(remove duplicatedprototypeimplementation, oldbackup сохранён); scripts/probe_d2_native_models.py; scripts/probe_d2_outage_chain.py (historicalimportquarantine); scripts/probe_d2_text_tail.py(actualbuilder/parser); tests/test_d2_native_reply.py and tests/test_d2_native_http.py (replace/archive backups); tests/test_d2_text_reply.py(new); tests/test_d2_text_http.py(new); tests/test_d2_text_tail_protocol.py(actualparser,nofixturepatch); tests/test_d2_diagnostics.py; docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md; docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md; docs/tasks/DEMO_D2_TARGET_CONTRACT.md. Necessaryextensionобъяснитьдоstaging. §46catalog/facts/sixMD/14EOLMD/testWIP, foreignprototype/experimentsнеизменять. §46knownproviderpromptlineсохранить/исключитьизcheckpointstageпрификсации.
+
+Astra consultGOwithinownerdecision. Испытанныйпротоколпереноситсявербатим; no new control/semanticfields/states/memory/retry/calls/new-oldadapter. История/TTL, actionorder(firstinvalidprice), sourcesmultiplicity/invalslots, exclusivehandoff, checkedknown-doc/pricebutton сохраняются. Providerknown/plain одинcallбезtools/responseformat. OrdinaryJSON-lookingtextнеinterpretedcommands. Protocoltypo limitationдокументирована, repairне добавлять.
+
+Targetedoffline realJSON/SSE,adversemetadata,точныйoffer/amount, tab/detail/replay, source+history, first-pricefail, childpolicy, unknownbrand, book/privateintake, foreign/staleUI, known-taskoverride. IndependentCheckeractualcallpath, затемCursor+виджет. Никакихmerge/deploy. Commit/pushтолькопослеприёмкиcoherentcheckpoint; текущийGitпроверен, новыеcheckpointнефиктивнопомеченыpushed. Liveownerauthorization действует, каждоеиспытание boundedбезretry иссчётчиком; лимитызадаютсяотдельновкарточке передсетью, нетавтоматическогоretry.
+
+§55 test-only allowlist расширение: tests/test_d2_input_boundary.py и tests/test_d2_lead_cancel_ui.py. Обновляются только fake output fixtures под действующую строку/хвост; assertions privacy, короткихпродолжений/replay иphone-cancel UI сохраняются. СтарыйJSONwire здесь отменёнвладельцем, не fallback и не baseline failure. Дополнительно вновомtextHTTP проверяютсяforeign/staleUI иmixedbooking/intake.
+
+### 55.1 Интегрированный live budget
+
+После95+20+6rootofflinePASS иscopedindependentCheckerPASS, ownerliveauthority реализуется отдельнымжёсткимлимитом6HTTP/SSErequestsклокальному9001 (SDKretries0, eachrouteonecallguard). СинтетическиеuniqueSIDs: Nobelavailability→classicNobelone-toothprice→warranty; fear→verifiedfollowup; healingfresh. Нетличныхконтактов/booking/SMTP, noactionretries. GET /health/ready неprovidercall. Reserveвignoredlogs/stage55-live-http/attempts.json докаждогоPOST. Необъявлятьprototypeдоказательства liveсервером; этиданные отдельны.
+
+
+### 55.2 Итог реализации и доказательства
+
+Архитектурное упрощение выполнено для обычных информационных вопросов и смешанных ответов. До: native API tool мог закончить ход одной ссылкой без текста. После: provider возвращает одну строку, готовый текст публикуется независимо от необязательного metadata tail. Удалены действующие D2ProviderReply/D2ToolCall, native tools и native parser; оба provider не отправляют tools/tool_choice/response_format. Исторический код изолирован в scripts/native_transport_archive.py, runtime его не импортирует. Дублирующий prototype parser удалён; тесты и probe используют действующий parser напрямую. Версия prompt 45. Смысл отвечает модель; ответственность Target Contract §3 не изменена.
+
+Добавлены parser необязательного хвоста и проверки действующего строкового ответа вместо native fixtures. Существующие actions и source claims сохранены, серверные идентификаторы модель не назначает. Повреждённый распознанный хвост не отменяет уже написанный текст; неправильная цена не превращается в другую цену. Пустой ответ или только источник без текста остаётся ошибкой. Known document и кнопки карточки выполняют сохранённую серверную задачу. Изменения materializer относительно сохранённого §54 — только переименование native source identifiers. Privacy/lead, foreign/stale UI, price/medical guards не ослаблены.
+
+Offline root: основной набор 95 passed, дополнительные guards 20 passed, diagnostics 6 passed — 121 различных случаев, не полный CI. Независимый Astra Checker: scoped PASS; 46 passed, 6 deselected, реальный путь /ask и /ask/stream прослежен. Проверены отсутствие параллельного native пути/адаптера, сохранение assertions старых 15 HTTP tests, добавленные privacy/UI guards. В независимой проверке provider/browser/SMTP вызовов ноль.
+
+Интегрированный live: ровно 6 POST к работающему серверу 9001, HTTP 200 для всех, provider_attempts 1 и finish_reason stop для каждого. Nobel availability, classic Nobel one_tooth (classic.one_tooth.nobel, 101200), гарантия по показанной карточке, страх боли, проверенная follow-up ссылка, приживление. Видимых metadata markers и технических отказов нет. /health/ready 200; startup подтверждает prompt 45. Синтетические беседы без личных контактов, записи и SMTP; retries ноль. Артефакты ignored logs/stage55-live-http/attempts.json. Никакой замены Qwen на DeepSeek не выполнялось.
+
+Ограничения: шесть примеров не доказывают долгосрочную надёжность. Ошибочная привязка источника по-прежнему может убрать follow-up, сохранив текст. Опечатанный delimiter не угадывается и может попасть в текст. Редакторские огрехи модели (например, латинская G в слове «гарантия») не исправляются скрытым переписыванием. Исторические wire suites не мигрированы целиком и не объявлены зелёными; прежние каталог/маркетинг/текстовые долги не закрываются этим PASS. Новых baseline failures этот targeted набор не выявил; полный CI не запускался.
+
+Git: root/top C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment; HEAD/baseline e4a098a72c1faa6b987ee1b9d9ce8c7c2bc051b1; origin/main и merge-base efa3f773bcf10891e2997addf8bbec38c7ae1317. Remote task HEAD совпал при проверке. Staging пуст, commit/push/PR/merge/deploy §55 не выполнялись. Foreign WIP manifest hashes не изменились. При последующей точной staging необходимо исключить сохранённую §46 commercial fact строку в core/d2_live_provider.py и все чужие файлы. Подробный allowlist приведён выше.
+
+### 55.3 Приёмка Cursor и виджета
+
+Промпт Cursor:
+
+Проведи read-only независимую приёмку §55 в C:/Cursor Projects/artgents-bot-active. Ветка codex/model-price-experiment, baseline/HEAD e4a098a. Прочитай AGENTS.md, docs/WORKFLOW_CHECKER.md, актуальный верх Roadmap, Interface Task §55 и Target Contract §3. Сверь точный allowlist и foreign WIP; не редактируй, не stage/commit/push и не делай provider calls.
+
+Сначала прочитай изменённые тесты, затем проследи actual /ask и /ask/stream → provider → parser → исполнение → history. Проверь архитектурную цель: обычный ответ действительно больше не зависит от API tools/native reply/root JSON; старые пути не reachable, нет fallback, new-to-old adapter, второго разбора смысла, дополнительного вызова, памяти или фразовых сценариев. scripts/native_transport_archive.py допустим только для исторических probes. Metadata tail необязателен и не должен отменять написанную прозу. Проверки цены/источников/UI/lead остаются у прежних владельцев. Нельзя выдавать PASS за одну лишь правку промпта или happy-path fixtures.
+
+Проверь adverse outputs: malformed/empty/source-only tail, first invalid price, соседний текст, known document override, цена/состав/таб/replay, неизвестный бренд, детская цена, foreign/stale UI, private intake и mixed booking. Assertions не ослаблены. Запусти целевой offline набор: tests/test_d2_text_reply.py, tests/test_d2_text_http.py, tests/test_d2_text_tail_protocol.py, tests/test_d2_input_boundary.py, tests/test_d2_lead_cancel_ui.py, tests/test_d2_diagnostics.py. Используй отдельные BOT_LOG_DIR и pytest basetemp. Failure сравни с baseline, не называй прежний долг регрессией без доказательства. Полный historical CI не является этой узкой приёмкой. Дай PASS/REJECT отдельно для архитектуры и поведения §55, конкретные риски и пределы доказательств. Foreign §46/MD/prototypes/experiments исключены из PASS; весь бот и маркетинг не аттестуются.
+
+Ручная проверка виджета после обновления страницы, в новой беседе:
+1. «Я боюсь боли» → обычный ответ и follow-up; нажать ссылку → содержательный ответ.
+2. «Вы ставите Nobel?» → ответ; «Сколько стоит классическая имплантация Nobel на один зуб?» → карточка; «А гарантия?» и «Это всё включено?» → обычный ответ с учётом карточки.
+3. Переключить вкладку и спросить «Что входит?» → модель учитывает выбранную карточку; кнопка «Что входит» также работает.
+4. «Где вы находитесь?» → контакты; затем новая услуга → смена предмета разговора.
+5. В новой беседе «Какая приживаемость имплантов?» → обычный ответ.
+
+Фиксировать любые технические отказы, пустые ответы, видимые markers, потерю источников и несовпадение суммы/выбранного варианта. После Cursor и подтверждения виджета — точный checkpoint commit/push. Сейчас остановка на приёмку, не завершение всей дорожной карты.
+
+
+### 55.4 Целевой сравнительный эксперимент — owner GO 2026-10-12
+
+Владелец разрешил изолированное сравнение текущего tail и одного API-tool show_price, живые вызовы разрешены. Это диагностический эксперимент, не исправление runtime и не архитектурная приёмка. Root/top C:/Cursor Projects/artgents-bot-active, branch codex/model-price-experiment, HEAD/baseline e4a098a, origin/main/merge-base efa3f77. Foreign WIP и §55 сохраняются. Exact edit allowlist: scripts/probe_d2_price_transport.py (new), этот отчёт. Артефакты только ignored logs/price-transport-20261012. Рабочий бот не переключается, commit/push нет.
+
+Жёсткий бюджет 32 вызова Qwen: 8 фиксированных входов × 2 транспорта × 2 повтора. SDK retries=0, temperature=0, max_completion_tokens=1024. Семь сохранённых provider inputs реальных Demo-продолжений плюс свежий mixed из текущего builder. Одинаковые история/база у каждой пары; это paired frozen-context replay, не end-to-end динамические цепочки. Никаких отправок заявок. Оценка отдельно: наличие действия, валидация аргументов, текст/суммы/дубли, mixed explanation. Успех parser не считать успехом выбора предложений или widget. Единственное транспортное изменение — show_price передаётся API tool; sources и прочие неиспользуемые действия сохраняют прежний tail. Проверка не закрывает весь контракт остальных действий. До живых вызовов проверить harness offline. Новые вызовы сверх32 запрещены без отдельного объявленного бюджета.
+
+
+#### 55.4 Результат Qwen A/B
+
+Выполнены ровно 32/32 вызова, без сетевых ошибок и retries; Qwen3.8-flash, temperature=0, лимит1024, всего1267439tokens. Рабочий сервер не переключался. Артефакты logs/price-transport-20261012/manifest.json и attempts.json (ignored). Повторы чередуют порядок вариантов. Тест сравнивает замороженные provider inputs, не новые динамические цепочки и не публикацию в виджете.
+
+До сети Astra проверила harness: исправлены nullable schema narrowing и неравная domain validation. После исправлений GO; transport decoding различается, strictJSON/PriceOperation/activeclarification checks одинаковы. Это эксперимент с nullable API schema, а не доказательство всех возможных способов описания tool Qwen.
+
+Tail: 8/12 ценовых ходов содержали структурно допустимый show_price. Это не 8 успешных ответов: «Один зуб» в первом повторе сам выбрал classic, во втором потерял Nobel; mixed в обоих выбрал classic без явного метода. Цена после Nobel пропущена в обоих повторах; в первом неправильный opener '<\nD2_META>' опубликован как текст, во втором расспросы. All-on-6 в обоих без допустимого действия: первый содержит show_price с недопустимым extent="jaw" и суммы в прозе, второй вообще без действия, с вводной/вопросом объёма. Направления implantation/prosthetics переданы правильно в обоих повторах. Обе вводные implantation совпадают с renderer и сохраняют риск дубля. Nobel informational оба отвечены; warranty оба содержат объяснение, но в первом протёк неправильный marker. Итого2 marker leaks, не скрытые parser errors.
+
+Один API-tool: 16/16 ответов содержали вызов show_price и пустую прозу; все16 имеют неверно строковый target, многие также volume. Валидных действий0; на4 информационных ходах Nobel/гарантия цена запрошена не по делу. Mixed потерял объяснение2/2. Даже исправление shape не исправило бы эти смысловые ошибки. Автоматической конвертации строк/repair не добавляли.
+
+Оба варианта не проходят поведенческую приёмку. Single-tool не подтверждён как улучшение на этом Qwen/input/schema; это не универсальный вывод обо всех моделях/API tools. Tail сохраняет разговор лучше, но не обеспечивает согласованную цену. Промпт поведения, история и corpus не очищались: проверено именно исходное транспортное сравнение, не эффект удаления вводных/сумм. DeepSeek не вызывался. §55 остаётся непринятым; никаких выводов «проблема решена» или смены рабочего формата нет.
+
+Файлы этапа: scripts/probe_d2_price_transport.py и этот отчёт. HEAD e4a098a, staging пуст, commit/push/PR/merge/deploy нет. Runtime и foreign WIP не менялись. Дальнейшие изменения требуют обсуждения результата; новый бюджет в32 не входит.
+
+Независимая Astra проверила все32 результата: оба варианта не проходят; только4/12 tail ценовых ходов явно сохраняют нужную область запроса, три сужают доclassic, один теряетNobel. Уточнение поAll-on-6 учтено выше. Review read-only, дополнительныхвызовов0.
+
+
+### 55.5 Три изолированных кандидата — owner GO 2026-10-12
+
+Владелец разрешил подготовить и испытать решения на Qwen/DeepSeek. Неизменённые два Qwen-кандидата §55.4 исключены из повторов. Сейчас DeepSeek-flash, thinking disabled, temperature0, budget80 max, retries0: clarifiedtail16; tool+standardcompletion до32; separatepriceextraction+writer до32. 8 пользовательских ходов ×2 повтора ×3 кандидата, плюс проверенные клики без модели. Каждый вариант накапливает собственную опубликованную историю через isolated actual /ask. ДанныеDemo скопированы, сервер9001 не переключается. Без заявок/SMTP.
+
+Preflight root/top C:/Cursor Projects/artgents-bot-active; branch codex/model-price-experiment; HEAD/baseline e4a098a; origin/main/mergebase efa3f77. Foreign§46/§55/MD/prototypes сохранены. Exactallowlist: scripts/d2_card_candidates.py(new), scripts/experiment_d2_cards.py(new), tests/test_d2_card_candidates.py(new), этот отчёт. Это эксперимент с разными обязанностями, не runtime fix, не чистый A/B одной переменной. Дополнительные поля classifier и второй вызов разрешены только внутри испытания; внедрение не согласовано. Existing runtime parser bridge используется только в harness для сравнения реальных карточек, не новый fallback приложения.
+
+Общие inputfacts/history, свежие actualprojections; убрать только introduction_text/unknown_extent_text из direction metadata для модели, не цены/состав из истории. Общий контракт: известное направление/услуга нацену→price, не выбирать метод за пациента; mixed сохраняет объяснение. Tail один вызов, tool auto один вызов плюс максимум один стандартный writer после pricecall (не retry), classifier отдельно определяет price args и самостоятельный текстовый вопрос; writer исполняет только его, ценовое решение не пересматривает. Live результаты включают failures, стоимость/latency/calls, а не только parseraccept. Условные клики только опубликованнымиrefs, при отсутствииcard фиксировать отсутствие, не подставлять правильнуюисторию.
+
+#### 55.5 Результат и независимая проверка
+
+Выполнены 66 из разрешённых максимум 80 сетевых вызовов DeepSeek-flash, без повторных попыток: tail 16, tool + completion 28, split 22. Всего 3 048 636 токенов. Это 48 пользовательских текстовых ходов через изолированный настоящий /ask, из них четыре HTTP 400. Артефакты: ignored logs/cards-deepseek-20261012/live/attempts.json и turns.json. Сравнение меняет одновременно инструкции и способ взаимодействия; оно не доказывает универсального превосходства DeepSeek над Qwen. Денежная стоимость не рассчитывалась. Время отдельных вызовов сохранено в ledger; оно не равно задержке полного пользовательского хода с двумя вызовами.
+
+| Кандидат | Вызовы | Карточки в 12 ценовых ходах | HTTP 200 в 16 текстовых ходах | Поведенческие дефекты |
+| --- | ---: | ---: | ---: | --- |
+| Уточнённый tail | 16 | 12/12 | 16/16 | Повторы прозы, суммы в прозе; в одном All-on-6 модель ошибочно объявила протезирование отдельной оплатой при включённых временном и постоянном протезах |
+| Один show_price tool + completion | 28 | 12/12 | 16/16 | В обоих смешанных ответах опубликовано английское обещание получить карточку перед содержательным русским объяснением |
+| Отдельное извлечение цены + writer | 22 | 8/12 | 12/16 | Четыре технических отказа, самовольный classic, выдуманная сумма и видимые metadata в соседнем тексте |
+
+Четыре split-отказа вызваны несовпадением существующих схемы и валидатора: схема разрешает clarification:null, PriceOperation отклоняет явный null. Цена во всех четырёх случаях распознана; это не четыре ошибки классификации. Отдельно split четыре раза выбрал classic без запроса метода, три таких выбора опубликованы. В первом смешанном ответе опубликованы одновременно выдуманные 95 000 ₽, правильная карточка 101 200 ₽ и буквальный повреждённый D2_META. Разделение вызовов само по себе не удержало автора текста в его обязанности.
+
+Tool использовал обычный auto tool calling, не strict beta. После принятия аргументов второй вызов получал ACK accepted_for_card_rendering с аргументами, а не уже собранную карточку. Поэтому здесь не проверено заземление второго автора на фактически выбранном составе карточки. Первичная проза и completion объединялись, что оставило видимым английское обещание. Наличие правильной карточки не означает правильности всего ответа.
+
+Каждый кандидат действительно получал собственную опубликованную историю, включая последствия отказов; успешная история не подставлялась. Все шесть условных live-проверок смены вкладки пропущены: подходящего другого опубликованного варианта не было. Продолжение после переключения вкладки живыми вызовами не подтверждено. Offline smoke отдельно проверил 16 текстовых ходов и два настоящих переключения вкладки, HTTP 200, без вызова модели на клике. Финальный успешный smoke завершился уже после старта live; ранее были исправлены несовместимая fake-фикстура и предположение о наличии альтернативной вкладки у Nobel.
+
+Targeted unit tests: tests/test_d2_card_candidates.py — 6 passed. Финальный offline smoke — 18 ходов, exit 0, logs/cards-deepseek-20261012/offline-smoke-final/turns.json. Полный CI не запускался; существующие baseline failures не переаттестованы. Эти восемь типов ходов не закрывают medical/lead/privacy, возраст, оплату и отсутствующие бренды. Никаких browser/widget/live-tab доказательств этому эксперименту не приписывается.
+
+Независимая Astra прочитала реальные вызовы, публикации и историю: tool + completion наиболее перспективен в данном наборе, ни один кандидат не получает полного поведенческого PASS или разрешения внедрять его в runtime. Дополнительных provider-вызовов у Checker нет. Следующая работа — обсуждение единственного владельца окончательного текста и второго вызова, затем отдельный ограниченный эксперимент; текущий отчёт не разрешает менять архитектуру рабочего бота.
+
+Изменения только экспериментальные: добавлены два скрипта и шесть unit-проверок, дополнен этот отчёт. Runtime не менялся этим экспериментом, сервер 9001 не переключался. HEAD/baseline e4a098a, ветка codex/model-price-experiment; staging пуст, commit/push/PR/merge/deploy не выполнялись. Ранее существующие §55 runtime, §46, прочие MD, prototypes и экспериментальные файлы остаются вне этой приёмки. Результат — диагностическое сравнение, не завершение дорожной карты.
+
+### 55.6 Повторный изолированный эксперимент — owner GO 2026-10-12
+
+Владелец разрешил следующий ограниченный живой прогон после обсуждения: инструмент с фактической карточкой для автора текста, инструмент со strict-схемой, исправленная схема классификатора. Максимум 60 сетевых попыток суммарно, максимум 20 на кандидат, SDK retries=0. DeepSeek-flash, thinking disabled, temperature=0, max_tokens=1536. Strict проверяется на официальном beta endpoint; его отказ считается попыткой и останавливает этот вариант без fallback. Неизменённые Qwen-кандидаты повторно не запускаются.
+
+Классификация работы: диагностический эксперимент, не runtime bug fix и не завершённое архитектурное упрощение. Root/top C:/Cursor Projects/artgents-bot-active, branch codex/model-price-experiment, HEAD/baseline e4a098a, origin/main/merge-base efa3f77. Exact allowlist: scripts/experiment_d2_cards_round2.py (new), tests/test_d2_cards_round2.py (new), этот отчёт. Существующие runtime §55, §46, MD/prototypes и прежние экспериментальные файлы сохраняются. Commit/push/merge/deploy не входят в этот прогон.
+
+Одинаковые 11 текстовых ходов на кандидат: Nobel → цена → один зуб → гарантия; явная классика без бренда → настоящая опубликованная вкладка → состав → смешанный вопрос об обезболивании и All-on-6; имплантация → All-on-6; отсутствующий Osstem; повтор смешанного вопроса в свежей беседе. Один повтор смешанного вопроса, не два полных прогона всех цепочек. Не более двух модельных вызовов на текстовый ход. Проверенные клики модели не вызывают. Сохранение истории через isolated /ask, отдельные копии клиентов и SQLite, без SMTP и данных пациентов.
+
+В эксперименте два чистых вызова прежнего materializer при наличии завершающей прозы: первый собирает кодовую карточку после прежних policy/reference проверок, модель получает реальные rendered_text/UI/price, второй добавляет единственную окончательную прозу через прежний ExplanationOperation. Сравниваются price block, price-owned body parts, части цены и действия выбора вкладки; несовпадение завершает ход ошибкой. Commit/receipt/revision один. Это не утверждение об однократном подборе и не предложение оставить такой адаптер в runtime. Промежуточная tool-проза не публикуется; окончательную пишет completion. Writer не имеет исполняемого канала новых действий. Текст не исправляется фильтрами; его ошибки и видимые служебные строки считаются дефектом результата.
+
+Обычный tool и classifier получают схему без недопустимого clarification:null. Strict требует все ключи: null механически означает отсутствие только для clarification, age_group, context, payment_scheme, payment_scheme_intent и volume.extent/jaw, где домен допускает отсутствие, но не null. Уже допустимые null сохраняются; сломанные строки/объекты не исправляются. Все аргументы затем проходят прежнюю доменную проверку. Схема strict — экспериментальная кодировка, не новая схема рабочего бота.
+
+До сети: первоначальные 3 targeted offline tests passed, включая реальный HTTP → фактическая карточка → completion → один commit/replay → настоящая вкладка Nobel без модели → следующий вопрос с Nobel в сохранённой истории. Astra нашла P1 в экспериментальном information-only writer: он мог исполнить собственный action после price=null классификатора. До live исправлено через запрет tool calls и существующий combine, отвергающий actions; добавлен adverse regression. Полный targeted набор после исправления: 4 passed, независимый focused recheck PASS. Полная приёмка бота, источников/follow-up, заявки, medical и дизайна этим набором не выполняется.
+
+#### 55.6 Результат
+
+Завершены 56/60 попыток суммарно: 51 полученный ответ модели, три APIConnectionError в первоначальной sandbox-сети и два отклонения strict-схемы сервером до генерации. SDK retries=0. После сетевого ограничения использован разрешённый запуск с доступом к API; все прежние попытки включены в общий счётчик. Всего 2 408 225 токенов. Артефакты ignored: logs/cards-round2-20261012-live (3 connection errors), logs/cards-round2-20261012-network (основной прогон), logs/cards-round2-20261012-strict (исправление схемы, ещё API 400), logs/cards-round2-20261012-strict-final (принятая strict-схема). В каждой папке attempts.json; HTTP-публикации в turns.json. Модель в Runner — DeepSeek-flash; Qwen в обычном startup-логе не означает вызовы Qwen в этом эксперименте.
+
+| Кандидат | Всего попыток / ответов модели | Текстовые ходы | Доступные запрошенные цены | Настоящие табы |
+| --- | ---: | --- | ---: | ---: |
+| Обычный grounded tool | 20 / 19 | 11/11 HTTP 200 | 7/7 карточек | 1/1, без модели |
+| Classifier + grounded writer | 16 / 15 | 6/11 HTTP 200; пять HTTP 400 | 2/7 карточек | 1/1, без модели |
+| Strict grounded tool | 20 / 17 | 9 завершённых HTTP 200; последний ход не завершён по бюджету | 6/6 в завершённых ходах | 1/1, без модели |
+
+Osstem не входит в знаменатель доступных цен: правильное поведение — отсутствие карточки. Повтор mixed-вопроса E выполнен только у обычного tool и classifier; strict проверял общие первые 10 вопросов без E. Это небольшой направленный набор, не статистическая гарантия и не сравнение двух полных повторов всех цепочек.
+
+Обычный инструмент сохранил Nobel на «А сколько?» и «Один зуб» без самовольного выбора classic, показал направления и All-on-6. В информационных ходах лишних карточек не было. Настоящий клик Implantium → Nobel передал выбранную карточку следующему вопросу «Это всё включено?», состав и исключения совпали. В смешанных вопросах есть русский ответ об обезболивании и карточка; промежуточные английские обещания не опубликованы. Остался поведенческий дефект: на Osstem completion пересказывает уже готовый серверный отказ, затем публикуется и сам отказ — два похожих абзаца. Дубликат исключений у одномоментной цены тоже виден, но он уже содержится в замороженном кодовом результате, не добавлен новым автором текста.
+
+Classifier правильно распознал цену в пяти отклонённых ходах, но снова передал clarification:null, теперь вопреки исправленной схеме/инструкции. Это ошибки формы ответа, не пять промахов намерения. На «Один зуб» и Osstem также выбрал не запрошенный classic (первый ход отклонён, второй дал отказ по бренду). В информационном ответе после таба опубликовал суммы и буквальный inline D2_META; первый text_question содержал уже сформулированный ответ вместо вопроса. Принятый mixed после карточки дал содержательную прозу; этого недостаточно для PASS.
+
+Два отказа strict связаны с конструкцией экспериментальной схемы, а не неспособностью модели понять пользователя: nullable-преобразование повторно создавало вложенный anyOf без type. После исправления всех вложенных узлов, recursive offline test и focused Astra recheck схема принята beta API. Добавлено только механическое отсутствие optional TermClarification.choices при null; обязательные service choices:null не исправляются. Strict привёл аргументы к проверяемой форме, но в вопросе «А гарантия?» дополнительно вызвал цену и повторно показал карточку Nobel. Следовательно, успешная strict-форма не подтверждает правильность выбора действия.
+
+Последний strict Osstem: selection вернул допустимые implantation/osstem/one_tooth, но completion не вызван — достигнут предел 20 попыток для этого кандидата с учётом предварительных отказов. Существующий harness начал ход при одном оставшемся вызове; жёсткий сетевой guard запретил второй. Получившийся HTTP 400 классифицируется как budget-incomplete эксперимента, не ошибка модели/аргументов и не доказательство неправильного отказа по бренду. Лимиты не превышены; история после этого хода не тестировалась.
+
+Независимая Astra проверила реальную публикацию, историю, сохранность карточек, tab и все четыре ledger: PASS только исполнению эксперимента и учёту попыток. Ни один кандидат не получил полного поведенческого PASS; runtime adoption не разрешён этим вердиктом. Checker provider calls=0. Из локальных проверок четыре targeted tests passed; после изменения strict-кодировки focused schema test отдельно passed у root и Checker. Полный CI и исторические baseline failures не перепроверялись. Скрипт использует два чистых materialization и один commit; это диагностическое подключение, не готовая целевая архитектура.
+
+Вывод для обсуждения: обычный grounded tool наиболее перспективен в этом наборе. Следующее архитектурное решение — единое авторство окончательной прозы при кодовом отказе/готовом объяснении, с сохранением содержательной части смешанного вопроса. Не вводить фильтр по фразе Osstem и не объявлять второй вызов или strict универсальным решением. Рабочий сервер не переключался, новые runtime-правки не внесены. Branch codex/model-price-experiment, HEAD e4a098a; изменены только указанные новые скрипт/тест и этот отчёт; staging пуст, commit/push/PR/merge/deploy нет. Прежние WIP сохранены.
+
+
+## 56. DeepSeek + обычный show_price — owner GO 2026-10-12
+
+Baseline 08b5041 (WIP checkpoint предыдущих §46/55 и экспериментов, pushed).
+Папка C:/Cursor Projects/artgents-bot-active, ветка codex/model-price-experiment;
+origin/main и merge-base efa3f77. Foreign WIP: prototypes/ и 14 MD с line-ending-only diff.
+
+Классификация: замена транспорта ценового действия и исправление единого авторства
+финального ответа. Не объявляется завершением всего упрощения/REC-5.
+Решение владельца: DeepSeek Flash для всех ролей, обычный auto show_price, без strict
+и отдельного классификатора. Обычный вопрос — один вызов. Вызов цены — модель выбирает
+действие, код фиксирует результат, один дополнительный вызов пишет финальную прозу.
+Начальная проза при tool не публикуется. Нет retry, fallback на Qwen, нового контекста
+или ремонта аргументов. Полезная проза при пропуске карточки допустима; 100% гарантия
+карточки не является целью. FullContext и существующая история сохраняются. Чистка KB позже.
+
+До → после → удалённая зависимость: цена в необязательном D2_META → native show_price
+напрямую в PriceOperation → удалён исполняемый tail show_price и экспериментальный
+adapter/double materialization. Владелец выбора цены — модель; владелец сумм/вкладок —
+прежний resolver; окончательная поясняющая проза — completion. Проверки запретов
+остаются кодовыми, их результат передаётся completion; повтор готового отказа не печатается.
+Контакты, medical/lead/privacy и проверенные клики сохраняют владельцев Target Contract §3.
+Astra consult: сначала один frozen price/guard result, затем completion, затем существующая
+проверка sources и единая сборка UI/истории. Runtime не импортирует scripts экспериментов.
+
+Точный allowlist реализации:
+- config.py
+- llm.py
+- contracts/d2_dialogue.py
+- contracts/d2_dialogue_result.py
+- core/d2_live_provider.py
+- core/d2_dialogue.py
+- core/d2_diagnostics.py
+- core/one_call_prompt_contract.py
+- core/response_plan_materialization.py
+- core/chat_transport_policy.py (новый)
+- tests/test_d2_native_price_runtime.py (новый)
+- tests/test_chat_transport_policy.py (новый)
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md
+- docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md
+- docs/tasks/DEMO_D2_TARGET_CONTRACT.md
+- docs/tasks/DEMO_D2_CHECKPOINT_LEDGER.md
+Локальный .env переключается без коммита и вывода секретов. Другие runtime-файлы — только
+после объяснения необходимости. Прежние экспериментальные скрипты остаются отдельными.
+
+Приёмка: targeted offline JSON/SSE, обычный ответ, mixed price, отказ+информация,
+некорректные args/sources/actions completion, отсутствие commit при сетевом сбое,
+точные карточки/клики/replay/следующая история. Затем независимый Checker, bounded live
+с заранее объявленным бюджетом, Cursor и виджет. Ни PASS эксперимента, ни checkpoint
+не заменяет эту приёмку. Статус: реализация начата, live budget ещё не открыт.
+
+Allowlist расширен до правок: contracts/response_plan.py и core/response_text_renderer.py. Удаляется обязательная связка price_reference -> отдельный exact_text; основание отказа сохраняется, финальное объяснение — в проверенном content блока ответа. Без финальной прозы отсутствие текста отказа по-прежнему ошибка.
+
+
+### 56.1 Реализация и evidence
+
+Удалено: исполняемый show_price в D2_META, зависимость пояснения price_reference от
+отдельного обязательного exact_text. Экспериментальный adapter в runtime не добавлялся.
+Добавлено: native price tool schema из PriceOperation; внутренний D2PriceToolReply
+только на время хода; completion callable после frozen price/guards и до общей
+проверки sources/UI/commit; явный DeepSeek endpoint gate. Цена и guards выполняются
+один раз. Старый callback эксперимента с двумя materialization не используется.
+
+Начальный текст при native tool не публикуется. Существующие контакты/запись/off_topic
+из его metadata сохраняются как typed siblings; handoff остаётся исключительным.
+Второй ответ не может исполнять actions; tools передаются с tool_choice=none, как
+в выбранном эксперименте. Пустая готовая ценовая проза обозначается <NO_TEXT>.
+При отказе необходим текст объяснения. История/receipt пишутся только после завершения.
+Policy/brand источники остаются в request parts; запрет карточки/CTA сохраняется.
+Второй вызов тоже проходит обычный transport/admission/accounting. Retries=0.
+
+Локальный .env: CHAT_* и DEFAULT_LLM_MODEL переключены на DEEPSEEK_* (deepseek-flash).
+Прежние Qwen значения сохранены в DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL, QWEN_SAVED_MODEL;
+автоматического runtime fallback нет. .env не коммитится, ключи не печатались.
+FullContext/история/TTL/данные клиники не менялись. Из входа убраны только готовые
+introduction_text/unknown_extent_text настроенных обзоров: их печатает код.
+
+Offline: 43 distinct tests в test_d2_native_price_runtime.py + test_chat_transport_policy.py
+прошли по основному и focused-прогонам. JSON/SSE, frozen offer, source claims, история,
+replay, tab/detail/doc click, clarification roundtrip, отказ+информация, malformed args,
+completion actions/failure, контакты/запись/medical siblings. Целевой повтор2 JSON/SSE
+после tool_choice=none — PASS. Никаких реальных сетевых вызовов в pytest.
+Регрессионный набор response_plan_contract + response_plan_materialization +
+d2_input_boundary + d2_diagnostics: 146 passed, 12 failed. Все12 failure IDs диагностики
+воспроизведены на чистом08b5041 (28passed/12failed). Старые envelope/price-tail suites
+целиком не мигрировались и полный CI не заявлен зелёным. Новый negative test доказывает,
+что валидный прежний price-tail больше не исполняется; старый путь не оставлен ради тестов.
+
+Independent Checker Astra: начальный P1 — потеря non-price siblings рядом с native tool.
+Исправлено через прежние typed operations, focused recheck PASS. 43 distinct offline
+проверки независимо пройдены. Никакого отдельного распознавания фраз/новой памяти/retry.
+
+Live, explicit owner authority: первый hard budget20, затем дополнительный8; всего
+28/28 попыток, 17 HTTP-ходов, все ответы200, сетевых/провайдерских ошибок0, SMTP0.
+Использован реальный D2HttpProvider/llm transport и /ask,/ask/stream с изолированными
+тестовыми DB/tenant copies; не экспериментальный adapter, не browser test.
+Первый прогон16calls/10turns показал пересказ цены completion перед карточкой.
+После сохранения экспериментального tools+tool_choice=none и уточнения writer инструкции:
+4calls/2turns (чистая цена + mixed), затем8calls/5turns (Nobel→цена→один зуб→гарантия,
+общая имплантация). Финальные7ходов/12calls: pure prices завершаются NO_TEXT и карточкой;
+mixed сохраняет объяснение боли; warranty обычная проза; вводная цены одна.
+Последняя цепочка3.03–4.13сек полного локального HTTP; mixed focused5.44сек. Это небольшой
+направленный повтор, не гарантия latency/100% semantic reliability.
+Ignored evidence: logs/stage56-live, logs/stage56-live-focused, logs/stage56-live-chain.
+Все28calls: 1325723 total tokens по provider usage. Raw payloads не коммитятся.
+
+Остаточные риски: модель может не выбрать tool или выбрать неверные параметры;
+strict/classifier/фильтр ценовой прозы не добавлялись. Редактура длинных ответов и
+прежние повторы условий внутри карточок остаются будущей работой. Вопрос гарантии
+берёт действующий fact из базы; эта стадия не меняет медицинские/коммерческие факты.
+Полный свободный диалог, маркетинг §46/A6–A10/REC-5 не аттестуются.
+
+### 56.2 Cursor и ручной виджет
+
+Проверять только diff08b5041..checkpoint§56 по allowlist выше. Классификация — замена
+транспорта/исправление единого авторства. Проследить фактический /ask и /ask/stream:
+native show_price→PriceOperation→existing guards/freeze→completion с tools disabled→
+source binding/UI→single commit. Искать возврат оболочки, phrase rules, repair, retry,
+classifier, новую память/второй price resolver и обход medical/lead/privacy/ownership.
+Проверить mixed contact/booking/handoff, отказ+информацию, неисправные args/claims,
+completion actions/errors, replay/клики/историю. Не ослаблять assertions для PASS.
+Сверить live ограничения, не переносить PASS на весь бот. Запустить два новых test-файла;
+provider/network/SMTP запрещены проверяющему. Вердикт PASS/REJECT с конкретным call path.
+
+Виджет, новая беседа: Nobel ставите?→А сколько стоит?→Один зуб→А гарантия?;
+Сколько стоит имплантация?→All-on-6; mixed боль+All-on-6; Osstem;
+карточка→переключение вкладки→Что входит→Это всё включено?;
+информация о боли→реально показанный follow-up. Проверить отсутствие английского
+планирования и повторной ценовой вводной. Ручная приёмка ещё ожидается.
+
+Локальный виджет перезапущен штатным scripts/start_local_widget.ps1 2026-10-12.
+Startup подтвердил deepseek-flash, single_model=true, prompt_contract46;
+health/live отвечает200. Это локальный запуск, не deploy и не ручная приёмка виджета.
+
+
+## 57. Demo budget and short numeric input — owner GO 2026-10-12
+
+Bug fix/input allowance and demo configuration, not architecture simplification. Owner authorizes 30 billable calls per session and short numeric replies; other technical work deferred, price-card appearance next. Baseline 50be797, branch codex/model-price-experiment, root C:/Cursor Projects/artgents-bot-active, origin/main and merge-base efa3f77. Foreign 14 EOL-only MD and prototypes preserved.
+
+Allowlist: core/d2_demo_limits.py; core/d2_spam_gate.py; core/user_text_privacy.py; tests/test_d2_input_boundary.py; tests/test_d2_demo_session_budget.py (new); this document; DEMO_D2_DELIVERY_ROADMAP.md. Accept short ASCII integers (1–3 digits) and ranges of such integers as ordinary text. No semantic interpretation; model owns meaning. Shared lexical predicate, raw-source check prevents admitting stripped phone fragments. Existing contact masking/lead processing remain. Daily/IP quotas unchanged; price uses two calls. Offline JSON/SSE history/replay, contact/noise negatives, quota concurrency/boundary. No live calls required.
+
+Allowlist extension before staging: tests/test_user_text_privacy_contract_offline.py. Replace obsolete rejection of 123 with 1234; approved short integer acceptance is covered on JSON/SSE, contact assertions unchanged. First privacy run:62 PASS/1 obsolete numeric expectation, not labelled baseline failure.
+
+§57 evidence: first targeted input-boundary/native-quota run29 PASS (95.50s), JSON/SSE, real provider wrapper with offline transport, history/replay and atomic quota boundary. Added 123 case afterwards receives focused independent recheck. No live/provider/SMTP calls. Server auto-reload confirmed DeepSeek Flash / prompt46 and health200. Old quota HTTP fixtures using removed envelope are not migrated or declared green; new native transport coverage replaces no assertions in those files. Full CI not run. No model semantics, history limits, daily/IP budgets or lead state changes.
+
+Independent Astra Checker PASS scoped §57:72 PASS (privacy63, numeric123 JSON/SSE2, guards6, quota windows1); 95 distinct cases across executor/checker. Initial checker temp-directory permission errors resolved by writable scratch, no runtime failure. Exact8 staged files, diff check clean, foreign WIP preserved. No live calls. Owner can verify numeric continuation in widget; next priority remains price-card visual work, Cursor §56 pending.
+
+§57 follow-up owner GO: daily budget raised from200 to400 calls in rolling24h; session30/IP rules unchanged. Configuration-only, baseline9f83ce0. Exactallowlist:core/d2_demo_limits.py,tests/test_d2_demo_limits.py,this document. ForeignWIP preserved. Existing daily quota fixtures updated to400; focused expiry/IP test, no live calls.
+
+
+## 58. Approved price-card visual transfer — owner GO 2026-10-12
+
+Presentation bug fix/UX transfer, not dialogue architecture simplification. Baseline4cefc34, root C:/Cursor Projects/artgents-bot-active, branchcodex/model-price-experiment, origin/main/mergebaseefa3f77. Prototype approved incl tabs weight400, 13px captions/info, 14px accordion bodies and plain checklist ticks. Owner removes Back button; no new return action/memory. Owner authorizes provisional Demo promo presentation: first already-applicable published promo highlighted/open, remaining published promos inside conditions; no extra fact selection or applicability override. No model/prompt changes.
+
+Allowlist:static/widget/widget.js;static/widget/widget.css;clients/demo/target_response/pricebook/services/removable_dentures.jaw.partial.json;clients/demo/target_response/pricebook/services/removable_dentures.jaw.full.json;tests/test_d2_widget_visual_contract.py(new);docs/tasks/DEMO_D2_INTERFACE_TASK.md;docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md. Overview clickable rows use exact published price_select refs, not ordinal inference. Remove duplicate method navigation and volume navigation on detail. Scope/conditions show frozen authored fields; only first-letter capitalization of explanation for presentation. Source edit only exact duplicate exception case/punctuation; amounts/currency/mode/billing/includes/excludes/stages unchanged. Independent Checker and owner widget after scoped offline/actual visual verification. Live budget if needed:at most4 provider calls for2 demonstration questions; no retries. Foreign14EOLMD/prototypes preserved.
+
+
+### 58.1 Result and limits
+
+Removed duplicate method buttons and detailed-card volume buttons; overview rows themselves call the exact published server action. Detailed views keep only existing brand/option choices; no Back handler or metadata fields added. Existing scope, condition, includes/excludes/stages and commercial texts rendered without model changes. Accordion typography14px, unit/info13px, tabs400. First published applicable promotion receives open highlighted block; remaining commercial text stays in conditions. This provisional Demo layout does not implement configurable main-promo placement.
+
+33 offer files compared against4cefc34: only two removable package labels changed case/punctuation; prices/modes/currency/units/includes/excludes/payment stages unchanged. Their authored exception now exactly matches required metadata, so existing dedup removes the repetition. Other editorial overlaps (one_stage phrases, long package captions) preserved; no claim of complete KB cleanup.
+
+Executor6PASS26.22s + focused2single-brandPASS7.96s; independent6PASS27.73s. Checker found lost static variant label when only one variant is published: restored frozen variant_label without fake action, focused recheckPASS. Total8distinct targeted cases, JSON/SSE real HTTP with offline native wire, overview/select/tab/history/replay and duplicate exception. No weakening or full CI claim. Historical browser fixtures/fonts/envelopes not migrated in this scoped test file; current visual verification uses actual browser, not server tests as DOM proof.
+
+Actual9001 browser: implantation overview → classic → Nobel → includes, extractionprice → complex tab; no console errors observed. Executor provider4calls across2pricequestions, no retries/SMTP. Other owner-operated widget turns may coexist in logs and are not executor calls. Server source confirms DeepSeek/prompt46; logic/roles unchanged. Owner can inspect actualwidget. Branch/HEAD4cefc34, stagingempty, no newcommit/push; foreign14EOLMD/prototypes preserved. Stop owner visual review and Cursor before final checkpoint.
+
+§58 visual follow-up owner GO: all price tabs blue border/text, selected400 preserved, detailed amount24px (overview size unchanged). Extend allowlist3 one_stage.one_tooth.{implantium,impro,nobel}.json: package exclusion clause equals existing mandatory_exclusion text; unique scope, amounts/stages/includes/excludes/mandatory metadata unchanged. Authoritative mandatory sentence remains visible exactly once. Owner removes only duplication for now, not all preview exclusions. Three focused source/formatter tests, no live calls.
+
+§58 compact iteration owner GO: numeric detail amount22px, scope parenthetical beside amount (wrap allowed), closer note. Owner requests short authored extraction tab labels withoutchangingmodelunderstanding. Allowlist extension contracts/response_schema.py,core/response_plan_materialization.py,clients/demo/target_response/service_catalog.json. Optional TargetServiceOption.tab_label ispresentationonly; existing UiQuickReplyCandidate.label reads it; canonicalname/aliases/optionID/frozenvariant_label untouched. ActiveServiceCatalogSnapshot remains explicitoption_id/name projection. No actions/memory/modelcontract/callchanges. Demo tabsОбычное/Сложное. Focused offline checks and independentreview; no livecallsneeded.
+
+Latest owner correction: only active tab blue border/text, inactive darktext/lightborder asprototype; weight400 unchanged. Supersedes all-blue iteration above.
+
+Compact delta evidence: executor2PASS11.74s and independent2PASS12.24s (same2cases, not4distinct). CheckerPASS; tab_label isbutton-only, canonicalvariant/history/actionIDs/modeldescriptor andbrandprecedence preserved. No newprovidercalls, nofullCI/layoutcertification. Runtimeauto-reloadstartupok DeepSeekprompt46. Stagingempty, commit/pushnotperformed pendingownerreview. Sourcecatalogchanged: owner should use newconversation.
+
+Latest owner visual correction: abandon inline parenthetical scope; restore scope below detail price with decorative12px ruler/volume SVG,13px mutedtext. Amount22 andshorttablabels preserved. No quantityinference/datachanges/providercalls. Supersedes compact inline layout above.
+
+Owner explicit preview decision: overview rows show only service name, price andscope; authored condition/exclusion lines are hidden in overview DOM and remain visible in detailedcard. Frozen data/history/conditions are notremoved. Overview arrowblue14pxstroke2.4 for clickaffordance. Scope decorativecube14x14 replacesruler. No provider/schema/actionchanges inthisvisualiteration.
+
+
+### 58.2 Owner visual acceptance and pause checkpoint — 2026-10-12
+
+Owner: overall visual approved, explicitly requests commit/push then stop. Final presentation: detail price22px; muted13px scope below with square cube14px; active-onlyblue tabs400; overview onlyname/price/scope, blue14pxstroke2.4 arrow; plain checklists; payment stage heading/amount black500 with timing muted. No Back button. Demo first already-published applicablepromo open highlighted, otherapprovedcommercialtextconditions. Optionaltab_label only2extractionoptions, fullmodelnamesunchanged. No new provider/memory/actionpaths; pricefactauthorityretained.
+
+Final exact checkpoint allowlist:static/widget/widget.js;static/widget/widget.css;contracts/response_schema.py;core/response_plan_materialization.py;clients/demo/target_response/service_catalog.json;5 offer JSON (3 one_stage.one_tooth brands,2 removable_dentures.jaw partial/full);tests/test_d2_widget_visual_contract.py;this document;DEMO_D2_DELIVERY_ROADMAP.md. Prototypes and14pre-existingEOLMD excluded. Full KB editorialcleanup/contexttokenoptimization and optionaldoctor/before-aftercards deferred; not implemented as part of pause checkpoint. Cursor58 not received; scoped Checker evidence above plus focused final delta. No full bot/CI/deploy certification. No additionallivecalls during checkpoint closure.
+
+Final checkpoint evidence:13distinct targeted cases PASS38.24s on final tree; focused final independentCheckerPASS (no extra tests/providercalls). Staged13exactpaths, diffcheckclean. FullCI/historicalbrowserfixtures notrun; no new baselinefailureclaim. Ownerpause follows pushedcheckpoint, no merge/deploy.
+
+
+## 59. RF booking phone mask — owner GO 2026-10-13
+
+Bug fix, not architecture simplification. Baseline 58a9e42071f22d4c266908943636e68e54cbf356; branch codex/model-price-experiment; root C:/Cursor Projects/artgents-bot-active; origin/main and merge base efa3f77. Foreign 14 MD EOL changes and prototypes/ preserved. Exact allowlist: contracts/response_plan.py; core/d2_lead_bridge.py; static/widget/widget.js; tests/test_d2_phone_mask.py; tests/js/phone_mask_test.cjs; this document; DEMO_D2_DELIVERY_ROADMAP.md.
+
+Owner requests working +7(999) 999-99-99 booking mask. Existing lead owner sets presentation-only composer_input_mode in frozen UI projection at its phone prompt; default text elsewhere. No new lead state, model field, semantic owner, adapter or provider call. Delete obsolete meta.lead_flow/lead_step dependency. Do not infer phone from cancel button, since pause also contains it. Formatter accepts national digits, +7 or 8 prefix, keeps overlength visible/unsendable, preserves textual questions for existing interruption path. Natural deletion allows clearing prefix/separators; subsequent insertion reapplies format. Contact acceptance, dispatch and privacy remain server-owned and unchanged.
+
+Acceptance: JSON/SSE name→phone→interruption→retry→cancel; replay frozen phone projection after cancellation; widget typing/paste/deletion, incomplete/overlength/foreign prefix, ordinary interruption text. No real contacts submitted, provider/network/SMTP budget0. Independent Checker required. Commit/push pending owner visual check.
+
+
+§59 evidence: new JSON/SSE transition/replay tests2 PASS; existing name/phone/cancel cases2 PASS. Old pause-price cases2 FAIL identically on clean archived58a9e42 (d2_invalid_turn, obsolete price-tail fixture); unchanged and not declared fixed. Actual-widget Node suite passes typing with9/8/7 prefixes, paste, incomplete/overflow/foreign prefix, question preservation, deletion/clear, mode transitions and sendFromComposer submission. Independent Astra Checker PASS scoped bug fix: newHTTP2 PASS + Node suite, call path and privacy ownership reviewed, no architecture/whole-bot PASS. Browser offline page uses current widget source and stub transport: pasted8-prefix formats +7(999) 999-99-99, excessive digit remains visible/disabled, textual question remains unchanged/enabled. Screenshot logs/phone-mask-check/browser-mask.png ignored. No real contact submitted; provider/SMTP0. Physical mobile keyboard not certified. Staging empty, HEAD58a9e42; no commit/push for§59 yet.
+
+2026-10-13: owner explicitly authorizes commit/push of the seven-path phone-mask checkpoint. Existing verification and focused Astra recheck PASS retained; no additional runtime edits or provider calls. Foreign MD/prototypes remain excluded. Commit title: Fix RF phone mask in booking widget.

@@ -29,23 +29,44 @@
     {
       "topic_id": "prosthetics",
       "service_ids": [
+        "zirconia_crowns",
         "removable_dentures",
         "clasp_dentures",
-        "implant_supported_prosthetics"
+        "implant_supported_prosthetics",
+        "all_on_4",
+        "all_on_6"
       ],
       "offer_ids": [
+        "zirconia_crowns.default",
         "removable_dentures.jaw.partial",
         "removable_dentures.jaw.full",
         "clasp_dentures.default",
-        "implant_supported_prosthetics.default"
+        "implant_supported_prosthetics.default",
+        "all_on_4.jaw.implantium",
+        "all_on_4.jaw.impro",
+        "all_on_4.jaw.nobel",
+        "all_on_6.jaw.implantium",
+        "all_on_6.jaw.impro",
+        "all_on_6.jaw.nobel"
       ],
-      "introduction_text": "Вот варианты и цены на протезирование. Состав у них разный — обратите внимание, за что указана каждая сумма. Подходящий вариант и итоговую стоимость определят на консультации.",
+      "introduction_text": "Цены на протезирование указаны за один зуб, один протез или одну челюсть — единица обозначена в каждом варианте. Для восстановления целой челюсти доступны полное съёмное протезирование и комплексы All-on-4/6; подходящий метод определяет врач после диагностики.",
       "unknown_extent_text": "Какой объём вас интересует: один зуб, вся челюсть или пока не знаете?"
     },
     {
       "topic_id": "restoration",
-      "service_ids": ["classic", "removable_dentures"],
-      "offer_ids": ["classic.one_tooth.implantium", "removable_dentures.jaw.partial"],
+      "service_ids": [
+        "classic",
+        "removable_dentures",
+        "zirconia_crowns"
+      ],
+      "offer_ids": [
+        "classic.one_tooth.implantium",
+        "classic.one_tooth.impro",
+        "classic.one_tooth.nobel",
+        "removable_dentures.jaw.partial",
+        "removable_dentures.jaw.full",
+        "zirconia_crowns.default"
+      ],
       "introduction_text": "Вот варианты и цены на восстановление зубов. Здесь разные способы восстановления. Подходящий способ и общую стоимость уточнят на консультации.",
       "unknown_extent_text": "Стоимость зависит от объёма и способа восстановления. Хотите записаться на консультацию?"
     }

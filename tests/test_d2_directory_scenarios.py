@@ -21,9 +21,7 @@ import pytest
 from contracts.response_plan import SessionKey
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore
-from core.d2_directory import classify_d2_directory_request
 from core.one_call_envelope_protocol import production_envelope_template
-from types import SimpleNamespace
 
 
 NOW = datetime(2026, 9, 22, 22, tzinfo=timezone.utc)
@@ -226,30 +224,15 @@ def test_medical_terminal_still_beats_directory_shape(tmp_path: Path) -> None:
     assert len(provider.inputs) == 1
 
 
-def test_protocols_classifier_only_allowlisted_topics() -> None:
-    """Boundary: bare clinic/other topic is not protocols (external Checker P1)."""
-    implantation = SimpleNamespace(
-        kind="content",
-        topic_id="implantation",
-        service_id=None,
-        content_ref=None,
-    )
-    clinic = SimpleNamespace(
-        kind="content",
-        topic_id="clinic",
-        service_id=None,
-        content_ref=None,
-    )
-    assert (
-        classify_d2_directory_request(
-            part=implantation, envelope_commercial_intent="none"
-        )
-        == "protocols"
-    )
-    assert (
-        classify_d2_directory_request(part=clinic, envelope_commercial_intent="none")
-        is None
-    )
+@pytest.mark.parametrize("topic", ["implantation", "clinic", "doctors"])
+def test_topics_are_ordinary_content_not_directory_commands(topic) -> None:
+    from contracts.d2_dialogue_result import D2DialogueResult
+    result = D2DialogueResult.model_validate({"outcome": "dialogue", "blocks": [{
+        "kind": "content", "request_id": "r1", "target": {"type": "topic", "id": topic},
+        "content_text": "Связный ответ по базе клиники.",
+    }]})
+    assert result.blocks[0].kind == "content"
+    assert result.blocks[0].content_text == "Связный ответ по базе клиники."
 
 
 def test_clinic_topic_not_hijacked_as_protocols(tmp_path: Path) -> None:

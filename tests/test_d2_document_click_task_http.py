@@ -61,7 +61,7 @@ def _body(response, transport):
 @pytest.mark.parametrize("doc,sections", [
     ("implantation__faq__pain.md", (
         ("kakuyu-anesteziyu-ispolzuyut", "Какую анестезию используют"),
-        ("chto-chuvstvuetsya-posle-ustanovki", "Что чувствуется после установки"),
+        ("chto-chuvstvuetsya-posle-ustanovki", "Что чувствуется после установки импланта?"),
     )),
     ("implantation__faq__osseointegration.md", (
         ("a-esli-implant-ne-prizhivetsya", "А если имплант не приживётся"),

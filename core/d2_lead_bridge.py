@@ -13,7 +13,7 @@ from contracts.d2_tenant_snapshot import D2TenantSnapshot
 from contracts.request_understanding import RequestUnderstanding
 from contracts.response_plan import (
     ComposerResult,
-    D2ExactTextBlock, D2ResolvedRequestPart,
+    D2ExactTextBlock, D2ResolvedRequestPart, D2SourceResult,
     ComposerSelectedRouteAuthority,
     PreComposerPlan,
     PricePlan,
@@ -243,7 +243,7 @@ def resolve_d2_booking_lead_entry(
     ))
     if blocked_keys:
         text = "\n\n".join(filter(None, (
-            _authored_policy_answer(snapshot, key) for key in blocked_keys
+            d2_authored_policy_answers(snapshot).get(key) for key in blocked_keys
         ))) or "У меня пока недостаточно информации об условиях такой записи."
         return D2LeadBridgeResult(
             kind="booking_blocked",
@@ -255,7 +255,7 @@ def resolve_d2_booking_lead_entry(
             kind="unclear",
             response=_plain_answer(snapshot, session_key=session_key,
                 text="Уточните, пожалуйста, условия записи. Пока я не могу подтвердить её по указанным данным.",
-                quick=()),
+                quick=(), public_kind="clarification"),
         )
     sid = session_key.sid
     st = mem_get(sid)
@@ -427,25 +427,6 @@ def resolve_d2_lead_pre_provider(
     )
 
 
-def _authored_policy_answer(snapshot: D2TenantSnapshot, policy_key: str) -> str | None:
-    import yaml
-
-    raw_bytes = dict(snapshot.files).get("clinic_policies.yaml")
-    if raw_bytes is None:
-        return None
-    raw = yaml.safe_load(raw_bytes.decode("utf-8"))
-    if not isinstance(raw, dict):
-        return None
-    policies = raw.get("policies")
-    if not isinstance(policies, dict):
-        return None
-    body = policies.get(policy_key)
-    if not isinstance(body, dict):
-        return None
-    answer = body.get("answer")
-    return answer.strip() if isinstance(answer, str) and answer.strip() else None
-
-
 def _lead_slot_quick_replies(client_id: str) -> tuple[UiQuickReplyCandidate, ...]:
     return (
         UiQuickReplyCandidate(
@@ -481,12 +462,17 @@ def _phone_prompt_response(
         or "Оставьте, пожалуйста, номер телефона — администратор свяжется с вами, "
         "чтобы подтвердить запись."
     )
-    return _plain_answer(
+    response = _plain_answer(
         snapshot,
         session_key=session_key,
         text=text,
         quick=_lead_slot_quick_replies(snapshot.client_id),
     )
+
+
+    return replace(response, ui_projection=response.ui_projection.model_copy(
+        update={"composer_input_mode": "phone"},
+    ))
 
 
 def _plain_answer(
@@ -497,6 +483,7 @@ def _plain_answer(
     quick: tuple[UiQuickReplyCandidate, ...],
     policy_ids: tuple[str, ...] = (),
     request_id: str | None = None,
+    public_kind: Literal["clarification"] | None = None,
 ) -> MaterializedResponseOutcome:
     if snapshot.client_id != session_key.client_id:
         raise ValueError("d2_lead_client_mismatch")
@@ -512,17 +499,19 @@ def _plain_answer(
         active_session_service_id=None,
         selected_topic_id=None,
         price_plan=PricePlan(kind="none"),
-        d2_result_status="complete" if policy_ids else None,
-        d2_request_parts=(D2ResolvedRequestPart(request_id=request_id,
-            kind="reference", status="answered", scope="clinic"),) if policy_ids else (),
-        d2_exact_text_blocks=(D2ExactTextBlock(request_id=request_id,
+        d2_result_status="complete",
+        d2_request_parts=(D2ResolvedRequestPart(request_id=request_id or "r1",
+            kind="reference" if policy_ids else public_kind or "lead", status="answered", scope="clinic",
+            source_results=tuple(D2SourceResult(source_ref=f"policy:{key}", outcome="answered")
+                for key in policy_ids)),),
+        d2_exact_text_blocks=(D2ExactTextBlock(request_id=request_id or "r1",
             source_client_id=session_key.client_id, display_text=text,
-            policy_ids=policy_ids),) if policy_ids else (),
+            policy_ids=policy_ids),),
         ui_candidates=UiPlanCandidates(quick_replies=quick),
         transport_kind="blocking",
     )
     composer = ComposerResult(route="ANSWER", mode="standard",
-        patient_text=None if policy_ids else text, code_owned_answer=bool(policy_ids))
+        patient_text=None, code_owned_answer=True)
     resolved = resolve_response_plan(plan, composer)
     resolved = resolved.model_copy(update={"attribution_kind": "lead"})
     return MaterializedResponseOutcome(

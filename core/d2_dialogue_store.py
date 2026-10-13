@@ -93,6 +93,23 @@ class D2DialogueStore:
             raise ValueError("d2_completion_owner_mismatch")
         return result
 
+    def read_completion_at_revision(self, key: SessionKey, revision: int) -> D2CompletedTurn | None:
+        """Read one exact published receipt, scoped to its tenant and session."""
+        rows = self._connection.execute(
+            "SELECT payload FROM d2_turn_request WHERE client_id=? AND sid=? "
+            "AND status='complete' AND json_extract(payload, '$.committed_revision')=?",
+            (key.client_id, key.sid, revision),
+        ).fetchall()
+        if not rows:
+            return None
+        if len(rows) != 1:
+            raise ValueError("d2_completion_revision_ambiguous")
+        result = D2CompletedTurn.model_validate_json(rows[0][0])
+        if (result.context.session_key != key or result.committed_revision != revision
+                or result.context.source_revision + 1 != revision):
+            raise ValueError("d2_completion_owner_mismatch")
+        return result
+
     def reserve_request(
         self, key: SessionKey, *, request_id: str, request_fingerprint: str,
     ) -> D2RequestReservation:

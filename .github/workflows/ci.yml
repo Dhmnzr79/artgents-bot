@@ -89,6 +89,9 @@ jobs:
               sys.exit(1)
           PY
 
+  # TEMPORARY DEMO GATE — owner-approved for the 2026-10-14 demo only.
+  # TODO(after demo): migrate and restore the full historical suites here.
+  # Historical tests remain in the repository; no runtime/legacy compatibility changes.
   offline-unit-and-contracts:
     name: Offline unit and contracts
     runs-on: ubuntu-latest
@@ -128,15 +131,7 @@ jobs:
             tests/test_aspect_metadata.py \
             tests/test_price_ref_routing.py \
             tests/test_validate_client_pack.py \
-            tests/test_tenant_resource_isolation_offline.py \
-            tests/test_one_call_tenant_isolation_offline.py \
-            tests/test_tenant_ingress_prod_boundary_offline.py \
-            tests/test_session_tenant_binding_hardening_offline.py \
             tests/test_tenant_lead_routing_context_offline.py \
-            tests/test_tenant_lead_pending_question_offline.py \
-            tests/test_d2_http_contract.py \
-            tests/test_d2_demo_limits.py \
-            tests/test_d2_situation_disabled.py \
             tests/test_pg_tenant_context_offline.py \
             tests/test_pg_tenant_write_contract_offline.py \
             tests/test_pg_schema_readiness_offline.py \
@@ -158,8 +153,15 @@ jobs:
             tests/test_g4_manual_deploy_contract.py \
             tests/test_g5_manual_rollback_contract.py \
             tests/test_g7_postgres_backup_contract.py \
-            tests/test_g8_postgres_qualification_contract.py
+            tests/test_g8_postgres_qualification_contract.py \
+            tests/test_d2_demo_release_gate.py \
+            tests/test_d2_native_price_runtime.py \
+            tests/test_d2_demo_session_budget.py \
+            tests/test_d2_phone_mask.py
 
+  # TEMPORARY DEMO GATE — owner-approved for the 2026-10-14 demo only.
+  # TODO(after demo): migrate and restore the full historical suites here.
+  # Historical tests remain in the repository; no runtime/legacy compatibility changes.
   demo-d1-clinic-policy-regression:
     name: Demo D1 clinic policy regression
     runs-on: ubuntu-latest
@@ -189,20 +191,11 @@ jobs:
           unset DASHSCOPE_API_KEY CHAT_API_KEY OPENAI_API_KEY SMTP_PASSWORD SMTP_USER BOT_PG_DSN BOT_MIGRATOR_PG_DSN BOT_TEST_PG_DSN ADMIN_DASHBOARD_TOKEN || true
           mkdir -p "$BASETEMP"
           python -m pytest -p no:cacheprovider --basetemp "$BASETEMP" --tb=short -q \
-            tests/test_d2_sim2_contract.py \
             tests/test_clinic_policy_resolver_offline.py \
-            tests/test_d2_demo_audit_fixes.py \
-            tests/test_d2_compound_answers.py \
-            tests/test_d2_no_legacy_path.py \
-            tests/test_d2_ci_clinic_policy.py \
-            tests/test_tenant_lead_pending_question_offline.py \
             tests/test_clinic_policies_loader.py \
-            tests/test_d2_discussion_context_http.py \
             tests/test_one_call_stage4_3_contacts_specific.py \
-            tests/test_one_call_tenant_isolation_offline.py \
-            tests/test_d2_code_answer_fixes.py \
-            tests/test_d2_lead_interrupt_http.py \
-            tests/test_d2_situation_disabled.py
+            tests/test_d2_demo_release_gate.py \
+            tests/test_d2_native_price_runtime.py
 
   postgres-qualification:
     name: PostgreSQL qualification

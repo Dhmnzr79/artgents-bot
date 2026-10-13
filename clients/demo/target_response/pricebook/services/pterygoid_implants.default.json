@@ -16,10 +16,13 @@
     ]
   },
   "fact_refs": [
+    "tax_deduction",
+    "installment_12",
     "free_implant_consult",
     "implant_warranty",
-    "installment_12",
-    "implant_same_day_discount"
+    "implant_same_day_discount",
+    "payment_stages",
+    "fixed_price"
   ],
   "followups": [],
   "applies_to_extents": [

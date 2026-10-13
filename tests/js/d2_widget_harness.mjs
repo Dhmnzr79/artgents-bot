@@ -17,6 +17,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const runner = `
 import { mountWidget } from "/static/widget/widget.js";
 import { renderBotAnswerHtml } from "/static/widget/answer_format.js";
+import { TECHNICAL_ERROR_MESSAGE, friendlyErrorMessage } from "/static/widget/api.js";
 const fixture = await fetch("/payloads.json").then((response) => response.json());
 const root = document.createElement("div");
 document.body.append(root);
@@ -53,7 +54,7 @@ globalThis.fetch = async (url, options = {}) => {
   sent.push(body);
   const count = (failures.get(body.request_id) || 0) + 1;
   failures.set(body.request_id, count);
-  const forRequest = (payload) => ({ ...payload, request_id: body.request_id });
+  const forRequest = (payload) => ({ ...payload, request_id: body.request_id, sid: body.sid || payload.sid });
   if (body.ref === scopeChoice.reply_id) return response(forRequest(scope));
   if (body.ref === "button:" + leadButton.button_id) return response(forRequest(lead));
   if (body.q === "после UI") return response(forRequest(afterUi), count === 1 ? "after" : null);
@@ -65,6 +66,8 @@ globalThis.fetch = async (url, options = {}) => {
   if (p2Stages && body.ref === "price_detail:stages") return response(forRequest(p2Stages));
   if (body.q === "error") return new Response(sse([["status", { message: "Проверяю вопрос" }],
     ["error", { error: "d2_invalid_turn" }]]),
+    { status: 200, headers: { "content-type": "text/event-stream" } });
+  if (body.q === "quota") return new Response(sse([["error", { error: "demo_daily_limit" }]]),
     { status: 200, headers: { "content-type": "text/event-stream" } });
   if (body.q === "первый") {
     const distinct = new Set(sent.filter((item) => item.q === "первый").map((item) => item.request_id));
@@ -107,7 +110,7 @@ try {
     throw new Error("wrong first D2 text: " + JSON.stringify({ actual: botBodies()[0], expected: first.answer }));
   if (root.querySelectorAll(".clinic-turn .clinic-msg__body")[0].querySelectorAll("ul li").length !== 3)
     throw new Error("compact price list did not render as three list items");
-  const link = root.querySelector(".clinic-msg__link");
+  const link = root.querySelector(".clinic-msg__volume-chip");
   if (!link || link.textContent.trim() !== scopeChoice.label) throw new Error("scope UI missing");
   link.click();
   await waitUntil(() => botBodies().length === 2);
@@ -137,8 +140,10 @@ try {
   if (!sameRenderedText(botBodies().at(-1), afterUi.answer)) throw new Error("after-ui final mismatch");
   if (root.querySelectorAll(".clinic-turn").length !== 5) throw new Error("duplicate bot bubble");
   await send("ручной повтор");
-  await waitUntil(() => root.querySelector(".clinic-shell__error button") !== null);
-  root.querySelector(".clinic-shell__error button").click();
+  await waitUntil(() => root.querySelector("[data-clinic-err] button") !== null);
+  if (!root.querySelector("[data-clinic-feed] [data-clinic-err]"))
+    throw new Error("retry error is outside feed");
+  root.querySelector("[data-clinic-err] button").click();
   await waitUntil(() => botBodies().length === 6);
   const manualAttempts = sent.filter((item) => item.q === "ручной повтор");
   if (manualAttempts.length !== 3 || new Set(manualAttempts.map((item) => item.request_id)).size !== 1)
@@ -150,17 +155,41 @@ try {
   if ([...root.querySelectorAll(".clinic-turn")].at(-1).querySelector(".clinic-turn__btn--cta-primary"))
     throw new Error("terminal gained an unplanned CTA");
   await send("error");
-  await waitUntil(() => root.querySelector("[data-clinic-err]")?.textContent.includes("Не получилось показать ответ. Понимаю, что это неудобно"));
+  await waitUntil(() => root.querySelector("[data-clinic-err]")?.textContent.includes(TECHNICAL_ERROR_MESSAGE));
   if (root.querySelector("[data-clinic-err]")?.textContent.includes("d2_invalid_turn"))
     throw new Error("technical D2 error leaked into widget");
-  if (botBodies().length !== 1 || root.querySelector("[data-clinic-err] button"))
-    throw new Error("terminal SSE error created UI or retry");
-  widget.resetSession();
+  const errorTurn = root.querySelector("[data-clinic-feed] .clinic-turn--error");
+  if (!errorTurn || botBodies().length !== 2 || errorTurn.querySelector(".clinic-turn__btn--cta-primary"))
+    throw new Error("error must be one plain bot turn in feed without clinical CTA");
+  if (errorTurn.querySelector(".clinic-msg__attribution")?.textContent.trim() !== "Тест")
+    throw new Error("error attribution must contain only bot name");
+  if (root.querySelector(".clinic-shell__error")) throw new Error("red error panel still reachable");
+  const errorBody = errorTurn.querySelector(".clinic-msg__body");
+  const normalBody = root.querySelector(".clinic-turn:not(.clinic-turn--error) .clinic-msg__body");
+  if (getComputedStyle(errorBody).color !== getComputedStyle(normalBody).color)
+    throw new Error("error text differs from ordinary bot text");
+  const buttons = [...errorTurn.querySelectorAll("button")].map(b => b.textContent);
+  if (JSON.stringify(buttons) !== JSON.stringify(["Новая беседа"]))
+    throw new Error("nonretryable error controls changed");
+  const errorSid = sent.at(-1).sid;
+  const errorRequestId = sent.at(-1).request_id;
+  await send("video");
+  await waitUntil(() => botBodies().length === 2 && !root.querySelector("[data-clinic-err]"));
+  if (sent.at(-1).sid !== errorSid || sent.at(-1).request_id === errorRequestId)
+    throw new Error("new question after error changed SID or reused failed request");
+  const videoButton = root.querySelector(".clinic-msg__link[aria-label='Посмотреть видео с врачом']");
+  if (!videoButton || !sameRenderedText(botBodies().at(-1), video.answer))
+    throw new Error("D2 secondary video projection missing");
+  await send("quota");
+  await waitUntil(() => root.querySelector("[data-clinic-err]")?.textContent.includes(friendlyErrorMessage("demo_daily_limit")));
+  if (sent.filter(x => x.q === "quota").length !== 1 || sent.at(-1).sid !== errorSid)
+    throw new Error("quota added automatic retry/reset");
+  root.querySelector("[data-clinic-err] button").click();
+  await waitUntil(() => botBodies().length === 0);
   await send("video");
   await waitUntil(() => botBodies().length === 1);
-  const videoButton = root.querySelector(".clinic-msg__link[aria-label='Посмотреть видео с врачом']");
-  if (!videoButton || !sameRenderedText(botBodies()[0], video.answer))
-    throw new Error("D2 secondary video projection missing");
+  if (sent.at(-1).sid === errorSid || !sameRenderedText(botBodies()[0], video.answer))
+    throw new Error("explicit new conversation did not reset SID and render a new answer");
   if (p2Price && p2Includes && p2Stages) {
     widget.resetSession();
     await send("детальная цена");
@@ -188,7 +217,8 @@ try {
   window.__D2_WIDGET_RESULT__ = {
     passed: true, requests: sent.length, before_retry_same_id: true,
     after_retry_same_id: true, one_bubble_per_turn: true,
-    manual_retry_same_id: true, terminal_without_cta: true, error_without_ui: true,
+    manual_retry_same_id: true, terminal_without_cta: true, error_without_server_ui: true,
+    error_plain_in_feed: true, continuation_same_sid: true, quota_copy_preserved: true,
     secondary_video_from_d2: true,
     scope_ref: sent.find(x => x.ref?.startsWith("volume:"))?.ref,
     lead_ref: sent.find(x => x.ref?.startsWith("button:"))?.ref,

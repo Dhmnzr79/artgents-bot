@@ -9,7 +9,7 @@
     "billing_unit": "tooth_package"
   },
   "package": {
-    "label": "за восстановление одного зуба (имплант в день удаления + постоянная коронка); КТ, лечение воспаления и временная коронка — по показаниям, отдельно",
+    "label": "за восстановление одного зуба (имплант в день удаления + постоянная коронка); КТ, лечение воспаления по показаниям и временная коронка — отдельно",
     "includes": [
       "удаление зуба при показаниях",
       "имплант с документами в день удаления",
@@ -39,10 +39,13 @@
     }
   ],
   "fact_refs": [
+    "tax_deduction",
+    "installment_12",
     "free_implant_consult",
     "implant_warranty",
-    "installment_12",
-    "implant_same_day_discount"
+    "implant_same_day_discount",
+    "payment_stages",
+    "fixed_price"
   ],
   "followups": [
     {
@@ -58,7 +61,8 @@
   ],
   "brand_id": "nobel_biocare",
   "applies_to_extents": [
-    "one_tooth"
+    "one_tooth",
+    "few_teeth"
   ],
   "required_conditions_metadata": {
     "completeness": "complete",

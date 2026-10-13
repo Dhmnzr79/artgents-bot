@@ -51,89 +51,60 @@ _FORBIDDEN_FIELDS = {
     "ui",
 }
 
-_EXPECTED_CATALOG = {
-    "doctors": {
-        "doctors__doctor__fedorova": {
-            "name": "Фёдорова Ирина Михайловна",
-            "position": "Врач-стоматолог-терапевт",
-            "experience_years": 16,
-            "service_ids": [
-                "caries",
-                "pulpitis",
-                "teeth_treatment",
-                "professional_whitening",
-                "veneers",
-                "zirconia_crowns",
-            ],
-            "profile_ref": "kb:doctors__doctor__fedorova.md#korotko",
-        },
-        "doctors__doctor__grigoriev": {
-            "name": "Григорьев Павел Игоревич",
-            "position": "Врач-пародонтолог",
-            "experience_years": 12,
-            "service_ids": ["periodontitis"],
-            "profile_ref": "kb:doctors__doctor__grigoriev.md#korotko",
-        },
-        "doctors__doctor__kuznetsov": {
-            "name": "Кузнецов Дмитрий Андреевич",
-            "position": "Врач-стоматолог-ортопед",
-            "experience_years": 19,
-            "service_ids": [
-                "zirconia_crowns",
-                "veneers",
-                "all_on_4",
-                "all_on_6",
-                "temporary_teeth",
-                "classic",
-                "implant_supported_prosthetics",
-                "clasp_dentures",
-                "removable_dentures",
-            ],
-            "profile_ref": "kb:doctors__doctor__kuznetsov.md#korotko",
-        },
-        "doctors__doctor__morozova": {
-            "name": "Морозова Анна Сергеевна",
-            "position": "Врач-ортодонт",
-            "experience_years": 11,
-            "service_ids": ["aligners"],
-            "profile_ref": "kb:doctors__doctor__morozova.md#korotko",
-        },
-        "doctors__doctor__orlov": {
-            "name": "Орлов Никита Владимирович",
-            "position": "Врач-имплантолог",
-            "experience_years": 16,
-            "service_ids": [
-                "classic",
-                "one_stage",
-                "sinus_lift",
-                "bone_graft",
-                "all_on_4",
-                "all_on_6",
-                "temporary_teeth",
-                "implant_supported_prosthetics",
-            ],
-            "profile_ref": "kb:doctors__doctor__orlov.md#korotko",
-        },
-        "doctors__doctor__volkov": {
-            "name": "Волков Александр Сергеевич",
-            "position": "Главный врач, стоматолог-хирург, имплантолог",
-            "experience_years": 13,
-            "service_ids": [
-                "classic",
-                "one_stage",
-                "sinus_lift",
-                "bone_graft",
-                "zygomatic_implants",
-                "pterygoid_implants",
-                "all_on_4",
-                "all_on_6",
-                "temporary_teeth",
-                "tooth_extraction",
-            ],
-            "profile_ref": "kb:doctors__doctor__volkov.md#korotko",
-        },
-    }
-}
+_EXPECTED_CATALOG = {'doctors': {'doctors__doctor__fedorova': {'name': 'Фёдорова Ирина Михайловна',
+                                           'position': 'Врач-стоматолог-терапевт',
+                                           'experience_years': 16,
+                                           'service_ids': ['caries',
+                                                           'pulpitis',
+                                                           'teeth_treatment',
+                                                           'professional_whitening'],
+                                           'profile_ref': 'kb:doctors__doctor__fedorova.md#korotko'},
+             'doctors__doctor__grigoriev': {'name': 'Григорьев Павел Игоревич',
+                                            'position': 'Врач-пародонтолог',
+                                            'experience_years': 12,
+                                            'service_ids': ['periodontitis'],
+                                            'profile_ref': 'kb:doctors__doctor__grigoriev.md#korotko'},
+             'doctors__doctor__kuznetsov': {'name': 'Кузнецов Дмитрий Андреевич',
+                                            'position': 'Врач-стоматолог-ортопед',
+                                            'experience_years': 19,
+                                            'service_ids': ['zirconia_crowns',
+                                                            'veneers',
+                                                            'all_on_4',
+                                                            'all_on_6',
+                                                            'temporary_teeth',
+                                                            'classic',
+                                                            'implant_supported_prosthetics',
+                                                            'clasp_dentures',
+                                                            'removable_dentures'],
+                                            'profile_ref': 'kb:doctors__doctor__kuznetsov.md#korotko'},
+             'doctors__doctor__morozova': {'name': 'Морозова Анна Сергеевна',
+                                           'position': 'Врач-ортодонт',
+                                           'experience_years': 11,
+                                           'service_ids': ['aligners'],
+                                           'profile_ref': 'kb:doctors__doctor__morozova.md#korotko'},
+             'doctors__doctor__orlov': {'name': 'Орлов Никита Владимирович',
+                                        'position': 'Врач-имплантолог',
+                                        'experience_years': 16,
+                                        'service_ids': ['classic',
+                                                        'one_stage',
+                                                        'sinus_lift',
+                                                        'bone_graft',
+                                                        'all_on_4',
+                                                        'all_on_6'],
+                                        'profile_ref': 'kb:doctors__doctor__orlov.md#korotko'},
+             'doctors__doctor__volkov': {'name': 'Волков Александр Сергеевич',
+                                         'position': 'Главный врач, стоматолог-хирург, имплантолог',
+                                         'experience_years': 13,
+                                         'service_ids': ['classic',
+                                                         'one_stage',
+                                                         'sinus_lift',
+                                                         'bone_graft',
+                                                         'zygomatic_implants',
+                                                         'pterygoid_implants',
+                                                         'all_on_4',
+                                                         'all_on_6',
+                                                         'tooth_extraction'],
+                                         'profile_ref': 'kb:doctors__doctor__volkov.md#korotko'}}}
 
 
 class _StrictSafeLoader(yaml.SafeLoader):
@@ -229,7 +200,10 @@ def test_real_demo_catalog_passes_external_integrity_and_service_coverage() -> N
         for doctor in catalog.doctors.values()
         for service_id in doctor.service_ids
     }
-    assert set(raw_services) - covered == {"tomography"}
+    active_services = {sid for sid, record in raw_services.items() if record["active"]}
+    assert active_services - covered == {"tomography"}
+    assert covered <= active_services
+    assert raw_services["braces"]["active"] is False
     assert covered - set(raw_services) == set()
 
 

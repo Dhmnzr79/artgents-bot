@@ -8,12 +8,6 @@ from pathlib import Path
 from typing import Any
 
 from config import PRICE_SERVICE_MATCH_STRONG
-from contracts.doctor_schema import TargetDoctorCatalog
-from contracts.doctor_schema_refs import (
-    DoctorCatalogExternalIndex,
-    build_doctor_source_refs,
-    validate_doctor_catalog_external_refs,
-)
 from contracts.response_schema import ResponseSchemaBundle, TargetService
 from contracts.response_schema_refs import (
     ResponseSchemaExternalIndex,
@@ -25,7 +19,6 @@ from core.client_config_loader import (
     require_explicit_pack_client_id,
     resolve_pack_client_id,
 )
-from core.doctor_schema_loader import load_doctor_catalog
 from core.response_schema_kb_index import build_response_schema_kb_refs
 from core.response_schema_loader import load_response_schema_bundle
 
@@ -76,17 +69,8 @@ def _validate_external_refs(
     bundle: ResponseSchemaBundle,
     md_root: Path,
 ) -> None:
-    doctors = load_doctor_catalog(client_pack_root(client_id) / "doctor_catalog.json")
     kb_refs = build_response_schema_kb_refs(md_root)
-    doctor_index = DoctorCatalogExternalIndex(
-        service_ids=tuple(bundle.services),
-        kb_refs=kb_refs,
-    )
-    validate_doctor_catalog_external_refs(doctors, doctor_index)
-    external_index = ResponseSchemaExternalIndex(
-        kb_refs=kb_refs,
-        doctor_refs=build_doctor_source_refs(doctors),
-    )
+    external_index = ResponseSchemaExternalIndex(kb_refs=kb_refs)
     validate_response_schema_external_refs(bundle, external_index)
 
 

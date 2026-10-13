@@ -15,7 +15,7 @@ import yaml
 from pydantic import ValidationError
 from yaml.nodes import MappingNode
 
-from contracts.response_schema import ResponseSchemaBundle
+from contracts.response_schema import ResponseDataCatalog, ResponseSchemaBundle
 
 
 class DuplicateKeyError(ValueError):
@@ -264,9 +264,8 @@ def load_response_schema_bundle(pack_root: Path) -> ResponseSchemaBundle:
         _raise_load_error("schema_invalid", Path("."), exc)
 
 
-def load_response_schema_bundle_from_texts(texts: dict[str, str]) -> ResponseSchemaBundle:
-    """Validate captured target-pack texts with exactly the path-loader rules."""
-    required = (_SERVICE_CATALOG, _BRAND_CATALOG, _FACTS, _CLINIC_STRATEGY, _MARKETING)
+def _catalog_payload_from_texts(texts: dict[str, str]) -> dict[str, object]:
+    required = (_SERVICE_CATALOG, _BRAND_CATALOG, _FACTS)
     for relative in required:
         if relative.as_posix() not in texts:
             _raise_load_error("required_path_missing", relative, FileNotFoundError(relative.as_posix()))
@@ -278,15 +277,31 @@ def load_response_schema_bundle_from_texts(texts: dict[str, str]) -> ResponseSch
     services = _parse_json_mapping(texts[_SERVICE_CATALOG.as_posix()], _SERVICE_CATALOG)
     brands = _parse_json_mapping(texts[_BRAND_CATALOG.as_posix()], _BRAND_CATALOG)
     facts = _parse_json_mapping(texts[_FACTS.as_posix()], _FACTS)
-    strategy = _parse_yaml_mapping(texts[_CLINIC_STRATEGY.as_posix()], _CLINIC_STRATEGY)
-    marketing = _parse_yaml_mapping(texts[_MARKETING.as_posix()], _MARKETING)
     offers = [_parse_json_mapping(texts[path], Path(path)) for path in offer_paths]
     family_text = texts.get(_FAMILY_PRICES.as_posix())
     family_prices = {"version": 1, "records": []} if family_text is None else _parse_json_mapping(family_text, _FAMILY_PRICES)
+    return {"services": services, "brands": brands, "offers": offers, "facts": facts,
+            "family_prices": family_prices}
+
+
+def load_response_data_catalog_from_texts(texts: dict[str, str]) -> ResponseDataCatalog:
+    """Validate captured catalog data directly; legacy policies are not inputs."""
+    payload = _catalog_payload_from_texts(texts)
     try:
-        return ResponseSchemaBundle.model_validate({
-            "services": services, "brands": brands, "offers": offers, "facts": facts,
-            "strategy": strategy, "marketing": marketing, "family_prices": family_prices,
-        })
+        return ResponseDataCatalog.model_validate(payload)
+    except ValidationError as exc:
+        _raise_load_error("schema_invalid", Path("."), exc)
+
+
+def load_response_schema_bundle_from_texts(texts: dict[str, str]) -> ResponseSchemaBundle:
+    """Validate the legacy captured pack, including its required policies."""
+    for relative in (_CLINIC_STRATEGY, _MARKETING):
+        if relative.as_posix() not in texts:
+            _raise_load_error("required_path_missing", relative, FileNotFoundError(relative.as_posix()))
+    payload = _catalog_payload_from_texts(texts)
+    payload["strategy"] = _parse_yaml_mapping(texts[_CLINIC_STRATEGY.as_posix()], _CLINIC_STRATEGY)
+    payload["marketing"] = _parse_yaml_mapping(texts[_MARKETING.as_posix()], _MARKETING)
+    try:
+        return ResponseSchemaBundle.model_validate(payload)
     except ValidationError as exc:
         _raise_load_error("schema_invalid", Path("."), exc)

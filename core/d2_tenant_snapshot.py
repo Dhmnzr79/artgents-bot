@@ -6,8 +6,11 @@ import hashlib
 import json
 import re
 from pathlib import Path
+from types import MappingProxyType
 
 import yaml
+
+from core.clinic_policies_loader import validate_policy_text_refs
 
 from contracts.d2_tenant_snapshot import (
     D2CommercialPack,
@@ -16,12 +19,12 @@ from contracts.d2_tenant_snapshot import (
     D2ModelView,
     D2TenantSnapshot,
 )
-from contracts.response_schema import ResponseSchemaBundle
+from contracts.response_schema import ResponseDataCatalog
 from contracts.response_plan_materialization import D2AuthoredContentAuthority, D2AuthoredContentSection
 from core.d2_published_offer_terms import build_d2_published_offer_terms
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
-from core.response_schema_loader import ResponseSchemaLoadError, load_response_schema_bundle_from_texts
+from core.response_schema_loader import ResponseSchemaLoadError, load_response_data_catalog_from_texts
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 
 
@@ -33,7 +36,7 @@ _FRONTMATTER = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
 _HEADING = re.compile(r"^(#{1,6})\s+(.+?)(?:\s+\{#([^}]+)\})?\s*$")
 _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 _REQUIRED_TARGET = (
-    "service_catalog.json", "brand_catalog.json", "clinic_strategy.yaml", "marketing.yaml",
+    "service_catalog.json", "brand_catalog.json",
     "pricebook/facts.json",
 )
 
@@ -61,8 +64,9 @@ def _read_set(client_root: Path) -> tuple[tuple[str, bytes], ...]:
             if base.name == "md":
                 raise D2TenantSnapshotError("required_path_missing:md")
             continue
-        files.extend(item for item in base.rglob(pattern) if item.is_file())
-    for name in ("tone.yaml", "ui.yaml", "video_catalog.yaml", "doctor_catalog.json", "clinic_policies.yaml"):
+        files.extend(item for item in base.rglob(pattern)
+                     if item.is_file() and item not in (target / "marketing.yaml", target / "clinic_strategy.yaml"))
+    for name in ("tone.yaml", "ui.yaml", "video_catalog.yaml", "clinic_policies.yaml"):
         path = client_root / name
         if path.is_file():
             files.append(path)
@@ -136,7 +140,7 @@ def load_d2_tenant_snapshot(client_id: str, *, clients_root: Path) -> D2TenantSn
         raise D2TenantSnapshotError("tenant_pack_changed_during_capture")
     texts = {path.removeprefix("target_response/"): data.decode("utf-8") for path, data in first if path.startswith("target_response/")}
     try:
-        bundle = load_response_schema_bundle_from_texts(texts)
+        bundle = load_response_data_catalog_from_texts(texts)
     except (UnicodeDecodeError, ResponseSchemaLoadError) as exc:
         raise D2TenantSnapshotError(f"schema_load_failed:{exc}") from exc
     _direction_prices(first, bundle)
@@ -154,8 +158,9 @@ def load_d2_tenant_snapshot(client_id: str, *, clients_root: Path) -> D2TenantSn
         parsed_content.append((ref, metadata, body, sections))
     metadata_by_ref = {ref: metadata for ref, metadata, _, _ in parsed_content}
     service_topics = {
-        service_id: metadata_by_ref.get(service.content_ref, {}).get("topic")
+        service_id: metadata_by_ref[service.content_ref]["topic"]
         for service_id, service in bundle.services.items()
+        if isinstance(metadata_by_ref.get(service.content_ref, {}).get("topic"), str)
     }
     content: list[D2AuthoredContentAuthority] = []
     for ref, metadata, body, sections in parsed_content:
@@ -172,10 +177,10 @@ def load_d2_tenant_snapshot(client_id: str, *, clients_root: Path) -> D2TenantSn
             allowed_service_ids=direct or topical,
             sections=sections,
         ))
-    return D2TenantSnapshot(client_id=client_id, fingerprint=_fingerprint(client_id, first), bundle=bundle, files=first, content=tuple(content), diagnostics=tuple(diagnostics))
+    return D2TenantSnapshot(client_id=client_id, fingerprint=_fingerprint(client_id, first), bundle=bundle, files=first, content=tuple(content), service_topics=MappingProxyType(service_topics), diagnostics=tuple(diagnostics))
 
 
-def build_d2_bundle(snapshot: D2TenantSnapshot):
+def build_d2_bundle(snapshot: D2TenantSnapshot) -> ResponseDataCatalog:
     """Return a fresh validated bundle from captured bytes, never from the filesystem."""
     texts = {
         path.removeprefix("target_response/"): data.decode("utf-8")
@@ -183,7 +188,7 @@ def build_d2_bundle(snapshot: D2TenantSnapshot):
         if path.startswith("target_response/")
     }
     try:
-        return load_response_schema_bundle_from_texts(texts)
+        return load_response_data_catalog_from_texts(texts)
     except (UnicodeDecodeError, ResponseSchemaLoadError) as exc:
         raise D2TenantSnapshotError(f"snapshot_bundle_invalid:{exc}") from exc
 
@@ -228,7 +233,7 @@ def _approved_md_corpus(snapshot: D2TenantSnapshot) -> str:
 
 
 def _clinic_policy_catalog_json(snapshot: D2TenantSnapshot) -> str:
-    """Expose policy IDs and authored answers from the captured tenant pack only."""
+    """Expose policy IDs and MD references from the captured tenant pack only."""
     raw = dict(snapshot.files).get("clinic_policies.yaml")
     if raw is None:
         return json.dumps(
@@ -239,13 +244,14 @@ def _clinic_policy_catalog_json(snapshot: D2TenantSnapshot) -> str:
         parsed = yaml.safe_load(raw.decode("utf-8"))
     except (UnicodeDecodeError, yaml.YAMLError) as exc:
         raise D2TenantSnapshotError("clinic_policy_catalog_invalid") from exc
+    validate_policy_text_refs(parsed, lambda name: dict(snapshot.files)["md/" + name].decode("utf-8"))
     policies = parsed.get("policies") if isinstance(parsed, dict) else None
     rows: list[dict[str, str]] = []
     if isinstance(policies, dict):
         for policy_id, body in sorted(policies.items()):
-            answer = body.get("answer") if isinstance(body, dict) else None
-            if isinstance(policy_id, str) and policy_id.strip() and isinstance(answer, str) and answer.strip():
-                rows.append({"policy_id": policy_id, "answer": answer.strip()})
+            ref = body.get("text_ref") if isinstance(body, dict) else None
+            if isinstance(policy_id, str) and policy_id.strip() and isinstance(ref, str) and ref.strip():
+                rows.append({"policy_id": policy_id, "text_ref": ref})
     brand_rows: list[dict[str, str]] = []
     raw_brands = parsed.get("brand_alternatives") if isinstance(parsed, dict) else None
     if isinstance(raw_brands, list):
@@ -253,9 +259,9 @@ def _clinic_policy_catalog_json(snapshot: D2TenantSnapshot) -> str:
             if not isinstance(body, dict):
                 continue
             brand_id = body.get("requested_brand_id")
-            answer = body.get("approved_text")
-            if isinstance(brand_id, str) and brand_id.strip() and isinstance(answer, str) and answer.strip():
-                brand_rows.append({"brand_id": brand_id.strip(), "answer": answer.strip()})
+            ref = body.get("text_ref")
+            if isinstance(brand_id, str) and brand_id.strip() and isinstance(ref, str) and ref.strip():
+                brand_rows.append({"brand_id": brand_id.strip(), "text_ref": ref})
     service_rows: list[dict[str, object]] = []
     raw_services = parsed.get("service_alternatives") if isinstance(parsed, dict) else None
     if isinstance(raw_services, list):
@@ -268,8 +274,8 @@ def _clinic_policy_catalog_json(snapshot: D2TenantSnapshot) -> str:
                 continue
             ids = list(dict.fromkeys(item.strip() for item in alternatives
                 if isinstance(item, str) and item.strip() and item.strip() != requested.strip()))[:2]
-            answer = body.get("approved_text")
-            if ids and isinstance(answer, str) and answer.strip():
+            ref = body.get("text_ref")
+            if ids and isinstance(ref, str) and ref.strip():
                 service_rows.append({"requested_service_id": requested.strip(), "alternative_service_ids": ids})
     contact = parsed.get("contact") if isinstance(parsed, dict) else None
     branch_rows: list[dict[str, object]] = []
@@ -302,7 +308,7 @@ def _clinic_policy_catalog_json(snapshot: D2TenantSnapshot) -> str:
 
 
 def _direction_prices(
-    files: tuple[tuple[str, bytes], ...], bundle: ResponseSchemaBundle,
+    files: tuple[tuple[str, bytes], ...], bundle: ResponseDataCatalog,
 ) -> tuple[D2DirectionPriceConfig, ...]:
     raw = dict(files).get("target_response/d2_direction_prices.json")
     if raw is None:
@@ -334,9 +340,6 @@ def _direction_prices(
 _COMMERCIAL_CODES = (
     "commercial_blank",
     "commercial_package_not_single",
-    "commercial_promo_ref_cap",
-    "commercial_promo_ref_duplicate",
-    "commercial_promo_fact_duplicate",
     "commercial_package_duplicate",
     "commercial_profile_duplicate",
     "commercial_incompatibility_duplicate",
@@ -358,8 +361,11 @@ def _commercial_texts(*values: str) -> tuple[str, ...]:
 
 
 def _commercial_contract(
-    files: tuple[tuple[str, bytes], ...], bundle: ResponseSchemaBundle, client_id: str,
+    files: tuple[tuple[str, bytes], ...], bundle: ResponseDataCatalog, client_id: str,
 ) -> D2CommercialPack:
+    for fact in bundle.facts.values():
+        if fact.active and fact.kind == "promo" and fact.microfact_text is None:
+            raise D2TenantSnapshotError("commercial_promo_short_missing")
     raw = dict(files).get("target_response/d2_commercial.json")
     if raw is None:
         return D2CommercialPack(version=1)
@@ -369,17 +375,6 @@ def _commercial_contract(
         raise D2TenantSnapshotError(_commercial_error_code(exc)) from exc
     if pack.client_id is not None and pack.client_id != client_id:
         raise D2TenantSnapshotError("commercial_tenant_mismatch")
-    promos = {item.fact_id: item for item in pack.promo_facts}
-    for promo in pack.promo_facts:
-        fact = bundle.facts.get(promo.fact_id)
-        if fact is None or not fact.active:
-            raise D2TenantSnapshotError("commercial_fact_unavailable")
-        if fact.kind != "promo":
-            raise D2TenantSnapshotError("commercial_promo_kind_invalid")
-        if fact.microfact_text is None:
-            raise D2TenantSnapshotError("commercial_promo_short_missing")
-        if promo.short_text != fact.microfact_text or promo.full_text != fact.text_fact:
-            raise D2TenantSnapshotError("commercial_promo_forms_conflict")
     boosters = {item.package_id: item for item in pack.price_booster_packages}
     also_lists = {item.package_id: item for item in pack.also_list_packages}
     for profile in pack.service_profiles:
@@ -387,14 +382,11 @@ def _commercial_contract(
         if service is None or not service.active:
             raise D2TenantSnapshotError("commercial_service_unavailable")
         owned: list[str] = []
-        for fact_id in profile.promo_refs:
-            promo = promos.get(fact_id)
-            fact = bundle.facts.get(fact_id)
-            if promo is None:
-                raise D2TenantSnapshotError("commercial_promo_forms_missing")
-            if fact is None or profile.service_id not in fact.allowed_service_ids or profile.service_id in fact.excluded_service_ids:
-                raise D2TenantSnapshotError("commercial_promo_inapplicable")
-            owned.extend(_commercial_texts(promo.short_text, promo.full_text))
+        for fact in bundle.facts.values():
+            if (fact.active and fact.kind == "promo"
+                    and profile.service_id in fact.allowed_service_ids
+                    and profile.service_id not in fact.excluded_service_ids):
+                owned.extend(_commercial_texts(fact.microfact_text, fact.text_fact))
         if profile.price_booster_id is not None:
             package = boosters.get(profile.price_booster_id)
             if package is None:

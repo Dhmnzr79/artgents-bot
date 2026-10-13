@@ -5,10 +5,8 @@ topic: implantation
 subtopic: tooth_loss
 
 aliases:
-  - "выпал зуб"
   - "потерял зуб"
   - "нет зуба что делать"
-  - "выпал зуб что делать"
   - "остался без зуба"
 
 cta_key: consult

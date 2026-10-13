@@ -7,7 +7,7 @@ from contracts.d2_session_context import (
     D2SessionContextError, empty_d2_session_snapshot, D2_SESSION_SCHEMA_VERSION,
 )
 from contracts.d2_dialogue_result import (
-    PendingExplanationOperation, ParameterClarification, ServiceTarget,
+    ExplanationOperation, ParameterClarification, ServiceTarget,
 )
 from contracts.response_plan import SessionKey
 from contracts.response_plan_session import PersistedShownCommercialIds, D2ShownPriceOfferRef
@@ -22,7 +22,7 @@ def snapshot():
         schema_version=D2_SESSION_SCHEMA_VERSION, session_key=KEY, revision=2, last_committed_turn_index=2,
         discussion_request_id="completed-price", terminal_state="clarify",
         accumulated_shown_ids=PersistedShownCommercialIds(promo_fact_ids=("promo",)),
-        clarify_pending=True, clarify_task=PendingExplanationOperation(
+        clarify_pending=True, clarify_task=ExplanationOperation(
             request_id="r1", kind="content", target=ServiceTarget(type="service", id="classic"),
             pending_question="How long?", clarification=ParameterClarification(missing="extent"),
         ),
@@ -69,7 +69,7 @@ def test_owner_and_time_boundaries(which):
             policy=D2SessionTtlPolicy(), now=NOW.replace(tzinfo=None) if which == "naive" else NOW)
 
 
-@pytest.mark.parametrize("field", ["idle_ttl_seconds","history_pair_limit","history_text_max_chars"])
+@pytest.mark.parametrize("field", ["idle_ttl_seconds","history_pair_limit"])
 @pytest.mark.parametrize("value", [0,-1,True,"3",1.5])
 def test_policy_requires_positive_strict_counters(field,value):
     with pytest.raises(ValidationError):
@@ -99,3 +99,8 @@ def test_future_receipt_is_rejected():
 def test_pending_operation_must_have_pending_state():
     with pytest.raises(ValidationError,match="requires_pending"):
         D2SessionState.model_validate({**snapshot().state.model_dump(),"clarify_pending":False})
+
+
+def test_history_has_no_character_cut_setting():
+    with pytest.raises(ValueError):
+        D2SessionTtlPolicy(history_text_max_chars=1000)

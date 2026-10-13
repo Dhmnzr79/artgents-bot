@@ -7,7 +7,7 @@
 > короткой и полной формами, один профиль услуги с не более чем одним пакетом
 > усилителя и одним пакетом «Также», и compatibility groups с готовым
 > пояснением — зафиксирована в
-> [`DEMO_D2_SCENARIO_MARKETING_AUDIT.md`](tasks/DEMO_D2_SCENARIO_MARKETING_AUDIT.md)
+> [`DEMO_D2_SCENARIO_MARKETING_AUDIT.md`](archive/task-history/DEMO_D2_SCENARIO_MARKETING_AUDIT.md)
 > и D2-090.
 > До CP5-M1 этот guide продолжает честно описывать текущие файлы; не редактировать
 > demo pack по будущей схеме заранее.

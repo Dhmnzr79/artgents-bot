@@ -9,7 +9,10 @@ import yaml
 from core.clinic_policies_loader import resolve_policy_text, validate_policy_text_refs
 from core.d2_snapshot_sources import d2_authored_policy_answers
 from core.d2_tenant_snapshot import load_d2_tenant_snapshot, build_d2_model_view
-from tests.d2_ci_http import FakeProvider, http_env, raw, send, explanation
+from tests.d2_ci_http import FakeProvider, http_env, send
+from core.d2_live_provider import D2HttpProvider
+from tests.test_d2_native_price_runtime import Transport, message, price
+from tests.test_d2_text_reply import response as reply, action
 
 
 @pytest.mark.parametrize("ref,md,error", [
@@ -77,19 +80,29 @@ def test_md_owns_refusal_and_history_without_price_or_booking(http_env, transpor
     before = resolve_policy_text(rules["policies"][policy], lambda _: text)
     expected = before + " Подробности уточните в клинике."
     path.write_text(text.replace(before, expected), encoding="utf-8")
-    block = {"kind": kind, "request_id": "r1", **fields}
-    if kind == "price":
-        block["target"] = {"type": "service", "id": "caries"}
-    fake = use(FakeProvider(raw(block)))
-    result = send(client, transport, request_id="first", q="Лечение и условия приёма")
-    assert result["answer"] == expected
-    assert not result["ui"]["projected_commercial_ids"]["price_offer_ids"]
-    assert not any(b["action_kind"] == "cta" for b in result["ui"]["buttons"])
-    assert send(client, transport, request_id="first", q="Лечение и условия приёма") == result
-    assert len(fake.inputs) == 1
-    fake.raw = raw(explanation("Могу рассказать об услугах."))
-    send(client, transport, request_id="next", q="Расскажите")
-    assert fake.inputs[-1].context.ordinary.dialogue_pairs[-1].assistant_text == expected
+    if kind == 'price':
+        wire = Transport(message(None, price('caries', **fields)), message(expected),
+                         message('Могу рассказать об услугах.'))
+    else:
+        wire = Transport(message(reply(actions=[action('start_booking', **fields)])),
+                         message('Могу рассказать об услугах.'))
+    use(D2HttpProvider(transport=wire))
+    result = send(client, transport, request_id='first', q='Лечение и условия приёма')
+    assert result['answer'] == expected
+    assert not result['ui']['projected_commercial_ids']['price_offer_ids']
+    assert not any(b['action_kind'] == 'cta' for b in result['ui']['buttons'])
+    assert send(client, transport, request_id='first', q='Лечение и условия приёма') == result
+    assert len(wire.calls) == (2 if kind == 'price' else 1)
+    if kind == 'price':
+        assert expected in wire.calls[1]['messages'][-2]['content']
+    from session import mem_get, session_client_scope
+    with session_client_scope('demo'):
+        assert mem_get('cp6a')['lead_intent'] not in {'collecting_name', 'collecting_phone'}
+    send(client, transport, request_id='next', q='Расскажите')
+    user = wire.calls[-1]['messages'][1]['content']
+    context = json.loads(user.split('=== D2_SESSION_CONTEXT ===\n', 1)[1].split('\n\n=== ', 1)[0])
+    assert context['ordinary']['dialogue_pairs'][-1]['assistant_text'] == expected
+
 
 
 @pytest.mark.parametrize("tenant", ["demo", "nikadent"])
@@ -112,15 +125,18 @@ def test_unavailable_price_uses_md_without_creating_offer(http_env, transport, g
     old = resolve_policy_text(data[group][0], lambda _: text)
     expected = "Этот вариант в клинике недоступен. Уточните альтернативы у администратора."
     path.write_text(text.replace(old, expected), encoding="utf-8")
-    block = {"kind": "price", "request_id": "r1", "target": {"type": "service", "id": service}}
-    if brand:
-        block["brand_id"] = brand
-    fake = use(FakeProvider(raw(block)))
-    result = send(client, transport, q="Сколько стоит этот вариант?")
-    suffix = "\n\n- Элайнеры для выравнивания зубов" if service == "braces" else ""
-    assert result["answer"] == expected + suffix
-    assert result["ui"]["projected_commercial_ids"]["price_offer_ids"] == []
-    assert len(fake.inputs) == 1
+    fields = {'brand_id': brand} if brand else {}
+    suffix = '\n\n- Элайнеры для выравнивания зубов' if service == 'braces' else ''
+    wire = Transport(message(None, price(service, **fields)), message(expected + suffix))
+    use(D2HttpProvider(transport=wire))
+    result = send(client, transport, q='Сколько стоит этот вариант?')
+    assert result['answer'] == expected + suffix
+    assert result['ui']['projected_commercial_ids']['price_offer_ids'] == []
+    assert len(wire.calls) == 2
+    assert expected in wire.calls[1]['messages'][-2]['content']
+    if service == 'braces':
+        assert 'Элайнеры для выравнивания зубов' in wire.calls[1]['messages'][-2]['content']
+
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
@@ -133,7 +149,7 @@ def test_broken_policy_ref_fails_before_provider_without_booking(http_env, trans
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     data["policies"]["no_pediatric_dentistry"]["text_ref"] = ref
     path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
-    fake = use(FakeProvider(raw({"kind": "booking", "request_id": "r1", "age_group": "adult"})))
+    fake = use(FakeProvider(reply(actions=[action('start_booking', age_group='adult')])))
     response = (post if transport == "json" else post_sse)(client, sid="bad-ref", q="Хочу записаться")
     body = response.get_json() if transport == "json" else dict(sse_events(response))
     assert "d2_invalid_turn" in json.dumps(body)

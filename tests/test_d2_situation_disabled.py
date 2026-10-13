@@ -6,10 +6,31 @@ import pytest
 
 from session import mem_get, session_client_scope, set_situation_pending, set_situation_note
 from tests.test_d2_http_contract import FakeProvider, http_env, post, post_sse, sse_events
-from tests.test_d2_document_click_task_http import _body
-from tests.test_d2_sim2_dialogues import raw, explanation
 from lead_interrupt import LEAD_PENDING_ANSWER_REF, LEAD_RESUME_REF
 from core.d2_live_provider import build_d2_d1r_messages
+
+
+def booking_reply():
+    return '\n<D2_META>\n' + json.dumps({'actions': [
+        {'name': 'start_booking', 'arguments': {'age_group': 'adult'}}
+    ]}) + '\n</D2_META>'
+
+
+def _body(response, transport):
+    assert response.status_code == 200, response.get_data(as_text=True)
+    if transport == 'json':
+        body = response.get_json()
+    else:
+        events = dict(sse_events(response))
+        assert 'error' not in events and 'done' in events, events
+        body = events['ui']
+    assert body['revision'] > 0 and isinstance(body['ui'], dict)
+    return body
+
+
+def assert_lead_step(step):
+    with session_client_scope('demo'):
+        assert mem_get('cp6a')['lead_intent'] == step
 
 
 def rejected(response, transport):
@@ -27,11 +48,13 @@ def rejected(response, transport):
 @pytest.mark.parametrize('active', [False, True])
 def test_obsolete_command_cannot_change_lead_or_call_model(http_env, transport, action, active):
     client, db, use, _ = http_env
-    fake = use(FakeProvider(raw({'kind': 'booking', 'request_id': 'r1', 'age_group': 'adult'})))
+    fake = use(FakeProvider(booking_reply()))
     send = post if transport == 'json' else post_sse
     if active:
         _body(send(client, request_id='book', q='Хочу записаться'), transport)
+        assert_lead_step('collecting_name')
         _body(send(client, request_id='name', q='Анна'), transport)
+        assert_lead_step('collecting_phone')
     with session_client_scope('demo'):
         before = deepcopy(mem_get('cp6a'))
     count = len(fake.inputs)
@@ -47,16 +70,18 @@ def test_obsolete_command_cannot_change_lead_or_call_model(http_env, transport, 
 @pytest.mark.parametrize('slot', ['ordinary', 'name', 'phone'])
 def test_historical_situation_flag_cannot_route_current_turn(http_env, transport, slot):
     client, _, use, _ = http_env
-    fake = use(FakeProvider(raw({'kind': 'booking', 'request_id': 'r1', 'age_group': 'adult'})))
+    fake = use(FakeProvider(booking_reply()))
     send = post if transport == 'json' else post_sse
     if slot != 'ordinary':
         _body(send(client, request_id='book', q='Хочу записаться'), transport)
+        assert_lead_step('collecting_name')
         if slot == 'phone':
             _body(send(client, request_id='name', q='Анна'), transport)
+            assert_lead_step('collecting_phone')
     with session_client_scope('demo'):
         set_situation_pending('cp6a', True)
         set_situation_note('cp6a', 'Старая заметка')
-    fake.raw = raw(explanation('Пояснение по материалам клиники.'))
+    fake.raw = 'Пояснение по материалам клиники.'
     question = 'Как проходит лечение? +79991234567' if slot == 'ordinary' else 'Александр' if slot == 'name' else '+79991234567'
     count = len(fake.inputs)
     args = dict(request_id='current', q=question)
@@ -84,7 +109,7 @@ def test_historical_situation_flag_cannot_route_current_turn(http_env, transport
 @pytest.mark.parametrize('transport', ['json', 'sse'])
 def test_existing_booking_cta_still_requires_published_ui(http_env, transport):
     client, _, use, _ = http_env
-    fake = use(FakeProvider(raw(explanation('Пояснение по материалам клиники.'))))
+    fake = use(FakeProvider('Пояснение по материалам клиники.'))
     send = post if transport == 'json' else post_sse
     answer = _body(send(client, request_id='answer', q='Как проходит лечение?'), transport)
     button = next(b for b in answer['ui']['buttons'] if b['action_kind'] == 'cta')
@@ -102,12 +127,14 @@ def test_existing_booking_cta_still_requires_published_ui(http_env, transport):
 @pytest.mark.parametrize('transport', ['json', 'sse'])
 def test_historical_situation_flag_does_not_interrupt_lead_pause(http_env, transport):
     client, _, use, _ = http_env
-    fake = use(FakeProvider(raw({'kind': 'booking', 'request_id': 'r1', 'age_group': 'adult'})))
+    fake = use(FakeProvider(booking_reply()))
     send = post if transport == 'json' else post_sse
     _body(send(client, request_id='book', q='Хочу записаться'), transport)
+    assert_lead_step('collecting_name')
     _body(send(client, request_id='name', q='Анна'), transport)
+    assert_lead_step('collecting_phone')
     pending = _body(send(client, request_id='question', q='Как проходит лечение?'), transport)
-    fake.raw = raw(explanation('Пояснение по материалам клиники.'))
+    fake.raw = 'Пояснение по материалам клиники.'
     paused = _body(send(client, request_id='answer', q='', ref=LEAD_PENDING_ANSWER_REF,
                         ui_revision=pending['revision']), transport)
     with session_client_scope('demo'):

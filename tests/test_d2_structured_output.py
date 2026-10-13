@@ -1,4 +1,4 @@
-"""One wire description, strict HTTP generation, and a bounded capability probe."""
+"""Historical strict-schema/probe safety; not the current HTTP reply protocol."""
 import json
 from dataclasses import replace
 from types import SimpleNamespace
@@ -8,7 +8,7 @@ import pytest
 from contracts.d2_dialogue_result import (
     D2DialogueResult, D2ExplanationReply, D2ExplanationTask, validate_d2_payload,
 )
-from core.d2_live_provider import D2HttpProvider, build_d2_d1r_messages, d2_strict_response_format
+from core.d2_live_provider import d2_strict_response_format
 from scripts.check_d2_structured_output import MAX_CALLS, check_reply, main, prepare_cases, run_live
 from tests.test_d2_live_provider_offline import _request
 
@@ -95,19 +95,6 @@ def test_strict_format_is_generated_from_the_same_runtime_types(known):
         assert len(items["discriminator"]["mapping"]) == 9
 
 
-@pytest.mark.parametrize("known", [False, True])
-def test_http_retains_json_object_after_adverse_strict_comparison(known):
-    request = replace(_request(), known_task=task() if known else None)
-    calls = []
-    def transport(**kwargs):
-        calls.append(kwargs)
-        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="{}"))])
-    assert D2HttpProvider(transport=transport).generate(request) == "{}"
-    assert len(calls) == 1
-    assert calls[0]["response_format"] == {"type": "json_object"}
-    assert calls[0]["messages"] == build_d2_d1r_messages(request)
-    assert calls[0]["max_completion_tokens"] == 1024
-    assert calls[0]["provider_call_source"] == "d2_http"
 
 
 def response(raw):

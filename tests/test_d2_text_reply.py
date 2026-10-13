@@ -21,11 +21,19 @@ def parse(raw, **kwargs):
 
 
 @pytest.mark.parametrize("args",[[{}],"{",{"target":0},{"request_id":"r1"},{"kind":"price"},{"brand_id":5},{"option_id":0}])
-def test_bad_price_arguments_keep_written_prose(args):
-    result=parse(response("Готовый ответ.",actions=[{"name":"show_price","arguments":args}]))
+def test_bad_action_arguments_keep_written_prose(args):
+    arguments = {"contact_fields": ["contact_phone"], **args} if isinstance(args, dict) else args
+    result=parse(response("Готовый ответ.",actions=[{"name":"show_contacts","arguments":arguments}]))
     assert result.blocks[0].content_text=="Готовый ответ."
     assert isinstance(result.blocks[1],D2RejectedOperation)
-    assert result.blocks[1].kind=="price"
+    assert result.blocks[1].kind=="contact"
+
+
+def test_tail_price_cannot_restore_removed_command():
+    result = parse(response("Готовый ответ.", actions=[action("show_price", target={"type":"service","id":"classic"})]))
+    assert result.blocks[0].content_text == "Готовый ответ."
+    assert isinstance(result.blocks[1], D2RejectedOperation)
+    assert result.blocks[1].kind == "reference"
 
 
 def test_duplicate_key_tail_keeps_text_but_executes_nothing():
@@ -43,21 +51,28 @@ def test_bad_source_keeps_unscoped_sibling_slot(bad):
 
 def test_text_first_actions_in_order_and_identity_owned_by_server():
     result=parse(response("Вступление.",actions=[action("show_price",target={"type":"service","id":"classic"}),action("show_contacts",contact_fields=["contact_address"])],sources=[{"content_ref":"one.md"}]))
-    assert [b.kind for b in result.blocks]==["content","price","contact"]
+    assert [b.kind for b in result.blocks]==["content","reference","contact"]
+    assert isinstance(result.blocks[1], D2RejectedOperation)
     assert [b.request_id for b in result.blocks]==["r1","r2","r3"]
 
 
-def test_removed_information_command_rejected_without_losing_prose():
-    result=parse(response("Ответ.",actions=[action("clarify_content",pending_question="Что?",clarification={"missing":"service","choices":["classic","sinus_lift"]})]))
+@pytest.mark.parametrize("name", ["clarify_content", "doctors"])
+def test_removed_information_command_rejected_without_losing_prose(name):
+    result=parse(response("Ответ.",actions=[action(name,pending_question="Что?",clarification={"missing":"service","choices":["classic","sinus_lift"]})]))
     assert result.blocks[0].content_text=="Ответ."
     assert isinstance(result.blocks[1],D2RejectedOperation)
 
 
 def test_known_task_requires_single_text_and_cannot_be_reclassified():
-    task=D2ExplanationTask(blocks=(AuthorizedExplanationOperation(kind="content",request_id="r1",content_ref="known.md",pending_question="Explain"),))
+    task=D2ExplanationTask(blocks=(AuthorizedExplanationOperation(
+        kind="content",request_id="r1",target={"type":"service","id":"classic"},
+        brand_id="nobel_biocare",volume={"extent":"one_tooth"},
+        content_ref="known.md",content_section_refs=["a:pain"],pending_question="Explain"),))
     result=parse(response("Section answer.",actions=[action("handoff")],sources=[{"content_ref":"other.md"}]),known_task=task)
     assert result.outcome=="dialogue"
-    assert result.blocks[0].content_ref=="known.md"
+    assert result.blocks[0].model_dump(exclude={"content_text"}) == task.blocks[0].model_dump(exclude={"pending_question"})
+    assert result.blocks[0].content_text == "Section answer."
+    assert result.source_claims is None
     for invalid in (" ",):
         with pytest.raises(ValueError):parse(invalid,known_task=task)
     with pytest.raises(ValueError):parse("Answer",known_task=task.model_copy(update={"blocks":task.blocks*2}))
@@ -111,3 +126,31 @@ def test_cp3_provider_uses_same_single_text_contract_without_tools():
     provider=D2Cp3LiveProvider(transport=transport)
     assert provider.generate(_request())=="Ответ."
     assert not {"tools","tool_choice","response_format"}.intersection(calls[0])
+
+
+@pytest.mark.parametrize("known", [False, True])
+def test_current_http_reply_has_no_json_envelope_requirement(known):
+    from dataclasses import replace
+    from tests.test_d2_live_provider_offline import _request
+    from core.d2_live_provider import D2HttpProvider, build_d2_d1r_messages
+    task = D2ExplanationTask(blocks=(AuthorizedExplanationOperation(
+        kind="content", request_id="r1", content_ref="known.md", pending_question="Explain"),))
+    request = replace(_request(), known_task=task if known else None)
+    calls=[]
+    def transport(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="Section answer."))])
+    assert D2HttpProvider(transport=transport).generate(request) == "Section answer."
+    assert len(calls) == 1 and 'response_format' not in calls[0]
+    assert calls[0]['max_completion_tokens'] == 1536
+    assert calls[0]['provider_call_source'] == 'd2_http'
+    assert calls[0]['messages'] == build_d2_d1r_messages(request)
+    from core.one_call_prompt_contract import D2_CLINIC_FACTS_AND_STYLE_INSTRUCTIONS
+    system = calls[0]['messages'][0]['content']
+    assert system.count(D2_CLINIC_FACTS_AND_STYLE_INSTRUCTIONS.strip()) == 1
+
+    if known:
+        assert not {'tools','tool_choice'} & calls[0].keys()
+    else:
+        assert calls[0]['tool_choice'] == 'auto'
+        assert [tool['function']['name'] for tool in calls[0]['tools']] == ['show_price']

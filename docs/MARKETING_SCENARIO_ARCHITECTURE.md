@@ -6,7 +6,7 @@
 > marketing authority отменены D2-017–020, D2-044–046 и D2-085–090. Канон D2:
 > [`DEMO_D2_TARGET_CONTRACT.md`](tasks/DEMO_D2_TARGET_CONTRACT.md),
 > [`DEMO_D2_PRODUCT_DECISIONS.md`](tasks/DEMO_D2_PRODUCT_DECISIONS.md) и
-> [`DEMO_D2_SCENARIO_MARKETING_AUDIT.md`](tasks/DEMO_D2_SCENARIO_MARKETING_AUDIT.md).
+> [`DEMO_D2_SCENARIO_MARKETING_AUDIT.md`](archive/task-history/DEMO_D2_SCENARIO_MARKETING_AUDIT.md).
 > Не переносить описанный ниже selector или сценарные pools в common D2 route.
 
 **Статус:** согласованный product/design-контракт; frozen schema models реализованы

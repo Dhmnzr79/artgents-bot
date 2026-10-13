@@ -276,10 +276,19 @@ def test_demo_starter_prompts_preserved() -> None:
     cfg = load_widget_presentation_v1("demo")
     labels = [item["label"] for item in cfg["starterPrompts"]]
     assert labels == [
-        "Я боюсь боли",
-        "Расскажите про all-on-4",
+        "Давно не был у стоматолога",
         "Посмотреть видео с врачом",
     ]
+
+
+def test_demo_welcome_promotion_reaches_public_config() -> None:
+    cfg = build_public_widget_config("demo")
+    assert cfg["welcomePromotion"] == {
+        "title": "До 15% на имплантацию",
+        "subtitle": "При оплате в день обращения",
+        "q": "Расскажите об условиях скидки до 15% на имплантацию при оплате в день обращения",
+    }
+    assert build_public_widget_config("nikadent")["welcomePromotion"] is None
 
 
 def test_integration_valid_demo() -> None:

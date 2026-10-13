@@ -8,6 +8,8 @@ import json
 import re
 from pathlib import Path
 
+from tests.workflow_test_selection import with_test_selection
+
 import pytest
 
 from deploy.postgres.g8_disposable_constants import (
@@ -173,6 +175,7 @@ def test_offline_mandatory_includes_g8_contract_not_integration() -> None:
     offline = _workflow_text().split("offline-unit-and-contracts:", 1)[-1].split(
         "postgres-qualification:", 1
     )[0]
+    offline = with_test_selection(offline)
     assert "tests/test_g8_postgres_qualification_contract.py" in offline
     assert "tests/test_g8_postgres_qualification_integration.py" not in offline
 
@@ -316,11 +319,11 @@ def test_env_example_documents_postgres_image_pin() -> None:
 
 
 def test_g8_contract_in_ci_and_publish_verify() -> None:
-    ci = _workflow_text()
+    ci = with_test_selection(_workflow_text())
     publish = (_REPO_ROOT / ".github" / "workflows" / "publish-image.yml").read_text(encoding="utf-8")
     rel = str(_CONTRACT_PATH.relative_to(_REPO_ROOT)).replace("\\", "/")
     assert rel in ci
-    verify = publish.split("verify:", 1)[1].split("secret-scan:", 1)[0]
+    verify = with_test_selection(publish.split("verify:", 1)[1].split("secret-scan:", 1)[0])
     assert rel in verify
 
 
@@ -329,7 +332,7 @@ def test_g8_contract_in_ci_workflow_offline_list() -> None:
         "postgres-qualification:", 1
     )[0]
     rel = str(_CONTRACT_PATH.relative_to(_REPO_ROOT)).replace("\\", "/")
-    assert rel in offline
+    assert rel in with_test_selection(offline)
 
 
 def test_g7_receipt_hash_mismatch_rejected(tmp_path: Path) -> None:

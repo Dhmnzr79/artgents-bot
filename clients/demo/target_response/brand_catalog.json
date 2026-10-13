@@ -17,6 +17,7 @@
     },
     "nobel_biocare": {
       "canonical_name": "Nobel Biocare",
+      "tab_label": "Nobel",
       "country": "Швейцария",
       "aliases": [
         "nobel",

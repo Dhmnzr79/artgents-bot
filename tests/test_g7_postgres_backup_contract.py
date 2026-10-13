@@ -11,6 +11,8 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from tests.workflow_test_selection import with_test_selection
+
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -218,10 +220,10 @@ def parse_backup_cli(argv: list[str]) -> tuple[str, str | None]:
 
 
 def test_g7_contract_in_ci_and_publish() -> None:
-    ci = _CI_WORKFLOW.read_text(encoding="utf-8")
+    ci = with_test_selection(_CI_WORKFLOW.read_text(encoding="utf-8"))
     publish = _PUBLISH_WORKFLOW.read_text(encoding="utf-8")
     assert str(_CONTRACT_PATH.relative_to(_REPO_ROOT)).replace("\\", "/") in ci
-    verify = publish.split("verify:", 1)[1].split("secret-scan:", 1)[0]
+    verify = with_test_selection(publish.split("verify:", 1)[1].split("secret-scan:", 1)[0])
     assert str(_CONTRACT_PATH.relative_to(_REPO_ROOT)).replace("\\", "/") in verify
 
 

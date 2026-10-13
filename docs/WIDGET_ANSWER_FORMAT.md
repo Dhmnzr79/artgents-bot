@@ -19,7 +19,7 @@ Checker/Cursor review P2; публичный wire и правила Markdown н�
 Для активного D2 источники правил —
 [Target Contract](tasks/DEMO_D2_TARGET_CONTRACT.md), D2-101–103 в
 [Decisions](tasks/DEMO_D2_PRODUCT_DECISIONS.md) и
-[карточка REC-4-P](tasks/DEMO_D2_PRICE_PRESENTATION_DETAILS_TASK.md).
+[карточка REC-4-P](archive/task-history/DEMO_D2_PRICE_PRESENTATION_DETAILS_TASK.md).
 На baseline `b02db8e` виджет уже умел Markdown-списки/bold, но компактная
 группировка цен и exact-detail route ещё не были реализованы. Ниже сохранён
 целевой формат на дату документа; текущий статус P2 указан выше.
@@ -99,8 +99,8 @@ Checker/Cursor review P2; публичный wire и правила Markdown н�
 
 ## Источник md vs ответ
 
-В файлах `md/` допустимы `<!-- aliases: ... -->` и сложная вёрстка для индекса.  
-В контекст LLM комментарии aliases **не попадают** (см. `chunk_context_md_for_llm`).  
+В файлах `md/` допустимы `<!-- aliases: ... -->` и сложная вёрстка для индекса.
+В контекст LLM комментарии aliases **не попадают** (см. `chunk_context_md_for_llm`).
 Модель не обязана копировать `**` из источника — виджет их отрисует, если они есть в ответе.
 
 ## Маркетинг и промо (composer path)

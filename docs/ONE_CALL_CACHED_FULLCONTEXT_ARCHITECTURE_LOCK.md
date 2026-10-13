@@ -1,5 +1,12 @@
 # ONE_CALL_CACHED_FULLCONTEXT — Architecture Lock
 
+> **ИСТОРИЯ. НЕ ТЕКУЩИЙ КОНТРАКТ И НЕ РАЗРЕШЕНИЕ НА РЕАЛИЗАЦИЮ.**
+> Прежний путь и исходный текст сохранены для historical test/eval references.
+> Старые «TARGET», «нормативный», модели, STOP/GO и правила относятся к baseline оригинала.
+> Нынешнее поведение: [D2 architecture](CURRENT_ARCHITECTURE.md),
+> процесс и статус: [документация](README.md).
+
+
 **Статус:** нормативный TARGET-контракт + синхронизация принятого baseline (Stage 4.3 принят; Stage 5.1 — **принят**; Stage 5.1B — **принят**; Stage 5.2 — **принят**).
 **Дата:** 2026-08-13.
 **Модель:** `qwen3.7-flash-2026-07-15`.

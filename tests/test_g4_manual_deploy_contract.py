@@ -7,6 +7,8 @@ import os
 import re
 from pathlib import Path
 
+from tests.workflow_test_selection import with_test_selection
+
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -514,10 +516,10 @@ def test_current_transition_is_nondestructive_and_fail_closed() -> None:
 
 
 def test_g4_contract_in_ci_and_publish_verify() -> None:
-    ci = _CI_WORKFLOW.read_text(encoding="utf-8")
+    ci = with_test_selection(_CI_WORKFLOW.read_text(encoding="utf-8"))
     publish = _PUBLISH_WORKFLOW.read_text(encoding="utf-8")
     assert "tests/test_g4_manual_deploy_contract.py" in ci
-    verify = publish.split("verify:", 1)[1].split("secret-scan:", 1)[0]
+    verify = with_test_selection(publish.split("verify:", 1)[1].split("secret-scan:", 1)[0])
     assert "tests/test_g4_manual_deploy_contract.py" in verify
 
 

@@ -53,14 +53,14 @@ scope_nav:
     full_arch:
       label: "Вся челюсть"
     unknown:
-      label: "Пока не знаю"
+      label: "Не знаю"
   prosthetics:
     one_tooth:
       label: "Один зуб"
     full_arch:
       label: "Вся челюсть"
     unknown:
-      label: "Пока не знаю"
+      label: "Не знаю"
 
 stage_nav:
   prosthetics:

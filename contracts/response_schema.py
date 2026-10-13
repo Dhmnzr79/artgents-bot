@@ -201,6 +201,7 @@ class TargetService(TargetSchemaModel):
 
 class TargetBrand(TargetSchemaModel):
     canonical_name: NonBlankStr
+    tab_label: NonBlankStr | None = None
     country: NonBlankStr
     aliases: list[NonBlankStr] = Field(default_factory=list)
 

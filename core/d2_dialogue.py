@@ -901,16 +901,6 @@ def _run_reserved_d2_dialogue_turn(
         if isinstance(block, PriceOperation) and block.target is None:
             reject_part(block)
             continue
-        if isinstance(block, PriceOperation) and selected_volume_price_task is not None and selected_volume_price_task.extent == "unknown":
-            exact_text.append(D2ExactTextBlock(request_id=block.request_id,
-                source_client_id=session_key.client_id,
-                display_text="Ничего страшного. На консультации врач поможет разобраться с объёмом лечения."))
-            exact_parts.append(D2ResolvedRequestPart(request_id=block.request_id,
-                kind="reference", status="answered",
-                scope="service" if isinstance(block.target, ServiceTarget) else "topic",
-                service_id=block.service_id, topic_id=block.topic_id, brand_id=block.brand_id,
-                discussion_scope=DiscussionScope(target=block.target, volume=block.volume, brand_id=block.brand_id)))
-            continue
         operations.append(block)
     sources = build_d2_snapshot_sources(
         tenant, model_view=view, operations=tuple(operations), session_key=session_key,
@@ -918,6 +908,29 @@ def _run_reserved_d2_dialogue_turn(
                               else context.retained_shown_ids.promo_fact_ids),
         shown_secondary_ref_ids=context.retained_shown_ids.secondary_ref_ids,
     )
+    # Document follow-ups are consumed by a click, not by being displayed.
+    # Reuse the TTL-gated, committed dialogue receipts instead of another
+    # session ledger. Other secondary UI keeps its existing shown-once policy.
+    document_reply_ids = {
+        candidate.reply_id
+        for authority in sources.d2_source_ui
+        for candidate in authority.quick_replies
+    }
+    clicked_document_refs = [
+        pair.selected_ui_ref.reply_id
+        for pair in context.ordinary.dialogue_pairs
+        if pair.selected_ui_ref is not None
+        and pair.selected_ui_ref.reply_id in document_reply_ids
+    ]
+    if selected_document_action is not None and selected_ui_ref is not None:
+        clicked_document_refs.append(selected_ui_ref.reply_id)
+    sources = sources.model_copy(update={
+        "shown_d2_secondary_ref_ids": tuple(dict.fromkeys((
+            *(ref for ref in context.retained_shown_ids.secondary_ref_ids
+              if ref not in document_reply_ids),
+            *clicked_document_refs,
+        ))),
+    })
     render_order = tuple(b.request_id for b in result.blocks
         if b.kind != "booking" or isinstance(b, D2RejectedOperation))
     def complete_price(outcome):

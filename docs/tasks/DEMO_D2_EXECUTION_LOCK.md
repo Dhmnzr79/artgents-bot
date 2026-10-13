@@ -11,12 +11,14 @@
 
 ## 1. Реальность развёртывания
 
-- В production **нет бота и нет пользователей**.
-- Текущий локальный `/ask`, `/ask/stream` и виджет — одноразовая база для
-  сравнения. Старый local runtime **не является compatibility target**:
-  его допустимо заменять и временно ломать.
-- Сохраняются только явно названные границы: tenant isolation,
-  lead/privacy, заявки, typed UI action ownership, transport-защиты.
+- По подтверждению владельца2026-10-13 demo бот развёрнут на VPS.
+  Реальные production-пользовательские диалоги и миграция не поставлены в scope.
+- Локальный /ask,/ask/stream — отдельный development/test запуск. Старый
+  semantic runtime не становится compatibility target из-за наличия VPS demo.
+- Tenant isolation, lead/privacy, заявки, typed UI и transport-защиты сохраняются.
+  Merge/deploy только по явному разрешению; topic push не обновляет VPS.
+- Чистка документации/tests и последующая demo KB выполняются отдельно;
+  итоговая совместная выкладка ещё не разрешена этим checkpoint.
 
 ## 2. Неснимаемая цель
 
@@ -88,16 +90,15 @@ baseline-долг не требует реализации будущих эта
 согласования это правило не вводит.
 
 На рубежах, названных в действующем разделе дорожной карты, нужен отдельный Cursor
-review по [проверочному prompt](DEMO_D2_CURSOR_CHECKER_PROMPT.md).
+review по [WORKFLOW_CHECKER](../WORKFLOW_CHECKER.md) и текущей карточке.
 После требуемых PASS допустимы только exact staging, commit, push и финальный
 отчёт с фактическим hash в согласованной ветке. Нельзя дописывать Ledger
 после review только ради hash: проверяющий видит Ledger вместе с diff.
 
-Постоянный процесс исполнителя:
-[DEMO_D2_CODEX_EXECUTOR_PROMPT.md](DEMO_D2_CODEX_EXECUTOR_PROMPT.md).
-Короткая вставка в каждый новый этап —
-[DEMO_D2_STAGE_TASK_MINI_PROMPT.md](DEMO_D2_STAGE_TASK_MINI_PROMPT.md).
-Карточка этапа задаёт точный baseline, allowlist, приёмку и тесты.
+Постоянный процесс исполнителя — [AGENTS](../../AGENTS.md),
+[WORKFLOW_GIT](../WORKFLOW_GIT.md) и текущая карточка с baseline/allowlist/приёмкой.
+Прежние executor/mini/checker prompts архивированы: их старые продуктовые
+формулировки не применяются. Требования разделов2–5 и независимый Checker сохранены.
 
 ## 6. Приоритет документов
 
@@ -106,7 +107,7 @@ AGENTS.md
 → D2 Execution Lock (этот файл)
 → D2 Delivery Roadmap (фиксированный порядок checkpoint)
 → утверждённые D2 contract / acceptance / decision log
-→ D2 Codex Executor Prompt (постоянный процесс исполнения)
+→ WORKFLOW_GIT / WORKFLOW_CHECKER (процесс, не новые продуктовые правила)
 → текущий checkpoint prompt
 ```
 

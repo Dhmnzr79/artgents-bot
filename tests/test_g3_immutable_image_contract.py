@@ -6,6 +6,8 @@ import ast
 import re
 from pathlib import Path
 
+from tests.workflow_test_selection import with_test_selection
+
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -336,9 +338,15 @@ def test_verify_job_preflight_and_ci_lock() -> None:
     assert "requirements.lock" not in verify.replace("requirements-ci.lock", "")
     assert "Compile production Python sources" in verify
     assert "pip install --upgrade pip" not in verify
-    pytest_block = verify.split("Offline unit, G2/G3 contracts", 1)[-1]
+    pytest_block = with_test_selection(verify.split("Offline unit, G2/G3 contracts", 1)[-1])
     assert "tests/test_g2_pr_ci_contract.py" in pytest_block
     assert "tests/test_g3_immutable_image_contract.py" in pytest_block
+    assert "tests/test_d2_contact_model_context.py" in pytest_block
+    assert "tests/test_d2_text_reply.py" in pytest_block
+    assert "tests/test_d2_situation_disabled.py" in pytest_block
+    assert "tests/test_d2_demo_limits.py" in pytest_block
+    assert "tests/test_d2_policy_text_refs.py" in pytest_block
+    assert "tests/test_d2_af1b_contacts_http.py" in pytest_block
     assert "tests/test_g4_manual_deploy_contract.py" in pytest_block
     assert "tests/test_g5_manual_rollback_contract.py" in pytest_block
     assert "tests/test_g7_postgres_backup_contract.py" in pytest_block

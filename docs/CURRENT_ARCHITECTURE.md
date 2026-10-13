@@ -1,192 +1,86 @@
-# Текущая архитектура бота
+# Текущая архитектура D2 demo
 
-> **УСТАРЕЛО (2026-07-24).** Описывает pre-S69 legacy runtime (`ask_turn`, playbook,
-> `SITUATION_PRICE_ON`). **Фактический product path** — target FullContext only; канон:
-> [`S70_FULLCONTEXT_MIGRATION_CLOSEOUT.md`](S70_FULLCONTEXT_MIGRATION_CLOSEOUT.md),
-> [`ARCH_TARGET_DESIGN.md`](ARCH_TARGET_DESIGN.md), [`ARCHITECTURE_CONVERGENCE.md`](ARCHITECTURE_CONVERGENCE.md).
-> Файл сохранён как историческая справка; не использовать для новых задач.
+Срез 2026-10-13. Описывает существующий код, не обещает безошибочный выбор
+моделью и не закрывает всю историческую SIM/REC приёмку. Старое описание
+Composer/playbook/router сохранено в [архиве](archive/pre-d2/CURRENT_ARCHITECTURE.md).
 
-**Статус:** исторический snapshot (Stage 3.4 / 5.5).
-**Обновлено:** 2026-07-10 (не отражает S61–S70).
-**Связано:** `ROUTING_MAP.md`, `MULTICLIENT.md`, `PRICEBOOK_V2.md`, `TECH_DEBT.md`.
+## Общий путь
 
----
+`app.py` /ask и /ask/stream → `core/d2_http_adapter.py` →
+`core/d2_dialogue.py` → захваченный tenant snapshot и completed history →
+`core/d2_live_provider.py` → текстовый protocol / native price tool →
+кодовое исполнение операций → frozen answer/UI и durable completion/replay.
+JSON/SSE — HTTP transport, не обязательная JSON-оболочка ответа модели.
+Lead/privacy и опубликованные UI actions проверяются существующими владельцами.
+Старые Composer/selectors/playbook не являются запасным обычным путём.
 
-## 1. Главное состояние
+## Текст и контекст
 
-- RAG-поиск удалён в Stage 3.4. В runtime нет отдельного embed/search слоя и OpenAI-эмбеддингов.
-- Единственный content-путь — full-context composer: композер получает всю md-базу клиента как контекст и пишет ответ поверх детерминированного пакета.
-- `get_chunk_by_ref` и `core/md_chunks.py` остались. Это не поиск, а прямое чтение md-секции по ref для контактов, карточек, price/detail refs и служебных вставок.
-- Плановый вызов живёт в `core/turn_planner_llm.py` и возвращает `route`, `aspects`, `service_id`, `patient_situation`, `brand_filter`.
-- Цены детерминированы: PriceBook/legacy offers собирают суммы, бренды, порядок и кнопки до LLM.
-- Stage 5.5 добавил read-only ядро услуги: `core/service_node.py`, `core/answer_lens.py`, ситуационную цену за флагом `SITUATION_PRICE_ON`, живые обрамления через `core/living_frame.py` за `LIVING_OVERVIEW_ON`.
+Модель получает весь approved MD corpus выбранного клиента, актуальную историю
+завершённых ответов и данные уже показанной карточки. Snapshot captures tenant
+files; последующая правка диска не переписывает уже захваченные данные.
+Canonical публичные контакты из `clinic_policies.yaml -> contact` разбирает
+`core/clinic_contact_policies.py`; `core/d2_tenant_snapshot.py` передаёт их
+в существующем `clinic_policy_catalog_json`. Адрес/метро, часы, парковка,
+телефон/WhatsApp и branch binding не дублируются в contacts MD.
+Policy IDs ссылаются через text_ref на authored MD, а не inline answer copies.
 
----
+Обычный ответ — свободный текст. Optional `<D2_META>` actions/sources идут после
+него отдельными строками. Непустая строка `{invalid` не structural JSON error:
+в нынешнем protocol это prose. Это не разрешение обходить action/security guards.
+Для обычного уточнения и вопроса о составе отдельные команды не требуются.
 
-## 2. Client pack и данные
+## Цена и интерактивные карточки
 
-Каждый клиент изолирован в `clients/{id}/`.
+На обычном ходу `D2HttpProvider.generate` предоставляет native `show_price`
+с tool_choice=auto. Модель определяет запрос и аргументы; код берёт только
+утверждённые tenant price данные, materializes результат и карточку.
+Предварительная prose перед tool call не публикуется как окончательный ответ.
+`complete_price` получает фактический результат и пишет финальный текст;
+на этом вызове tool_choice=none, повторная команда запрещена.
+Оба вызова используют одну настроенную модель и каждый считается в quota.
+При отсутствии tool карточка не обязана появиться; полезная prose сохраняется.
+Модельные финансовые неточности остаются принятым остаточным риском;
+это не повод добавлять classifier, semantic sanitizer или legacy fallback.
 
-```text
-clients/{id}/
-  md/
-  service_catalog.json
-  pricebook/
-    manifest.json
-    facts.json
-    services/*.json
-  patient_playbook.yaml
-  marketing.yaml
-  clinic_policies.yaml
-  video_catalog.yaml
-  widget_config.json
-  brand.yaml
-  tone.yaml
-  ui.yaml
-  features.yaml
-  lead_config.yaml
-  price_brand_aliases.json
+Табы/аккордеоны и проверенные price_select/price_detail clicks исполняются кодом
+по опубликованным refs и revision. Сохраняемый direct UI price_detail не означает
+возврата удалённой модельной ordinary price_detail. Факты выбранной карточки
+доступны следующему диалогу. Подробнее ответственность —
+[Target Contract §3](tasks/DEMO_D2_TARGET_CONTRACT.md).
 
-data/{id}/
-  bot.db
-```
+## Контакты, заявки и безопасность
 
-`data/{id}/bot.db` — SQLite-сессии, в git не трекаются. Runtime не должен fallback'иться из одного client pack в другой.
+`show_contacts` остаётся code-owned способом показать exact контактные блоки;
+это не единственный способ обычного разговора об адресе/парковке.
+`start_booking` и существующие lead steps принимают имя/телефон и управляют
+pause/resume/cancel. Intake PII не включается в ordinary model history.
+Формат телефона и composer_input_mode — UI projection, не новая semantic память.
+Demo заявка учебная; реальную доставку для конкретного tenant подтверждают отдельно.
+Tenant isolation, forged/stale UI rejection, quota boundaries, transactional
+commit/error и replay — действующие проверки, не legacy-долг для удаления.
+Situation intake выключен; его старые действия не должны запускать модель/заявку.
 
----
+## Модель и запуск
 
-## 3. `/ask` в одну строку
+Согласованная модель — DeepSeek Flash:
+`DEFAULT_LLM_MODEL=deepseek-flash`, `CHAT_BASE_URL=https://api.deepseek.com`,
+`CHAT_API_KEY`. Код сохраняет legacy env aliases; clean environment имеет
+Qwen default в config.py, это не автоматический fallback после ошибки DeepSeek.
+Readiness разрешает точный api.deepseek.com, сохраняя HTTPS/credentials/query/fragment guards.
+Секреты и .env не коммитятся. Native first/second response имеют одного provider owner.
 
-```text
-ingress/pre-resolver guards
-→ resolver / turn plan / source routing
-→ ask_turn hard routes
-→ composer or deterministic service reply
-→ finalize/policy/session/widget payload
-```
+Локальный запуск: [WORKFLOW_GIT](WORKFLOW_GIT.md), scripts/start_local_widget.ps1.
+На VPS есть demo deployment; последний подтверждённый release8888fdd.
+CI → Publish verified immutable Docker image → manual Deploy production.
+Изменение локальных файлов или push topic branch само по себе VPS не обновляет.
+Runtime fallback, миграцию пользователей и новые гарантии не предполагать.
 
-Фактический порядок в `orchestration/ask_turn.py`:
+## Проверки и остатки
 
-1. contacts overlay;
-2. patient playbook overview для content-ситуаций;
-3. situation price overview за `SITUATION_PRICE_ON`;
-4. doctor route;
-5. brand/budget early path за `BRAND_FILTER_ON` (`core/price_brand_money.try_brand_money_early`);
-6. composer overlay;
-7. catalog facts;
-8. price flow;
-9. fail-open composer fallback.
-
-Composer overlay: при `FULLCTX_ON=1` (дефолт) — без гейта «≥2 аспекта»; при `FULLCTX_ON=0` — только составные аспекты (`composer_flow.py`).
-
-Детали маршрутов — `ROUTING_MAP.md`.
-
----
-
-## 4. Основные модули
-
-| Модуль | Роль |
-|---|---|
-| `app.py` | HTTP, dispatch, сборка ответа |
-| `orchestration/pre_resolver_turn.py` | входные guards, lead/ref/continuation до resolver |
-| `orchestration/resolver_turn.py` | `DecisionFrame` и fallback intent |
-| `orchestration/ask_turn.py` | основной post-resolver порядок маршрутов |
-| `orchestration/composer_flow.py` | full-context composer overlay |
-| `orchestration/price_flow.py` | deterministic price replies |
-| `orchestration/patient_playbook_flow.py` | situation overview и situation-price |
-| `orchestration/catalog_flow.py` | doctors, catalog facts, md priority |
-| `core/knowledge_base.py` | сборка всей md-базы клиента для composer |
-| `core/md_chunks.py` | прямое чтение md-section по ref |
-| `core/turn_planner_llm.py` | one-turn plan: route/aspects/service/situation/brand |
-| `core/pricebook_loader.py` | загрузка PriceBook |
-| `core/price_answer_assembler.py` | deterministic price answer |
-| `core/price_offers.py` | нормализация offers/brands/legacy fallback |
-| `core/price_scope.py` | regex price-scope routing, оставлен намеренно |
-| `core/patient_situation.py` | semantic patient situation |
-| `core/patient_playbook.py` | situation → ordered clinic options |
-| `core/service_node.py` | read-only service view: catalog + pricebook |
-| `core/answer_lens.py` | describe/price/situation projections |
-| `core/price_brand_money.py` | brand filter + budget anchor на price path (`BRAND_FILTER_ON`) |
-| `core/living_frame.py` | live intro/closer вокруг пришпиленных facts |
-| `session.py` | per-client SQLite session |
-
----
-
-## 5. Content path
-
-Composer — единственный путь для content-ответов.
-
-1. `core/knowledge_base.py` собирает md-базу текущего клиента.
-2. `core/answer_packet.py` и соседние модули готовят детерминированный пакет фактов, карточек, price/promo вставок.
-3. `llm.generate_answer_from_packet_fullctx` / composer flow пишет финальный текст.
-4. Numeric gate проверяет числа по базе и карточкам.
-
-Прямые md refs (`get_chunk_by_ref`) используются только там, где нужен конкретный фрагмент: контакты, detail refs, service cards, legacy price refs, follow-up snippets.
-
----
-
-## 6. Price path
-
-PriceBook — основной источник денег на demo.
-
-- `query_selector.select_price_service_route` определяет price route и price scope.
-- `core/price_scope.py` и `core/patient_scope_cues.py` остаются рабочим dental-router для метод-ценовых вопросов вроде «сколько имплантация».
-- `core/price_answer_assembler.py` собирает суммы, brands, units, followups и кнопки без LLM.
-- `core/price_group_overview.py` строит обзор группы протоколов; при `LIVING_OVERVIEW_ON=1` intro/closer пишет composer через `core/living_frame.py`, цены остаются пришпилены.
-- `orchestration/patient_playbook_flow.try_patient_options_price_overview` строит цену за ситуацию за `SITUATION_PRICE_ON=1`: герой с одной inline-ценой, остальные варианты кнопками.
-
-Эксперимент planner → price-scope отменён: планировщик не заменяет regex price-routing.
-
----
-
-## 7. Patient situation и Stage 5.5
-
-`core/patient_situation.py` определяет ситуацию пациента: один зуб, вся челюсть, верхняя челюсть, протезный этап и т.п.
-
-`core/patient_playbook.py` превращает ситуацию в упорядоченные опции клиники из `patient_playbook.yaml`.
-
-Stage 5.5 добавляет общий read-only слой:
-
-- `ServiceNode`: единый вид услуги из catalog + pricebook;
-- `DescribeView`: content ref, intro, followups;
-- `PriceView`: offers, min_total, brand choice;
-- `SituationView`: ordered `ServiceNode` items с role/positioning/priority.
-
-Потребители подключены только там, где это уже нужно: situation-price. Остальные линзы остаются фундаментом для будущего рендера.
-
----
-
-## 8. LLM и провайдеры
-
-Chat/classifier модели идут через Qwen/DashScope (`DASHSCOPE_API_KEY`, `CHAT_BASE_URL`). OpenAI-эмбеддинги больше не являются частью runtime.
-
-Модели и флаги задаются в `config.py`. Важные флаги текущего слоя:
-
-| Флаг | Назначение |
-|---|---|
-| `FULLCTX_ON` / `COMPOSER_ON` / `TURN_PLANNER_ON` | full-context composer (дефолт **ON**, env `"0"` = kill-switch) |
-| `SERVICE_SELECT_LLM_ON` | LLM service selection for composer price aspects |
-| `PRICE_STRICT_SERVICE_ON` / `PRICE_SYMPTOM_CONSULT_ON` | ценовые гварды (дефолт **ON**) |
-| `BRAND_FILTER_ON` | brand filter + budget anchor (дефолт OFF) |
-| `LIVING_OVERVIEW_ON` | live intro/closer для overview frames |
-| `SITUATION_PRICE_ON` | situation price overview |
-
----
-
-## 9. Widget, leads, observability
-
-- Widget contract: `WIDGET_ANSWER_FORMAT.md`.
-- Widget config и allowed origins: `clients/{id}/widget_config.json`.
-- Leads включаются через `features.yaml` и доставляются по `lead_config.yaml`.
-- Events пишутся в JSONL и опционально в Postgres.
-- Admin dashboard описан в `DASHBOARD.md`.
-
----
-
-## 10. Что считать legacy
-
-- Старый RAG/search стек удалён. Не возвращать его в docs как runtime.
-- Старые roadmaps композера, dialog focus и marketing cleanup удалены из `docs/`; git-история остаётся источником архива.
-- `build_index.py` может оставаться хвостом в коде, но текущие docs не должны описывать его как обязательную операцию runtime.
-
-При расхождении docs и кода править вместе: этот файл отражает текущий runtime, а не желаемую архитектуру.
+[Текущий статус](tasks/DEMO_D2_CURRENT_STATUS.md),
+[очередь](tasks/DEMO_D2_DELIVERY_ROADMAP.md),
+[карточка чистки §60](tasks/DEMO_D2_INTERFACE_TASK.md#60-cleanup-checkpoint--2026-10-13).
+Temporary demo gate не означает полный historical suite PASS. Полезные старые
+tests мигрируются, проверки удалённых механизмов и доказанные дубли можно убрать.
+KB cleanup/экономия context tokens и optional doctor/case UI — отдельно позже.

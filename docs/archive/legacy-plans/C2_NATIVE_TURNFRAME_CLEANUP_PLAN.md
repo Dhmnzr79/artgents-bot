@@ -1,8 +1,13 @@
+> **АРХИВ. ИСТОРИЯ — НЕ ИНСТРУКЦИЯ ДЛЯ ТЕКУЩЕГО БОТА.**
+> Старые «канон», «GO», «текущий», планы, запреты и PASS относятся к моменту записи.
+> Этот материал не разрешает изменения runtime или восстановление старых контрактов.
+> Актуальный вход: [документация](../../README.md).
+
 # C2 — Native TurnFrame cleanup plan
 
-**Status:** plan only — no C2 implementation  
-**Baseline:** post-S70 / C1 (`codex/stage-a`)  
-**Authority:** Owner Cleanup-series C2 (separate governance commit required before code)  
+**Status:** plan only — no C2 implementation
+**Baseline:** post-S70 / C1 (`codex/stage-a`)
+**Authority:** Owner Cleanup-series C2 (separate governance commit required before code)
 **Mode:** read-only audit of real call sites; no product changes in this document
 
 ---
@@ -41,11 +46,11 @@ POST /ask
 Flow after one LLM JSON parse (`obj`):
 
 1. **Shadow branch first (unchanged order):** `build_turn_frame_from_raw(obj, allowed_topics=…, allowed_service_ids=…)` → `shadow_frame` or `shadow_degraded`.
-2. **Legacy branch:**  
-   - `_project_legacy_turn_plan_raw(obj)` — strips only `patient_scope` key; all other raw keys preserved (`:105–107`).  
-   - `_validate_plan(...)` — topic sanitize + strict `TurnPlan.model_validate` (`:366–417`).  
-   - `_apply_protocol_choice_guard(plan, q, client_id, sid)` — implant protocol downgrade (`:162–211`).  
-   - `_apply_focus_followup_enrichment(plan, q, sid)` — session `last_subject` + vague follow-up (`:140–160`).  
+2. **Legacy branch:**
+   - `_project_legacy_turn_plan_raw(obj)` — strips only `patient_scope` key; all other raw keys preserved (`:105–107`).
+   - `_validate_plan(...)` — topic sanitize + strict `TurnPlan.model_validate` (`:366–417`).
+   - `_apply_protocol_choice_guard(plan, q, client_id, sid)` — implant protocol downgrade (`:162–211`).
+   - `_apply_focus_followup_enrichment(plan, q, sid)` — session `last_subject` + vague follow-up (`:140–160`).
    - Result assigned to `legacy_plan` (`:664`).
 
 **Wrapper:** `plan_turn(q, sid, client_id)` returns `plan_turn_attempt(...).legacy_plan` only (`:688–690`).
@@ -63,8 +68,8 @@ Flow after one LLM JSON parse (`obj`):
 
 **Session inputs to legacy guards (not TurnFrame today):**
 
-- `_session_focus_service_id(sid)` → `core/dialog_focus._focus_from_last_subject(mem_get(sid))` (`:123–137`).  
-- `_apply_protocol_choice_guard` → `get_pending_clarify(sid)` option list (`:194–203`).  
+- `_session_focus_service_id(sid)` → `core/dialog_focus._focus_from_last_subject(mem_get(sid))` (`:123–137`).
+- `_apply_protocol_choice_guard` → `get_pending_clarify(sid)` option list (`:194–203`).
 - `_pending_clarify_prompt_block` → planner user prompt (`:242–274`, `get_pending_clarify`).
 
 ---
@@ -77,12 +82,12 @@ Flow after one LLM JSON parse (`obj`):
 
 - Pure function; does not mutate `raw`.
 - Per-field `FieldMeta` with `status` / `error` / `provenance`.
-- **Intent:** `raw["route"]` → `intent` (`_intent_from_raw`, `:270–278`).  
-- **Topic:** `topic` + `topic_confidence` vs `allowed_topics` (`_topic_from_raw`, `:293–334`).  
-- **Aspects:** list validation; empty → invalid metadata, frame may have `aspects=[]` (`_aspects_from_raw`, `:337–365`).  
-- **service_id / followup_of:** catalog allowlist (`_catalog_id_from_raw`, `:368–446`).  
-- **needs_clarification:** `needs_clarify` bool (`:449–459`).  
-- **patient_scope:** native `raw["patient_scope"]` if present, else scalar bridge from `patient_situation` (`_patient_scope_from_raw`, `:261–268`; bridge map `:58–68`).  
+- **Intent:** `raw["route"]` → `intent` (`_intent_from_raw`, `:270–278`).
+- **Topic:** `topic` + `topic_confidence` vs `allowed_topics` (`_topic_from_raw`, `:293–334`).
+- **Aspects:** list validation; empty → invalid metadata, frame may have `aspects=[]` (`_aspects_from_raw`, `:337–365`).
+- **service_id / followup_of:** catalog allowlist (`_catalog_id_from_raw`, `:368–446`).
+- **needs_clarification:** `needs_clarify` bool (`:449–459`).
+- **patient_scope:** native `raw["patient_scope"]` if present, else scalar bridge from `patient_situation` (`_patient_scope_from_raw`, `:261–268`; bridge map `:58–68`).
 - **Not migrated in shadow:** `emotion`, `specificity` → `a7.not_migrated` (`:481–502`).
 
 **Invocation:** `plan_turn_attempt` passes full `obj` (including `patient_scope`) to this builder **before** legacy projection (`turn_planner_llm.py:615–619`).
@@ -91,9 +96,9 @@ Flow after one LLM JSON parse (`obj`):
 
 **`core/turn_frame_adapter.py` → `build_turn_frame_from_legacy(turn_plan, decision_frame?, primary_aspect?)`** (`:70–194`)
 
-- Maps **valid** `TurnPlan` + optional `DecisionFrame` → `TurnFrame`.  
-- **Empty `patient_scope`** — always defaulted (`PatientScopeFrame()`, `:164–180`).  
-- **specificity** from `decision_frame.query_mode` when present (`:50–67`).  
+- Maps **valid** `TurnPlan` + optional `DecisionFrame` → `TurnFrame`.
+- **Empty `patient_scope`** — always defaulted (`PatientScopeFrame()`, `:164–180`).
+- **specificity** from `decision_frame.query_mode` when present (`:50–67`).
 - **No product call site on hot path** — only `core/turn_frame_shadow.record_turn_frame_shadow` (`:98–134`) and unit tests.
 
 ### 2.3 Shadow recording (ctx bridge)
@@ -112,8 +117,8 @@ Flow after one LLM JSON parse (`obj`):
 
 **`core/target_runtime_turn_frame_hydration.py` → `hydrate_target_runtime_turn_frame_from_session`**
 
-- Runs after `load_runtime_turn_frame` in `core/target_runtime_turn.py:110–115`.  
-- If `service_id` missing and vague attribute follow-up → copy `session_state.last_service_id` from `target_runtime_state` (`:47–72`).  
+- Runs after `load_runtime_turn_frame` in `core/target_runtime_turn.py:110–115`.
+- If `service_id` missing and vague attribute follow-up → copy `session_state.last_service_id` from `target_runtime_state` (`:47–72`).
 - Does **not** read `last_subject` directly.
 
 ---
@@ -133,13 +138,13 @@ Flow after one LLM JSON parse (`obj`):
 
 **Does not read TurnFrame (legacy DecisionFrame / TurnPlan path):**
 
-- `orchestration/resolver_turn.py` — uses `legacy_plan` → `turn_plan_to_decision_frame` (`:63–64`).  
-- `core/dialog_focus.py` — `turn_plan_from_ctx()` when planner published (`:353–364`).  
+- `orchestration/resolver_turn.py` — uses `legacy_plan` → `turn_plan_to_decision_frame` (`:63–64`).
+- `core/dialog_focus.py` — `turn_plan_from_ctx()` when planner published (`:353–364`).
 - `orchestration/composer_flow.py`, `orchestration/ask_turn.py` — `turn_plan_from_ctx()` (legacy composer path; not target `/ask`).
 
 **Ctx keys today (telemetry + bridge):**
 
-- `turn_frame_shadow`, `turn_frame_shadow_status`, `turn_frame_shadow_reason`  
+- `turn_frame_shadow`, `turn_frame_shadow_status`, `turn_frame_shadow_reason`
 - `turn_plan`, `turn_planner_used`, `turn_plan_*` (via `publish_turn_plan`, `turn_planner_llm.py:487–503`)
 
 ---
@@ -171,10 +176,10 @@ ELIF decision IS NULL:
 
 **`resolve_with_fallback`** (`resolver.py:181–238`):
 
-1. `resolve_decision_frame` — Resolver LLM (`RESOLVER_MODEL`, `:199`).  
-2. Safety-net vs `THRESHOLDS.resolver.min_confidence`:  
-   - Low intent → `classify_intent` remaps `route_intent` (`:204–220`).  
-   - Low topic → `service_topic = "unknown"` (`:224–228`).  
+1. `resolve_decision_frame` — Resolver LLM (`RESOLVER_MODEL`, `:199`).
+2. Safety-net vs `THRESHOLDS.resolver.min_confidence`:
+   - Low intent → `classify_intent` remaps `route_intent` (`:204–220`).
+   - Low topic → `service_topic = "unknown"` (`:224–228`).
    - Low query_mode → `query_mode = "specific"` (`:232–236`).
 
 **Target path note:** `app._orchestrate_ask_turn` always calls `run_resolver_turn` then `orchestrate_target_fullcontext_turn` (`app.py:309–322`). Resolver output populates `request.ctx` decision frame and `effective_intent`, but **target answer does not consume `DecisionFrame`** — only TurnFrame shadow. Resolver fallback is still a **second LLM** on planner strict failure and affects shared telemetry/focus helpers.
@@ -202,14 +207,14 @@ ELIF decision IS NULL:
 
 ### 5.2 `turn_frame_has_invalid_or_missing` (`contracts/planner_attempt.py:15–31`)
 
-- Any top-level `FieldMeta.status` in `{invalid, missing}` → true.  
-- Nested `patient_scope` subfields counted.  
+- Any top-level `FieldMeta.status` in `{invalid, missing}` → true.
+- Nested `patient_scope` subfields counted.
 - Used to set `shadow_status=partial` vs `ok` (`turn_planner_llm.py:676–679`).
 
 ### 5.3 Strict legacy triggers (examples)
 
-- `aspects=[]` → Pydantic `min_length=1` on `TurnPlan` → `legacy_plan=None`, shadow may be `partial`.  
-- Unknown `service_id` / `followup_of` → `ValueError` in `_validate_plan` (`:393–396`).  
+- `aspects=[]` → Pydantic `min_length=1` on `TurnPlan` → `legacy_plan=None`, shadow may be `partial`.
+- Unknown `service_id` / `followup_of` → `ValueError` in `_validate_plan` (`:393–396`).
 - Invalid brand_filter → `ValueError` (`:413–416`).
 
 ---
@@ -229,37 +234,37 @@ plan_turn_attempt(q, sid, client_id)
 
 ### 6.2 Required moves (ordered)
 
-1. **Product branch in `run_resolver_turn`:**  
-   - If `attempt.shadow_frame` and status ∈ `{ok, partial}` → treat as planner success for target.  
+1. **Product branch in `run_resolver_turn`:**
+   - If `attempt.shadow_frame` and status ∈ `{ok, partial}` → treat as planner success for target.
    - If `not_available` / `degraded` / missing frame → fail-closed target error (same as today’s `load_runtime_turn_frame` failure); **do not** call resolver.
 
-2. **Relocate deterministic guards off `TurnPlan`:**  
-   - `_apply_protocol_choice_guard` and `_apply_focus_followup_enrichment` today mutate only `legacy_plan`.  
-   - C2: implement `apply_turn_frame_planner_guards(frame, q, sid, client_id)` operating on `TurnFrame` (or pre-frame raw + post-build patch) with same rules:  
-     - implant protocol downgrade on `service_id`  
-     - session focus enrichment for vague follow-ups  
-     - `pending_clarify` option proof for protocol guard  
+2. **Relocate deterministic guards off `TurnPlan`:**
+   - `_apply_protocol_choice_guard` and `_apply_focus_followup_enrichment` today mutate only `legacy_plan`.
+   - C2: implement `apply_turn_frame_planner_guards(frame, q, sid, client_id)` operating on `TurnFrame` (or pre-frame raw + post-build patch) with same rules:
+     - implant protocol downgrade on `service_id`
+     - session focus enrichment for vague follow-ups
+     - `pending_clarify` option proof for protocol guard
    - Session input: **`target_runtime_state.last_service_id`** instead of `last_subject` (`_session_focus_service_id`).
 
-3. **Retire `turn_plan_to_decision_frame` on hot path:**  
-   - Target dispatch already uses TurnFrame field_meta gates (`target_turn_frame_dispatch.py`).  
+3. **Retire `turn_plan_to_decision_frame` on hot path:**
+   - Target dispatch already uses TurnFrame field_meta gates (`target_turn_frame_dispatch.py`).
    - Shared helpers that still read `turn_plan_from_ctx()` (`dialog_focus`, `composer_flow`) must switch to runtime TurnFrame ctx or target session — or be deleted if dead post-S69.
 
-4. **Rename shadow → runtime (ctx contract):**  
-   - `turn_frame_shadow` → `runtime_turn_frame` (or similar); keep telemetry aliases one release if needed.  
-   - `record_planner_attempt_shadow` → `publish_runtime_turn_frame`.  
+4. **Rename shadow → runtime (ctx contract):**
+   - `turn_frame_shadow` → `runtime_turn_frame` (or similar); keep telemetry aliases one release if needed.
+   - `record_planner_attempt_shadow` → `publish_runtime_turn_frame`.
    - Update `metadata_first_observability` allowlist keys accordingly.
 
-5. **Partial frame policy (owner decision inside C2):**  
-   - Define minimum viable fields for target materialize vs terminal clarify/defer (reuse `dispatch_target_turn_frame_response` invalid-field rejects).  
+5. **Partial frame policy (owner decision inside C2):**
+   - Define minimum viable fields for target materialize vs terminal clarify/defer (reuse `dispatch_target_turn_frame_response` invalid-field rejects).
    - `partial` with valid `intent`+`topic`+`aspects` should materialize; missing `service_id` may terminal-clarify — **no resolver**.
 
 6. **Keep single LLM:** `plan_turn_attempt` remains the only planner call; no `resolve_decision_frame` on `/ask`.
 
 ### 6.3 Explicit non-goals for C2
 
-- No second classifier for routing.  
-- No loosening of base/client MD wording or verifier.  
+- No second classifier for routing.
+- No loosening of base/client MD wording or verifier.
 - No A9 `patient_scope` product authority (see §10).
 
 ---
@@ -338,8 +343,8 @@ plan_turn_attempt(q, sid, client_id)
 # Plus separate key target_runtime_followups
 ```
 
-**Reader:** `read_target_runtime_session` → `TargetRuntimeSessionState` (`:53–92`).  
-**Hydration consumer:** `hydrate_target_runtime_turn_frame_from_session` (`last_service_id` only).  
+**Reader:** `read_target_runtime_session` → `TargetRuntimeSessionState` (`:53–92`).
+**Hydration consumer:** `hydrate_target_runtime_turn_frame_from_session` (`last_service_id` only).
 **Pre-resolver ref nav:** `orchestration/pre_resolver_turn.py:232–237` reads `followups`.
 
 ### 8.2 Migration map
@@ -356,9 +361,9 @@ plan_turn_attempt(q, sid, client_id)
 
 ### 8.3 C2 session rules
 
-- **Read path:** target pipeline and planner guards read **only** `read_target_runtime_session`.  
-- **Write path:** only after successful materialized target response (unchanged).  
-- **Compat:** one-release dual-write to `last_subject` optional; dual-read forbidden after cutover.  
+- **Read path:** target pipeline and planner guards read **only** `read_target_runtime_session`.
+- **Write path:** only after successful materialized target response (unchanged).
+- **Compat:** one-release dual-write to `last_subject` optional; dual-read forbidden after cutover.
 - **Reset:** `mem_reset` / `clear_focus_context` must clear `target_runtime_state` + followups.
 
 ---
@@ -388,16 +393,16 @@ Post-S70 product is **demo-only** on target path; no multi-legacy client packs i
 
 Per `docs/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md` and guardrails:
 
-- `patient_scope` is extracted in **`build_turn_frame_from_raw`** only (`turn_frame_from_raw.py:261–268`).  
-- **`_project_legacy_turn_plan_raw` strips `patient_scope`** before `TurnPlan` validation (`turn_planner_llm.py:105–107`) — product `legacy_plan` never sees it.  
-- **No target module** reads `turn_frame.patient_scope` for dispatch/composer/verifier.  
+- `patient_scope` is extracted in **`build_turn_frame_from_raw`** only (`turn_frame_from_raw.py:261–268`).
+- **`_project_legacy_turn_plan_raw` strips `patient_scope`** before `TurnPlan` validation (`turn_planner_llm.py:105–107`) — product `legacy_plan` never sees it.
+- **No target module** reads `turn_frame.patient_scope` for dispatch/composer/verifier.
 - A9 eval harness (`evals/v5/run_patient_scope_shadow_eval_v2.py`) is measurement only.
 
 **C2 law:**
 
-1. `patient_scope` remains **telemetry / offline eval** only.  
-2. No routing, evidence, pricing, or UI may branch on `patient_scope` without separate owner authority gate.  
-3. Native TurnFrame primary **does not** change this — flipping authority to TurnFrame must not implicitly promote `patient_scope`.  
+1. `patient_scope` remains **telemetry / offline eval** only.
+2. No routing, evidence, pricing, or UI may branch on `patient_scope` without separate owner authority gate.
+3. Native TurnFrame primary **does not** change this — flipping authority to TurnFrame must not implicitly promote `patient_scope`.
 4. Scalar `patient_situation` bridge in `turn_frame_from_raw` stays for shadow completeness until a later authority task.
 
 ---
@@ -406,13 +411,13 @@ Per `docs/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md` and guardrails:
 
 ### 11.1 Protected (must pass unchanged through C2 unless test is explicitly in allowlist)
 
-- `tests/test_turn_planner_llm.py`  
-- `tests/test_turn_frame_shadow.py` (rewrite to runtime naming)  
-- `tests/test_turn_frame_from_raw.py`  
-- `tests/test_s61_target_fullcontext_runtime.py`  
-- `tests/test_target_fullcontext_content_response.py`  
-- `tests/test_s67_legacy_isolation_offline.py`  
-- `tests/test_s62_correction_offline.py`, `tests/test_s63_correction_offline.py`  
+- `tests/test_turn_planner_llm.py`
+- `tests/test_turn_frame_shadow.py` (rewrite to runtime naming)
+- `tests/test_turn_frame_from_raw.py`
+- `tests/test_s61_target_fullcontext_runtime.py`
+- `tests/test_target_fullcontext_content_response.py`
+- `tests/test_s67_legacy_isolation_offline.py`
+- `tests/test_s62_correction_offline.py`, `tests/test_s63_correction_offline.py`
 - Frozen pin guards (S62/S63/S66) — byte-identical
 
 ### 11.2 New / extended C2 tests (recommended allowlist)
@@ -428,8 +433,8 @@ Per `docs/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md` and guardrails:
 
 ### 11.3 Evals (offline)
 
-- A9 patient_scope shadow matrix — rerun for regression; **no authority change**.  
-- A6/A7 topic shadow attempt contract — update event names if shadow renamed.  
+- A9 patient_scope shadow matrix — rerun for regression; **no authority change**.
+- A6/A7 topic shadow attempt contract — update event names if shadow renamed.
 - **No new live eval requirement** (§12).
 
 ### 11.4 Commands (offline, from C1 TASK pattern)
@@ -495,29 +500,29 @@ Rationale: C2 is wiring/authority cleanup; behavior claims must be provable from
 
 ### 13.2 Explicitly **NOT** in C2 allowlist (STOP if needed)
 
-- `core/turn_frame_adapter.py` — **delete only** (no extend)  
-- `resolver.py` semantic changes beyond gating product call — needs owner decision  
-- `contracts/turn_plan.py` deletion — optional follow-up  
-- Client packs / MD / pricebook data  
-- Composer, Verifier, medical boundary logic  
-- A9 eval matrix / frozen live artifacts  
-- Protected acceptance spec/golden/target/current  
-- `evals/v5/*_live_*` changes  
-- Per-MD routing, RAG, retrieval reintroduction  
+- `core/turn_frame_adapter.py` — **delete only** (no extend)
+- `resolver.py` semantic changes beyond gating product call — needs owner decision
+- `contracts/turn_plan.py` deletion — optional follow-up
+- Client packs / MD / pricebook data
+- Composer, Verifier, medical boundary logic
+- A9 eval matrix / frozen live artifacts
+- Protected acceptance spec/golden/target/current
+- `evals/v5/*_live_*` changes
+- Per-MD routing, RAG, retrieval reintroduction
 
 ### 13.3 STOP conditions (owner / Architect required)
 
 Stop and escalate if C2 implementation requires:
 
-1. **Second LLM** on `/ask` for routing (resolver, classify_intent safety-net, service_select duplicate).  
-2. **Partial TurnFrame → resolver** hybrid (fail-open contradicts native primary).  
-3. **`patient_scope` product authority** (pricing, medzone, clarify, evidence).  
-4. **Files outside §13.1** without governance correction + PRE-CODE ✅.  
-5. **Changing protected tests** expectations to greenwash.  
-6. **`TurnPlan` strict relax** (e.g. `aspects` min_length) instead of frame authority.  
-7. **Session dual-read** indefinitely (legacy + target without migration end).  
-8. **Live eval / frozen artifact** edits to mask regressions.  
-9. **Behavior change** in FullContext composer/verifier/boundary masked as “cleanup”.  
+1. **Second LLM** on `/ask` for routing (resolver, classify_intent safety-net, service_select duplicate).
+2. **Partial TurnFrame → resolver** hybrid (fail-open contradicts native primary).
+3. **`patient_scope` product authority** (pricing, medzone, clarify, evidence).
+4. **Files outside §13.1** without governance correction + PRE-CODE ✅.
+5. **Changing protected tests** expectations to greenwash.
+6. **`TurnPlan` strict relax** (e.g. `aspects` min_length) instead of frame authority.
+7. **Session dual-read** indefinitely (legacy + target without migration end).
+8. **Live eval / frozen artifact** edits to mask regressions.
+9. **Behavior change** in FullContext composer/verifier/boundary masked as “cleanup”.
 10. **Corpus overflow** prompt to add RAG/retriever (FINAL_FULLCONTEXT_ONLY violation).
 
 ### 13.4 Suggested C2 phases (for TASK splitting)
@@ -557,9 +562,9 @@ Stop and escalate if C2 implementation requires:
 
 ## Appendix B — Related docs
 
-- `docs/S70_FULLCONTEXT_MIGRATION_CLOSEOUT.md` — current product diagram  
-- `docs/evidence/a_series/FIELD_LEVEL_PLANNER_OUTCOME_A7.md` — dual-branch law  
-- `docs/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md` — shadow-only patient_scope  
+- `docs/S70_FULLCONTEXT_MIGRATION_CLOSEOUT.md` — current product diagram
+- `docs/evidence/a_series/FIELD_LEVEL_PLANNER_OUTCOME_A7.md` — dual-branch law
+- `docs/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md` — shadow-only patient_scope
 - `TASK.md` (C1) — explicit NOT in C1 allowlist = C2 scope
 
 **STOP after plan — C2 code requires separate owner governance commit.**

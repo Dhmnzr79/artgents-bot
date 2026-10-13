@@ -1,3 +1,8 @@
+> **ИСТОРИЧЕСКИЙ ДОКУМЕНТ. НЕ ТЕКУЩИЙ ПЛАН И НЕ КАНОН D2.**
+> Прежний путь пока сохранён для исторических test/eval readers.
+> Не восстанавливать старые механизмы по этому тексту.
+> Актуальные документы: [вход](README.md).
+
 # Architecture Convergence — канон (2026-07-24)
 
 **Статус:** docs sync @ AC3 complete (`aa8e6dd`) + A9R governance.
@@ -98,4 +103,4 @@ Scope **не выбирает** лечение, протокол или `service
 8. Post-A9 widget E2E
 9. Provider prompt caching
 
-См. также: [`A9R_GOVERNANCE.md`](A9R_GOVERNANCE.md), [`ARCH_TARGET_DESIGN.md`](ARCH_TARGET_DESIGN.md), [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md), [`PATIENT_SCOPE_DESIGN_A9.md`](PATIENT_SCOPE_DESIGN_A9.md).
+См. также: [`A9R_GOVERNANCE.md`](archive/legacy-plans/A9R_GOVERNANCE.md), [`ARCH_TARGET_DESIGN.md`](ARCH_TARGET_DESIGN.md), [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md), [`PATIENT_SCOPE_DESIGN_A9.md`](PATIENT_SCOPE_DESIGN_A9.md).

@@ -1,3 +1,8 @@
+> **АРХИВ. ИСТОРИЯ — НЕ ИНСТРУКЦИЯ ДЛЯ ТЕКУЩЕГО БОТА.**
+> Старые «канон», «GO», «текущий», планы, запреты и PASS относятся к моменту записи.
+> Этот материал не разрешает изменения runtime или восстановление старых контрактов.
+> Актуальный вход: [документация](../../README.md).
+
 # A9 Native Patient-scope — Raw Contract и Prompt Spec
 
 Статус: **frozen specification, shadow-only, implementation disabled**.

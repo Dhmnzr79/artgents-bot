@@ -1,50 +1,39 @@
-# Документация — актуальный вход
+# Документация нынешнего бота
 
-Срез 2026-10-13: работающий D2 demo на VPS; чистка docs/tests идёт отдельной
-веткой `codex/docs-tests-cleanup`. Исторические планы не разрешают возвращать
-удалённые механизмы и не являются состоянием нынешнего бота.
+Для владельца достаточно первых двух документов. Остальное — рабочая справка
+для разработчиков, Codex и Cursor. Старые планы не задают нынешнюю архитектуру.
 
-## Читать сначала
+## Основное
 
-1. [Текущее состояние](tasks/DEMO_D2_CURRENT_STATUS.md) — release, модель,
-   выполненные fixes, реальные границы evidence и локальные отличия.
-2. [Текущая очередь](tasks/DEMO_D2_DELIVERY_ROADMAP.md) — верхний раздел
-   «Текущая очередь — owner GO 2026-10-13» заменяет нижние исторические next steps.
-3. [Карточка чистки §60](tasks/DEMO_D2_INTERFACE_TASK.md#60-cleanup-checkpoint--2026-10-13)
-   — allowlist, инвентаризация, что сохраняем/мигрируем/архивируем.
-4. [Git и локальный запуск](WORKFLOW_GIT.md), [Checker](WORKFLOW_CHECKER.md).
+1. [Как ведёт себя бот](BOT_BEHAVIOR.md) — обычный разговор, цены, контакты и запись.
+2. [Состояние и остатки](tasks/DEMO_D2_CURRENT_STATUS.md) — что на VPS, что в PR,
+   проверенные результаты и ещё открытые задачи.
+3. [Запуск и выкладка](WORKFLOW_GIT.md) — локальный виджет, Git и рабочая папка.
 
-## Текущая архитектура
+## Для разработчиков и агентов
 
-[CURRENT_ARCHITECTURE](CURRENT_ARCHITECTURE.md) описывает нынешний D2 path,
-текст/native price, контекст, lead/privacy и env. Старый pre-D2 snapshot
-перенесён в [архив](archive/pre-d2/CURRENT_ARCHITECTURE.md).
+- [AGENTS](../AGENTS.md) и [Checker](WORKFLOW_CHECKER.md) — процесс исполнения.
+- [Архитектура](CURRENT_ARCHITECTURE.md), [конфигурация](FLAGS_AND_STATUS.md),
+  [маршрутизация](ROUTING_MAP.md), [release-тесты](TEST_SUITE_ARCHITECTURE.md).
+- [Текущая очередь](tasks/DEMO_D2_DELIVERY_ROADMAP.md) — только верхняя текущая очередь;
+  [карточка чистки §60](tasks/DEMO_D2_INTERFACE_TASK.md#60-cleanup-checkpoint--2026-10-13).
+- [Execution Lock](tasks/DEMO_D2_EXECUTION_LOCK.md),
+  [Target Contract §3](tasks/DEMO_D2_TARGET_CONTRACT.md),
+  [Product Decisions](tasks/DEMO_D2_PRODUCT_DECISIONS.md) — сохраняемые protections
+  и ответственность. Позднейшие явные решения владельца заменяют противоречащие
+  старые записи; весь исторический текст не является действующей инструкцией.
+- [Client pack authoring](CLIENT_PACK_AUTHORING.md) — данные клиента;
+  чистка demo KB выполняется отдельно.
 
-Короткие индексы: [маршрутизация](ROUTING_MAP.md),
-[конфигурация](FLAGS_AND_STATUS.md), [проверки](TEST_SUITE_ARCHITECTURE.md).
-Старые ROUTING/FLAGS/envelope-task snapshots теперь в archive/pre-d2;
-стабильные старые пути оставлены короткими указателями, не старым каноном.
-Хроника Current Status тоже [в архиве](archive/pre-d2/tasks/DEMO_D2_CURRENT_STATUS.md);
-актуальный статус больше не смешан с прежними остановками и отменёнными планами.
+## История — не использовать для новых задач
 
-## Принятые решения и ограничения
+[АРХИВ](archive/README.md): прежние architecture/config/status,19 old plans/audits,
+one-call/patient-scope/hybrid и инциденты. Материалы сохранены для provenance,
+не для восстановления отменённых контрактов или запуска старых тестов в release.
+Некоторые historical probe readers ещё держат старые пути; такие документы
+помечаются историческими. Остальные планы/аудиты и SIM/REC evidence ещё
+классифицируются: не считать весь корпус уже очищенным.
 
-[Product Decisions](tasks/DEMO_D2_PRODUCT_DECISIONS.md) и
-[Target Contract §3](tasks/DEMO_D2_TARGET_CONTRACT.md) сохраняют agreed responsibility
-boundaries. Позднейшие явные owner decisions (обычная prose, native price tool,
-дополнительный provider response, DeepSeek) заменяют противоречащие старые записи.
-[Interface](tasks/DEMO_D2_INTERFACE_TASK.md) хранит receipts этих изменений;
-не считать весь его исторический текст текущей инструкцией.
-
-## Исторические материалы — пока перенос не завершён
-
-A1–A9/S*/prepared-hybrid/sales-one-plus plans, audit evidence и старые
-experiment/card sections — история либо будущие предложения, не текущая
-очередь. Они ещё не все перенесены физически в архив: это открытая работа §60.
-Действующие инварианты и полезные tests нужно выделить перед переносом/удалением.
-
-Отдельно сохраняются deployment/security/PG contracts, client authoring инструкции
-и настоящие tenant/lead/privacy protections. Они не отменяются из-за возраста.
-[Текущий индекс тестов](TEST_SUITE_ARCHITECTURE.md) описывает actual gate;
-полная миграция historical tests ещё в работе;
-не выдавать этот исправленный вход за завершённую чистку всего корпуса.
+Secret scan, deployment/security/PostgreSQL contracts и tenant/lead/privacy
+защиты действуют. Архивирование не отменяет их. Клиентская база знаний
+и документы для ответов пациентам не переносились этим этапом.

@@ -1,6 +1,11 @@
+> **АРХИВ. ИСТОРИЯ — НЕ ИНСТРУКЦИЯ ДЛЯ ТЕКУЩЕГО БОТА.**
+> Старые «канон», «GO», «текущий», планы, запреты и PASS относятся к моменту записи.
+> Этот материал не разрешает изменения runtime или восстановление старых контрактов.
+> Актуальный вход: [документация](../../README.md).
+
 # S66 — governance correction audit (docs-only)
 
-**Recorded:** post-live correction at `c23d00f` baseline  
+**Recorded:** post-live correction at `c23d00f` baseline
 **Scope:** process/measurement incident documentation only — **no artifact rewrite, no rerun**
 
 ## Governance gate history

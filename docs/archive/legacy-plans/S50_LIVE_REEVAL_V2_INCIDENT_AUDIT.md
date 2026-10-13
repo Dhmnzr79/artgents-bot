@@ -1,10 +1,15 @@
+> **АРХИВ. ИСТОРИЯ — НЕ ИНСТРУКЦИЯ ДЛЯ ТЕКУЩЕГО БОТА.**
+> Старые «канон», «GO», «текущий», планы, запреты и PASS относятся к моменту записи.
+> Этот материал не разрешает изменения runtime или восстановление старых контрактов.
+> Актуальный вход: [документация](../../README.md).
+
 # S50 Live Re-eval v2 Incident Audit
 
 **Captured:** 2026-07-22 · **Baseline commit:** `848a7d7` · **Status:** incident captured, **S50 not passed**
 
-Machine-readable pins: [`evals/v5/artifacts/s50_live_reeval_v2_incident_manifest.json`](../evals/v5/artifacts/s50_live_reeval_v2_incident_manifest.json)
+Machine-readable pins: [`evals/v5/artifacts/s50_live_reeval_v2_incident_manifest.json`](../../../evals/v5/artifacts/s50_live_reeval_v2_incident_manifest.json)
 
-Human audit patch: [`evals/v5/artifacts/s50_live_harness_dirty_audit.patch`](../evals/v5/artifacts/s50_live_harness_dirty_audit.patch)
+Human audit patch: [`evals/v5/artifacts/s50_live_harness_dirty_audit.patch`](../../../evals/v5/artifacts/s50_live_harness_dirty_audit.patch)
 
 ---
 
@@ -73,7 +78,7 @@ AttributeError: '_ComposerAuditProxy' object has no attribute 'captures'
 
 ## Dirty harness hotfixes (successful attempt 2 only)
 
-Captured in [`s50_live_harness_dirty_audit.patch`](../evals/v5/artifacts/s50_live_harness_dirty_audit.patch):
+Captured in [`s50_live_harness_dirty_audit.patch`](../../../evals/v5/artifacts/s50_live_harness_dirty_audit.patch):
 
 | Hotfix | Change | Rationale | Risk |
 |--------|--------|-----------|------|

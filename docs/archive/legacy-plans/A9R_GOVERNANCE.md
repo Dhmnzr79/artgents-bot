@@ -1,3 +1,8 @@
+> **АРХИВ. ИСТОРИЯ — НЕ ИНСТРУКЦИЯ ДЛЯ ТЕКУЩЕГО БОТА.**
+> Старые «канон», «GO», «текущий», планы, запреты и PASS относятся к моменту записи.
+> Этот материал не разрешает изменения runtime или восстановление старых контрактов.
+> Актуальный вход: [документация](../../README.md).
+
 # A9R — Patient scope authority re-audit (governance)
 
 **Status:** governance checkpoint only · **NO LIVE / NO LLM / NO PRODUCT AUTHORITY**

@@ -57,9 +57,13 @@
 | §60.3 | Policy/text_ref38cases и contacts20cases; проверки tenant/data/missing/replay сохранены, оба suite в gate |
 | §60.4 | Удалены15 obsolete cases; text protocol27cases усилен и в gate; три старых документа архивированы |
 | §60.5 | Старую хронику статуса вынесли в архив; этот путь оставлен актуальным кратким статусом |
+| §60.6 | PR и Publish используют shared release selections; прежние проверки сохранены, добавлен selection contract |
+| §60.7 | Новый owner behavior entry;19 старых планов/аудитов перенесены в архив с явной исторической пометкой |
 
-Последний локальный прогон точного publish offline selection (49 файлов):
-**812 passed,5 skipped,0 failed**. Все5 skips — ограничения symlink на Windows/POSIX.
+Последний локальный прогон точного publish offline selection (50 файлов, §60.6):
+**821 passed,5 skipped,0 failed**. Все5 skips — ограничения symlink на Windows/POSIX.
+Все49 прежних файлов сохранены; добавлен только selection contract. Targeted
+selection/G2–G8:271PASS5SKIP, independent selection/G2/G3:65PASS и Checker PASS.
 Targeted text/native-price/G2/G3:120PASS; independent Checker §60.4 — PASS.
 Два trailing-whitespace места архива исправлены в `2cbbd15`, focused Checker PASS.
 Это offline evidence, не повторная проверка Docker/PG/deploy и не полный historical suite.

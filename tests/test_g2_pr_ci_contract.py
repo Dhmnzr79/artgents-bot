@@ -6,6 +6,8 @@ import ast
 import re
 from pathlib import Path
 
+from tests.workflow_test_selection import selected_tests, with_test_selection
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _WORKFLOW_PATH = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 _CONTRACT_PATH = Path(__file__).resolve()
@@ -105,7 +107,7 @@ def _workflow_text() -> str:
 
 def _offline_pytest_block(text: str) -> str:
     block = text.split("offline-unit-and-contracts:", 1)[-1]
-    return block.split("postgres-qualification:", 1)[0]
+    return with_test_selection(block.split("postgres-qualification:", 1)[0])
 
 
 def test_contract_module_has_no_network_imports() -> None:
@@ -245,6 +247,7 @@ def test_g2_contract_runs_in_offline_unit_and_contracts_job() -> None:
 
 def test_clinic_policy_job_requires_current_demo_protection_suites():
     block = _workflow_text().split('  demo-d1-clinic-policy-regression:', 1)[1].split('  postgres-qualification:', 1)[0]
+    block = with_test_selection(block)
     for name in ('d2_demo_release_gate', 'd2_native_price_runtime',
                  'd2_policy_text_refs', 'd2_af1b_contacts_http',
                  'clinic_policy_resolver_offline', 'clinic_policies_loader', 'one_call_stage4_3_contacts_specific'):
@@ -252,10 +255,10 @@ def test_clinic_policy_job_requires_current_demo_protection_suites():
     assert 'TEMPORARY DEMO GATE' in _workflow_text()
     assert 'TODO(after demo)' in _workflow_text()
     # Inspect executed test paths, not comments that merely mention historical files.
-    paths = re.findall(r'^\s+tests/(test_[\w]+\.py)', block, re.MULTILINE)
+    paths = selected_tests(block)
     for retired in ('test_d2_sim2_contract.py', 'test_d2_compound_answers.py',
                     'test_d2_ci_clinic_policy.py'):
-        assert retired not in paths
+        assert f'tests/{retired}' not in paths
 
 
 def test_g8_integration_not_in_offline_pytest_list() -> None:

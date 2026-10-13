@@ -7,7 +7,10 @@
 
 ## Обязательный release gate
 
-Точные списки — `.github/workflows/ci.yml` и `publish-image.yml`.
+Точные списки — `tests/release/offline.txt` и `tests/release/policy.txt`.
+Workflows PR читают их через pytest `@file`; Publish объединяет через `sort -u`
+и добавляет G3. [Правила списка](../tests/release/README.md) и selection contract
+защищают совпадение, exact paths и отсутствие bypass options.
 PR CI: offline-unit-and-contracts + demo-d1-clinic-policy-regression.
 Имя второго job историческое; содержимое проверяет текущие D2/policy paths.
 Publish verify использует union этих списков плюс G3 immutable image contract.

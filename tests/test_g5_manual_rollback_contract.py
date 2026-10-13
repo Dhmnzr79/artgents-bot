@@ -7,6 +7,8 @@ import re
 import sys
 from pathlib import Path
 
+from tests.workflow_test_selection import with_test_selection
+
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -85,10 +87,10 @@ def tokenize_rollback_command(original: str) -> tuple[str, str]:
 
 
 def test_g5_contract_in_ci_and_publish() -> None:
-    ci = _text(_CI_WORKFLOW)
+    ci = with_test_selection(_text(_CI_WORKFLOW))
     publish = _text(_PUBLISH_WORKFLOW)
     assert "tests/test_g5_manual_rollback_contract.py" in ci
-    verify = publish.split("verify:", 1)[1].split("secret-scan:", 1)[0]
+    verify = with_test_selection(publish.split("verify:", 1)[1].split("secret-scan:", 1)[0])
     assert "tests/test_g5_manual_rollback_contract.py" in verify
 
 

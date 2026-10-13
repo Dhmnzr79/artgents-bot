@@ -1,10 +1,15 @@
+> **АРХИВ. ИСТОРИЯ — НЕ ИНСТРУКЦИЯ ДЛЯ ТЕКУЩЕГО БОТА.**
+> Старые «канон», «GO», «текущий», планы, запреты и PASS относятся к моменту записи.
+> Этот материал не разрешает изменения runtime или восстановление старых контрактов.
+> Актуальный вход: [документация](../../README.md).
+
 # S62 Target FullContext HTTP Live Runtime — Post-Live Audit
 
 **Captured:** 2026-07-23 · **Live baseline:** `c00fa4d` · **Artifact commit:** `0a43da1` · **Status:** `S62_NOT_PASSED` (diagnostic evidence only)
 
-Machine-readable pins: [`evals/v5/artifacts/s62_target_runtime_post_live_audit_manifest.json`](../evals/v5/artifacts/s62_target_runtime_post_live_audit_manifest.json)
+Machine-readable pins: [`evals/v5/artifacts/s62_target_runtime_post_live_audit_manifest.json`](../../../evals/v5/artifacts/s62_target_runtime_post_live_audit_manifest.json)
 
-Supplementary stdout (ingress/planner evidence): [`evals/v5/artifacts/s62_live_stdout_capture.txt`](../evals/v5/artifacts/s62_live_stdout_capture.txt)
+Supplementary stdout (ingress/planner evidence): [`evals/v5/artifacts/s62_live_stdout_capture.txt`](../../../evals/v5/artifacts/s62_live_stdout_capture.txt)
 
 ---
 

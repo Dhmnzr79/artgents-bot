@@ -5288,3 +5288,81 @@ file links valid. Direct whitespace scan includes untracked archive; branch
 and working diffcheck PASS. Independent Checker PASS, current claims traced to
 config/provider/dialogue/snapshot/quota code; no implementation simplification
 or live/whole-bot quality certified. Exact5paths, stagingempty, foreignWIP0.
+
+
+### 60.6 Shared release test selection
+
+CI maintenance + documentation, no runtime architecture change. Owner GO:
+streamline GitHub→VPS updates; don't revive obsolete tests or drop useful safety.
+Baseline3fec64e; root/topC:/Cursor Projects/artgents-bot-active;
+branchcodex/docs-tests-cleanup; origin/main/mergebase8888fdd; preflightclean/WIP0.
+Allowlist: ci.yml,publish-image.yml; G2/G3/G4/G5/G7/G8 workflow contracts;
+tests/release/offline.txt,policy.txt,README.md; workflow_test_selection.py;
+test_release_test_selection.py; TEST_SUITE_ARCHITECTURE; CurrentStatus; Roadmap; thiscard.
+
+Before:49 unique publish files repeated in3 inline workflow lists.
+After:2 plain pytest argument files own selection; PR consumes each directly;
+Publish sorts their union and adds G3. Removed dependency: independently edited
+PR/publish lists; no new runner/fallback/runtime layer. Every previously selected
+file retained; only selection contract added. Policy's existing PR overlaps remain,
+publish duplicates eliminated as before. Existing static contracts inspect actual
+manifest contents, not comments or filename merely mentioned in workflow.
+Job names, permissions, dependencies, secret scans, PG, build/smoke/publish/deploy
+unchanged. TODO now calls for useful invariant review, not blind historical restoration.
+Historical test classification/retirement and remaining docs archive still open.
+Provider/live/SMTP0; targeted contract tests and exact publish selection then Checker.
+
+
+### 60.7 Owner entry and first bulk historical archive
+
+Documentation only, no runtime simplification. Samebaseline3fec64e; §60.6 own
+17pathWIP preserved, no foreignWIP. Owner GO: hide obsolete docs, retain current
+behavior/technical protections; don't revive unnecessary historical tests.
+Additional exact allowlist: docs/README.md,BOT_BEHAVIOR.md,archive/README.md;
+ARCHITECTURE_CONVERGENCE.md,STRANGLER_ROADMAP.md,archive/pre-d2/CURRENT_ARCHITECTURE.md;
+thiscard,CurrentStatus,Roadmap; the19 old/new archive paths below.
+- `docs/A9R_GOVERNANCE.md` → `docs/archive/legacy-plans/A9R_GOVERNANCE.md`
+- `docs/C1_LEGACY_RESIDUE_REPORT.md` → `docs/archive/legacy-plans/C1_LEGACY_RESIDUE_REPORT.md`
+- `docs/C2_NATIVE_TURNFRAME_CLEANUP_PLAN.md` → `docs/archive/legacy-plans/C2_NATIVE_TURNFRAME_CLEANUP_PLAN.md`
+- `docs/DEMO_READINESS_ROADMAP.md` → `docs/archive/legacy-plans/DEMO_READINESS_ROADMAP.md`
+- `docs/ONE_CALL_ARCHITECTURE.md` → `docs/archive/legacy-plans/ONE_CALL_ARCHITECTURE.md`
+- `docs/PATIENT_PLAYBOOK_MIGRATION_AUDIT.md` → `docs/archive/legacy-plans/PATIENT_PLAYBOOK_MIGRATION_AUDIT.md`
+- `docs/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md` → `docs/archive/legacy-plans/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md`
+- `docs/PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md` → `docs/archive/legacy-plans/PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md`
+- `docs/PREPARED_HYBRID_HANDOFF.md` → `docs/archive/legacy-plans/PREPARED_HYBRID_HANDOFF.md`
+- `docs/PREPARED_HYBRID_ROADMAP.md` → `docs/archive/legacy-plans/PREPARED_HYBRID_ROADMAP.md`
+- `docs/RESPONSE_CONTRACT.md` → `docs/archive/legacy-plans/RESPONSE_CONTRACT.md`
+- `docs/S47_FIRST_LIVE_INCIDENT_AUDIT.md` → `docs/archive/legacy-plans/S47_FIRST_LIVE_INCIDENT_AUDIT.md`
+- `docs/S50_LIVE_REEVAL_V2_INCIDENT_AUDIT.md` → `docs/archive/legacy-plans/S50_LIVE_REEVAL_V2_INCIDENT_AUDIT.md`
+- `docs/S53_VERIFIER_REPLAY_POST_LIVE_AUDIT.md` → `docs/archive/legacy-plans/S53_VERIFIER_REPLAY_POST_LIVE_AUDIT.md`
+- `docs/S62_TARGET_RUNTIME_POST_LIVE_AUDIT.md` → `docs/archive/legacy-plans/S62_TARGET_RUNTIME_POST_LIVE_AUDIT.md`
+- `docs/S64_FULLCONTEXT_AUTHORITY_AUDIT.md` → `docs/archive/legacy-plans/S64_FULLCONTEXT_AUTHORITY_AUDIT.md`
+- `docs/S66_GOVERNANCE_CORRECTION_AUDIT.md` → `docs/archive/legacy-plans/S66_GOVERNANCE_CORRECTION_AUDIT.md`
+- `docs/S68_LEGACY_DELETION_INVENTORY.md` → `docs/archive/legacy-plans/S68_LEGACY_DELETION_INVENTORY.md`
+- `docs/S70_FULLCONTEXT_MIGRATION_CLOSEOUT.md` → `docs/archive/legacy-plans/S70_FULLCONTEXT_MIGRATION_CLOSEOUT.md`
+
+All19 basename readers checked across core/tests/scripts/evals/deploy source/data
+files:0. Full original narratives retained, relative Markdown targets relocated,
+3 incoming-link documents updated. ARCHITECTURE_CONVERGENCE/STRANGLER retain paths
+for historical readers but explicit non-current warning added. No old runtime
+claims revive product obligations. New owner behavior summary delegates technical
+facts to current status/architecture; admitted prose/card residual risk preserved.
+Remaining198-doc corpus not declared completely cleaned; active authoring/security,
+current contracts and remaining historical-reader bindings preserved/out of scope.
+Checks: archive narrative/target preservation, entry links, explicit path mapping,
+diffcheck. Provider/live/SMTP0, no pytest required for doc-only delta; CI §60.6
+full50-file run separately. Independent Checker reviews archive/entry scope.
+
+§60.6 final evidence: exact50-file publish union821PASS5platformSKIP0FAIL198.41s.
+Targeted selection/G2/G3/G4/G5/G7/G8:271PASS5SKIP17.01s; Independent Checker
+PASS, ownselection/G2/G3:65PASS. Old49file selection retained; onlyselectiontest
+added. Protected CI PG suffix and publish secret/build/smoke/push suffix identical
+against baseline. No live/provider/SMTP; no runtime/deploy change. Fullhistorical
+suite notgreen/notrun. §60.7 archive preservation confirmed after ignoring EOL and
+97 oldMarkdown hardbreak-space formatting lines; all original prose retained.
+
+§60.7 independent Checker PASS:19 original narratives and relative targets
+retained, strong historical warnings, baseline reader grep0, owner behavior
+matches current code/accepted prose risk. Entry links/whitespace PASS; no pytest
+required for docdelta. Combined §60.6/7 exact61paths verified; foreignWIP0,
+provider/live/SMTP0, stagingempty before save; allhistorical debt notdeclaredclosed.

@@ -1,7 +1,12 @@
+> **АРХИВ. ИСТОРИЯ — НЕ ИНСТРУКЦИЯ ДЛЯ ТЕКУЩЕГО БОТА.**
+> Старые «канон», «GO», «текущий», планы, запреты и PASS относятся к моменту записи.
+> Этот материал не разрешает изменения runtime или восстановление старых контрактов.
+> Актуальный вход: [документация](../../README.md).
+
 # S64 — FullContext authority audit (read-only)
 
-**Baseline:** `codex/stage-a` / `520e34a` (S63 live complete)  
-**Audit commit:** read-only trace of product code at `520e34a`; no product changes in S64.  
+**Baseline:** `codex/stage-a` / `520e34a` (S63 live complete)
+**Audit commit:** read-only trace of product code at `520e34a`; no product changes in S64.
 **Authority status:** **NOT transferred** — `TARGET_FULLCONTEXT_DEV` default remains **OFF** (`config.py`).
 
 ## Executive summary
@@ -341,6 +346,6 @@ TARGET_FULLCONTEXT_DEV = os.getenv("TARGET_FULLCONTEXT_DEV", "0").lower() in (
 
 ---
 
-**S64 audit status:** complete (read-only).  
-**Authority transferred:** NO.  
+**S64 audit status:** complete (read-only).
+**Authority transferred:** NO.
 **Next gate:** S65 (owner approval required).

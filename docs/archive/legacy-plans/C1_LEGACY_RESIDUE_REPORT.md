@@ -1,6 +1,11 @@
+> **АРХИВ. ИСТОРИЯ — НЕ ИНСТРУКЦИЯ ДЛЯ ТЕКУЩЕГО БОТА.**
+> Старые «канон», «GO», «текущий», планы, запреты и PASS относятся к моменту записи.
+> Этот материал не разрешает изменения runtime или восстановление старых контрактов.
+> Актуальный вход: [документация](../../README.md).
+
 # C1 — Legacy residue report (post-cleanup)
 
-**Baseline:** `c9598ee` → C1 implementation on `codex/stage-a`  
+**Baseline:** `c9598ee` → C1 implementation on `codex/stage-a`
 **Mode:** offline `rg` classification — no product behavior change intended
 
 ## Summary

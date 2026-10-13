@@ -1,6 +1,11 @@
+> **АРХИВ. ИСТОРИЯ — НЕ ИНСТРУКЦИЯ ДЛЯ ТЕКУЩЕГО БОТА.**
+> Старые «канон», «GO», «текущий», планы, запреты и PASS относятся к моменту записи.
+> Этот материал не разрешает изменения runtime или восстановление старых контрактов.
+> Актуальный вход: [документация](../../README.md).
+
 # S70 — FullContext migration closeout audit
 
-**Baseline:** `codex/stage-a` / `cdcd79f` (S69 complete) · **Audit commit:** read-only at `86ebf9b` governance HEAD  
+**Baseline:** `codex/stage-a` / `cdcd79f` (S69 complete) · **Audit commit:** read-only at `86ebf9b` governance HEAD
 **Mode:** READ-ONLY / NO PRODUCT CODE / NO LIVE / NO LLM / NO A9 changes
 
 ---

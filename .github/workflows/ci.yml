@@ -90,7 +90,7 @@ jobs:
           PY
 
   # TEMPORARY DEMO GATE — owner-approved for the 2026-10-14 demo only.
-  # TODO(after demo): migrate and restore the full historical suites here.
+  # TODO(after demo): finish invariant coverage review; migrate useful guards only, never restore cancelled contracts.
   # Historical tests remain in the repository; no runtime/legacy compatibility changes.
   offline-unit-and-contracts:
     name: Offline unit and contracts
@@ -118,53 +118,10 @@ jobs:
         run: |
           unset DASHSCOPE_API_KEY CHAT_API_KEY OPENAI_API_KEY SMTP_PASSWORD SMTP_USER BOT_PG_DSN BOT_MIGRATOR_PG_DSN BOT_TEST_PG_DSN ADMIN_DASHBOARD_TOKEN || true
           mkdir -p "$BASETEMP"
-          python -m pytest -p no:cacheprovider --basetemp "$BASETEMP" --tb=short -q \
-            tests/test_turn_planner_llm.py \
-            tests/test_turn_planner_wiring.py \
-            tests/test_composer_parity_eval.py \
-            tests/test_composer_live_eval.py \
-            tests/test_md_chunks.py \
-            tests/test_answer_planner.py \
-            tests/test_contacts_intent.py \
-            tests/test_client_runtime.py \
-            tests/test_e2e_smoke_infer.py \
-            tests/test_aspect_metadata.py \
-            tests/test_price_ref_routing.py \
-            tests/test_validate_client_pack.py \
-            tests/test_tenant_lead_routing_context_offline.py \
-            tests/test_pg_tenant_context_offline.py \
-            tests/test_pg_tenant_write_contract_offline.py \
-            tests/test_pg_schema_readiness_offline.py \
-            tests/test_pg_sink_tenant_worker_offline.py \
-            tests/test_pg_sink_connection_reuse_offline.py \
-            tests/test_pg_retention_non_admin_tenant_offline.py \
-            tests/test_pg_retention_trusted_registry_offline.py \
-            tests/test_user_text_privacy_contract_offline.py \
-            tests/test_leads_pg_no_pii_offline.py \
-            tests/test_observability_pii.py \
-            tests/test_admin_dashboard_tenant_offline.py \
-            tests/test_admin_dashboard_schema_health_offline.py \
-            tests/test_t6b_pass1_health_runtime_offline.py \
-            tests/test_t6b_pass2_postgres_migrate_offline.py \
-            tests/test_t6b_pass3_production_deploy_offline.py \
-            tests/test_migrations_postgresql_static.py \
-            tests/test_migration_002_constraint_drift.py \
-            tests/test_g2_pr_ci_contract.py \
-            tests/test_g4_manual_deploy_contract.py \
-            tests/test_g5_manual_rollback_contract.py \
-            tests/test_g7_postgres_backup_contract.py \
-            tests/test_g8_postgres_qualification_contract.py \
-            tests/test_d2_demo_release_gate.py \
-            tests/test_d2_contact_model_context.py \
-            tests/test_d2_text_reply.py \
-            tests/test_d2_situation_disabled.py \
-            tests/test_d2_demo_limits.py \
-            tests/test_d2_native_price_runtime.py \
-            tests/test_d2_demo_session_budget.py \
-            tests/test_d2_phone_mask.py
+          python -m pytest -p no:cacheprovider --basetemp "$BASETEMP" --tb=short -q @tests/release/offline.txt
 
   # TEMPORARY DEMO GATE — owner-approved for the 2026-10-14 demo only.
-  # TODO(after demo): migrate and restore the full historical suites here.
+  # TODO(after demo): finish invariant coverage review; migrate useful guards only, never restore cancelled contracts.
   # Historical tests remain in the repository; no runtime/legacy compatibility changes.
   demo-d1-clinic-policy-regression:
     name: Demo D1 clinic policy regression
@@ -194,14 +151,7 @@ jobs:
         run: |
           unset DASHSCOPE_API_KEY CHAT_API_KEY OPENAI_API_KEY SMTP_PASSWORD SMTP_USER BOT_PG_DSN BOT_MIGRATOR_PG_DSN BOT_TEST_PG_DSN ADMIN_DASHBOARD_TOKEN || true
           mkdir -p "$BASETEMP"
-          python -m pytest -p no:cacheprovider --basetemp "$BASETEMP" --tb=short -q \
-            tests/test_clinic_policy_resolver_offline.py \
-            tests/test_clinic_policies_loader.py \
-            tests/test_one_call_stage4_3_contacts_specific.py \
-            tests/test_d2_policy_text_refs.py \
-            tests/test_d2_af1b_contacts_http.py \
-            tests/test_d2_demo_release_gate.py \
-            tests/test_d2_native_price_runtime.py
+          python -m pytest -p no:cacheprovider --basetemp "$BASETEMP" --tb=short -q @tests/release/policy.txt
 
   postgres-qualification:
     name: PostgreSQL qualification

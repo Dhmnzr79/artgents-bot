@@ -1,3 +1,8 @@
+> **ИСТОРИЧЕСКИЙ ДОКУМЕНТ. НЕ ТЕКУЩИЙ ПЛАН И НЕ КАНОН D2.**
+> Прежний путь пока сохранён для исторических test/eval readers.
+> Не восстанавливать старые механизмы по этому тексту.
+> Актуальные документы: [вход](README.md).
+
 # Архитектурная миграция A1–A9 — roadmap для владельца продукта
 
 Этот документ показывает, как мы строим новое внутреннее понимание вопроса пациента в локальном demo. Production-клиентов нет; widget compatibility и сохранность legacy-ответов **не требуются**. Legacy и shadow сейчас — **измерительный контур**, не целевой product path. Целевая архитектура — **FINAL_FULLCONTEXT_ONLY** (см. ниже и [ARCH_TARGET_DESIGN.md](ARCH_TARGET_DESIGN.md)): сразу чистая cached FullContext-цепочка для базы порядка 150–200 небольших MD, без временных response bridges «на потом удалим».
@@ -655,7 +660,7 @@ A1–A9 не были целиком придуманы заранее как н
 
 После будущего подтверждения качества эта ось сможет помогать делать ответ релевантнее масштабу ситуации, но только через отдельное product/authority решение. Она не должна сама ставить диагноз или назначать лечение.
 
-Подробнее: [PATIENT_SCOPE_DESIGN_A9.md](PATIENT_SCOPE_DESIGN_A9.md), [PATIENT_SCOPE_SHADOW_AUDIT_A9.md](evidence/a9/PATIENT_SCOPE_SHADOW_AUDIT_A9.md), [PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md](PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md) и [PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md](PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md).
+Подробнее: [PATIENT_SCOPE_DESIGN_A9.md](PATIENT_SCOPE_DESIGN_A9.md), [PATIENT_SCOPE_SHADOW_AUDIT_A9.md](evidence/a9/PATIENT_SCOPE_SHADOW_AUDIT_A9.md), [PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md](archive/legacy-plans/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md) и [PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md](archive/legacy-plans/PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md).
 
 ## Следующий технический checkpoint — A9R (governance)
 

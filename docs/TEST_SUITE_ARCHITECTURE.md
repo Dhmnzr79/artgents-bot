@@ -25,6 +25,7 @@ Secret scan, lint/client validation, PostgreSQL qualification, Docker build/smok
 | test_d2_native_price_runtime | native show_price и provider completion после фактической карточки |
 | test_d2_contact_model_context | YAML→snapshot→обычный provider prompt, адрес/метро/часы/парковка, branch/tenant binding |
 | test_d2_demo_session_budget | 30 model calls/session, включая второй price response |
+| test_d2_demo_limits | Actual admission: replay/free click, daily/IP windows, atomic persistent counters, charged failures и сохранность lead при quota denial |
 | test_d2_phone_mask | frozen phone projection и lead transitions/replay |
 | test_d2_situation_disabled | obsolete actions отвергаются; old flags не вмешиваются в обычную речь/заявку; pause/resume и PII |
 | PG/privacy/G2–G8 | сохраняемые изоляция, persistence, security и безопасная выкладка |

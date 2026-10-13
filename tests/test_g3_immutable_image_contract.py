@@ -341,6 +341,7 @@ def test_verify_job_preflight_and_ci_lock() -> None:
     assert "tests/test_g3_immutable_image_contract.py" in pytest_block
     assert "tests/test_d2_contact_model_context.py" in pytest_block
     assert "tests/test_d2_situation_disabled.py" in pytest_block
+    assert "tests/test_d2_demo_limits.py" in pytest_block
     assert "tests/test_g4_manual_deploy_contract.py" in pytest_block
     assert "tests/test_g5_manual_rollback_contract.py" in pytest_block
     assert "tests/test_g7_postgres_backup_contract.py" in pytest_block

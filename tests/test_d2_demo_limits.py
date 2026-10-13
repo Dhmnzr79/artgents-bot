@@ -1,6 +1,7 @@
 """Demo admission on actual HTTP provider with offline transport only."""
 import sqlite3
-from types import SimpleNamespace
+import shutil
+from copy import deepcopy
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -8,20 +9,30 @@ import pytest
 from core.d2_demo_limits import admit_demo_call, D2DemoLimitReached
 from core.d2_live_provider import D2HttpProvider
 from tests.test_d2_http_contract import http_env, post, post_sse, sse_events
-from tests.test_d2_document_click_task_http import _body
-from tests.test_d2_sim2_dialogues import raw, price, explanation
+from tests.test_d2_native_price_runtime import Transport, message, price
+from tests.test_d2_text_reply import response, action
+from tests.test_d2_price_cards import cards
 
 
-def wire(monkeypatch, payload=None, fail=False):
+def wire(monkeypatch, *replies, fail=False):
     import core.d2_http_adapter as adapter
-    calls = []
-    def transport(**kwargs):
-        calls.append(kwargs)
-        if fail:
-            raise RuntimeError('offline transport failure')
-        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=payload or raw(explanation('Объяснение по материалам клиники.'))))], model='offline', usage=None)
+    transport = Transport(*(replies or (message('Объяснение по материалам клиники.'),)))
+    if fail:
+        transport.replies = [RuntimeError('offline transport failure')]
     monkeypatch.setattr(adapter, 'D2HttpProvider', lambda **kwargs: D2HttpProvider(transport=transport, **kwargs))
-    return calls
+    return transport.calls
+
+
+def _body(response, transport):
+    assert response.status_code == 200, response.get_data(as_text=True)
+    if transport == 'json':
+        body = response.get_json()
+    else:
+        events = dict(sse_events(response))
+        assert 'error' not in events and 'done' in events, events
+        body = events['ui']
+    assert body['revision'] > 0 and isinstance(body['ui'], dict)
+    return body
 
 
 def seed(db, *, sid='other', count=1, peer='seed', stamp=None):
@@ -43,27 +54,42 @@ def limit(response, transport, code):
 @pytest.mark.parametrize('transport', ['json', 'sse'])
 def test_session_limit_replay_free_click_and_explicit_new_sid(http_env, monkeypatch, transport):
     client, db, _, _ = http_env
-    calls = wire(monkeypatch, raw(price()))
-    seed(db, sid='cp6a', count=9)
+    native = price(volume={'extent': 'one_tooth'})
+    calls = wire(monkeypatch, message(None, native), message('<NO_TEXT>'),
+                 message(None, native), message('<NO_TEXT>'))
+    seed(db, sid='cp6a', count=28)
     send = post if transport == 'json' else post_sse
-    first = _body(send(client, request_id='tenth', q='Сколько стоит имплантация?'), transport)
-    assert len(calls) == 1
-    assert _body(send(client, request_id='tenth', q='Сколько стоит имплантация?'), transport) == first
-    limit(send(client, request_id='eleventh', q='А сроки?'), transport, 'demo_session_limit')
+    args = dict(request_id='thirtieth', q='Сколько стоит имплантация?')
+    first = _body(send(client, **args), transport)
+    row = cards(first)[0]['price']['rows'][0]
+    assert row['offer_id'] == 'classic.one_tooth.implantium'
+    assert row['amount'] == 76200
+    assert len(calls) == 2  # Selection and completion are separately charged.
+    assert _body(send(client, **args), transport) == first
+    limit(send(client, request_id='thirty-first', q='А сроки?'), transport, 'demo_session_limit')
     with sqlite3.connect(db) as conn:
-        assert conn.execute('SELECT COUNT(*) FROM d2_demo_model_attempt').fetchone()[0] == 10
-        assert not conn.execute("SELECT 1 FROM d2_turn_request WHERE request_id='eleventh'").fetchone()
-    clicked = _body(send(client, request_id='free', q='', ref='volume:implantation:one_tooth', ui_revision=first['revision']), transport)
-    assert '76 200' in clicked['answer'].replace('\u00a0',' ')
-    assert len(calls) == 1
+        assert conn.execute('SELECT COUNT(*) FROM d2_demo_model_attempt').fetchone()[0] == 30
+        assert not conn.execute("SELECT 1 FROM d2_turn_request WHERE request_id='thirty-first'").fetchone()
+    ref = 'price_select:classic.one_tooth.nobel'
+    assert ref in {q['reply_id'] for q in first['ui']['quick_replies']}
+    clicked = _body(send(client, request_id='free', q='', ref=ref, ui_revision=first['revision']), transport)
+    selected = cards(clicked)[0]['price']['rows'][0]
+    assert selected['offer_id'] == 'classic.one_tooth.nobel'
+    assert selected['amount'] == 101200
+    assert len(calls) == 2
     fresh = _body(send(client, sid='new-sid', request_id='new', q='Сколько стоит имплантация?'), transport)
-    assert fresh['sid'] == 'new-sid' and len(calls) == 2
+    assert fresh['sid'] == 'new-sid' and len(calls) == 4
+    assert cards(fresh)[0]['price']['rows'][0]['offer_id'] == 'classic.one_tooth.implantium'
+
 
 
 @pytest.mark.parametrize('transport', ['json', 'sse'])
 @pytest.mark.parametrize('kind', ['daily', 'ip'])
 def test_shared_limit_before_transport_and_other_tenant_unchanged(http_env, monkeypatch, transport, kind):
-    client, db, _, _ = http_env
+    client, db, _, tmp = http_env
+    shutil.copytree(tmp / 'clients/demo', tmp / 'clients/secondary')
+    import config
+    monkeypatch.setattr(config, 'ALLOWED_CLIENTS', frozenset({'demo', 'secondary'}))
     calls = wire(monkeypatch)
     import core.d2_demo_limits as quota
     if kind == 'daily':
@@ -74,8 +100,8 @@ def test_shared_limit_before_transport_and_other_tenant_unchanged(http_env, monk
     send = post if transport == 'json' else post_sse
     limit(send(client, sid='fresh', request_id='blocked', q='Как проходит лечение?'), transport, 'demo_'+kind+'_limit')
     assert calls == []
-    other = _body(send(client, client_id='nikadent', sid='fresh', request_id='other', q='Как проходит лечение?'), transport)
-    assert other['client_id'] == 'nikadent' and len(calls) == 1
+    other = _body(send(client, client_id='secondary', sid='fresh', request_id='other', q='Как проходит лечение?'), transport)
+    assert other['client_id'] == 'secondary' and len(calls) == 1
     with sqlite3.connect(db) as conn:
         assert not conn.execute("SELECT 1 FROM d2_turn_request WHERE request_id='blocked'").fetchone()
 
@@ -98,7 +124,7 @@ def test_failed_provider_attempt_is_charged_and_reservation_released(http_env, m
 def test_counters_persist_and_rolling_window_and_concurrency(tmp_path):
     path=tmp_path/'quota.sqlite'
     with sqlite3.connect(path) as conn:
-        for i in range(9): admit_demo_call(conn, sid='same', peer_ip='ip', now=0)
+        for i in range(29): admit_demo_call(conn, sid='same', peer_ip='ip', now=0)
     def try_one(i):
         with sqlite3.connect(path) as conn:
             try: admit_demo_call(conn, sid='same', peer_ip='ip', now=90000)
@@ -108,7 +134,7 @@ def test_counters_persist_and_rolling_window_and_concurrency(tmp_path):
         assert sorted(pool.map(try_one, [1,2])) == ['admitted','demo_session_limit']
     with sqlite3.connect(path) as conn:
         admit_demo_call(conn, sid='fresh', peer_ip='ip', now=90000)
-        assert conn.execute('SELECT COUNT(*) FROM d2_demo_model_attempt').fetchone()[0] == 11
+        assert conn.execute('SELECT COUNT(*) FROM d2_demo_model_attempt').fetchone()[0] == 31
         assert 'ip' not in [r[0] for r in conn.execute('SELECT peer_hash FROM d2_demo_model_attempt')]
 
 
@@ -131,14 +157,19 @@ def test_quota_denial_preserves_named_lead_and_new_sid_does_not_inherit_it(http_
     from lead_interrupt import LEAD_PENDING_ANSWER_REF
     from session import mem_get, session_client_scope
     client, db, _, _ = http_env
-    calls = wire(monkeypatch, raw({'kind': 'booking', 'request_id': 'r1', 'age_group': 'adult'}))
+    calls = wire(monkeypatch, message(response(actions=[action('start_booking', age_group='adult')])),
+                 message(response(actions=[action('start_booking', age_group='adult')])))
     send = post if transport == 'json' else post_sse
     _body(send(client, request_id='book', q='Хочу записаться'), transport)
-    _body(send(client, request_id='name', q='Анна'), transport)
-    pending = _body(send(client, request_id='question', q='Сколько стоит имплантация?'), transport)
-    seed(db, sid='cp6a', count=9)
     with session_client_scope('demo'):
-        before = mem_get('cp6a')
+        assert mem_get('cp6a')['lead_intent'] == 'collecting_name'
+    _body(send(client, request_id='name', q='Анна'), transport)
+    with session_client_scope('demo'):
+        assert mem_get('cp6a')['lead_intent'] == 'collecting_phone'
+    pending = _body(send(client, request_id='question', q='Сколько стоит имплантация?'), transport)
+    seed(db, sid='cp6a', count=29)
+    with session_client_scope('demo'):
+        before = deepcopy(mem_get('cp6a'))
         assert before['profile']['name'] == 'Анна'
     limit(send(client, request_id='blocked', q='', ref=LEAD_PENDING_ANSWER_REF,
                ui_revision=pending['revision']), transport, 'demo_session_limit')
@@ -148,4 +179,6 @@ def test_quota_denial_preserves_named_lead_and_new_sid_does_not_inherit_it(http_
     _body(send(client, sid='new', request_id='fresh-book', q='Хочу записаться'), transport)
     with session_client_scope('demo'):
         assert mem_get('cp6a') == before
+        assert mem_get('new')['lead_intent'] == 'collecting_name'
         assert not mem_get('new')['profile'].get('name')
+    assert len(calls) == 2

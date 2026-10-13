@@ -5152,3 +5152,29 @@ current/new archive files PASS; archived architecture only relative links adjust
 archived test document preserved exactly. Workflow delta add-only situation module;
 all other jobs compare equal to baseline. git diff --check PASS. Provider/SMTP0,
 no runtime/KB/VPS changes. Independent Checker follows before checkpoint save.
+
+### 60.2 Demo quota fixture migration
+
+Baseline1568202, root/branch/main unchanged. Test fixture bug fix + documentation,
+not runtime simplification. Allowlist: tests/test_d2_demo_limits.py; two workflows;
+G2/G3 contract tests; TEST_SUITE_ARCHITECTURE.md; this card; Current Status; Roadmap.
+
+Baseline9FAIL3PASS12cases. Existing10-call assertions/counter seeds moved to30;
+native show_price + second completion separately charged, actual published Nobel
+selection/free click checked by frozen offer ID and amount. Prose/META replace old
+JSON fixtures. Request successes and actual lead start checked before dependent
+assertions. State equality uses deepcopy snapshot, no aliased before/after object.
+Shared-limit isolation now uses valid synthetic secondary tenant cloned only in
+fixture temp directory; real nikadent unfinished, not modified/certified.
+
+All12cases retained: session/replay/free clicks/new SID, daily/IP isolation,
+failed-attempt charging/reservation release, persistent atomic concurrent boundary,
+window expiry, lead preservation/no transfer to new SID. Targeted12PASS24.38s.
+No skips/xfail/assertion removals. Add module PR/publish and G2/G3 selection guards.
+Provider/network/SMTP0; runtime/KB/VPS unchanged. Further policy/contact fixture
+migration and obsolete-only test deletions remain separate unresolved scope.
+
+§60.2 final executor: quota12 + sessionbudget3 + demogate25 + G2/G3 56 =
+96PASS58.00s; existing datetime warnings. Add-only gate delta and equality
+publish=PR job union+G3 confirmed; other jobs unchanged. DiffcheckPASS.
+Independent Checker follows. Full historical suite not run/closed; live0.

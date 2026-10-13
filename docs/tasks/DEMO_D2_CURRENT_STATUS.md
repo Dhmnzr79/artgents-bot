@@ -1,5 +1,9 @@
 # D2 — текущее состояние и куда смотреть
 
+§60.2: demo quota suite мигрирован12PASS (baseline9FAIL3PASS), возвращён
+в PR/publish gate. Runtime лимиты30/400 не менялись. Policy/contact
+historical suites и остальное архивирование ещё открыты.
+
 Документальная сверка §60.1: current architecture/test index обновлены,
 предыдущие snapshots перенесены в docs/archive/pre-d2. AGENTS/Execution Lock
 теперь отражают VPS demo. Situation regression мигрирован18PASS и возвращён

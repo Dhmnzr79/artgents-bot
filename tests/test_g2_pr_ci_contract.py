@@ -47,6 +47,7 @@ _MANDATORY_OFFLINE_MODULES = (
     "tests/test_d2_demo_release_gate.py",
     "tests/test_d2_contact_model_context.py",
     "tests/test_d2_situation_disabled.py",
+    "tests/test_d2_demo_limits.py",
     "tests/test_d2_native_price_runtime.py",
     "tests/test_d2_demo_session_budget.py",
     "tests/test_d2_phone_mask.py",

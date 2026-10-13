@@ -16,3 +16,8 @@
 Некоторые старые файлы пока сохраняют прежние пути из-за historical probes;
 они явно помечены историческими. Оставшиеся документы ещё классифицируются.
 Действующие privacy/tenant/deploy требования не отменены архивированием.
+
+- `task-history/` —50 прежних task cards и executor/checker/mini prompts.
+- `checkpoints/` —полные прежние Interface/Roadmap; прежние STOP/GO и планы не
+  определяют текущий checkpoint. Unresolved SIM/REC protections сохраняются
+  текущими контрактами; перенос не является закрытием acceptance.

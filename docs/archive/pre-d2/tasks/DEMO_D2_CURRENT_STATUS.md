@@ -119,7 +119,7 @@ Foreign data/ и docs/tasks/DEMO_D2_SIM0_TASK.md остаются вне пуб�
 Baseline 4d4b0276d83208f2043f31f6af31be35b4d496ae, ветка codex/d2-stage1-contract.
 D2-119/120 и UI отмены на телефоне сохранены/pushed; их scoped PASS в Ledger.
 Владелец разрешил оставшуюся приёмку SIM-4; актуальный preflight/allowlist и
-результаты — [SIM4 Task](../../../tasks/DEMO_D2_SIM4_TASK.md). Это проверка существующего
+результаты — [SIM4 Task](../../task-history/DEMO_D2_SIM4_TASK.md). Это проверка существующего
 ценового механизма после изменений интерфейса, не новый подбор цен.
 Админка и оптимизация базы не входят. Live/SMTP и новые commit/push не входят.
 Нижние сообщения о patient state, authored/fallback, старом SHA/WIP и запрете
@@ -133,7 +133,7 @@ push его SHA — база продолжения в этой же ветке 
 Ниже незакоммиченное состояние — исторический preflight до публикации.
 Публикация не закрывает SIM4/REC5 и не разрешает новый runtime или live.
 
-Следующее чтение: [карточка интерфейса и handoff](../../../tasks/DEMO_D2_INTERFACE_TASK.md).
+Следующее чтение: [карточка интерфейса и handoff](../../checkpoints/DEMO_D2_INTERFACE_TASK.md).
 Разрешена подготовка документов; новый runtime и новые live calls не разрешены.
 Root C:\Cursor Projects\artgents-bot-active; branch codex/d2-stage1-contract;
 HEAD и origin branch e6756ee59df4f186e499c29ae41cda0e993d80fe;
@@ -161,7 +161,7 @@ Foreign data/, docs/MARKETING_ANSWER_SCENARIOS.md, DEMO_D2_SIM0_TASK.md не т�
 
 GO на bug fix примера: известное направление + объём теперь показано прямой
 ценовой задачей, а не уточнением услуги. Runtime/schema/память прежние.
-Границы и проверки — [SIM4 Task](../../../tasks/DEMO_D2_SIM4_TASK.md). Offline: 17 PASS;
+Границы и проверки — [SIM4 Task](../../task-history/DEMO_D2_SIM4_TASK.md). Offline: 17 PASS;
 независимый Checker PASS (собственные 5 PASS). Устойчивость живой модели
 не подтверждена. Provider/live0; commit/push нет, Cursor gate остаётся.
 
@@ -170,7 +170,7 @@ GO на bug fix примера: известное направление + об
 GO владельца на три ценовых ответа: подходящая цена, разрешённый ориентир,
 известная услуга без цены. Общий restoration overview и prosthetics pool
 настроены в существующем механизме; prompt32. Правило — [D2-116](../../../tasks/DEMO_D2_PRODUCT_DECISIONS.md),
-границы и exact allowlist — [SIM4 Task](../../../tasks/DEMO_D2_SIM4_TASK.md). Этот checkpoint
+границы и exact allowlist — [SIM4 Task](../../task-history/DEMO_D2_SIM4_TASK.md). Этот checkpoint
 заменяет прежний few_teeth gap, не меняя исходный объём и медицинские факты.
 Новых model calls/памяти/семантических проверок нет. Основной offline: 92 PASS;
 соседний: 49 PASS и 3 старых FAIL; ещё 10 старых FAIL в availability/recovery.
@@ -186,14 +186,14 @@ clarification.operation. Prompt31; runtime/schema/память не меняют
 Known direction по-прежнему идёт напрямую к цене, не к выбору услуги.
 Тесты проверяют задачу, клик без модели, пробел цены и следующий контекст;
 omission модели сервер не исправляет. Exact allowlist и границы проверки —
-[SIM4 Task](../../../tasks/DEMO_D2_SIM4_TASK.md). Independent Checker PASS для этого bug fix,
+[SIM4 Task](../../task-history/DEMO_D2_SIM4_TASK.md). Independent Checker PASS для этого bug fix,
 собственный прогон 12 PASS / 26.09 s. Live-adherence не аттестована; Cursor
 gate остаётся. Provider/live0, commit/push нет.
 
 ## Текущий checkpoint — SIM-4/D2-114–115, 2026-10-02
 
 Runtime SIM-4 разрешён делегацией владельца по демо-набору D2-115.
-Карточка: [SIM4 Task](../../../tasks/DEMO_D2_SIM4_TASK.md). Implantation overview — один пример
+Карточка: [SIM4 Task](../../task-history/DEMO_D2_SIM4_TASK.md). Implantation overview — один пример
 на методику из explicit pool, бренд/объём фильтруются до cap3. Конкретный демо-набор
 SIM-0 принят в рамках делегации; independent runtime Checker PASS,
 собственный reviewer прогон 44 PASS / 48.51 s; Cursor gate ещё впереди.
@@ -221,7 +221,7 @@ Live/provider/SMTP0, stage/commit/push/merge/deploy не выполнялись.
 
 Владелец начал SIM-3 и принял сохранение обсуждаемой услуги/объёма через более
 трёх контактных отвлечений до смены темы/услуги либо TTL. Карточка и точные границы:
-[SIM3 Task](../../../tasks/DEMO_D2_SIM3_TASK.md). Baseline HEAD/origin branch
+[SIM3 Task](../../task-history/DEMO_D2_SIM3_TASK.md). Baseline HEAD/origin branch
 5cb58d5629bb78b07736246e12d951844bbe6c55; branch codex/d2-stage1-contract.
 Реализация проверена offline: receipt index → completion.response.resolved →
 существующая projection; отдельный recent_price_scope удалён. Prompt30,
@@ -252,7 +252,7 @@ SIM-0/4/5 и REC-5 открыты. Детали closure/CI debt — верх SIM
 Repo C:\Cursor Projects\artgents-bot-active; branch codex/d2-stage1-contract.
 HEAD4d240430c2ce056dc306c50e215dbb09843c6b8f; origin/main и merge-base
 141ce91fb1731cd990fcf8391550150016c73e7f. Это baseline до согласованной публикации.
-Точная карточка и границы — [SIM2 Task](../../../tasks/DEMO_D2_SIM2_TASK.md), результаты
+Точная карточка и границы — [SIM2 Task](../../task-history/DEMO_D2_SIM2_TASK.md), результаты
 по времени — верх [Ledger](../../../tasks/DEMO_D2_CHECKPOINT_LEDGER.md).
 
 Актуальный Cursor review получен: PASS,142 теста прошли за202.88s, exit0
@@ -326,7 +326,7 @@ docs/MARKETING_ANSWER_SCENARIOS.md вне scope.
   origin/main и merge-base: 141ce91fb1731cd990fcf8391550150016c73e7f.
   Новый fetch не выполнялся.
 - Владелец согласовал общий checkpoint: остаток SIM-1 и необходимое ядро SIM-2.
-  Разрешение, runtime allowlist и критерии — [SIM2 Task](../../../tasks/DEMO_D2_SIM2_TASK.md).
+  Разрешение, runtime allowlist и критерии — [SIM2 Task](../../task-history/DEMO_D2_SIM2_TASK.md).
   Новый D2 получает узкие операции напрямую, без восстановления старого envelope.
   Service/volume/detail выполняются сервером; пояснение известной задачи
   получает ограниченный ответ модели. D2-111 и B14 включены.
@@ -359,7 +359,7 @@ docs/MARKETING_ANSWER_SCENARIOS.md вне scope.
   Allowlist/результаты — верх SIM2 Task.
   Shared task types ограничивают wire и pending; legacy pending без migration
   может отказать, нужен отдельный новый тестовый чат. Новый live не разрешён.
-- [Roadmap](../../../tasks/DEMO_D2_DELIVERY_ROADMAP.md) сохраняет SIM-0 offers и SIM-3/4/5,
+- [Roadmap](../../checkpoints/DEMO_D2_DELIVERY_ROADMAP.md) сохраняет SIM-0 offers и SIM-3/4/5,
   затем REC-5. Полная память completion → projection и контроль всей
   финансовой prose этим checkpoint не выполнены.
 - Последний агентский gate: provider/live 4, плюс 1 заблокированная сетевая
@@ -378,7 +378,7 @@ runtime checkpoint: **REC-4-P2
 предыдущий runtime checkpoint — D2-LEAD-INTERRUPT `71d7467`.
 GitHub branch проверена read-only `ls-remote` 2026-09-29 и совпадает с HEAD;
 main и merge-base — `141ce91fb1731cd990fcf8391550150016c73e7f`.
-Текущая документальная работа — [D2-AUDIT-PLAN](../../../tasks/DEMO_D2_AUDIT_FOLLOWUP_TASK.md):
+Текущая документальная работа — [D2-AUDIT-PLAN](../../task-history/DEMO_D2_AUDIT_FOLLOWUP_TASK.md):
 сверка после аудита и проект дальнейшего порядка, **без GO на runtime**.
 Это локальный демо-бот; production-развёртывания и пользователей нет. Перед
 работой сверяйте текущие Git HEAD, origin и status: этот файл — указатель на
@@ -388,7 +388,7 @@ main и merge-base — `141ce91fb1731cd990fcf8391550150016c73e7f`.
 
 1. [AGENTS.md](../../../../AGENTS.md) и [Execution Lock](../../../tasks/DEMO_D2_EXECUTION_LOCK.md)
    задают процесс и запреты.
-2. [Delivery Roadmap](../../../tasks/DEMO_D2_DELIVERY_ROADMAP.md) задаёт порядок этапов.
+2. [Delivery Roadmap](../../checkpoints/DEMO_D2_DELIVERY_ROADMAP.md) задаёт порядок этапов.
 3. Карточка текущего checkpoint задаёт baseline, точный allowlist и приёмку.
 4. [Target Contract](../../../tasks/DEMO_D2_TARGET_CONTRACT.md),
    [Product Decisions](../../../tasks/DEMO_D2_PRODUCT_DECISIONS.md) и
@@ -401,11 +401,11 @@ main и merge-base — `141ce91fb1731cd990fcf8391550150016c73e7f`.
 
 | Шаг | Состояние на этом снимке | Где детали |
 |---|---|---|
-| D2-DOC-CLICK | Checker и Cursor PASS, commit/push `e246f1e`; исправлены передача выбранного раздела модели и omitted mode ordinary prose. Качество реальной генерации отдельно не доказано | [Карточка](../../../tasks/DEMO_D2_DOCUMENT_CLICK_TASK.md) |
-| Вопрос при активной записи | Реализация прошла Checker/Cursor, сохранена и отправлена в `71d7467`; ответ, resume/cancel и replay проверены offline, живое качество генерации отдельно не доказано | [Карточка lead-прерывания](../../../tasks/DEMO_D2_LEAD_INTERRUPT_TASK.md) |
-| REC-4-P2 | Checker/Cursor PASS, commit/push `f4a08ea`. `classic`: обе detail-кнопки при полных данных всех показанных offers; клики читают captured набор, прямой вопрос доступен без кнопки. Это ограниченный A16/B19, не весь REC-5 | [Карточка цен](../../../tasks/DEMO_D2_PRICE_PRESENTATION_DETAILS_TASK.md) |
-| D2-AUDIT-PLAN | Разрешены сверка документов и проект плана. Карточка фиксирует находки и вопросы; изменения бота не начаты | [Текущая карточка](../../../tasks/DEMO_D2_AUDIT_FOLLOWUP_TASK.md) |
-| Исправления после аудита | Предложены малые checkpoint: задача volume-кнопки, контакты, полнота контекста, независимые части. Порядок и кодовые карточки ещё требуют принятия; цитаты владельца не равны GO | [Проект в Roadmap](../../../tasks/DEMO_D2_DELIVERY_ROADMAP.md) |
+| D2-DOC-CLICK | Checker и Cursor PASS, commit/push `e246f1e`; исправлены передача выбранного раздела модели и omitted mode ordinary prose. Качество реальной генерации отдельно не доказано | [Карточка](../../task-history/DEMO_D2_DOCUMENT_CLICK_TASK.md) |
+| Вопрос при активной записи | Реализация прошла Checker/Cursor, сохранена и отправлена в `71d7467`; ответ, resume/cancel и replay проверены offline, живое качество генерации отдельно не доказано | [Карточка lead-прерывания](../../task-history/DEMO_D2_LEAD_INTERRUPT_TASK.md) |
+| REC-4-P2 | Checker/Cursor PASS, commit/push `f4a08ea`. `classic`: обе detail-кнопки при полных данных всех показанных offers; клики читают captured набор, прямой вопрос доступен без кнопки. Это ограниченный A16/B19, не весь REC-5 | [Карточка цен](../../task-history/DEMO_D2_PRICE_PRESENTATION_DETAILS_TASK.md) |
+| D2-AUDIT-PLAN | Разрешены сверка документов и проект плана. Карточка фиксирует находки и вопросы; изменения бота не начаты | [Текущая карточка](../../task-history/DEMO_D2_AUDIT_FOLLOWUP_TASK.md) |
+| Исправления после аудита | Предложены малые checkpoint: задача volume-кнопки, контакты, полнота контекста, независимые части. Порядок и кодовые карточки ещё требуют принятия; цитаты владельца не равны GO | [Проект в Roadmap](../../checkpoints/DEMO_D2_DELIVERY_ROADMAP.md) |
 | REC-5 | Общая приёмка открыта. Существующие PASS её не закрывают; ни один новый live call не разрешён | [Acceptance](../../../tasks/DEMO_D2_ACCEPTANCE.md) |
 
 ## Исторические ограничения и evidence — до SIM

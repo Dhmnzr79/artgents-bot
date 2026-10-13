@@ -285,7 +285,7 @@ Known document click сохраняет совпадающие параметр�
 Пригодная prose с пропущенным ref сохраняется без выдуманных кнопок; retry,
 refusal и выбор материала сервером не добавлены. Фактический выбор источника
 моделью ещё требует live проверки. [Отчёт, Cursor prompt и widget сценарии —
-Interface Task §9](DEMO_D2_INTERFACE_TASK.md#9-d2-118--источник-ответа-и-показ-продолжений-2026-10-02).
+Interface Task §9](../archive/checkpoints/DEMO_D2_INTERFACE_TASK.md#9-d2-118--источник-ответа-и-показ-продолжений-2026-10-02).
 
 Root/Git top C:\Cursor Projects\artgents-bot-active, branch codex/d2-stage1-contract,
 HEAD a53e6b4f37e1d35474f6e8c8c41bcdcb0767bddf,
@@ -323,7 +323,7 @@ current/same/cross carry, bind/seed и старый envelope materialization ada
 сохранены. Единственные владельцы — Target Contract §3.
 
 Трасса, удаления, добавления, точные allowlist/файлы, Astra consult и риски:
-[Interface Task §8.7](DEMO_D2_INTERFACE_TASK.md#87-runtime-d2-117--результат-и-границы-evidence-2026-10-02).
+[Interface Task §8.7](../archive/checkpoints/DEMO_D2_INTERFACE_TASK.md#87-runtime-d2-117--результат-и-границы-evidence-2026-10-02).
 Новый state/schema5 отклоняет старые schema4 SID/completion, включая replay,
 без migration/reset/recovery. SQLite state/request/lead rows byte-equal после
 отказа; активное имя и сохранённый submitted receipt не удалены. Новый SID
@@ -415,7 +415,7 @@ JSON/SSE error; ordinarypayload/requestrows/leadrow остаются byte-equal.
 возвращает его без новой заявки. Явный новый SID независим, ПД не наследует.
 External delivery/store не редактировались и live не проверены.
 
-Evidence/actual line trace/подробности — [Interface Task §7](DEMO_D2_INTERFACE_TASK.md#7-runtime-checkpoint--фактическая-реализация-2026-10-02).
+Evidence/actual line trace/подробности — [Interface Task §7](../archive/checkpoints/DEMO_D2_INTERFACE_TASK.md#7-runtime-checkpoint--фактическая-реализация-2026-10-02).
 106PASS/4baselineFAIL первого набора; assembled176PASS/22FAIL, из них21baseline,
 одна собственная promptошибка исправлена; final contract/session/known/document
 143PASS/1baselineFAIL; scope8PASS; oldschema/detailclick8PASS; receipt-replay2PASS.
@@ -491,11 +491,11 @@ Baseline e6756ee + прежний WIP. Runtime и схема не меняютс
 примера на модель требует live-проверки с отдельно разрешённым бюджетом.
 Offline: 15 PASS /24.53s + 2 PASS /5.51s. Independent Checker PASS,
 его отдельный запуск: 5 PASS /3.51s. Provider/live/commit/push0, staging пуст.
-Подробности — [SIM4 Task](DEMO_D2_SIM4_TASK.md).
+Подробности — [SIM4 Task](../archive/task-history/DEMO_D2_SIM4_TASK.md).
 
 ## WIP — D2-116 три ценовых ответа, 2026-10-02
 
-Владелец согласовал общий механизм и дал GO реализации. [SIM4 Task](DEMO_D2_SIM4_TASK.md)
+Владелец согласовал общий механизм и дал GO реализации. [SIM4 Task](../archive/task-history/DEMO_D2_SIM4_TASK.md)
 содержит точный scope; [D2-116](DEMO_D2_PRODUCT_DECISIONS.md) заменяет прежний
 few_teeth gap и узкий prosthetics pool. Baseline e6756ee, ветка прежняя,
 staging пуст. Прежние SIM4/prompt31 PASS ниже не подтверждают этот новый diff.
@@ -510,7 +510,7 @@ Cursor gate остаётся. Подробности и ограничения �
 
 GO владельца после ручного диалога с потерей явно указанного объёма.
 Тип bug fix prompt31, не архитектурное упрощение; pending/click runtime прежний.
-Scope и allowlist — [SIM4 Task](DEMO_D2_SIM4_TASK.md). Astra read-only consult:
+Scope и allowlist — [SIM4 Task](../archive/task-history/DEMO_D2_SIM4_TASK.md). Astra read-only consult:
 поля уже сохраняются, причина в omission модели; новые поля/owner/retry не нужны.
 Offline проверяет корректно сформированную задачу и отдельно честно показывает
 предел adverse omission. Качество живой модели не подтверждено. Checker PASS;
@@ -601,7 +601,7 @@ Owner «ПРинимаю» согласовал продолжительный �
 Root C:\Cursor Projects\artgents-bot-active, branch codex/d2-stage1-contract,
 HEAD/origin branch 5cb58d5629bb78b07736246e12d951844bbe6c55,
 origin/main и merge-base 141ce91fb1731cd990fcf8391550150016c73e7f.
-Allowlist: [SIM-3 Task](DEMO_D2_SIM3_TASK.md); staging пуст; foreign WIP не изменён.
+Allowlist: [SIM-3 Task](../archive/task-history/DEMO_D2_SIM3_TASK.md); staging пуст; foreign WIP не изменён.
 
 Архитектурное упрощение: завершённый completion → существующая projection →
 следующий ход. dialogue_pairs хранит ссылки, не вторую копию assistant prose.
@@ -932,7 +932,7 @@ PASS. Независимый Checker: PASS документальной фикс
 Владелец согласовал изменение границы checkpoint и реализацию («Да»).
 Branch codex/d2-stage1-contract, HEAD 4d240430c2ce056dc306c50e215dbb09843c6b8f;
 origin/main и merge-base 141ce91fb1731cd990fcf8391550150016c73e7f.
-Точный активный allowlist и удаления — [SIM2 Task §1/10](DEMO_D2_SIM2_TASK.md).
+Точный активный allowlist и удаления — [SIM2 Task §1/10](../archive/task-history/DEMO_D2_SIM2_TASK.md).
 Предшествующий own WIP сохранён, foreign data/ и
 docs/MARKETING_ANSWER_SCENARIOS.md не открывались.
 
@@ -990,7 +990,7 @@ git diff --check: PASS. Независимый Checker: PASS документа�
 ## DOC — технический проект SIM-1/2/3, 2026-10-01
 
 Ветка `codex/d2-stage1-contract`, HEAD `4d24043`, main/merge-base `141ce91`.
-По разрешению владельца подготовлена [карточка SIM-2](DEMO_D2_SIM2_TASK.md):
+По разрешению владельца подготовлена [карточка SIM-2](../archive/task-history/DEMO_D2_SIM2_TASK.md):
 локальное уточнение одной операции, независимое объяснение, D2-111/B14,
 производители и потребители, перечень удалений и общая граница памяти.
 Astra участвовала read-only. Проект не разрешает runtime и не закрывает SIM-1.
@@ -1030,7 +1030,7 @@ main/merge-base 141ce91. Владелец согласился проектир�
 совместно с SIM-2, без универсальной разметки всех частей разговора.
 Это согласие на направление проектирования, не новый runtime PASS/GO.
 
-В [карточке SIM-1](DEMO_D2_SIM1_TASK.md) предложена структурная связь
+В [карточке SIM-1](../archive/task-history/DEMO_D2_SIM1_TASK.md) предложена структурная связь
 выбора с конкретной операцией/задачей пояснения в существующем owner;
 отдельный глобальный target-ID список и полный старый envelope не обязательны.
 Предыдущая рекомендация обязательного нового поля уточнена после Astra-разбора.
@@ -1062,7 +1062,7 @@ Astra выявила отсутствующую связь service clarification
 Сохранение полного understanding само по себе её не создаёт. Черновой service
 рефакторинг снят; baseline service-path остаётся до решения владельца.
 Нельзя угадать адресата уточнения по пустому service_id/topic/порядку частей.
-Scope и вопрос приведены в [карточке](DEMO_D2_SIM1_TASK.md).
+Scope и вопрос приведены в [карточке](../archive/task-history/DEMO_D2_SIM1_TASK.md).
 
 Baseline: 130 PASS / 4 FAIL (3 прежних snapshot expectations, widget CDP timeout).
 Новые SIM-1 cases: 19 PASS; HTTP/lead/terminal/medical: 30 PASS.
@@ -1170,7 +1170,7 @@ Baseline HEAD/local origin `4e435ce8006cc2df07930a40d058f278469a99f6`,
 ветка `codex/d2-stage1-contract`, Git root `C:\Cursor Projects\artgents-bot-active`;
 локальный `origin/main`/merge-base `141ce91fb1731cd990fcf8391550150016c73e7f`.
 Implementation GO и точный 11-file allowlist — в
-[карточке AF-1b](DEMO_D2_AF1B_CONTACTS_TASK.md). Foreign `data/` и
+[карточке AF-1b](../archive/task-history/DEMO_D2_AF1B_CONTACTS_TASK.md). Foreign `data/` и
 `docs/MARKETING_ANSWER_SCENARIOS.md` не открывались и не stage.
 
 | Checkpoint | Scope и evidence | Review / оставшиеся ворота |
@@ -1185,7 +1185,7 @@ Git root `C:\Cursor Projects\artgents-bot-active`, ветка
 merge-base `141ce91fb1731cd990fcf8391550150016c73e7f`.
 Перед правками tracked diff/staging пусты; foreign untracked `data/` и
 `docs/MARKETING_ANSWER_SCENARIOS.md` оставлены без изменений. Write allowlist:
-эта Draft-строка и [карточка AF-1b](DEMO_D2_AF1B_CONTACTS_TASK.md).
+эта Draft-строка и [карточка AF-1b](../archive/task-history/DEMO_D2_AF1B_CONTACTS_TASK.md).
 
 | Checkpoint | Scope и evidence | Review / оставшиеся ворота |
 |---|---|---|
@@ -1203,7 +1203,7 @@ merge-base `141ce91fb1731cd990fcf8391550150016c73e7f`.
 Перед правками staging/tracked diff пусты. Foreign untracked `data/` и
 `docs/MARKETING_ANSWER_SCENARIOS.md` не открывались и не stage.
 Точный implementation allowlist и решения владельца — в
-[карточке AF-1a](DEMO_D2_AF1A_PRICE_TASK_TASK.md).
+[карточке AF-1a](../archive/task-history/DEMO_D2_AF1A_PRICE_TASK_TASK.md).
 После изменения scope отдельный набор context/scope/continuation дал
 87 passed / те же 3 baseline failed из continuation; новых отказов нет.
 
@@ -1219,7 +1219,7 @@ Git root `C:\Cursor Projects\artgents-bot-active`, ветка
 `141ce91fb1731cd990fcf8391550150016c73e7f`. Staging/tracked diff до
 правок пусты; foreign `data/` и `docs/MARKETING_ANSWER_SCENARIOS.md`
 сохранены. Write allowlist — эта строка и
-[карточка AF-1a](DEMO_D2_AF1A_PRICE_TASK_TASK.md). Локальный `origin/*`
+[карточка AF-1a](../archive/task-history/DEMO_D2_AF1A_PRICE_TASK_TASK.md). Локальный `origin/*`
 прочитан без нового fetch/remote-запроса. Историческая Draft
 D2-AUDIT-PLAN ниже относится к прежнему `f4a08ea`, не к сегодняшнему HEAD.
 
@@ -1234,7 +1234,7 @@ Git root `C:\Cursor Projects\artgents-bot-active`, ветка
 `f4a08ea75b284cb51291fd7fe6ca64d842d8e2d0`; main/merge-base
 `141ce91fb1731cd990fcf8391550150016c73e7f`. GitHub проверен read-only
 `ls-remote` в этой сессии; до правок tracked/staging пусты. Write allowlist —
-шесть документов [карточки](DEMO_D2_AUDIT_FOLLOWUP_TASK.md). Foreign `data/`
+шесть документов [карточки](../archive/task-history/DEMO_D2_AUDIT_FOLLOWUP_TASK.md). Foreign `data/`
 и `docs/MARKETING_ANSWER_SCENARIOS.md` сохранены, не stage. Старая папка,
 worktree и backup не менялись. БД/сырые логи не открывались в doc-checkpoint.
 
@@ -1292,7 +1292,7 @@ Git root `C:\Cursor Projects\artgents-bot-active`, ветка
 `141ce91fb1731cd990fcf8391550150016c73e7f`. До правок tracked diff и
 staging пусты; чужие untracked `data/` и
 `docs/MARKETING_ANSWER_SCENARIOS.md` сохранены. Allowlist и решение владельца —
-[карточка](DEMO_D2_LEAD_INTERRUPT_TASK.md). Нижняя Draft карточки — снимок до
+[карточка](../archive/task-history/DEMO_D2_LEAD_INTERRUPT_TASK.md). Нижняя Draft карточки — снимок до
 её Checker/Cursor PASS и commit/push `43c0aba`, не текущий Git-status.
 
 | Checkpoint | Scope и evidence | Review / оставшиеся ворота |
@@ -1307,7 +1307,7 @@ staging пусты; чужие untracked `data/` и
 `141ce91fb1731cd990fcf8391550150016c73e7f`. До правок tracked diff и
 staging пусты. Чужие untracked `data/` и
 `docs/MARKETING_ANSWER_SCENARIOS.md` сохранены. Точный документальный
-allowlist — [карточка](DEMO_D2_LEAD_INTERRUPT_TASK.md). Нижняя Draft строка
+allowlist — [карточка](../archive/task-history/DEMO_D2_LEAD_INTERRUPT_TASK.md). Нижняя Draft строка
 указателя — снимок до его Checker/Cursor PASS и сохранения в `b39ed36`;
 Ledger после её review не переписывали.
 
@@ -1323,7 +1323,7 @@ Ledger после её review не переписывали.
 `141ce91fb1731cd990fcf8391550150016c73e7f`. До правок tracked diff и
 staging пусты. Чужие untracked `data/` и
 `docs/MARKETING_ANSWER_SCENARIOS.md` сохраняются. Точный allowlist и владелец
-решения — [карточка](DEMO_D2_CURRENT_STATUS_INDEX_TASK.md). Предыдущая Draft
+решения — [карточка](../archive/task-history/DEMO_D2_CURRENT_STATUS_INDEX_TASK.md). Предыдущая Draft
 D2-DOC-CLICK ниже — историческая строка до его Checker/Cursor PASS и commit/push
 `e246f1e`, не текущий Git-status; после review её не переписывали.
 
@@ -1341,7 +1341,7 @@ D2-DOC-CLICK ниже — историческая строка до его Chec
 до review, не нынешний Git-status. До этой коррекции tracked/staging пусты.
 Чужие untracked `data/` и `docs/MARKETING_ANSWER_SCENARIOS.md` сохранены;
 БД не открывались. Точный allowlist —
-[D2-DOC-CLICK](DEMO_D2_DOCUMENT_CLICK_TASK.md). Старые строки не переписываются.
+[D2-DOC-CLICK](../archive/task-history/DEMO_D2_DOCUMENT_CLICK_TASK.md). Старые строки не переписываются.
 
 | Checkpoint | Scope и evidence | Review / оставшиеся ворота |
 |---|---|---|
@@ -1357,7 +1357,7 @@ D2-DOC-CLICK ниже — историческая строка до его Chec
 diff/staging чисты; чужие untracked `data/` и
 `docs/MARKETING_ANSWER_SCENARIOS.md` не менялись. Git предупреждал о
 недоступных global ignore и `.pytest_cache/`. Точный будущий P1 allowlist —
-§4 [карточки REC-4-P](DEMO_D2_PRICE_PRESENTATION_DETAILS_TASK.md); новый
+§4 [карточки REC-4-P](../archive/task-history/DEMO_D2_PRICE_PRESENTATION_DETAILS_TASK.md); новый
 `tests/test_d2_price_presentation_http.py` входит в него.
 
 | Checkpoint | Scope и evidence | Review / оставшиеся ворота |
@@ -1373,7 +1373,7 @@ diff/staging чисты; чужие untracked `data/` и
 чужие untracked `data/` и `docs/MARKETING_ANSWER_SCENARIOS.md` сохранены.
 Git предупреждает о недоступных global ignore/`.pytest_cache/`; свежего fetch
 не было. Семь разрешённых doc paths перечислены в §1
-[карточки REC-4-P](DEMO_D2_PRICE_PRESENTATION_DETAILS_TASK.md).
+[карточки REC-4-P](../archive/task-history/DEMO_D2_PRICE_PRESENTATION_DETAILS_TASK.md).
 Предыдущая строка REC-4 ниже — snapshot **до** его review, не текущий status:
 его последующий Checker/Cursor PASS и сохранение относятся к `b02db8e`.
 Старые строки, включая процессное исключение `6c4a963`, не переписываются.
@@ -1391,7 +1391,7 @@ Git предупреждает о недоступных global ignore/`.pytest_
 diff и staging пусты. Чужие untracked `data/` и
 `docs/MARKETING_ANSWER_SCENARIOS.md` не правились и не stage. Карточка REC-4
 была untracked и входит в checkpoint. Полный точный write allowlist — § «Точный
-write allowlist будущей реализации» [карточки REC-4](DEMO_D2_REC4_PRICE_BUTTONS_TASK.md),
+write allowlist будущей реализации» [карточки REC-4](../archive/task-history/DEMO_D2_REC4_PRICE_BUTTONS_TASK.md),
 включая три отдельно разрешённых старых test-файла. Владелец отдельно
 разрешил обновить в них проверку краткой цены и проверку опубликованного
 объёма удаления зуба; остальные изменения в этих файлах касаются CTA.
@@ -1406,7 +1406,7 @@ Baseline `28ff60a4f51228dec1409e7b703cd279ea2dcee7`, ветка
 `codex/d2-stage1-contract`; origin branch совпал, `origin/main` и merge-base
 `141ce91`. До работы tracked/staged diff пуст. Чужой untracked `data/`
 сохранён; лог теста владельца прочитан только для диагностики. Точный
-allowlist — [карточка коррекции](DEMO_D2_ENVELOPE_CORRECTION_TASK.md).
+allowlist — [карточка коррекции](../archive/task-history/DEMO_D2_ENVELOPE_CORRECTION_TASK.md).
 
 | Checkpoint | Scope и evidence | Review / оставшиеся ворота |
 |---|---|---|
@@ -1417,7 +1417,7 @@ allowlist — [карточка коррекции](DEMO_D2_ENVELOPE_CORRECTION_
 Baseline `279b21c3504b1c2ae999575e1f44eb85567d3ac7`, ветка
 `codex/d2-stage1-contract`; локальный origin branch совпал, `origin/main` и
 merge-base `141ce91`. До реализации tracked/staged diff пуст, чужой `data/`
-сохранён. Точный allowlist — [карточка REC-3](DEMO_D2_RECOVERY_MEMORY_TASK.md),
+сохранён. Точный allowlist — [карточка REC-3](../archive/task-history/DEMO_D2_RECOVERY_MEMORY_TASK.md),
 включая отдельно разрешённый владельцем `core/response_plan_materialization.py`.
 
 | Checkpoint | Scope и evidence | Review / оставшиеся ворота |
@@ -1430,7 +1430,7 @@ Baseline `7621441ca84e6bfc39fce79b744b647cc521a8b4`, ветка
 `codex/d2-stage1-contract`; origin branch совпал, `origin/main` и merge-base
 `141ce91`. Tracked/staged diff до работы пуст; чужой untracked `data/`
 сохранён. Точный allowlist — § «Точный write allowlist» в
-[карточке коррекции](DEMO_D2_REC2_CORRECTION_TASK.md).
+[карточке коррекции](../archive/task-history/DEMO_D2_REC2_CORRECTION_TASK.md).
 
 | Checkpoint | Scope и evidence | Review / оставшиеся ворота |
 |---|---|---|
@@ -1459,7 +1459,7 @@ REC-2 после отдельных независимых Checker и Cursor о�
 включая тестовые ПД. Он не заменяет REC-1 безопасные события и не разрешает
 live/merge/deploy. Исторический `d2_full_audit.py` используется только как
 reference writer; старый dialogue/HTTP runtime не переносится. Карточка:
-[D2 local full audit](DEMO_D2_FULL_AUDIT_TASK.md). Код прошёл offline review:
+[D2 local full audit](../archive/task-history/DEMO_D2_FULL_AUDIT_TASK.md). Код прошёл offline review:
 последний полный прогон нового `tests/test_d2_full_audit.py` — **15 passed**;
 связанный офлайн-набор full audit + diagnostics/HTTP/SSE/widget/no-legacy/lead
 до последнего расширения маски credentials — **71 passed**. После расширения
@@ -1505,7 +1505,7 @@ Draft ниже отражает состояние проверяемого diff
 `origin/main` / merge-base: `141ce91fb1731cd990fcf8391550150016c73e7f`.
 Это журнал evidence, не самостоятельный план. Текущий порядок — в
 [Delivery Roadmap](DEMO_D2_DELIVERY_ROADMAP.md); сохранённые источники и
-ограничения аудита — в [inventory](DEMO_D2_RECONCILIATION_INVENTORY.md).
+ограничения аудита — в [inventory](../archive/task-history/DEMO_D2_RECONCILIATION_INVENTORY.md).
 
 | Checkpoint | Scope и evidence | Review / оставшиеся ворота |
 |---|---|---|

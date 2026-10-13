@@ -16,7 +16,8 @@
 - [Архитектура](CURRENT_ARCHITECTURE.md), [конфигурация](FLAGS_AND_STATUS.md),
   [маршрутизация](ROUTING_MAP.md), [release-тесты](TEST_SUITE_ARCHITECTURE.md).
 - [Текущая очередь](tasks/DEMO_D2_DELIVERY_ROADMAP.md) — только верхняя текущая очередь;
-  [карточка чистки §60](tasks/DEMO_D2_INTERFACE_TASK.md#60-cleanup-checkpoint--2026-10-13).
+  [карточка чистки §60](tasks/DEMO_D2_INTERFACE_TASK.md#60-cleanup-checkpoint--2026-10-13);
+  [назначение текущих task документов](tasks/README.md).
 - [Execution Lock](tasks/DEMO_D2_EXECUTION_LOCK.md),
   [Target Contract §3](tasks/DEMO_D2_TARGET_CONTRACT.md),
   [Product Decisions](tasks/DEMO_D2_PRODUCT_DECISIONS.md) — сохраняемые protections
@@ -37,3 +38,6 @@ one-call/patient-scope/hybrid и инциденты. Материалы сохр
 Secret scan, deployment/security/PostgreSQL contracts и tenant/lead/privacy
 защиты действуют. Архивирование не отменяет их. Клиентская база знаний
 и документы для ответов пациентам не переносились этим этапом.
+
+Старые50 task cards/prompts и полные прежние Interface/Roadmap теперь в архиве.
+На прежних currentпутях оставлены только текущая очередь и карточкаdocs/tests.

@@ -90,16 +90,15 @@ baseline-долг не требует реализации будущих эта
 согласования это правило не вводит.
 
 На рубежах, названных в действующем разделе дорожной карты, нужен отдельный Cursor
-review по [проверочному prompt](DEMO_D2_CURSOR_CHECKER_PROMPT.md).
+review по [WORKFLOW_CHECKER](../WORKFLOW_CHECKER.md) и текущей карточке.
 После требуемых PASS допустимы только exact staging, commit, push и финальный
 отчёт с фактическим hash в согласованной ветке. Нельзя дописывать Ledger
 после review только ради hash: проверяющий видит Ledger вместе с diff.
 
-Постоянный процесс исполнителя:
-[DEMO_D2_CODEX_EXECUTOR_PROMPT.md](DEMO_D2_CODEX_EXECUTOR_PROMPT.md).
-Короткая вставка в каждый новый этап —
-[DEMO_D2_STAGE_TASK_MINI_PROMPT.md](DEMO_D2_STAGE_TASK_MINI_PROMPT.md).
-Карточка этапа задаёт точный baseline, allowlist, приёмку и тесты.
+Постоянный процесс исполнителя — [AGENTS](../../AGENTS.md),
+[WORKFLOW_GIT](../WORKFLOW_GIT.md) и текущая карточка с baseline/allowlist/приёмкой.
+Прежние executor/mini/checker prompts архивированы: их старые продуктовые
+формулировки не применяются. Требования разделов2–5 и независимый Checker сохранены.
 
 ## 6. Приоритет документов
 
@@ -108,7 +107,7 @@ AGENTS.md
 → D2 Execution Lock (этот файл)
 → D2 Delivery Roadmap (фиксированный порядок checkpoint)
 → утверждённые D2 contract / acceptance / decision log
-→ D2 Codex Executor Prompt (постоянный процесс исполнения)
+→ WORKFLOW_GIT / WORKFLOW_CHECKER (процесс, не новые продуктовые правила)
 → текущий checkpoint prompt
 ```
 

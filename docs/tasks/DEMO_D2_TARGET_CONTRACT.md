@@ -24,7 +24,7 @@ Checkpoint прежнего WIP/экспериментов: 08b5041, pushed; н�
 Точная граница и проверки — Interface Task §11.
 
 [Принятые правила D2-119](DEMO_D2_PRODUCT_DECISIONS.md) и
-[план исправлений §10](DEMO_D2_INTERFACE_TASK.md#10-d2-119--согласованные-правила-и-план-доведения)
+[план исправлений §10](../archive/checkpoints/DEMO_D2_INTERFACE_TASK.md#10-d2-119--согласованные-правила-и-план-доведения)
 имеют приоритет над историческими разрешениями ordinary authored и stage-кнопок.
 D2-117 (единый discussion context) и D2-118 (source UI) реализованы и проверены
 offline в своих границах. Widget выявил дефекты prose/admin/policy и повторы;
@@ -73,7 +73,7 @@ Restoration — один настроенный обзор разных спос
 Обзор направления по D2-115: один явно настроенный pool → brand/extent filter →
 один representative offer на service → cap3. Exact service без cap; отсутствие
 подходящего overview не запускает поиск по всему каталогу. Демо-набор и удаления
-описаны в [SIM4 Task](DEMO_D2_SIM4_TASK.md); это не клиническое назначение.
+описаны в [SIM4 Task](../archive/task-history/DEMO_D2_SIM4_TASK.md); это не клиническое назначение.
 Актуальные решения D2-107–109 ниже и в Product Decisions приняты владельцем.
 Runtime baseline — AF-1b `0691217`; состояние выполнения — в Current Status.
 Позднейшие решения заменяют противоречащие им прежние демо-допущения.
@@ -489,7 +489,7 @@ includes остаётся ненажатая stages; после обеих — �
 `Во втором` означает второй offer показанного набора, а не активную тему.
 Partial data не роняет доступный ответ, но foreign/stale/forged refs остаются
 строгими. Details freeze в единственном плане; replay не читает каталог заново.
-Подробный allowlist и проверки — [REC-4-P](DEMO_D2_PRICE_PRESENTATION_DETAILS_TASK.md).
+Подробный allowlist и проверки — [REC-4-P](../archive/task-history/DEMO_D2_PRICE_PRESENTATION_DETAILS_TASK.md).
 
 ## 8. Память, доставка и заявка
 
@@ -506,7 +506,7 @@ Partial data не роняет доступный ответ, но foreign/stale
 не наследуется. В том завершённом checkpoint medical situation и lead/privacy
 не менялись. Теперь D2-117 заменяет отдельную patient memory; медицинские
 ограничения и lead/privacy сохраняются. Исторический путь и проверки —
-[SIM3 Task](DEMO_D2_SIM3_TASK.md).
+[SIM3 Task](../archive/task-history/DEMO_D2_SIM3_TASK.md).
 Старое prose-only описание §7 — исторический формат до SIM-3, не требование
 сохранить пропуск code-owned завершённых ходов.
 

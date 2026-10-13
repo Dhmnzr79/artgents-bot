@@ -59,6 +59,7 @@
 | §60.5 | Старую хронику статуса вынесли в архив; этот путь оставлен актуальным кратким статусом |
 | §60.6 | PR и Publish используют shared release selections; прежние проверки сохранены, добавлен selection contract |
 | §60.7 | Новый owner behavior entry;19 старых планов/аудитов перенесены в архив с явной исторической пометкой |
+| §60.8 | 50 старых task cards/prompts и полные Interface/Roadmap snapshots архивированы; current очередь и process pointers очищены |
 
 Последний локальный прогон точного publish offline selection (50 файлов, §60.6):
 **821 passed,5 skipped,0 failed**. Все5 skips — ограничения symlink на Windows/POSIX.
@@ -67,14 +68,16 @@ selection/G2–G8:271PASS5SKIP, independent selection/G2/G3:65PASS и Checker PA
 Targeted text/native-price/G2/G3:120PASS; independent Checker §60.4 — PASS.
 Два trailing-whitespace места архива исправлены в `2cbbd15`, focused Checker PASS.
 Это offline evidence, не повторная проверка Docker/PG/deploy и не полный historical suite.
-Новых live/provider/SMTP calls в чистке:0. Runtime и client KB не менялись.
+GitHubCI checkpoint `51d4bd2`: все5jobs SUCCESS, включая PostgreSQL и secret scan.
+Publish image/deploy этого PR не запускались. Новых live/provider/SMTP calls в чистке:0. Runtime и client KB не менялись.
 
 ## Что осталось
 
 1. Закончить карту historical tests: полезные guards мигрировать, доказанные дубли
    и assertions удалённых механизмов убрать. Не удалять тест только потому, что он красный.
 2. Архивировать остальные устаревшие планы/аудиты, выделив действующие invariants.
-   Roadmap/Interface всё ещё содержат исторические sections; весь корпус не очищен.
+   Прежние Interface/Roadmap sections архивированы; оставшиеся rootdocs/evidence
+   и historical-reader bindings ещё классифицируются, весь корпус не очищен.
 3. Завершить сверку SIM/REC evidence: «выполнено / заменено / отменено / отложено».
    Общая whole-bot acceptance не закрыта; offline fixtures не доказывают live model quality.
 4. Temporary demo gate пока ограничен. Постоянный набор утвердить по законченной

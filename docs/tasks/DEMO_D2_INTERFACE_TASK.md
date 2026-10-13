@@ -5217,3 +5217,45 @@ only2 duplicate old order permutations removed and3 adverse branch cases added.
 Gate delta add-only two suites; other jobs and publish/PR union parity unchanged.
 DiffcheckPASS. Current protocol outcomes verified by frozen state, not status-only.
 Independent Checker follows; live/provider0 and whole historical suite unresolved.
+
+### 60.4 Obsolete assertions and historical routing/config archive
+
+Baseline3688500, same root/branch/main, foreignWIP0. Test/doc cleanup only.
+Allowlist: test_d2_structured_output.py; test_d2_sim2_contract.py;
+test_d2_text_reply.py; two workflows; G2/G3 tests; docs/ROUTING_MAP.md;
+FLAGS_AND_STATUS.md; tasks/DEMO_D2_ENVELOPE_CORRECTION_TASK.md;
+new archive/pre-d2 copies of these3 paths; docs/README.md;
+TEST_SUITE_ARCHITECTURE.md; this card; Current Status; Roadmap.
+
+Removed15cases, selected baseline8FAIL7PASS:2 HTTPjson_object/1024 requirements,
+6 old JSON prompt examples incl modelprice_detail,7 doctor-envelope validations.
+Do not remove shared parse/prompt_example helpers: legacy suites import them.
+Strict capability/probe safety tests retained because scripts/check_d2_format_layers
+and experiment_d2_interface_comparison still consume prepare_cases. Their remaining
+historical failures not migrated/declared green and don't protect currentHTTP.
+
+Current known-task test strengthened: complete frozen binding, target/brand/volume/
+source sections, identity, text and ignored foreign metadata. Added ordinary/known
+actualHTTP-provider no-response_format checks; known no tools, ordinary nativeprice
+only, one call1536tokens. Removed command doctors checked through current META;
+native tool schema/bad argument guards remain in test_d2_native_price_runtime.
+
+Text-protocol original baseline8FAIL15PASS23cases reproduced from HEAD in temporary
+file. They expected tail show_price still active. Shared malformed-argument7 cases
+migrated to actual show_contacts with valid base fields; kept bad-shape/server-field
+checks. API-only tail price now explicitly rejected; order/server IDs including
+unavailable sibling retained. No runtime modification/adapter/skip/xfail.
+
+Old ROUTING/FLAGS/envelope-card archived (existing valid relative links adjusted);
+old paths become brief current indexes/forward links. Historical claim of absent
+VPS and stale Composer flag authority removed from current reading path. Evidence
+is retained; no production flags or prices changed. Full historical archive/suite
+still not closed. Add current text_reply to PR/publish, G2/G3 require it.
+
+§60.4 final executor: text_reply27 + native_price37 + G2/G3 56 =120PASS50.41s.
+Exact current publish selection49files:812PASS5SKIP0FAIL192.53s on local Windows.
+This is current offline gate only, not full historical tests/ nor real Docker/PG
+qualification/deploy. Platform skips remain documented environment limitations.
+Entry/index links and archive narrative preservation (only link relocation) PASS;
+other workflow jobs unchanged; diffcheckPASS. Independent Checker follows.
+Provider/live/SMTP0. Current archived evidence not relabeled as runtime authority.

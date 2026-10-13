@@ -20,6 +20,11 @@
 текст/native price, контекст, lead/privacy и env. Старый pre-D2 snapshot
 перенесён в [архив](archive/pre-d2/CURRENT_ARCHITECTURE.md).
 
+Короткие индексы: [маршрутизация](ROUTING_MAP.md),
+[конфигурация](FLAGS_AND_STATUS.md), [проверки](TEST_SUITE_ARCHITECTURE.md).
+Старые ROUTING/FLAGS/envelope-task snapshots теперь в archive/pre-d2;
+стабильные старые пути оставлены короткими указателями, не старым каноном.
+
 ## Принятые решения и ограничения
 
 [Product Decisions](tasks/DEMO_D2_PRODUCT_DECISIONS.md) и

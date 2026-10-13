@@ -21,6 +21,7 @@ Secret scan, lint/client validation, PostgreSQL qualification, Docker build/smok
 
 | Проверка | Назначение |
 |---|---|
+| test_d2_text_reply | Prose/META guards, frozen known-task binding, removed command rejection и отсутствие JSON response_format |
 | test_d2_demo_release_gate | JSON/SSE, ordinary prose, nativeprice, booking/contact, tenant/PII/replay/commit/error guards |
 | test_d2_native_price_runtime | native show_price и provider completion после фактической карточки |
 | test_d2_contact_model_context | YAML→snapshot→обычный provider prompt, адрес/метро/часы/парковка, branch/tenant binding |
@@ -64,3 +65,13 @@ runtime compatibility и не разрешает возвращать удалё
 Wide historical tests/ запускать для инвентаризации с baseline comparison,
 а не объявлять все старые падения regressions. Live provider/widget semantic
 verification требует отдельного owner GO и hard call budget.
+
+## Удаления §60.4
+
+Удалены15 obsolete cases: обязательный HTTP json_object2, старые JSON prompt
+examples6 и doctor-envelope7. Known-task binding/empty guards и отсутствие JSON
+теперь проверяются текущим text protocol; removed doctors/META-price не исполняются.
+Native price schema/arguments/transcript проверяет test_d2_native_price_runtime.
+Historical strict probe budget/no-retry/no-secret safety остаётся; весь файл
+structured_output не объявлен current или зелёным. Общие legacy helpers импортируются
+другими suites, поэтому адресные удаления не превращены в массовый file deletion.

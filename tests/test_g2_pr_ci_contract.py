@@ -46,6 +46,7 @@ _MANDATORY_OFFLINE_MODULES = (
     # Temporary 2026-10-14 demo gate; restore historical coverage after migration.
     "tests/test_d2_demo_release_gate.py",
     "tests/test_d2_contact_model_context.py",
+    "tests/test_d2_text_reply.py",
     "tests/test_d2_situation_disabled.py",
     "tests/test_d2_demo_limits.py",
     "tests/test_d2_native_price_runtime.py",

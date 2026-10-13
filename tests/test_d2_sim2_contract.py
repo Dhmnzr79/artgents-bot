@@ -1,4 +1,4 @@
-"""Boundary evidence: one strict parser, no competing control fields."""
+"""Historical envelope helpers still imported by older suites, not current HTTP."""
 import json
 
 import pytest
@@ -59,25 +59,10 @@ def test_admin_is_exclusive_and_contact_has_no_price_fields():
                "contact_fields": ["contact_address"], "brand_id": "nobel"}]})
 
 
-@pytest.mark.parametrize("service_id", ["foreign-service", "braces"])
-def test_doctors_rejects_nonactive_tenant_service(service_id):
-    with pytest.raises(ValueError, match="union_tag_invalid"):
-        parse({"outcome": "dialogue", "blocks": [{"kind": "doctors", "request_id": "r1",
-               "target": {"type": "service", "id": service_id}}]})
 
 
-@pytest.mark.parametrize("extra", [{"content_text": "Invented doctor"}, {"subject": {"subject_id": "s1", "relation": "self"}},
-                                  {"service_id": "classic"}, {"route": "ANSWER"}])
-def test_doctors_has_no_parallel_meaning_or_prose(extra):
-    with pytest.raises(ValueError):
-        parse({"outcome": "dialogue", "blocks": [{"kind": "doctors", "request_id": "r1",
-               "target": {"type": "service", "id": "classic"}, **extra}]})
 
 
-def test_doctors_requires_service_target():
-    with pytest.raises(ValueError):
-        parse({"outcome": "dialogue", "blocks": [{"kind": "doctors", "request_id": "r1",
-               "target": {"type": "topic", "id": "implantation"}}]})
 
 
 @pytest.mark.parametrize("replacement", [{}, {"content_text": None}, {"content_text": ""}, {"content_text": "   "}])
@@ -101,25 +86,6 @@ def prompt_example(index):
     return json.loads(text)
 
 
-@pytest.mark.parametrize("index,kind", [(0, "price"), (1, "price"), (2, "content"), (3, "content"), (4, "price_detail"), (5, "price")])
-def test_sent_prompt_examples_conform_to_current_parser(index, kind):
-    result = parse(prompt_example(index))
-    block = result.blocks[0]
-    operation = block
-    assert operation.kind == kind and operation.request_id == "r1"
-    if index in (0, 3, 5):
-        assert operation.topic_id == "implantation" and operation.service_id is None
-    elif index == 4:
-        assert operation.service_id == "classic"
-        assert operation.brand_id == "nobel_biocare"
-        assert operation.price_detail_aspect == "stages"
-    else:
-        assert block.clarification.missing == "service"
-        assert "operation" not in block.model_dump()
-    if index == 5:
-        assert operation.kind == "price"
-        assert operation.volume.extent == "few_teeth"
-        assert operation.volume.tooth_count == 3
 
 
 def test_target_in_place_of_pending_operation_is_not_repaired():

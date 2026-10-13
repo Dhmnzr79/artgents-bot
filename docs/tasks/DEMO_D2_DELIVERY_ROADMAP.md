@@ -1,5 +1,10 @@
 §58: владелец подтвердил визуал и разрешил checkpoint commit/push, затем стоп.
 
+§60.4: удалены15 obsolete envelope/prompt/doctor assertions; current
+text protocol guards усилены и включены в gates. ROUTING/FLAGS/envelope task
+перенесены в архив, старые пути — короткие ссылки на current architecture.
+Historical helpers/probe safety сохранены; полный legacy suite ещё не закрыт.
+
 §60.3: policy/contact fixtures переведены на current native/META protocol,
 оба набора возвращены в gates. Data/ref/tenant guards сохранены; two obsolete
 mixed-order duplicates заменены JSON/SSE current tests, branch rejection усилен.

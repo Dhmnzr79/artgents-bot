@@ -7,7 +7,7 @@
 Полная прежняя дорожная карта сохранена в
 [архиве](../archive/checkpoints/DEMO_D2_DELIVERY_ROADMAP.md).
 Состояние — [Current Status](DEMO_D2_CURRENT_STATUS.md),
-ближайший checkpoint — [Interface §61](DEMO_D2_INTERFACE_TASK.md#61-clinic-factual-grounding-and-proportionate-answer-detail).
+ближайший checkpoint — [Interface §62](DEMO_D2_INTERFACE_TASK.md#62-document-section-guidance).
 
 ## Уже выполнено
 
@@ -25,9 +25,9 @@
 
 ## Что делать дальше
 
-1. OwnerGO§61: stronger grounding for clinic facts, general dental knowledge
-   remains permitted; mild brevity without fixed caps. Only existing prompt tuning
-   extends earlier docs/tests scope; targeted tests and Checker before save.
+1. OwnerGO§62: instruction for relevant document sections (#korotko for general
+   questions, matched sections for direct questions/followups), essential conditions
+   preserved. Existing prompt only, no follow-up mechanism changes; tests/Checker.
 2. Продолжить классификацию оставшихся docs/evidence/probe bindings. Действующие
    tenant/privacy/medical/price/UI/transport/deploy protections сохранять.
    Исторические планы и эксперименты убрать из текущего чтения.

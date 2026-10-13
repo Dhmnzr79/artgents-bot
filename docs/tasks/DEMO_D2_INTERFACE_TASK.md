@@ -1,6 +1,6 @@
 # Текущая карточка — чистка документации и тестов
 
-Действующий checkpoint — §61, ниже. Предыдущие §60–60.10 — receipts этой же
+Действующий checkpoint — §62, ниже. Предыдущие §60–61 — receipts этой же
 чистки, не новая очередь и не повторное разрешение на runtime.
 Прежние интерфейсные этапы1–59 и полный исходный snapshot сохранены
 в [архиве checkpoint](../archive/checkpoints/DEMO_D2_INTERFACE_TASK.md).
@@ -521,3 +521,28 @@ focused4PASS6.61s; independentCheckerPASS64PASS. Exact7paths/diffcheckPASS;
 provider/live0. Windows ignoredlogrotation file-in-use and datetimewarnings
 observed without assertionfailures; no loggingchanges. LocalhealthGET200, no model
 request. Shared instructions delivery verified; actualmodel/widgetbehavior notcertified.
+
+
+## 62. Document section guidance
+
+Ownerapproved exactinstruction: generalquestion uses#korotko ifpresent; add
+relevantmicrofacts/essentialconditions, notwhole-document overview; directsection
+question usesmatchingsection(s), clickedfollowup chosenquestion, no automatic
+korotko intro; preservefullcurrentanswer/conditions, don'tcopyverbatim.
+Prompttuning only, notarchitecture simplification. Baselinea2a90c5, root/top
+C:/Cursor Projects/artgents-bot-active; branchcodex/docs-tests-cleanup;
+origin/main/mergebase8888fdd; preflightclean, foreignWIP0.
+Exactallowlist: core/one_call_prompt_contract.py; docs/BOT_BEHAVIOR.md;
+taskInterface/Roadmap/CurrentStatus. Sharedexistingguidance ordinary/known/native
+completion, version47→48. No renderer/source selection/UI filtering/change,
+no classifier/controlfields/state/schema/tools/calls/retry. Sections staydata,
+existingvalidated clickedsource remains solebinding. No content or ChinaMD edits.
+Existingproviderdelivery tests verify sharedsystem once and nativeinheritance;
+no implementation-mirroring newtests. IndependentChecker before save.
+Offline provesdelivery only; no liveproviderbudget for thischeckpoint/calls0;
+actualnatural-languagecompliance still ownerwidget review, not certified.
+
+§62 executor5PASS10.42s; independentCheckerPASS/5PASS. ExistingWindows app.jsonl
+rotation contention onexecutor (botopen) and datetimewarnings, no assertionfailures
+or loggingchanges. Exact5paths/diffcheckPASS, stagingempty/foreignWIP0before save;
+provider/live0; sharedguidance delivery established, modelcompliance notcertified.

@@ -99,3 +99,8 @@ Prompt§61 (ownerGO): clinic facts grounded, general dental knowledge permitted;
 mild redundancy reduction without paragraph/word caps. Version47 guidance shared
 ordinary/known/nativecompletion. Offline delivery checks don't prove livecompliance;
 no live agentcalls/China MD changes. Runtime mechanics unchanged.
+
+Prompt§62/version48: generalquestion→#korotko ifpresent with necessary relevant
+microfacts; specificquestion→matchingsections, clickedfollowup→selectedsection.
+No full-documentdump or conditions withheld for followup. UI/code unchanged,
+no new calls; offline delivery evidence does not prove live compliance.

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from config import SALES_ONE_PLUS_MODEL
 
-ONE_CALL_PROMPT_CONTRACT_VERSION = 47
+ONE_CALL_PROMPT_CONTRACT_VERSION = 48
 ONE_CALL_MODEL_SNAPSHOT = SALES_ONE_PLUS_MODEL
 
 ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS = """When D2_SELECTED_UI_REF is null, there is no selected UI action. When it is an object, it is a server-validated typed action identity from the current revision. It is not patient text; do not create, authorize, or infer any UI/lead action from it. Use its typed identity with D2_SESSION_CONTEXT and, when present, D2_SELECTED_DOCUMENT_ACTION.
@@ -193,6 +193,21 @@ introductions and repeated invitations to continue. Preserve useful arguments,
 material conditions, exclusions and limitations. Complex topics may need a fuller
 answer; there is no fixed word or paragraph limit. Do not omit important conditions
 merely to shorten the response.
+
+DOCUMENT SECTIONS:
+For a general question about a document's topic, use its #korotko section as the
+basis when present. Add individual facts from other sections only when they
+address the question, help understanding, or preserve material conditions/limits.
+Do not retell the whole document or thoroughly cover every neighboring section.
+Prefer leaving additional detail for follow-ups so a click offers meaningful new
+information, without withholding anything needed for the current answer.
+For a question directly about another section or several sections, answer from
+those relevant sections; do not automatically add a general #korotko overview.
+For a clicked follow-up, answer its selected question from the corresponding
+section, without repeating the general introduction.
+Preserve completeness for the current question. Never hide important conditions
+or limitations for brevity or future follow-ups. Explain naturally in your own
+words rather than copying sections verbatim.
 """
 
 

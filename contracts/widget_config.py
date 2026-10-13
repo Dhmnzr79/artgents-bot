@@ -89,12 +89,19 @@ class WidgetStarterPromptV1(_WidgetStrictModel):
         return value
 
 
+class WidgetWelcomePromotionV1(_WidgetStrictModel):
+    title: str = Field(min_length=1)
+    subtitle: str = Field(min_length=1)
+    q: str = Field(min_length=1)
+
+
 class WidgetPresentationV1(_WidgetStrictModel):
     schemaVersion: Literal[1]
     botName: str
     onlineLabel: str
     welcomeText: str | None
     starterPrompts: list[WidgetStarterPromptV1]
+    welcomePromotion: WidgetWelcomePromotionV1 | None = None
     videoAspect: Literal["horizontal", "vertical"]
     demoLauncher: StrictBool
     launcherCtaLabel: str

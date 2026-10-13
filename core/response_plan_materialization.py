@@ -1071,10 +1071,10 @@ def _d2_price_scope_decision(
         return None, ()
     brand = sources.material_authority.bundle.brands.brands.get(part.brand_id) if part.brand_id else None
     choices: tuple[D2PriceScopeChoice, ...] = ()
-    # Volume buttons come from clinic presentation (D2-028). Offer-set diversity
-    # is not required: extents may share a price card and still need a choice.
-    can_offer_choices = part.volume is None
-    if applied_extent is None and can_offer_choices and presentation.volume_choices:
+    # Owner-approved overview navigation: configured volume choices remain
+    # available for every topic overview, including explicit uncertainty.
+    # The service-target early return above keeps them out of service cards.
+    if presentation.volume_choices:
         choices = tuple(
             D2PriceScopeChoice(extent=item.extent, candidate=item.candidate)
             for item in presentation.volume_choices
@@ -1092,9 +1092,12 @@ def _d2_price_scope_decision(
                 f"Для {brand.canonical_name} есть такие варианты:"
                 if brand is not None else presentation.introduction_text
             ),
-            # Clarification copy only with volume buttons (D2-005/074). After
-            # «Не знаю» choices are empty: keep orienting prices, do not re-ask.
-            unknown_extent_text=presentation.unknown_extent_text if choices else None,
+            # Persistent navigation does not imply repeating the question:
+            # after a supplied volume (including «Не знаю»), omit the prompt.
+            unknown_extent_text=(
+                presentation.unknown_extent_text
+                if choices and part.volume is None and applied_extent is None else None
+            ),
             volume_choices=choices,
         ),
         choices,
@@ -1567,8 +1570,20 @@ def _d2_verified_content_claim(part, *, client_id, sources):
     scope = _d2_typed_content_scope_from_part(part, client_id=client_id, sources=sources)
     if scope is None or authority is None:
         return scope, None, ()
-    if any(ref not in {s.section_ref for s in authority.sections} for ref in part.content_section_refs):
-        return scope, None, ()
+    section_ids = {section.section_ref for section in authority.sections}
+    canonical_sections = []
+    for ref in part.content_section_refs:
+        # Markdown exposes explicit anchors without the internal a: namespace.
+        # Resolve that spelling only against this verified document; never guess
+        # a section or substitute the overview for an unknown reference.
+        if ref in section_ids:
+            canonical = ref
+        elif ":" not in ref and "#" not in ref and f"a:{ref}" in section_ids:
+            canonical = f"a:{ref}"
+        else:
+            return scope, None, ()
+        if canonical not in canonical_sections:
+            canonical_sections.append(canonical)
     if part.service_id is not None and part.service_id not in authority.allowed_service_ids:
         return scope, None, ()
     if part.topic_id is not None and authority.allowed_service_ids:
@@ -1584,7 +1599,7 @@ def _d2_verified_content_claim(part, *, client_id, sources):
         return scope, None, ()
     if (part.service_id is not None and part.service_id not in service_ids) or (part.topic_id is not None and part.topic_id != topic):
         return None, None, ()
-    return scope, authority.content_ref, part.content_section_refs
+    return scope, authority.content_ref, tuple(canonical_sections)
 
 
 def _d2_bind_source_claims(operations, claims, *, client_id, sources):
@@ -1643,7 +1658,7 @@ def _d2_information_blocks(
             )
 
     for part in content_parts:
-        verified_scope, verified_ref, _ = _d2_verified_content_claim(
+        verified_scope, verified_ref, verified_sections = _d2_verified_content_claim(
             part, client_id=client_id, sources=sources,
         )
         scopes[part.request_id] = verified_scope
@@ -1655,7 +1670,9 @@ def _d2_information_blocks(
             else:
                 unverified_source(part)
             continue
-        realization = realize_d2_content(part)
+        realization = realize_d2_content(
+            part.model_copy(update={"content_section_refs": verified_sections})
+        )
         realizations[part.request_id] = realization
         if realization.outcome == "unavailable":
             continue

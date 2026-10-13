@@ -1,19 +1,19 @@
-﻿/* Roboto — self-hosted, кириллица + латиница, веса 400/500/600. */
+/* Inter — self-hosted, кириллица + латиница, веса 400/500/600. */
 @font-face {
-  font-family: "Roboto";
+  font-family: "Inter";
   font-style: normal;
   font-display: swap;
   font-weight: 400 600;
-  src: url("../fonts/roboto-cyrillic-wght-normal.woff2") format("woff2");
+  src: url("../fonts/inter-cyrillic-wght-normal.woff2") format("woff2");
   unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
 }
 
 @font-face {
-  font-family: "Roboto";
+  font-family: "Inter";
   font-style: normal;
   font-display: swap;
   font-weight: 400 600;
-  src: url("../fonts/roboto-latin-wght-normal.woff2") format("woff2");
+  src: url("../fonts/inter-latin-wght-normal.woff2") format("woff2");
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
     U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
@@ -64,7 +64,7 @@
   --clinic-placeholder: #aaa0bb;
   --clinic-panel-w: 440px;
   --clinic-panel-h: min(720px, calc(100vh - 48px));
-  --clinic-font: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --clinic-font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-family: var(--clinic-font);
   letter-spacing: 0;
   color: var(--clinic-text);
@@ -856,20 +856,21 @@
 
 .clinic-msg__links {
   margin-top: 18px;
-  border-top: 1px solid var(--clinic-line);
+  display: grid;
+  gap: 8px;
   width: 100%;
   font-weight: 400;
 }
 
 .clinic-msg__link {
   width: 100%;
-  min-height: 44px;
+  min-height: 52px;
   margin: 0;
-  padding: 13px 0;
+  padding: 13px 14px;
   border: 0;
-  border-bottom: 1px solid var(--clinic-line);
-  background: transparent;
-  color: var(--clinic-action);
+  border-radius: 12px;
+  background: #f4f6f9;
+  color: #293447;
   font: inherit;
   font-size: 15px;
   line-height: 1.6;
@@ -880,22 +881,17 @@
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  transition: color 0.16s ease, opacity 0.16s ease;
+  transition: background-color 0.16s ease, opacity 0.16s ease;
 }
 
-.clinic-msg__link:last-child {
-  border-bottom: 0;
-  padding-bottom: 2px;
-}
-
-.clinic-msg__link:hover {
-  color: var(--clinic-action-hover);
+@media (hover: hover) and (pointer: fine) {
+  .clinic-msg__link:hover { background: #ecedf0; }
+  .clinic-shell__welcome-promo:hover { background: #eaf0fc; }
 }
 
 .clinic-msg__link:focus-visible {
-  outline: none;
-  border-radius: 4px;
-  box-shadow: var(--clinic-focus);
+  outline: 2px solid #6f7886;
+  outline-offset: 2px;
 }
 
 .clinic-msg__link-text {
@@ -907,7 +903,7 @@
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  color: currentColor;
+  color: #6f7886;
 }
 
 .clinic-msg__link-chevron svg {
@@ -1638,55 +1634,87 @@
 }
 
 
-.clinic-price-card{margin:12px 0 16px;padding:0;border:1px solid #dce2f3;border-radius:15px;overflow:hidden;background:#fff;font-size:14px;line-height:1.55}
-.clinic-price-card__title{margin:17px 17px 0;font-size:18px;line-height:1.35;font-weight:600;letter-spacing: 0}
-.clinic-price-card__tabs{display:flex;gap:6px;margin:16px 17px 0;flex-wrap:wrap}
-.clinic-price-card__volumes{margin:17px 17px 0}
-.clinic-price-card__tab{flex:1 1 75px;min-width:0;min-height:42px;padding:10px 4px;border:1px solid #dce2f3;border-radius:9px;background:#fff;color:inherit;font-size:13px;line-height:1.4;font-weight:400;cursor:pointer}
-.clinic-price-card__tab[aria-pressed="true"]{border-color:var(--clinic-brand);color:var(--clinic-brand);background:#f3f6ff;font-weight:400}
+.clinic-price-card{margin:12px 0 16px;padding:0;border:1px solid #e8e9ed;border-radius:18px;overflow:hidden;background:#fff;font-size:14px;line-height:1.55}
+.clinic-price-card__title{margin:20px 20px 0;font-size:19px;line-height:1.35;font-weight:500;letter-spacing: 0}
+.clinic-price-card__tabs{display:flex;gap:3px;margin:16px 20px 0;padding:4px;border-radius:11px;background:#f3f4f6;flex-wrap:wrap}
+.clinic-price-card__volumes{margin:20px 20px 0}
+.clinic-price-card__volume-hint{margin:14px 20px 0;padding:12px 14px;border-radius:10px;background:#f0f4ff;color:#626d82;font-size:14px;line-height:1.55}
+.clinic-price-card__tab{flex:1 1 75px;min-width:0;min-height:38px;padding:9px 5px;border:0;border-radius:8px;background:transparent;color:#717783;font-size:13px;line-height:1.4;font-weight:400;cursor:pointer}
+.clinic-price-card__tab[aria-pressed="true"]{color:#252a33;background:#fff;box-shadow:0 1px 4px #24304412;font-weight:400}
 .clinic-price-card button:disabled{cursor:default;opacity:.65}
 .clinic-price-card button:focus-visible,.clinic-price-card summary:focus-visible{outline:2px solid var(--clinic-brand);outline-offset:-3px}
-.clinic-price-card__price-area{padding:18px 17px 17px}
-.clinic-price-card__amount{font-size:17px;line-height:1.3;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
-.clinic-price-card__amount--single{font-size:22px;letter-spacing: 0}
+.clinic-price-card__price-area{padding:20px}
+.clinic-price-card__amount{font-size:15px;line-height:1.3;font-weight:500;white-space:nowrap;font-variant-numeric:tabular-nums}
+.clinic-price-card__amount--single{font-size:26px;letter-spacing: 0}
 .clinic-price-card__amount--description{font-size:14px;font-weight:400;white-space:normal}
-.clinic-price-card__caption{font-size:13px;color:#7c879d;line-height:1.55;margin:4px 0 0}
-.clinic-price-card__condition{display:flex;align-items:flex-start;gap:7px;margin:12px 0 0;font-size:13px;line-height:1.6;color:#7c879d}
+.clinic-price-card__caption{font-size:13px;color:#7a818b;line-height:1.55;margin:4px 0 0}
+.clinic-price-card__condition{display:flex;align-items:flex-start;gap:7px;margin:12px 0 0;font-size:13px;line-height:1.6;color:#7a818b}
 .clinic-price-card__icon{width:16px;height:16px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.6}
 .clinic-price-card__condition>.clinic-price-card__icon{width:14px;height:14px;margin-top:3px}
-.clinic-price-card__overview-row{display:grid;grid-template-columns:1fr auto 14px;gap:5px 8px;align-items:center;width:100%;padding:15px 17px;border:0;border-top:1px solid #e5e9f3;text-align:left;background:#fff;color:inherit}
+.clinic-price-card__overview-row{display:grid;grid-template-columns:1fr auto 14px;gap:5px 8px;align-items:center;width:100%;padding:17px 20px;border:0;border-top:1px solid #eff0f2;text-align:left;background:#fff;color:inherit}
 .clinic-price-card__overview-row:first-of-type{margin-top:13px}
 button.clinic-price-card__overview-row{cursor:pointer}
 button.clinic-price-card__overview-row:hover{background:#f3f6ff}
-.clinic-price-card__overview-name{font-size:14px;font-weight:500}
+.clinic-price-card__overview-name{font-size:15px;font-weight:400}
 .clinic-price-card__overview-row>.clinic-price-card__caption,.clinic-price-card__overview-row>.clinic-price-card__condition{grid-column:1/-1;margin:0}
 .clinic-price-card__row-arrow{width:14px;height:14px;color:var(--clinic-brand);stroke-width:2.4}
-.clinic-price-card__detail{margin:0;padding:0;border-top:1px solid #e5e9f3;font-size:14px}
-.clinic-price-card__detail summary{display:flex;align-items:center;gap:9px;list-style:none;padding:14px 17px;font-size:14px;font-weight:400;cursor:pointer;color:inherit}
+.clinic-price-card__detail{margin:0;padding:0;border-top:1px solid #eff0f2;font-size:14px}
+.clinic-price-card__detail summary{display:flex;align-items:center;gap:9px;list-style:none;padding:16px 20px;font-size:14px;font-weight:400;cursor:pointer;color:inherit}
 .clinic-price-card__detail summary::-webkit-details-marker{display:none}
-.clinic-price-card__detail summary>.clinic-price-card__icon{color:#8494b9}
+.clinic-price-card__detail summary>.clinic-price-card__icon{color:#8b929f}
 .clinic-price-card__detail summary>.clinic-price-card__chevron{width:13px;height:13px;margin-left:auto;transition:transform .15s}
 .clinic-price-card__detail[open] summary>.clinic-price-card__chevron{transform:rotate(90deg)}
-.clinic-price-card__detail-body{padding:0 17px 14px;font-size:14px;line-height:1.65;color:#626d82}
+.clinic-price-card__detail-body{padding:0 20px 17px;font-size:14px;line-height:1.65;color:#727985}
 .clinic-price-card__detail-body p{margin:0}
-.clinic-price-card__detail ul{margin:0;padding:0 17px 16px 34px;font-size:14px;color:#626d82;line-height:1.65}
+.clinic-price-card__detail ul{margin:0;padding:0 20px 17px 37px;font-size:14px;color:#727985;line-height:1.65}
 .clinic-price-card__detail li+li{margin-top:5px}
-.clinic-price-card__detail-heading{margin:3px 17px 8px;font-size:13px;font-weight:500;color:#626d82}
-.clinic-price-card__detail .clinic-price-card__check-list{list-style:none;padding-left:17px}
+.clinic-price-card__detail-heading{margin:3px 17px 8px;font-size:13px;font-weight:500;color:#727985}
+.clinic-price-card__detail .clinic-price-card__check-list{list-style:none;padding-left:20px}
 .clinic-price-card__check-list li{display:flex;align-items:flex-start;gap:8px}
-.clinic-price-card__check-list .clinic-price-card__icon{width:13px;height:13px;margin-top:4px;color:#8494b9}
-.clinic-price-card__promotion{display:flex;gap:9px;padding:16px 17px;background:#f3f6ff;border-top:1px solid #e5e9f3;color:var(--clinic-brand)}
+.clinic-price-card__check-list .clinic-price-card__icon{width:13px;height:13px;margin-top:4px;color:#8b929f}
+.clinic-price-card__promotion{display:flex;gap:10px;margin:0 12px 12px;padding:14px;background:#f0f4ff;border:0;border-radius:11px;color:var(--clinic-brand)}
 .clinic-price-card__promotion>.clinic-price-card__icon{margin-top:3px}
-.clinic-price-card__promotion .clinic-price-card__detail-body{padding:0;color:#626d82;font-size:14px}
+.clinic-price-card__promotion .clinic-price-card__detail-body{padding:0;color:#727985;font-size:14px}
 .clinic-price-card__promotion .clinic-price-card__detail-body p{margin:0}
 @media(max-width:380px){.clinic-price-card__tab{font-size:12px}.clinic-price-card__overview-row{gap:5px}.clinic-price-card__overview-row>.clinic-price-card__amount{font-size:15px}}
 
 .clinic-price-card__selected-variant{margin:12px 17px 0;font-size:13px;font-weight:400;color:var(--clinic-brand)}
 
 /* Scope below the price, with a small decorative volume marker. */
-.clinic-price-card__price-area{display:block;padding-top:14px;padding-bottom:14px}
+.clinic-price-card__price-area{display:block;padding-top:22px;padding-bottom:20px}
 .clinic-price-card__price-area>.clinic-price-card__caption{display:flex;align-items:flex-start;gap:6px;margin:4px 0 0;font-size:13px}
-.clinic-price-card__caption>.clinic-price-card__icon{width:14px;height:14px;margin-top:3px;color:#8494b9}
+.clinic-price-card__caption>.clinic-price-card__icon{width:14px;height:14px;margin-top:3px;color:#8b929f}
 .clinic-price-card__price-area>.clinic-price-card__condition{margin:9px 0 0}
 
 .clinic-price-card__stage-title{display:block;color:#202333;font-weight:500;font-size:14px;margin-bottom:4px}
+
+.clinic-case-card__frame{margin-top:0}
+.clinic-case-card__photo{display:block;width:100%;height:auto;aspect-ratio:7/5;object-fit:cover;background:#f3f6ff}
+.clinic-case-card__arrow{display:flex;align-items:center;justify-content:center;width:38px;height:38px;padding:8px;border:1px solid #e8e9ed;border-radius:50%;background:#fff;color:#555f70;cursor:pointer}
+.clinic-case-card__arrow svg{width:20px;height:20px}
+.clinic-case-card__arrow:disabled{opacity:.3;cursor:default}
+.clinic-case-gallery{touch-action:pan-y}
+.clinic-case-gallery .clinic-case-card[hidden]{display:none}
+.clinic-case-gallery__navigation{display:flex;align-items:center;justify-content:center;gap:22px;margin:0 0 16px}
+.clinic-case-gallery__counter{font-size:13px;color:#7a818b;letter-spacing:0}
+.clinic-case-gallery:focus-visible,.clinic-case-card__arrow:focus-visible{outline:2px solid var(--clinic-brand);outline-offset:2px}
+.clinic-case-card__description{margin:0;padding:8px 20px 20px;font-size:14px;line-height:1.55;color:#727985;letter-spacing:0}
+.clinic-case-card__error{margin:0;padding:12px 17px;color:#727985;font-size:15px}
+
+/* Shared quiet card styling; photos remain controlled by Before/After buttons. */
+.clinic-price-card{color:#24272d}
+.clinic-case-card .clinic-price-card__tabs{max-width:176px;margin:16px auto}
+.clinic-case-card .clinic-price-card__title{margin:0 20px;font-size:18px}
+.clinic-price-card__promotion .clinic-price-card__detail-body{font-size:13px;color:#737c8d}
+.clinic-price-card__promotion strong{font-weight:500;color:#434f6b}
+.clinic-price-card__promotion>.clinic-price-card__icon{width:18px;height:18px;margin-top:2px}
+
+.clinic-shell__menu-label { margin: 0 0 12px; color: #677487; font-size: 12px; line-height: 1.5; }
+.clinic-shell__welcome-promo { display: flex; align-items: flex-start; gap: 12px; width: 100%; margin-top: 18px; padding: 15px; border: 0; border-radius: 12px; background: #f0f4ff; color: #293447; text-align: left; font: inherit; line-height: 1.45; cursor: pointer; transition: background-color .16s ease; }
+.clinic-shell__welcome-promo:focus-visible { outline: 2px solid #6f7886; outline-offset: 2px; }
+.clinic-shell__promo-icon { width: 21px; height: 21px; flex-shrink: 0; color: #6c7ea6; margin-top: 2px; }
+.clinic-shell__promo-icon svg { display: block; width: 100%; height: 100%; }
+.clinic-shell__welcome-promo strong { display: block; font-size: 15px; font-weight: 500; }
+.clinic-shell__welcome-promo small { display: block; font-size: 12px; color: #626e83; margin-top: 4px; }
+.clinic-shell__promo-more { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #49576d; margin-top: 10px; }
+.clinic-shell__promo-more .clinic-msg__link-chevron { width: 14px; height: 14px; }

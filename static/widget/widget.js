@@ -1,6 +1,7 @@
 ﻿import { streamAsk } from "./api.js";
 import { setBotAnswerBody } from "./answer_format.js";
 import { friendlyErrorMessage } from "./api.js";
+import { casesForClient, casesForMessage, appendCaseCards } from "./cases.js";
 
 const STORAGE_SID = "clinic_widget_sid";
 const STORAGE_LAUNCHER_TEASER = "clinic_widget_launcher_teaser_shown";
@@ -993,7 +994,9 @@ export function mountWidget(root, config) {
       return;
     }
 
+    if (m.linksDismissed) return;
     const box = getOrCreateLinksBox(bubble);
+    if (box.querySelectorAll('.clinic-msg__link').length >= 2) return;
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "clinic-msg__link";
@@ -1007,6 +1010,7 @@ export function mountWidget(root, config) {
     btn.appendChild(lab);
     btn.appendChild(chev);
     btn.setAttribute("aria-label", VIDEO_REVEAL_LABEL);
+    btn.dataset.localVideoOffer = "true";
     btn.addEventListener("click", () => {
       const target = state.messages[msgIndex];
       if (!target || target.role !== "bot") return;
@@ -1470,6 +1474,7 @@ export function mountWidget(root, config) {
               });
               if (!afterInserted) merged.push(...after);
               Object.assign(old, turn, {bodyParts: merged});
+              if (volumeChange) old.volumeNavigation.selectedReplyId = body.ref;
             }
           } else state.messages.push(turn);
         }
@@ -1721,10 +1726,14 @@ export function mountWidget(root, config) {
     }
     for (const it of items) {
       if (!it.ref) continue;
+      const isVolume = String(it.ref).startsWith("volume:");
+      // Local case/video offers share the two follow-up slots. Volume
+      // selectors remain service navigation, not follow-up questions.
+      if (!isVolume && box.querySelectorAll('.clinic-msg__link').length >= 2) continue;
       const btn = document.createElement("button");
       btn.type = "button";
-      const isVolume = String(it.ref).startsWith("volume:");
       btn.className = isVolume ? "clinic-msg__volume-chip" : "clinic-msg__link";
+      if (!isVolume) btn.dataset.followupRef = it.ref;
       const lab = document.createElement("span");
       lab.className = "clinic-msg__link-text";
       lab.textContent = it.label || it.ref;
@@ -1823,6 +1832,7 @@ export function mountWidget(root, config) {
       actions.className = "clinic-shell__welcome-actions";
       const linksBox = document.createElement("div");
       linksBox.className = "clinic-msg__links";
+      let firstVideoButton = null;
       for (const s of config.starterPrompts || []) {
         const b = document.createElement("button");
         b.type = "button";
@@ -1842,6 +1852,7 @@ export function mountWidget(root, config) {
           b.setAttribute("aria-disabled", "true");
           b.title = "Скоро";
         } else if (s.videoKey) {
+          if (!firstVideoButton) firstVideoButton = b;
           const vk = String(s.videoKey).trim();
           const label = s.label || "Видео";
           b.addEventListener("click", () => {
@@ -1859,7 +1870,67 @@ export function mountWidget(root, config) {
         }
         linksBox.appendChild(b);
       }
-      actions.appendChild(linksBox);
+      if (casesForClient(clientId).length) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "clinic-msg__link";
+        const label = document.createElement("span");
+        label.className = "clinic-msg__link-text";
+        label.textContent = 'Результаты "До и после"';
+        const arrow = document.createElement("span");
+        arrow.className = "clinic-msg__link-chevron";
+        arrow.setAttribute("aria-hidden", "true");
+        arrow.innerHTML = LINK_ARROW_SVG;
+        button.append(label, arrow);
+        button.addEventListener("click", () => {
+          if (state.pending || state.retryBody) return;
+          transitionFromWelcome(() => {
+            state.messages.push({role: "user", text: 'Результаты "До и после"'});
+            state.messages.push({role: "bot", text: "", caseGallery: true,
+              caseSelection: {}, attributionKind: "plain", trailingDismissed: true});
+            renderFeed();
+          });
+        });
+        linksBox.insertBefore(button, firstVideoButton);
+      }
+      const menuLabel = document.createElement("p");
+      menuLabel.className = "clinic-shell__menu-label";
+      menuLabel.textContent = "С чего начнём?";
+      actions.append(menuLabel, linksBox);
+      const promotion = config.welcomePromotion;
+      if (promotion && typeof promotion.title === "string" &&
+          typeof promotion.subtitle === "string" && typeof promotion.q === "string" && promotion.q.trim()) {
+        const promo = document.createElement("button");
+        promo.type = "button";
+        promo.className = "clinic-shell__welcome-promo";
+        const icon = document.createElement("span");
+        icon.className = "clinic-shell__promo-icon";
+        icon.setAttribute("aria-hidden", "true");
+        icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18v4H3ZM5 13v8h14v-8M12 9v12M12 9C5 9 5 3 8 3c3 0 4 6 4 6s1-6 4-6c3 0 3 6-4 6Z"/></svg>';
+        const copy = document.createElement("span");
+        const title = document.createElement("strong");
+        title.textContent = promotion.title;
+        const subtitle = document.createElement("small");
+        subtitle.textContent = promotion.subtitle;
+        const more = document.createElement("span");
+        more.className = "clinic-shell__promo-more";
+        more.textContent = "Условия акции";
+        const arrow = document.createElement("span");
+        arrow.className = "clinic-msg__link-chevron";
+        arrow.setAttribute("aria-hidden", "true");
+        arrow.innerHTML = LINK_ARROW_SVG;
+        more.appendChild(arrow);
+        copy.append(title, subtitle, more);
+        promo.append(icon, copy);
+        promo.addEventListener("click", () => {
+          if (state.pending || state.retryBody) return;
+          transitionFromWelcome(() => {
+            input.value = promotion.q;
+            void sendFromComposer();
+          });
+        });
+        actions.appendChild(promo);
+      }
 
       screen.appendChild(card);
       screen.appendChild(actions);
@@ -1894,6 +1965,15 @@ export function mountWidget(root, config) {
         setBotAnswerBody(body, text);
         bubble.appendChild(body);
       }
+      if (m.caseGallery) {
+        const galleryCases = casesForClient(clientId).filter(item =>
+          !m.caseIds || m.caseIds.includes(item.id));
+        appendCaseCards(bubble, galleryCases, {
+          apiBase, resolveUrl: resolvePackAssetUrl, selection: m.caseSelection,
+        });
+      } else {
+        appendCaseOffer(bubble, m);
+      }
       appendVideoOffer(bubble, m, idx);
       renderInlineLinks(bubble, m, idx);
       wrap.appendChild(bubble);
@@ -1924,6 +2004,51 @@ export function mountWidget(root, config) {
     }
     syncComposerLeadUi();
     syncSendState();
+  }
+
+  function appendCaseOffer(bubble, message) {
+    const openedCaseIds = new Set(state.messages
+      .filter(turn => turn.role === "bot" && turn.caseGallery)
+      .flatMap(turn => turn.caseIds || casesForClient(clientId).map(item => item.id)));
+    const cases = casesForMessage(clientId, message)
+      .filter(item => !openedCaseIds.has(item.id));
+    if (!cases.length) return;
+    if (message.linksDismissed || message.revision !== state.lastPayload?.revision) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "clinic-msg__link";
+    const label = document.createElement("span");
+    label.className = "clinic-msg__link-text";
+    label.textContent = 'Посмотреть результаты "До и после"';
+    const arrow = document.createElement("span");
+    arrow.className = "clinic-msg__link-chevron";
+    arrow.setAttribute("aria-hidden", "true");
+    arrow.innerHTML = LINK_ARROW_SVG;
+    button.append(label, arrow);
+    button.disabled = state.pending || Boolean(state.retryBody);
+    button.addEventListener("click", () => {
+      if (state.pending || state.retryBody) return;
+      const remainingRefs = new Set(Array.from(
+        bubble.querySelectorAll('[data-followup-ref]'),
+        link => link.dataset.followupRef));
+      const remainingReplies = (message.quickReplies || []).filter(
+        item => remainingRefs.has(String(item.ref)));
+      const remainingVideo = bubble.querySelector('[data-local-video-offer]')
+        ? {videoKey: message.videoKey, videoSrc: message.videoSrc,
+          videoTitleText: message.videoTitleText}
+        : {};
+      dismissLinksAll(state.messages);
+      state.messages.push({role: "user", text: 'Посмотреть результаты "До и после"'});
+      state.messages.push({
+        role: "bot", text: "", caseGallery: true,
+        caseIds: cases.map(item => item.id), caseSelection: {},
+        revision: message.revision, quickReplies: remainingReplies,
+        ...remainingVideo,
+        attributionKind: "plain", trailingDismissed: true,
+      });
+      renderFeed({preserveScroll: false});
+    });
+    getOrCreateLinksBox(bubble).appendChild(button);
   }
 
   function renderPriceBody(bubble, message) {
@@ -1988,17 +2113,32 @@ export function mountWidget(root, config) {
       const overview=Boolean(part.overview);
       card.setAttribute('aria-label',overview?'Варианты лечения':rows[0].service_name);
       financialCard=card;sections.clear();promotionCount=0;
-      if(!message.volumeNavigation&&part.overview?.volume_choices?.length){
-        message.volumeNavigation={revision:message.revision,choices:part.overview.volume_choices.map(choice=>choice.candidate)};
+      if(part.overview?.volume_choices?.length){
+        message.volumeNavigation={
+          revision:message.revision,
+          choices:part.overview.volume_choices.map(choice=>choice.candidate),
+          selectedReplyId:message.volumeNavigation?.selectedReplyId,
+        };
       }
       if(overview&&message.volumeNavigation?.choices.length){
         const nav=document.createElement('div');nav.className='clinic-price-card__tabs clinic-price-card__volumes';
+        nav.setAttribute('role','group');nav.setAttribute('aria-label','Объём лечения');
         for(const choice of message.volumeNavigation.choices){
           const button=document.createElement('button');button.type='button';button.className='clinic-price-card__tab';
           button.textContent=choice.label;button.disabled=disabled();
+          const selected=message.volumeNavigation.selectedReplyId
+            || (part.overview.applied_extent ? `volume:${part.overview.topic_id}:${part.overview.applied_extent}` : null);
+          button.setAttribute('aria-pressed',String(choice.reply_id===selected));
           button.addEventListener('click',()=>select(choice,message.volumeNavigation.revision));nav.appendChild(button);
         }
         card.appendChild(nav);
+        if(message.volumeNavigation.selectedReplyId===`volume:${part.overview.topic_id}:unknown`){
+          const hint=document.createElement('p');
+          hint.className='clinic-price-card__volume-hint';
+          hint.setAttribute('role','status');
+          hint.textContent='Не уверены, какой вариант подходит? На консультации врач оценит состояние зубов и предложит варианты лечения с понятной стоимостью.';
+          card.appendChild(hint);
+        }
       }
       const title=document.createElement('h3');title.className='clinic-price-card__title';
       title.textContent=overview?'Варианты лечения':rows[0].service_name;card.appendChild(title);

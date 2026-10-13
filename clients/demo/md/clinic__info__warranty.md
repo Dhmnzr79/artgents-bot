@@ -10,6 +10,7 @@ aliases:
 
 suggest_h3:
   - chto-delat-esli-voznikla-problema
+  - pochemu-garantiya-na-rabotu-vracha-1-god
 
 cta_key: booking
 cta_action: lead

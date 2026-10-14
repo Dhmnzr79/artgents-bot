@@ -1,7 +1,7 @@
 ﻿import { streamAsk } from "./api.js";
 import { setBotAnswerBody } from "./answer_format.js";
 import { friendlyErrorMessage } from "./api.js";
-import { casesForClient, casesForMessage, appendCaseCards } from "./cases.js";
+import { casesForClient, casesForMessage, appendCaseCards, isCaseGalleryReply } from "./cases.js";
 
 const STORAGE_SID = "clinic_widget_sid";
 const STORAGE_LAUNCHER_TEASER = "clinic_widget_launcher_teaser_shown";
@@ -1712,6 +1712,7 @@ export function mountWidget(root, config) {
     const cardRows = (m.bodyParts || []).filter(part => part.kind === "price_card")
       .flatMap(part => part.price?.rows || []);
     const items = (m.quickReplies || []).filter((it) => {
+      if (isCaseGalleryReply(clientId, it)) return false;
       if (String(it.ref).startsWith("price_select:") && cardRows.length) return false;
       if (String(it.ref).startsWith("volume:") && m.volumeNavigation) return false;
       if (it.ref === "price_detail:includes" && cardRows.some(row => row.includes?.length)) return false;
@@ -1765,17 +1766,28 @@ export function mountWidget(root, config) {
     const trail = document.createElement("div");
     trail.className = "clinic-turn__trail";
 
-    if (m.cta && m.cta.text && m.revision === state.lastPayload?.revision) {
+    const publishedCta = m.cta && m.cta.text && m.revision === state.lastPayload?.revision;
+    const galleryBooking = m.caseGallery && m.revision === state.lastPayload?.revision
+      && !isActiveLeadFlowPayload(state.lastPayload)
+      && state.lastPayload?.attribution_kind !== "lead";
+    if (publishedCta || galleryBooking) {
       const c = document.createElement("button");
       c.type = "button";
       c.className = "clinic-turn__btn clinic-turn__btn--cta-primary";
-      const ctaLabel = (m.cta.text || "Записаться на консультацию").trim();
+      const ctaLabel = m.caseGallery ? "Я хочу так же"
+        : (m.cta.text || "Записаться на консультацию").trim();
       c.textContent = ctaLabel;
+      c.disabled = state.pending || Boolean(state.retryBody);
       c.addEventListener("click", () => {
+        if (state.pending || state.retryBody) return;
         dismissTrailingsAll(state.messages);
         dismissLinksAll(state.messages);
-        const echo = (m.cta.text || "Запись").trim();
-        void sendAsk({ ref: m.cta.ref, ui_revision: m.revision, q: "", userEcho: echo });
+        const echo = ctaLabel;
+        if (publishedCta) {
+          void sendAsk({ ref: m.cta.ref, ui_revision: m.revision, q: "", userEcho: echo });
+        } else {
+          void sendAsk({ q: "Хочу записаться на консультацию", userEcho: echo });
+        }
       });
       trail.appendChild(c);
     }
@@ -1887,7 +1899,7 @@ export function mountWidget(root, config) {
           transitionFromWelcome(() => {
             state.messages.push({role: "user", text: 'Результаты "До и после"'});
             state.messages.push({role: "bot", text: "", caseGallery: true,
-              caseSelection: {}, attributionKind: "plain", trailingDismissed: true});
+              caseSelection: {}, attributionKind: "plain", trailingDismissed: false});
             renderFeed();
           });
         });
@@ -2010,8 +2022,10 @@ export function mountWidget(root, config) {
     const openedCaseIds = new Set(state.messages
       .filter(turn => turn.role === "bot" && turn.caseGallery)
       .flatMap(turn => turn.caseIds || casesForClient(clientId).map(item => item.id)));
+    const requestedGallery = (message.quickReplies || [])
+      .some(reply => isCaseGalleryReply(clientId, reply));
     const cases = casesForMessage(clientId, message)
-      .filter(item => !openedCaseIds.has(item.id));
+      .filter(item => requestedGallery || !openedCaseIds.has(item.id));
     if (!cases.length) return;
     if (message.linksDismissed || message.revision !== state.lastPayload?.revision) return;
     const button = document.createElement("button");
@@ -2037,14 +2051,16 @@ export function mountWidget(root, config) {
         ? {videoKey: message.videoKey, videoSrc: message.videoSrc,
           videoTitleText: message.videoTitleText}
         : {};
+      dismissTrailingsAll(state.messages);
       dismissLinksAll(state.messages);
       state.messages.push({role: "user", text: 'Посмотреть результаты "До и после"'});
       state.messages.push({
         role: "bot", text: "", caseGallery: true,
         caseIds: cases.map(item => item.id), caseSelection: {},
         revision: message.revision, quickReplies: remainingReplies,
+        cta: message.cta,
         ...remainingVideo,
-        attributionKind: "plain", trailingDismissed: true,
+        attributionKind: "plain", trailingDismissed: false,
       });
       renderFeed({preserveScroll: false});
     });

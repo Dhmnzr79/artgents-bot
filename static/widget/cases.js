@@ -5,7 +5,10 @@ const DEMO_CASES = [
     serviceId: "all_on_4",
     document: "implantation__service__all_on_4.md",
     title: "Восстановление зубов All-on-4",
-    description: "Восстановили зубной ряд на четырёх имплантах. Подобрали форму и оттенок протеза, чтобы пациент мог снова уверенно улыбаться.",
+    descriptions: {
+      before: "Пациенту было трудно жевать, а из-за отсутствующих и разрушенных зубов он стеснялся улыбаться. Хотелось восстановить весь зубной ряд и обойтись без съёмного протеза.",
+      after: "Восстановили зубной ряд несъёмным протезом на четырёх имплантах All-on-4. Подобрали естественную форму и оттенок зубов — пациент снова может уверенно улыбаться и комфортно есть.",
+    },
     before: "/static/clients/demo/cases/before-2.jpg",
     after: "/static/clients/demo/cases/after-2.jpg",
   },
@@ -14,7 +17,10 @@ const DEMO_CASES = [
     serviceId: "zirconia_crowns",
     document: "prosthetics__service__zirconia_crowns.md",
     title: "Циркониевые коронки",
-    description: "Восстановили форму и цвет зубов коронками из собственной лаборатории. Согласовали естественный оттенок и вернули открытой улыбке уверенность.",
+    descriptions: {
+      before: "Пациентку не устраивали неровный цвет и форма зубов, старые реставрации выделялись в улыбке. Она хотела более светлую и гармоничную улыбку с естественным результатом.",
+      after: "Восстановили форму зубов циркониевыми коронками, изготовленными в собственной лаборатории. Цвет и пропорции согласовали с пациенткой — улыбка стала ровнее, светлее и естественнее.",
+    },
     before: "/static/clients/demo/cases/before-1.jpg",
     after: "/static/clients/demo/cases/after-1.jpg",
   },
@@ -24,12 +30,20 @@ export function casesForClient(clientId) {
   return clientId === "demo" ? DEMO_CASES : [];
 }
 
+export function isCaseGalleryReply(clientId, reply) {
+  return clientId === "demo"
+    && reply.ref === "clinic__info__results.md#posmotret-rezultaty";
+}
+
 export function casesForMessage(clientId, message) {
   // A direction overview lists alternatives, not a selected service.
   // Keep case offers for individual services and the welcome gallery.
   if ((message.bodyParts || []).some(part =>
     part.kind === "price_card" && part.overview
     && part.price?.source_client_id === clientId)) return [];
+  if ((message.quickReplies || []).some(reply => isCaseGalleryReply(clientId, reply))) {
+    return casesForClient(clientId);
+  }
   const services = new Set((message.bodyParts || [])
     .filter(part => part.kind === "price_card" && part.price?.source_client_id === clientId)
     .flatMap(part => part.price.rows || [])
@@ -73,11 +87,14 @@ export function appendCaseCards(container, cases, { apiBase, resolveUrl, selecti
     photo.addEventListener("error", () => { error.hidden = false; });
     photo.addEventListener("load", () => { error.hidden = true; });
     const buttons = [];
+    const description = document.createElement("p");
+    description.className = "clinic-case-card__description";
     const select = (phase) => {
       selection[item.id] = phase;
       const label = phase === "before" ? "До" : "После";
       photo.src = resolveUrl(apiBase, item[phase]);
       photo.alt = `${item.title} — ${label.toLowerCase()} лечения`;
+      description.textContent = item.descriptions[phase];
       error.hidden = true;
       for (const button of buttons) {
         button.setAttribute("aria-pressed", String(button.dataset.phase === phase));
@@ -94,9 +111,6 @@ export function appendCaseCards(container, cases, { apiBase, resolveUrl, selecti
       tabs.appendChild(button);
     }
     card.append(frame, error, tabs, title);
-    const description = document.createElement("p");
-    description.className = "clinic-case-card__description";
-    description.textContent = item.description;
     card.appendChild(description);
     select(selection[item.id] === "after" ? "after" : "before");
     cards.push(card);
@@ -120,8 +134,16 @@ export function appendCaseCards(container, cases, { apiBase, resolveUrl, selecti
     counter.className = "clinic-case-gallery__counter";
     counter.setAttribute("aria-live", "polite");
     const show = (index) => {
+      const previousIndex = selection.caseIndex;
       selection.caseIndex = Math.max(0, Math.min(cards.length - 1, index));
       cards.forEach((card, position) => { card.hidden = position !== selection.caseIndex; });
+      if (Number.isInteger(previousIndex) && previousIndex !== selection.caseIndex
+          && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        cards[selection.caseIndex].animate([
+          { opacity: 0, transform: `translateX(${selection.caseIndex > previousIndex ? 32 : -32}px)` },
+          { opacity: 1, transform: "translateX(0)" },
+        ], { duration: 220, easing: "cubic-bezier(0.22, 1, 0.36, 1)" });
+      }
       previous.disabled = selection.caseIndex === 0;
       next.disabled = selection.caseIndex === cards.length - 1;
       counter.textContent = `${selection.caseIndex + 1} / ${cards.length}`;

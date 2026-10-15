@@ -126,7 +126,6 @@ function applyWidgetTheme(shellEl, theme) {
   if (brandRgb) {
     const rgb = _rgbCss(brandRgb);
     shellEl.style.setProperty("--clinic-brand-rgb", rgb);
-    shellEl.style.setProperty("--clinic-bg-subtle", `rgba(${rgb}, 0.06)`);
     shellEl.style.setProperty("--clinic-chip-border", brand);
     shellEl.style.setProperty("--clinic-shadow", `0 8px 32px rgba(${rgb}, 0.14)`);
     shellEl.style.setProperty("--clinic-shadow-soft", `0 4px 16px rgba(${rgb}, 0.1)`);
@@ -886,14 +885,9 @@ export function mountWidget(root, config, { pagePath } = {}) {
   const launcher = root.querySelector("[data-clinic-launcher]");
   const launcherOpenBtn = root.querySelector("[data-clinic-launcher-open]");
   const launcherControl = launcherOpenBtn || launcher;
-  const launcherLinkEl = root.querySelector(".clinic-shell__launcher-link");
-  if (launcherLinkEl) launcherLinkEl.textContent = launcherCtaLabel;
   if (launcherOpenBtn && useDemoLauncher) {
     launcherOpenBtn.textContent = launcherCtaLabel;
     launcherOpenBtn.setAttribute("aria-label", launcherCtaLabel);
-  }
-  for (const el of root.querySelectorAll("[data-clinic-launcher-mobile-headline]")) {
-    el.textContent = launcherMobileCtaLabel;
   }
   if (launcher) launcher.setAttribute("aria-label", launcherMobileCtaLabel);
   const panel = root.querySelector("[data-clinic-panel]");
@@ -913,8 +907,6 @@ export function mountWidget(root, config, { pagePath } = {}) {
   const avatarImg = root.querySelector("[data-clinic-avatar]");
   const hAvatar = root.querySelector("[data-clinic-header-avatar]");
 
-  const launcherNameEl = root.querySelector("[data-clinic-launcher-name]");
-  if (launcherNameEl) launcherNameEl.textContent = config.botName;
   const compactNameEl = root.querySelector("[data-clinic-name]");
   if (compactNameEl) compactNameEl.textContent = launcherCtaLabel;
   for (const el of root.querySelectorAll("[data-clinic-launcher-subtitle]")) {

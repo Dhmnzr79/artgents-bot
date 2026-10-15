@@ -1,5 +1,19 @@
 # D2 demo — текущее состояние
 
+## НикаДент/demo — чистка старых стилей, 2026-10-15
+
+Interface §69, owner GO: из общего виджета удалены 18 классов без создаваемой
+разметки (старый launcher/видео-модалка/кнопки),4 неиспользуемых CSS-токена и
+3 stale DOM lookups. Из загрузчика/НикаДент/шаблона удалены прежние поля цветов
+action/button_1/button_2. Палитра brand/promo_background/promo_accent сохранена.
+Активные price/menu/consent/inline-video и динамические video-aspect классы прежние.
+Продолжение codex/nikadent-technical-onboarding, baseline5a9f0ba / PR31.
+Это presentation maintenance, не D2 architecture simplification. Только локально;
+VPS не меняется, фото остаётся локальным WIP. Проверки — в текущей карточке §69.
+41 targeted tests + launcher/consent DOM PASS;8 скриншотов побайтно совпали.
+Checker PASS. Старый price-detail browser test падает до браузера; идентичный
+StopIteration подтверждён на чистой базе5a9f0ba. Provider/SMTP0, merge/deploy0.
+
 ## НикаДент — свёрнутый виджет concept1, 2026-10-15
 
 §68, branch codex/nikadent-technical-onboarding / PR31, baseline50d61af.

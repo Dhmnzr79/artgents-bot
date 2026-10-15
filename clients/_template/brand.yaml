@@ -1,6 +1,5 @@
 # clients/_template/brand.yaml
 # brand — основной цвет; promo_background/promo_accent — фон и акценты стартовой акции.
-# action/button_1/button_2 — прежние поля, текущий widget.js их не применяет.
 clinic_name: "REPLACE_CLINIC_NAME"
 logo_url: null
 logo_width: null
@@ -11,6 +10,3 @@ colors:
   brand: null
   promo_background: null
   promo_accent: null
-  action: null
-  button_1: null
-  button_2: null

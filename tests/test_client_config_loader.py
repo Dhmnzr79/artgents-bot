@@ -44,8 +44,15 @@ def test_admin_disabled_for_demo_only_runtime():
 
 def test_widget_theme_from_brand_demo_palette():
     theme = widget_theme_from_brand("demo")
-    assert theme["button_1"] == "#7B4EFF"
-    assert theme["button_2"] == "#FF8DB2"
+    assert theme == {"brand": "#0C2FE0", "promoBackground": "#F0F4FF", "promoAccent": "#6C7EA6"}
+
+
+def test_widget_theme_emits_only_supported_palette(monkeypatch):
+    monkeypatch.setattr("core.client_config_loader.load_brand", lambda _: {"colors": {
+        "brand": "#762E94", "promo_background": "#F5EFF8", "promo_accent": "#762E94",
+        "action": "#111111", "button_1": "#222222", "button_2": "#333333"}})
+    assert widget_theme_from_brand("nikadent") == {
+        "brand": "#762E94", "promoBackground": "#F5EFF8", "promoAccent": "#762E94"}
 
 
 def test_widget_logo_from_brand_demo():
@@ -72,6 +79,5 @@ def test_load_widget_config_merges_demo_brand():
     assert cfg["logoWidth"] == 110
     assert cfg["logoHeight"] == 28
     assert cfg["avatarUrl"] == "/static/clients/demo/avatar.png"
-    assert cfg["theme"]["button_1"] == "#7B4EFF"
-    assert cfg["theme"]["button_2"] == "#FF8DB2"
+    assert cfg["theme"] == {"brand": "#0C2FE0", "promoBackground": "#F0F4FF", "promoAccent": "#6C7EA6"}
     assert "demoLauncherColors" not in cfg

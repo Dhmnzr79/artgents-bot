@@ -1,5 +1,41 @@
 # Текущая карточка — НикаДент
 
+## 69. Remove unused widget styling — owner GO 2026-10-15
+
+Owner explicitly authorizes cleanup of old styles for demo/Nikadent after audit.
+Presentation maintenance/bug fix, not D2 architecture simplification. Remove
+18 confirmed non-rendered classes (old launcher fragments, modal video and old
+secondary/video/ghost buttons),4 unread CSS tokens,3 stale DOM lookups and
+obsolete theme action/button_1/button_2 transport/config. No replacement paths.
+Current markup/theme renderer remains presentation owner. Preserve dynamic
+clinic-msg__video--horizontal/vertical and all active menu/price/consent styling.
+Root/top C:/Cursor Projects/artgents-bot-active; same onboarding branch; HEAD/base
+5a9f0ba, main/mergebasee93cb12. Staging clean; local photo avatar.png and foreign
+otzyv-1/2/3.jpg preserved/excluded. Exact allowlist:
+static/widget/widget.css; static/widget/widget.js; core/client_config_loader.py;
+clients/nikadent/brand.yaml; clients/_template/brand.yaml;
+tests/test_client_config_loader.py; docs/CLIENT_PACK_AUTHORING.md;
+docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_CURRENT_STATUS.md;
+docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md.
+Baseline test_client_config_loader:7PASS/2FAIL before edits (removed demo gradient
+button_1 expectations). Update these to actual brand/promotion contract, retain
+all existing loader assertions. Browser launcher/menu/consent/video/price offline
+checks as proportionate; independent Checker. No provider/SMTP, merge or deploy.
+Result:41 targeted loader/config/HTTP tests PASS, actual launcher DOM PASS
+(320/390/900, demo isolation), consent DOM PASS. Eight screenshots SHA256
+byte-identical against before-cleanup captures, including full welcome chat.
+Independent Checker PASS, independently loader10PASS; no removed class has
+current markup producers, no removed tokens/transport fields have active readers.
+Post-cleanup scan leaves only two dynamically produced aspect classes outside
+literal matching; no unread CSS tokens remain. diff--check PASS.
+Known baseline failure: price-detail browser flow StopIteration at
+tests/test_d2_price_details_http.py:417 before browser start. Identical failure
+reproduced on clean gitarchive5a9f0ba in temp/artgents-style-baseline-5hwe9hsr.
+This test is unchanged; price/video browser flow unverified. Earlier historical
+replay failures remain outside scope. Two stale loader failures now fixed by
+asserting actual palette rather than obsolete gradient. Calls provider/SMTP0.
+Checkpoint exact10 allowed paths; local avatar and3otzyv stay unstaged/unpushed.
+
 ## 68. Client launcher concept 1 — owner GO 2026-10-15
 
 Promotion palette follow-up frombc3d5bc: owner requests per-client color settings

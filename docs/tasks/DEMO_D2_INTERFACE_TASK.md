@@ -2,6 +2,15 @@
 
 ## 68. Client launcher concept 1 — owner GO 2026-10-15
 
+Typography follow-up from b05a411: UI polish/bug fix, not simplification.
+Owner requests heading18px (keep weight600), body14px, subtitle12px;
+body/subtitle same existing #6e7887 on desktop/mobile. Remove mobile19px override.
+Allowlist: static/widget/widget.css and this task card. Same root/branch;
+origin/main/mergebasee93cb12; tracked/staging clean; foreign3otzyv preserved.
+Existing browser launcher harness + focused Checker; provider/SMTP budget0.
+Result: Chrome harness PASS320/390/900, screenshots inspected, focused Checker
+PASS, diff--check PASS. Two files only; historical baseline failures unchanged.
+
 Follow-up from f646158: UI bug fix/polish, not architecture simplification.
 Owner requested removal of upper assistant caption, lower caption 10px -> 11px,
 and invitation heading font-weight600. Allowlist for this follow-up: only

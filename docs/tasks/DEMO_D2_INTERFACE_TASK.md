@@ -2,6 +2,16 @@
 
 ## 82. Real-client usage protection — owner GO 2026-10-16
 
+Release CI follow-up:5eb7c67 committed/pushed. CI38818834853 had four successful
+jobs; offline1069PASS/4SKIP/3FAIL only in new413/CORS fixture. Reproduced all3
+with a cold host registry containing defaultdemo imported before http_env patches
+config. Test-only correction explicitly binds the fixture's host registry, as
+production does on startup; runtime/protections unchanged. Added untrustedOrigin
+negative cases, retaining413/noaudit/noDB assertions. Same cold repro6PASS3.46s.
+Follow-up allowlist: tests/test_client_usage_limits.py and this task card only.
+A focused independent recheck and fresh complete CI are required before merge.
+No provider/SMTP/deploy calls. Index empty before this correction; foreign3JPG.
+
 Release continuation: owner now explicitly requests commit/push then VPS.
 Resume standard PR31→main→verified image→manual deploy after green checks.
 Preflight unchanged:21exact paths from external usage-limits-82/manifest.json,

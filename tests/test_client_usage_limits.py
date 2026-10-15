@@ -239,15 +239,19 @@ def test_hashed_buckets_no_contact_or_input_in_ledger(tmp_path):
 
 
 @pytest.mark.parametrize("route", ["/ask", "/ask/stream", "/lead"])
-def test_oversized_body_returns_bounded_cors_error_before_audit(http_env, monkeypatch, route):
+@pytest.mark.parametrize("origin", ["https://nikadent41.ru", "https://evil.example"])
+def test_oversized_body_returns_bounded_cors_error_before_audit(http_env, monkeypatch, route, origin):
     client,db,_,_=http_env
     audits=[]
     monkeypatch.setattr("core.client_host.APP_ENV", "prod")
+    # Host registry is captured at module import; configure the fixture tenant
+    # explicitly even if another test imported it before http_env patched config.
+    monkeypatch.setattr("core.client_host.ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
     monkeypatch.setattr("app._audit_d2_request", lambda *args: audits.append(args))
     response=client.post(route,data=json.dumps({"q":"x"*17000}),content_type="application/json",
-        base_url="https://nikadent.bot.artgents.ru",headers={"Origin":"https://nikadent41.ru"})
+        base_url="https://nikadent.bot.artgents.ru",headers={"Origin":origin})
     assert response.status_code == 413
-    assert response.headers["Access-Control-Allow-Origin"] == "https://nikadent41.ru"
+    assert response.headers.get("Access-Control-Allow-Origin") == (origin if origin == "https://nikadent41.ru" else None)
     assert not audits and not db.exists()
 
 

@@ -1,106 +1,95 @@
 # D2 demo — текущее состояние
 
-Срез 2026-10-13. Здесь только актуальные факты и незакрытые задачи.
-Датированные записи прежних веток, экспериментов и checkpoint сохранены целиком
-в [архиве состояния](../archive/pre-d2/tasks/DEMO_D2_CURRENT_STATUS.md).
-Они описывают момент записи, а не разрешают возвращать удалённые механизмы.
+Срез 2026-10-15. Начинать новый чат с этого документа и
+[текущей очереди](DEMO_D2_DELIVERY_ROADMAP.md), а не с исторических task cards.
 
-## Развёрнутая версия и локальные изменения
+## Что работает на VPS
 
-- Demo работает на VPS по подтверждению владельца. Последний подтверждённый
-  GitHub release — `8888fdd`, PR #26; CI, Publish image и Deploy production успешны.
-  Новый SSH-аудит контейнера не выполнялся. Реальные production-пользовательские
-  диалоги и требования миграции не заявлены.
-- Локальная чистка — ветка `codex/docs-tests-cleanup`, baseline `origin/main=8888fdd`.
-  Изменения идут в draft [PR #27](https://github.com/Dhmnzr79/artgents-bot/pull/27).
-  Push этой ветки сам по себе VPS не обновляет; merge/deploy ещё не выполнялись.
-- Roboto400/500/600, интервалы0 и замены14.5→15 сохранены исходным checkpoint
-  `9f8c8f7`, тегом `checkpoint/pre-cleanup-2026-10-13` и перенесены в `58c1afa`.
-  На VPS эта версия оформления ещё не выкладывалась.
-- Прежние14 MD отличались только EOL: исходные байты сохранены локально в ignored
-  `logs/pre-cleanup-md-eol-20261013/`; содержимое не менялось. Prototypes удалены
-  по решению владельца. `.env`, raw logs, локальные БД не публикуются.
+- Demo доступен на [demo.bot.artgents.ru](https://demo.bot.artgents.ru).
+- Развёрнутый commit: `e93cb121e8ea45c31dc45b435720a556fda8033d`.
+  [PR #29](https://github.com/Dhmnzr79/artgents-bot/pull/29) merged;
+  [CI](https://github.com/Dhmnzr79/artgents-bot/actions/runs/38568028019),
+  [Publish image](https://github.com/Dhmnzr79/artgents-bot/actions/runs/38568028002)
+  и [Deploy production](https://github.com/Dhmnzr79/artgents-bot/actions/runs/38568539796)
+  завершились успешно. Это подтверждение выкладки demo, не аттестация реальных
+  production-пользовательских диалогов или НикаДент.
+- После деплоя `/health/live` и `/health/ready` вернули 200/ok=true;
+  публичные `widget.css`, `widget.js`, `cases.js` совпали с релизом.
+  Живые запросы к модели агентом для этой проверки не выполнялись.
+- Предыдущие [PR #27](https://github.com/Dhmnzr79/artgents-bot/pull/27) и
+  [PR #28](https://github.com/Dhmnzr79/artgents-bot/pull/28) тоже merged и входят
+  в этот релиз. Их нельзя читать как открытые draft-задачи.
 
-## Нынешний ответ бота
+## Нынешнее поведение и данные
 
-- Рабочая модель — DeepSeek Flash: `DEFAULT_LLM_MODEL=deepseek-flash`,
-  `CHAT_BASE_URL=https://api.deepseek.com`, `CHAT_API_KEY`.
-  Чистая конфигурация без env имеет Qwen default; это не fallback при ошибке DeepSeek.
-- Обычный ответ — свободная prose с optional `<D2_META>` для действий/источников.
-  Уточнение и вопрос о составе не требуют отдельной команды. Обязательный
-  JSON-envelope, model ordinary price_detail/clarify_content и doctor_catalog удалены.
-- Цена — native `show_price`: модель выбирает запрос/аргументы, код собирает
-  фактическую карточку, затем второй provider response пишет окончательный текст.
-  Оба вызова используют настроенную модель и расходуют quota. Strict и отдельный
-  классификатор не выбраны. Карточка без tool не гарантируется; полезная prose
-  сохраняется, риск модельных финансовых неточностей принят владельцем.
-- Full context содержит approved MD, completed history и показанную карточку.
-  Canonical публичные контакты — `clinic_policies.yaml -> contact`; мост в обычный
-  model context включён в release (`0a9b1ce`). Readiness для DeepSeek — `33c1f55`.
-- Verified UI clicks, tenant isolation, lead/privacy, transactional commit/error
-  и replay сохраняются. Situation intake выключен. Demo-заявка учебная.
-- Demo quota:30 model calls/session,400/day. Это число provider calls,
-  не пользовательских сообщений; price второй вызов тоже считается.
+- Согласованная конфигурация production: `DEFAULT_LLM_MODEL=deepseek-flash`,
+  `CHAT_BASE_URL=https://api.deepseek.com`, ключ в `CHAT_API_KEY`.
+  Чистый env имеет Qwen default; автоматического fallback после ошибки DeepSeek нет.
+- Обычный ответ — свободный текст с optional `<D2_META>` для источников/действий.
+  Цена — native `show_price`, кодовая карточка и второй ответ той же модели.
+  Карточка зависит от вызова tool; полезная prose без него сохраняется.
+- Full context получает MD выбранного клиента, завершённую историю, опубликованную
+  карточку и канонические контакты из `clinic_policies.yaml -> contact`.
+  Первый заявленный документ в `sources` задаёт follow-up после успешной проверки;
+  неверный основной не заменяется следующим. Остальные — дополнительные факты.
+  При клике сервер сохраняет выбранную задачу. Лимит продолжений — два слота.
+- Situation intake выключен; tenant, lead/privacy, revision, commit/replay и
+  транспортные защиты сохранены. Demo-заявка учебная. Лимиты demo — 30 вызовов
+  модели на сессию и 400 в сутки; второй ценовой вызов тоже считается.
+- Интерфейс: локальный Inter 400–600, letter-spacing 0. Названия услуг,
+  числовые цены и заголовки карточек имеют вес 600 на десктопе и мобильных.
+  Размеры отличаются по существующим desktop/touch CSS-правилам.
+- Кейсы All-on-4 и циркониевых коронок открываются из меню, после услуги и по
+  authored ссылке общего документа `clients/demo/md/clinic__info__results.md`.
+  Фото лежат в `static/clients/demo/cases/`, каталог, связи с услугами и отдельные
+  описания «До»/«После» — в `static/widget/cases.js`. Модель этот JS не читает.
+- Галерея локальная: фото переключаются кнопками, кейсы — стрелками/свайпом
+  с анимацией 220 мс и учётом reduced motion. Повторный запрос может снова открыть
+  галерею, если модель выбрала документ результатов и сервер выдал его ссылку.
+  Уже просмотренные кейсы не предлагаются повторно в обычных service follow-up.
+- «Я хочу так же» под кейсами использует опубликованную серверную CTA, когда она
+  есть. Иначе, включая стартовое меню, отправляет обычное «Хочу записаться на
+  консультацию»: форма зависит от модельного `start_booking`, не открывается
+  принудительно. Перезапуск активной/приостановленной заявки ограничен прежними guards.
+- Редактура demo-контента и пользовательские UI-правки включены в релиз.
+  Техническая оптимизация базы/full-context tokens не объявляется выполненной.
 
-Подробности и sole responsibility table:
-[текущая архитектура](../CURRENT_ARCHITECTURE.md),
-[Target Contract §3](DEMO_D2_TARGET_CONTRACT.md).
-Позднейшие явные решения владельца заменяют противоречащие старые записи.
+## Что проверено и какие есть ограничения
 
-## Что подтверждено в чистке
+- Последний Linux publish gate: **878 passed**; Secret scan, PostgreSQL
+  qualification, Docker build/smoke/publish и deploy зелёные.
+- Независимый Checker и локальные браузерные проверки подтвердили изменения
+  кейсов/CTA и typography на desktop, 390 px, 360 px и landscape touch.
+  Это offline Chromium evidence, не физическая проверка всех Android/iOS.
+- Локальный Windows union в предыдущем релизе: 836 passed, 37 failed, 5 skipped.
+  Все 37 failing node IDs воспроизвелись на чистом baseline `3404c2f`:
+  Bash startup и права доступа G7/G8. Linux publish выполнил эти проверки успешно;
+  assertions/guards не отключались. Конкуренция с локальным ботом за rotating log
+  устранялась отдельным `BOT_LOG_DIR` для тестов, без runtime-правки.
+- PR/Publish используют `tests/release/offline.txt` и `tests/release/policy.txt`;
+  results-document regression включён в shared gate. Gate всё ещё temporary demo:
+  это не PASS всех historical tests и не закрытие всей SIM/REC acceptance.
 
-| Checkpoint | Результат |
-|---|---|
-| §60 | Contact model context regression включён в PR/publish gate; списки защищены G2/G3 |
-| §60.1 | Current docs entry и architecture/test index; situation suite18PASS, возвращён в gate |
-| §60.2 | Quota fixtures мигрированы на native price и30calls;12PASS, возвращены в gate |
-| §60.3 | Policy/text_ref38cases и contacts20cases; проверки tenant/data/missing/replay сохранены, оба suite в gate |
-| §60.4 | Удалены15 obsolete cases; text protocol27cases усилен и в gate; три старых документа архивированы |
-| §60.5 | Старую хронику статуса вынесли в архив; этот путь оставлен актуальным кратким статусом |
-| §60.6 | PR и Publish используют shared release selections; прежние проверки сохранены, добавлен selection contract |
-| §60.7 | Новый owner behavior entry;19 старых планов/аудитов перенесены в архив с явной исторической пометкой |
-| §60.8 | 50 старых task cards/prompts и полные Interface/Roadmap snapshots архивированы; current очередь и process pointers очищены |
-| §60.9 | Старые reference-bound документы явно помечены историческими; июльский backlog архивирован, current debt pointer обновлён |
-| §60.10 | Ещё3 отменённых ONE_CALL wiring assertions удалены; current native model consistency guards усилены |
+## Передача следующему чату
 
-Последний локальный прогон точного publish offline selection (50 файлов, §60.6):
-**821 passed,5 skipped,0 failed**. Все5 skips — ограничения symlink на Windows/POSIX.
-Все49 прежних файлов сохранены; добавлен только selection contract. Targeted
-selection/G2–G8:271PASS5SKIP, independent selection/G2/G3:65PASS и Checker PASS.
-Targeted text/native-price/G2/G3:120PASS; independent Checker §60.4 — PASS.
-Два trailing-whitespace места архива исправлены в `2cbbd15`, focused Checker PASS.
-Это offline evidence, не повторная проверка Docker/PG/deploy и не полный historical suite.
-GitHubCI checkpoint `f8c1700`: все5jobs SUCCESS, включая PostgreSQL и secret scan.
-Publish image/deploy этого PR не запускались. Новых live/provider/SMTP calls в чистке:0. Runtime и client KB не менялись.
+- Owner завершил настройку demo и планирует далее подключать НикаДент, а не
+  продолжать правки demo-контента. Работа с НикаДент ещё не начата/не аттестована.
+  Папка `clients/nikadent` существует; её наличие не доказывает готовность клиента.
+- Сначала read-only инвентаризация pack, контактов, прайса, политик, лид-доставки,
+  widget integration и tenant boundaries. Затем отдельный согласованный scope.
+  Demo на VPS не менять как побочный эффект подключения другого клиента.
+- Рабочая папка: `C:\Cursor Projects\artgents-bot-active`.
+  Закрывающая docs-only ветка — `codex/release-handoff-docs`, baseline `e93cb12`.
+  Перед новой задачей проверить фактические Git branch/status и свежий `origin/main`;
+  push документации не означает merge или изменение развёрнутого бота.
+- Посторонний WIP: `otzyv-1.jpg`, `otzyv-2.jpg`, `otzyv-3.jpg` в корне.
+  Они не подключены как отзывы и не опубликованы. Сохранить до отдельного решения.
+  Прежние 14 MD были EOL-копиями и сохранены в ignored backup; не считать их
+  нынешним незакоммиченным контентом. Игнорируемые эксперименты, logs, `.env` и БД
+  не включать в релиз.
 
-## Что осталось
-
-1. Закончить карту historical tests: полезные guards мигрировать, доказанные дубли
-   и assertions удалённых механизмов убрать. Не удалять тест только потому, что он красный.
-2. Архивировать остальные устаревшие планы/аудиты, выделив действующие invariants.
-   Прежние Interface/Roadmap sections архивированы; оставшиеся rootdocs/evidence
-   и historical-reader bindings ещё классифицируются, весь корпус не очищен.
-3. Завершить сверку SIM/REC evidence: «выполнено / заменено / отменено / отложено».
-   Общая whole-bot acceptance не закрыта; offline fixtures не доказывают live model quality.
-4. Temporary demo gate пока ограничен. Постоянный набор утвердить по законченной
-   карте полезных проверок; Secret scan, PostgreSQL и Docker/deploy защиты не ослаблять.
-5. Client KB cleanup и экономия full-context tokens — следующий отдельный этап.
-   Optional doctor/case UI — будущая идея. Итоговая совместная выкладка требует
-   отдельного разрешения; текущий VPS demo не менять в чистке.
-
-Порядок работ — [верх Roadmap](DEMO_D2_DELIVERY_ROADMAP.md),
-карточка/доказательства — [Interface §60](DEMO_D2_INTERFACE_TASK.md#60-cleanup-checkpoint--2026-10-13),
-проверки — [Test index](../TEST_SUITE_ARCHITECTURE.md).
-Процесс — [AGENTS](../../AGENTS.md), [Execution Lock](DEMO_D2_EXECUTION_LOCK.md),
-[Git/запуск](../WORKFLOW_GIT.md), [Checker](../WORKFLOW_CHECKER.md).
-
-
-Prompt§61 (ownerGO): clinic facts grounded, general dental knowledge permitted;
-mild redundancy reduction without paragraph/word caps. Version47 guidance shared
-ordinary/known/nativecompletion. Offline delivery checks don't prove livecompliance;
-no live agentcalls/China MD changes. Runtime mechanics unchanged.
-
-Prompt§62/version48: generalquestion→#korotko ifpresent with necessary relevant
-microfacts; specificquestion→matchingsections, clickedfollowup→selectedsection.
-No full-documentdump or conditions withheld for followup. UI/code unchanged,
-no new calls; offline delivery evidence does not prove live compliance.
+Исторические receipts: [Interface §§60–63](DEMO_D2_INTERFACE_TASK.md),
+[состояние до закрытия](https://github.com/Dhmnzr79/artgents-bot/blob/e93cb121e8ea45c31dc45b435720a556fda8033d/docs/tasks/DEMO_D2_CURRENT_STATUS.md),
+[архив](../archive/README.md). Они не задают новую очередь работ.
+Роли и protections: [архитектура](../CURRENT_ARCHITECTURE.md),
+[Target Contract §3](DEMO_D2_TARGET_CONTRACT.md), [AGENTS](../../AGENTS.md).

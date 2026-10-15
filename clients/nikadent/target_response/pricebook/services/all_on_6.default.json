@@ -1,0 +1,19 @@
+{
+  "offer_id": "all_on_6.default",
+  "service_id": "all_on_6",
+  "active": true,
+  "price": {
+    "mode": "no_public_price",
+    "approved_text": "Общую стоимость восстановления всей челюсти рассчитают после диагностики и согласования плана."
+  },
+  "package": {
+    "label": "восстановление зубного ряда одной челюсти",
+    "includes": [],
+    "excludes": []
+  },
+  "fact_refs": [],
+  "followups": [],
+  "applies_to_extents": [
+    "full_arch"
+  ]
+}

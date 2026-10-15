@@ -11,7 +11,11 @@
     "active": true,
     "content_ref": "treatment__service__caries.md",
     "selection": {
-      "mode": "direct"
+      "mode": "direct",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
     },
     "options": []
   },
@@ -26,7 +30,11 @@
     "active": true,
     "content_ref": "treatment__service__teeth_treatment.md",
     "selection": {
-      "mode": "context"
+      "mode": "context",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
     },
     "options": []
   },
@@ -104,7 +112,11 @@
     "active": true,
     "content_ref": "extraction__service__tooth_extraction.md",
     "selection": {
-      "mode": "direct"
+      "mode": "direct",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
     },
     "options": []
   },
@@ -240,6 +252,9 @@
       "extent": [
         "one_tooth",
         "few_teeth"
+      ],
+      "stage": [
+        "natural_tooth_present"
       ]
     },
     "options": []
@@ -261,12 +276,15 @@
       "extent": [
         "one_tooth",
         "few_teeth"
+      ],
+      "stage": [
+        "natural_tooth_present"
       ]
     },
     "options": []
   },
   "veneers": {
-    "name": "Виниры",
+    "name": "Виниры из пресс-керамики",
     "aliases": [
       "виниры на зубы",
       "керамические виниры"
@@ -320,7 +338,7 @@
     "family": "prosthodontics",
     "roles": [],
     "active": true,
-    "content_ref": "prosthetics__service__consultation.md",
+    "content_ref": "clinic__info__promo__free_orthopedic_consult.md",
     "selection": {
       "mode": "direct"
     },
@@ -345,7 +363,58 @@
         "full_arch"
       ]
     },
-    "options": []
+    "options": [
+      {
+        "option_id": "partial",
+        "name": "Частичный пластиночный протез",
+        "active": true,
+        "aliases": [],
+        "selection": {
+          "extent": [
+            "few_teeth"
+          ]
+        }
+      },
+      {
+        "option_id": "full",
+        "name": "Полный пластиночный протез",
+        "active": true,
+        "aliases": [],
+        "selection": {
+          "extent": [
+            "full_arch"
+          ]
+        }
+      },
+      {
+        "option_id": "acry_free",
+        "name": "Полный протез Acry Free",
+        "active": true,
+        "aliases": [
+          "акри фри",
+          "термопластмассовый протез"
+        ],
+        "selection": {
+          "extent": [
+            "full_arch"
+          ]
+        }
+      },
+      {
+        "option_id": "nylon",
+        "name": "Частичный нейлоновый / ацеталовый протез",
+        "active": true,
+        "aliases": [
+          "нейлоновый протез",
+          "ацеталовый протез"
+        ],
+        "selection": {
+          "extent": [
+            "few_teeth"
+          ]
+        }
+      }
+    ]
   },
   "clasp_dentures": {
     "name": "Бюгельные протезы",
@@ -386,7 +455,31 @@
         "implant_placed"
       ]
     },
-    "options": []
+    "options": [
+      {
+        "option_id": "crown",
+        "name": "Коронка на импланте",
+        "active": true,
+        "aliases": [],
+        "selection": {
+          "extent": [
+            "one_tooth",
+            "few_teeth"
+          ]
+        }
+      },
+      {
+        "option_id": "full_arch",
+        "name": "Протез на имплантах на всю челюсть",
+        "active": true,
+        "aliases": [],
+        "selection": {
+          "extent": [
+            "full_arch"
+          ]
+        }
+      }
+    ]
   },
   "denture_repair": {
     "name": "Ремонт протезов",
@@ -532,6 +625,65 @@
       "extent": [
         "one_tooth",
         "few_teeth"
+      ]
+    },
+    "options": []
+  },
+  "emax_crowns": {
+    "name": "Коронки E-MAX",
+    "aliases": [
+      "коронка Emax",
+      "коронка из пресс-керамики",
+      "имакс коронка"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__emax_crowns.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
+    },
+    "options": []
+  },
+  "temporary_denture": {
+    "name": "Временный съёмный протез на 1–3 зуба",
+    "aliases": [
+      "иммедиат-протез",
+      "бабочка на зуб",
+      "временный съемный протез"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__temporary_denture.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
+    },
+    "options": []
+  },
+  "denture_reline": {
+    "name": "Перебазировка съёмного протеза",
+    "aliases": [
+      "перебазировка протеза",
+      "протез плохо прилегает"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__denture_reline.md",
+    "selection": {
+      "mode": "direct",
+      "extent": [
+        "few_teeth",
+        "full_arch"
       ]
     },
     "options": []

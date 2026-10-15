@@ -6,9 +6,7 @@ subtopic: implant_vs_bridge
 
 aliases:
   - "мост или имплант"
-  - "что лучше имплант или мост"
   - "чем мост отличается от импланта"
-  - "что выбрать мост или имплант"
 
 suggest_h3:
   - esli-net-odnogo-zuba

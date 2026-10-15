@@ -1,0 +1,22 @@
+{
+  "offer_id": "denture_repair.default",
+  "service_id": "denture_repair",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 7000,
+    "currency": "RUB",
+    "billing_unit": "procedure"
+  },
+  "package": {
+    "label": "починка при переломе базиса, приварка зуба или кламмера; возможность ремонта — после осмотра",
+    "includes": [],
+    "excludes": []
+  },
+  "fact_refs": [],
+  "followups": [],
+  "applies_to_extents": [
+    "few_teeth",
+    "full_arch"
+  ]
+}

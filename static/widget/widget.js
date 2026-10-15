@@ -2270,10 +2270,11 @@ export function mountWidget(root, config, { pagePath } = {}) {
         const choice=allChoices.find(choice=>choice.reply_id===`price_select:${row.offer_id}`);
         const item=document.createElement(overview&&choice?'button':'div');
         item.className=overview?'clinic-price-card__overview-row':'clinic-price-card__price-area';
+        if(overview&&row.mode==='no_public_price')item.classList.add('clinic-price-card__overview-row--description');
         if(overview&&choice){item.type='button';item.disabled=disabled();item.addEventListener('click',()=>select(choice,message.revision));}
         if(overview){const name=document.createElement('span');name.className='clinic-price-card__overview-name';name.textContent=row.service_name;item.appendChild(name);}
         const amount=document.createElement('strong');amount.className='clinic-price-card__amount';
-        amount.textContent=row.mode==='no_public_price'?row.display_text:row.price_display_text;
+        amount.textContent=row.price_display_text;
         if(row.mode==='no_public_price')amount.classList.add('clinic-price-card__amount--description');
         else if(!overview)amount.classList.add('clinic-price-card__amount--single');item.appendChild(amount);
         if(overview&&choice){const arrow=svg('arrow');arrow.classList.add('clinic-price-card__row-arrow');item.appendChild(arrow);}

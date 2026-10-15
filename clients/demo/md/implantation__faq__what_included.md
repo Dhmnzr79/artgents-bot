@@ -6,9 +6,7 @@ subtopic: what_included
 
 aliases:
   - "имплантация под ключ что входит"
-  - "что входит в имплант под ключ"
   - "коронка отдельно от импланта"
-  - "имплант это с коронкой или без"
 
 suggest_h3:
   - kogda-koronka-schitaetsya-otdelno

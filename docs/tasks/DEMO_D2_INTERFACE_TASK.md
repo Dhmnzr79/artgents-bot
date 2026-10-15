@@ -1,5 +1,550 @@
 # Текущая карточка — НикаДент
 
+## 81. Release verification, commit/push and VPS — owner GO 2026-10-16
+
+Owner: «проверка и комит и пуш после. Потом на ВПС». Authorized sequence: verify
+accumulated onboarding/content/prices/UI, commit exact paths, push existing PR31,
+then normal main/publish/manual-deploy pipeline after green gates. This is release
+verification of existing bug fixes/data/UI work, NOT architecture simplification.
+No new model/provider test calls or emails authorized by this stage; public
+health/config/static checks do not call providers. Source baseline for pending
+commit HEAD2a2f2f1; main/mergebasee93cb12. Existing15onboarding commits are also
+part of PR31; no blind branch switch, rebase or unrelated cleanup.
+
+Exact commit/edit allowlist is external release-2026-10-16/manifest.json: all
+current changed/untracked task files except3foreign otzyvJPG, plus current status
+and release/offline selection. Includes owner configured avatar and prior Demo
+alias cleanup, AGENTS cadence, Nika content/prices, code/UI/tests and reports.
+Do not include .env, runtime data/logs, private dialogs or external audit probes.
+Foreign3JPG remain local untouched. Index empty at start.
+
+Checks: content/price lint; demo/Nika/template validators; app import and source
+compile; complete shared offline+policy+G3 selections plus Nika price/client-pack/
+schema tests; local browser presentation/consent/page/no-public fixtures. Add these
+current Nika guards to shared release list without removing existing protections.
+One independent Astra Checker for final coherent release diff vsorigin/main,
+then GitHub CI/PG/secret scan and immutable-image workflow evidence before deploy.
+Deployment follows existing fail-closed backup/digest/readiness/rollback contracts.
+No direct deployment from a mutable topic checkout.
+
+Release local evidence (2026-10-16): content/price lint and all three pack validators
+PASS; app import PASS;380production Python sources compile; diff--check PASS.
+Canonical offline+policy+G3 union:1146PASS/4platformSKIP with10Windows MAX_PATH
+failures in backup receipt temporary paths. Unchanged exact10rechecked using a
+short basetemp:9PASS/1symlinkSKIP. Effective1160cases:1155PASS/5platformSKIP,
+no unresolved failure. Linux CI must execute POSIX guards. Latest typography
+browser proof1PASS/6.72s at320/390/1280; independent consent15PASS/17.62s.
+Independent Astra source-review PASS after fixing Windows browser-test portability
+with existing platform marker; numeric/contract assertions remain in Linux CI.
+External evidence: release-2026-10-16/RELEASE_CHECKER.txt, release-tests.xml,
+short-path-recheck.xml and font-browser.xml. No live model/provider/SMTP calls.
+133exact pending paths; no forbidden secret/data paths or credential-pattern hits.
+Only binary is owner-authorized avatarPNG;3foreignJPG excluded. Fresh GitHub CI,
+PGqualification, secret scan, publish and deploy results remain mandatory/pending.
+
+## 80. Nikadent full-audit fixes — owner GO 2026-10-15
+
+Bug fixes/data corrections, NOT architecture simplification. Owner accepts the full
+audit findings, replaces the tax claim with «Помощь в получении налогового вычета 13%»,
+and says «Остальное поправь». Baseline is the preserved dirty worktree after79 and
+the read-only full audit. Root/top C:/Cursor Projects/artgents-bot-active; branch
+codex/nikadent-technical-onboarding; HEAD2a2f2f1, origin/main=mergebasee93cb12.
+Staging empty. All demo/avatar/JPG/prior source and test WIP preserved.
+
+Scope: core-inlay one/few applicability and explicit excluded crown; consultation
+advance booking in existing authored price-label clauses and short promo; align
+owner tax copy in fact/two MD; remove obsolete16-year age without inventing a date;
+remove source-note prose and repair/reline/orthographic alias duplicates. Fix stale
+format-test path using an actual current contact test. No unrelated cleanup.
+
+The listed five-teeth defect requires optional positive TargetOffer.max_tooth_count
+(Nika temporary=3), using existing volume.tooth_count. Astra consulted: this is
+the smallest general authored constraint. The existing code-owned applicability
+predicate is sole owner of extent/count eligibility in native price, overview
+variants and saved selection validation. Unknown count retains explicit scoped
+reference; known4/5 excludes1–3 offer with existing unavailable result. No count
+guessing, total calculation, new tool/model field/state/call or phrase heuristic.
+Do not broaden promo policy, doctor mappings, repair extent or other audit questions.
+
+Exact allowlist:
+- contracts/response_schema.py
+- core/response_plan_materialization.py
+- clients/nikadent/target_response/pricebook/facts.json
+- clients/nikadent/target_response/pricebook/services/core_inlay.default.json
+- clients/nikadent/target_response/pricebook/services/prosthetics_consultation.default.json
+- clients/nikadent/target_response/pricebook/services/temporary_denture.default.json
+- clients/nikadent/md/clinic__info__payment_terms.md
+- clients/nikadent/md/implantation__faq__cost.md
+- clients/nikadent/md/implantation__faq__osseointegration.md
+- clients/nikadent/md/clinic__info__advantages.md
+- clients/nikadent/md/prosthetics__service__denture_repair.md
+- clients/nikadent/md/prosthetics__service__removable_dentures.md
+- tests/test_nikadent_price_authority_offline.py
+- tests/test_response_schema_contract.py
+- tests/test_nikadent_client_pack_offline.py
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md
+- docs/evidence/client_pack/NIKADENT_PRICE_LAYER_REPORT.txt
+
+Evidence baseline/manifest: external nikadent-audit-fixes. Targeted offline native
+JSON/SSE regressions for known/unknown counts, other authored caps, no-cap offers,
+conditions/grounding/history/replay; schema invalid caps; Nika pack/meta-source/refs.
+One focused independent Astra Checker at this coherent checkpoint. No live
+provider/SMTP, staging/commit/push/PR update/merge/deployment.
+
+Results: current222 unique cases have passing coverage across group/recheck.
+Initial group218PASS2newfixtureFAIL; corrected single-offer click assumption using
+real removable tabs, focused6PASS. No product failure hidden/skipped. Validator,
+MD/anchor bindings and diff--check PASS. Astra independent Checker PASS:35targeted
+plus4adverse HTTP/SSE repros. Provider/SMTP0, no Git publication/deploy; indexempty.
+Measurement period99.8% and other client factual questions remain separate in
+the evidence report; no invented dates or notes in patient MD.
+
+## 79. Unpriced overview row layout — owner screenshot 2026-10-15
+
+Owner follow-up: remove loose billing-scope paragraph from no_public replies.
+Additional exact paths: core/response_plan_materialization.py and
+ tests/test_nikadent_price_authority_offline.py. First semicolon-delimited label
+clause is existing billing scope; no_public mode omits that standalone caption,
+but preserves later clauses and required_conditions_metadata. Numeric branch
+unchanged.2 nativeHTTP regression tests PASS: All4/6 approved response preserved,
+loose caption absent, extra authored and mandatory caveats present. Focused
+recheck PASS: independently2PASS, no_public Nika/Demo conditions preserved.
+This replaces the earlier backend-unchanged claim for this
+narrow follow-up; no amounts/selection/contracts changed.
+
+Presentation bug fix, not architecture simplification. Continuing same checkout
+C:/Cursor Projects/artgents-bot-active, codex/nikadent-technical-onboarding,
+HEAD2a2f2f1/main+mergebasee93cb12. Baseline current dirty tree after78; preserve
+all prior WIP. Exact allowlist: static/widget/widget.js, static/widget/widget.css,
+tests/test_widget_no_public_price_browser.py, this card and
+ docs/evidence/client_pack/NIKADENT_PRICE_LAYER_REPORT.txt.
+Existing no_public_price description used auto-width numeric grid column,
+compressing name to individual characters. Use existing server price_display_text
+without repeated service name; lay description below full-width title. No price,
+selection, transport or backend changes. Real widget browser check320/390/desktop,
+actual offline HTTP receipts, numeric rows/clicks unchanged. Focused Checker.
+No live model/SMTP/Git/deploy. Evidence: before-fix browser regression FAIL
+(nameWidth0/nameHeight380 at320px); after-fix PASS11.62s on320/390/1280px,
+real numeric/mixed rows and volume switch. Screenshot390px visually checked.
+Focused independent Astra Checker PASS; independently repeated browser1PASS.
+Diff--check PASS, staging empty; all other prior WIP preserved.
+
+## 78. Nikadent approved prices and existing volume mechanism — owner GO 2026-10-15
+
+Owner accepts 11 core price positions, 7 precise-question groups, defers steel
+crowns and reinforced dentures; requests implementation and strong model review.
+Content/catalog bug fix and tenant data onboarding, NOT architecture simplification.
+Use existing D2 native show_price, authored direction overview (max3 different
+services), one/full/unknown buttons, free-text few-teeth, option tabs and frozen
+terms. No new runtime fields, selector, heuristic, priority mechanism or model calls.
+Astra consulted actual call path: temporary denture must be separate service to
+avoid cheapest12k becoming ordinary removable default. Unknown currently repeats
+overview without question/provider; preserve actual existing behavior, do not
+claim the older contract's neutral response implemented by this data stage.
+No total calculation. Crown/implant single-unit prices do not cover full_arch.
+No published total for All4/6, bridge, root-canal treatment or full cleaning.
+Use detailed owner screenshots for filling5250/extraction5500/temporary12000;
+free promotional consultation remains0, not all consultations. Preserve core-inlay
+existing price separately from ceramic inlay. Remove unsupported bridge10k and
+broad family22k/35k assignments; active services remain available.
+Root/top C:/Cursor Projects/artgents-bot-active; continuing branch
+codex/nikadent-technical-onboarding HEAD2a2f2f1 main/mergebasee93cb12. Baseline:
+current dirty tree after accepted editorial/micro edits, external
+nikadent-price-stage-baseline; manifest nikadent-price-stage-manifest.json.
+Preserve all other WIP, demo, avatar and3otzyv JPG. Staging empty. No commit,
+push/PR update/merge/deploy or live provider/SMTP. Exact37path allowlist:
+- clients/nikadent/target_response/service_catalog.json
+- clients/nikadent/target_response/pricebook/family_prices.json
+- clients/nikadent/target_response/d2_direction_prices.json
+- clients/nikadent/target_response/pricebook/services/caries.default.json
+- clients/nikadent/target_response/pricebook/services/teeth_treatment.default.json
+- clients/nikadent/target_response/pricebook/services/tooth_extraction.default.json
+- clients/nikadent/target_response/pricebook/services/classic.default.json
+- clients/nikadent/target_response/pricebook/services/one_stage.default.json
+- clients/nikadent/target_response/pricebook/services/all_on_4.default.json
+- clients/nikadent/target_response/pricebook/services/all_on_6.default.json
+- clients/nikadent/target_response/pricebook/services/metal_ceramic_crowns.default.json
+- clients/nikadent/target_response/pricebook/services/zirconia_crowns.default.json
+- clients/nikadent/target_response/pricebook/services/emax_crowns.default.json
+- clients/nikadent/target_response/pricebook/services/veneers.default.json
+- clients/nikadent/target_response/pricebook/services/implant_supported_prosthetics.crown.json
+- clients/nikadent/target_response/pricebook/services/implant_supported_prosthetics.full_arch.json
+- clients/nikadent/target_response/pricebook/services/removable_dentures.jaw.partial.json
+- clients/nikadent/target_response/pricebook/services/removable_dentures.jaw.full.json
+- clients/nikadent/target_response/pricebook/services/removable_dentures.jaw.acry_free.json
+- clients/nikadent/target_response/pricebook/services/removable_dentures.jaw.nylon.json
+- clients/nikadent/target_response/pricebook/services/temporary_denture.default.json
+- clients/nikadent/target_response/pricebook/services/clasp_dentures.default.json
+- clients/nikadent/target_response/pricebook/services/denture_repair.default.json
+- clients/nikadent/target_response/pricebook/services/denture_reline.default.json
+- clients/nikadent/target_response/pricebook/services/sinus_lift.default.json
+- clients/nikadent/target_response/pricebook/services/bone_graft.default.json
+- clients/nikadent/target_response/pricebook/services/fixed_bridge.default.json
+- clients/nikadent/md/prosthetics__service__emax_crowns.md
+- clients/nikadent/md/prosthetics__service__temporary_denture.md
+- clients/nikadent/md/prosthetics__service__denture_reline.md
+- clients/nikadent/md/prosthetics__service__removable_dentures.md
+- clients/nikadent/md/prosthetics__service__implant_supported_prosthetics.md
+- clients/nikadent/md/prosthetics__service__veneers.md
+- tests/test_nikadent_price_authority_offline.py
+- tests/test_nikadent_client_pack_offline.py
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md
+- docs/evidence/client_pack/NIKADENT_PRICE_LAYER_REPORT.txt
+
+Acceptance: all18 groups reachable, data/source-backed amounts and units, no
+secondary/deferred clutter in overview, proper one/few/full filtering, optional
+precise variants, no unsupported package totals or multiplication, actual HTTP/
+SSE frozen cards, clicks/replay/foreign refs and metadata/privacy boundaries.
+Baseline focused run before changes:34PASS,3FAIL,1known format smoke deselected.
+Failures: existing 'на сайте' in advantages MD (outside price scope), old sales_fast
+bridge/core tests don't publish expected price. Known format smoke references
+missing test_multibranch_contact_authority.py. Rewrite obsolete price-authority
+checks against current D2; don't weaken MD-source guard or fix foreign text.
+Evidence:26 offers/27 active services,3 authored directions; broad family rows
+cleared. Production validator and diff--check PASS;1081 protected hashes unchanged.
+Whole targeted run175PASS/10FAIL/2deselected. All10failures in unchanged historical
+scope-selection/mode fixtures reproduced on clean HEAD2a2f2f1 with identical names
+and error messages (clean10FAIL/6PASS). Two prior MD-source/format failures explicitly
+deselected, not fixed.88 current Nikadent price-authority tests PASS.
+Independent Astra (spawn gpt-6-astra/high) Checker PASS:88tests independently PASS,
+4 extra HTTP scenarios; no P0/P1. P2 existing temporary1–3/count5 limitation is
+explicit in price title/scope/report; no unapproved runtime countguard. Clasp is
+exact-query reachable, not automatically in top3. No live/SMTP/commit/push/deploy.
+Report: docs/evidence/client_pack/NIKADENT_PRICE_LAYER_REPORT.txt.
+
+## 77. Nikadent insurance policy — owner instruction 2026-10-15
+
+Content bug fix, not architecture simplification. Owner confirms no treatment
+under OMS/DMS. Add one distinct section to clinic__info__policies.md; preserve
+adult-only rule, metadata and all runtime/config/price/privacy mechanisms.
+Root/top C:/Cursor Projects/artgents-bot-active; continuing branch
+codex/nikadent-technical-onboarding, HEAD 2a2f2f1, main/mergebase e93cb12.
+Baseline current worktree after section76, externally captured in
+nikadent-policy-insurance-baseline. Exact allowlist:
+- clients/nikadent/md/clinic__info__policies.md
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md
+- docs/evidence/client_pack/NIKADENT_CONTENT_EDITORIAL_REPORT.txt
+Preserve all prior WIP including avatar and untracked otzyv JPGs; staging empty.
+No commit/push/merge/deploy/provider/SMTP. Acceptance: explicit OMS/DMS refusal,
+unchanged adult rule/metadata, pack validator and focused independent Checker.
+Evidence pending. Existing unrelated baseline test failures remain out of scope.
+
+## 76. Nikadent warranty — explicit owner selections 2026-10-15
+
+Content bug fix, not architecture simplification. Owner explicitly selected five
+passages from demo warranty for Nikadent, superseding the earlier one-line-only
+warranty scope. Retain 1 year for performed work; do not copy demo brand terms
+or the unselected promise of free correction/replacement. Include contract,
+certified systems/passport/documents, recommendations/control visits, contacting
+clinic, moving cities, and the selected explanation of the one-year term.
+Root/top C:/Cursor Projects/artgents-bot-active; continuing branch
+codex/nikadent-technical-onboarding, HEAD 2a2f2f1, main/mergebase e93cb12.
+Baseline: current working tree after section75, externally captured in
+nikadent-warranty-owner-selection-baseline. Exact allowlist:
+- clients/nikadent/md/clinic__info__warranty.md
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md
+- docs/evidence/client_pack/NIKADENT_CONTENT_EDITORIAL_REPORT.txt
+Preserve prior demo/Nika/JSON/tests/avatar WIP and untracked otzyv-1/2/3.jpg.
+No runtime/config/price edits, commits, staging, push/merge/deploy or provider/SMTP.
+Acceptance: selected content present, 1-year term retained, no unselected demo
+brand terms/free replacement; valid suggested anchors and pack validator.
+Independent read-only Checker PASS. Pack validator PASS; metadata preserved,
+2 suggested anchors resolve through D2 and 2 wrong-source bindings reject;
+752 protected hashes unchanged. diff--check PASS; staging empty. No suite rerun
+for text-only edit; previous known baseline failures remain outside this scope.
+
+## 75. Restore Nikadent explanatory depth — owner correction 2026-10-15
+
+Owner rejected section74 editorial result as overly shortened. Its Checker PASS
+only certified scoped technical integrity, not owner acceptance of text quality.
+Owner GO: rewrite all Nikadent material with full useful selling explanations,
+use demo as the depth/presentation reference; remove only real repeats.
+Pain must explain reassurance, anesthesia process/sensations and recovery, not
+just availability. Payment must explicitly say agreed cost/no hidden surcharges.
+Retain earlier approved doctor format (experience/work/2–3 selling sentences,
+no education),1year warranty, screenshot consultation, Nika facts/site authority.
+No invented clinic specifics, no notes in patient MD. Questions only in report.
+This is content bug fix, not architecture simplification or token optimization.
+No length/button quota; every follow-up must add a distinct useful answer.
+Preserve current canonical promo/service refs, all prices/catalog/config/tests,
+topic/doctor/CTA/lead/privacy fields. Only bodies and suggest_h3 may change.
+Root/top C:/Cursor Projects/artgents-bot-active; branch
+codex/nikadent-technical-onboarding, HEAD2a2f2f1, main/mergebasee93cb12.
+Baseline: working tree AFTER section74, captured in external
+nikadent-editorial-depth-baseline; preserve all previous WIP/demo/avatar/3otzyv.
+Staging empty; no commit/push/merge/deploy or provider/SMTP. Exact55path allowlist:
+- clients/nikadent/md/clinic__info__advantages.md
+- clients/nikadent/md/clinic__info__contacts.md
+- clients/nikadent/md/clinic__info__payment_terms.md
+- clients/nikadent/md/clinic__info__policies.md
+- clients/nikadent/md/clinic__info__promo__free_orthopedic_consult.md
+- clients/nikadent/md/clinic__info__warranty.md
+- clients/nikadent/md/comparison__all_on_4_vs_all_on_6.md
+- clients/nikadent/md/comparison__bone_graft_vs_all_on_4.md
+- clients/nikadent/md/comparison__bugel_prosthesis_vs_fixed_bridge.md
+- clients/nikadent/md/comparison__classic_vs_one_stage.md
+- clients/nikadent/md/comparison__implant_vs_bridge.md
+- clients/nikadent/md/comparison__metal_ceramic_vs_zirconia.md
+- clients/nikadent/md/doctors__doctor__danilov.md
+- clients/nikadent/md/doctors__doctor__gadzhimuradov.md
+- clients/nikadent/md/doctors__doctor__kadiev.md
+- clients/nikadent/md/doctors__doctor__kitasova.md
+- clients/nikadent/md/doctors__doctor__lavrenov.md
+- clients/nikadent/md/doctors__doctor__overview.md
+- clients/nikadent/md/extraction__service__tooth_extraction.md
+- clients/nikadent/md/hygiene__service__teeth_cleaning.md
+- clients/nikadent/md/implantation__faq__cost.md
+- clients/nikadent/md/implantation__faq__duration.md
+- clients/nikadent/md/implantation__faq__osseointegration.md
+- clients/nikadent/md/implantation__faq__pain.md
+- clients/nikadent/md/implantation__faq__safety.md
+- clients/nikadent/md/implantation__faq__tooth_loss.md
+- clients/nikadent/md/implantation__faq__tooth_one_day.md
+- clients/nikadent/md/implantation__faq__what_included.md
+- clients/nikadent/md/implantation__info__aftercare.md
+- clients/nikadent/md/implantation__info__contraindications.md
+- clients/nikadent/md/implantation__info__methods_overview.md
+- clients/nikadent/md/implantation__info__steps.md
+- clients/nikadent/md/implantation__service__all_on_4.md
+- clients/nikadent/md/implantation__service__all_on_6.md
+- clients/nikadent/md/implantation__service__bone_graft.md
+- clients/nikadent/md/implantation__service__classic.md
+- clients/nikadent/md/implantation__service__one_stage.md
+- clients/nikadent/md/implantation__service__sinus_lift.md
+- clients/nikadent/md/periodontology__service__periodontitis.md
+- clients/nikadent/md/prosthetics__service__ceramic_inlays.md
+- clients/nikadent/md/prosthetics__service__clasp_dentures.md
+- clients/nikadent/md/prosthetics__service__core_inlay.md
+- clients/nikadent/md/prosthetics__service__denture_repair.md
+- clients/nikadent/md/prosthetics__service__fixed_bridge.md
+- clients/nikadent/md/prosthetics__service__implant_supported_prosthetics.md
+- clients/nikadent/md/prosthetics__service__metal_ceramic_crowns.md
+- clients/nikadent/md/prosthetics__service__removable_dentures.md
+- clients/nikadent/md/prosthetics__service__veneers.md
+- clients/nikadent/md/prosthetics__service__zirconia_crowns.md
+- clients/nikadent/md/treatment__service__caries.md
+- clients/nikadent/md/treatment__service__pulpitis.md
+- clients/nikadent/md/treatment__service__teeth_treatment.md
+- clients/nikadent/md/treatment__service__tooth_restoration.md
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md
+- docs/evidence/client_pack/NIKADENT_CONTENT_EDITORIAL_REPORT.txt
+
+Acceptance: compare patient question coverage/depth against demo, keep factual
+Nika differences; coherent main answers and distinct follow-ups, not volume KPI.
+Validate links/metadata/protected hashes and run smallest relevant offline checks;
+independent Checker must review content depth as well as technical integrity.
+Known format smoke baseline failure missing test_multibranch_contact_authority.py
+remains out of scope; no full CI/live calls for editorial micro-iterations.
+Evidence:51of53MD rewritten with full patient explanations; minimal1year warranty
+and adult-policy rule retained by owner constraint. No length/button reduction
+claimed as quality.45focused tests PASS,1known baseline format smoke deselected;
+no test/code changes.59valid clicks resolve and59wrong-source bindings reject;
+remaining metadata identical,81protected hashes unchanged, pack validator and
+diff--check PASS. Independent editorial-depth/technical Checker PASS: all53MD and relevant demo
+read; no blocking findings. Metadata,59valid/59rejected bindings,81hashes,
+validator/scope/diff independently verified. Payment repetition fixed before PASS.
+Owner text acceptance and medical expertise are not inferred.
+Live/provider/SMTP0, staging empty, no commit/push/PR update/merge/deploy.
+
+
+## 74. Nikadent MD editorial pass — owner GO 2026-10-15
+
+Data/content bug fix and editorial maintenance, not implemented architecture
+simplification. Owner approved all Nikadent MD: concise clinic voice, useful
+#korotko, independent follow-ups, demo as general presentation reference only.
+Facts/numbers from existing Nikadent and its website; no invented clinic claims.
+Doctors: experience, explicitly stated work,2–3 grounded selling sentences;
+no education. Warranty only1year. Unconfirmed package/warranty detail omitted
+from patient text and recorded ONLY in separate external-to-client report.
+Owner screenshot authorizes free exam, individual treatment plan, calculation
+of turnkey treatment cost, answers about surgery/recovery; advance appointment
+required; compare with treatment in China without invented prices or aftercare.
+Merge two consultation documents into one promo MD; preserve existing active
+consultation service/zero-price offer/fact identity and topic association.
+Update existing content_ref and existing package/text fields only; no new
+runtime field/mechanism/prompt/model call. Remaining topic/CTA/doctor metadata,
+price values, availability, contacts, lead/privacy and transport owners stay.
+Target Contract section3 applies; full MD still interpreted by existing model.
+Root/top C:/Cursor Projects/artgents-bot-active; continuation branch
+codex/nikadent-technical-onboarding; HEAD2a2f2f1, main/mergebasee93cb12.
+Task baseline is WORKTREE after section73 alias cleanup, copied outside repo to
+nikadent-editorial-baseline; not clean HEAD. Preserve previous demo/Nika aliases,
+foreign avatar.png and3otzyv; staging initially empty. No commit/push/merge/deploy;
+provider/SMTP budget0. Public website read only already performed.
+Exact61path allowlist (includes deletions/new files and unchanged inspected MD):
+- clients/nikadent/md/clinic__info__advantages.md
+- clients/nikadent/md/clinic__info__consultation.md
+- clients/nikadent/md/clinic__info__contacts.md
+- clients/nikadent/md/clinic__info__payment_terms.md
+- clients/nikadent/md/clinic__info__policies.md
+- clients/nikadent/md/clinic__info__warranty.md
+- clients/nikadent/md/comparison__all_on_4_vs_all_on_6.md
+- clients/nikadent/md/comparison__bone_graft_vs_all_on_4.md
+- clients/nikadent/md/comparison__bugel_prosthesis_vs_fixed_bridge.md
+- clients/nikadent/md/comparison__classic_vs_one_stage.md
+- clients/nikadent/md/comparison__implant_vs_bridge.md
+- clients/nikadent/md/comparison__metal_ceramic_vs_zirconia.md
+- clients/nikadent/md/doctors__doctor__danilov.md
+- clients/nikadent/md/doctors__doctor__gadzhimuradov.md
+- clients/nikadent/md/doctors__doctor__kadiev.md
+- clients/nikadent/md/doctors__doctor__kitasova.md
+- clients/nikadent/md/doctors__doctor__lavrenov.md
+- clients/nikadent/md/doctors__doctor__overview.md
+- clients/nikadent/md/extraction__service__tooth_extraction.md
+- clients/nikadent/md/hygiene__service__teeth_cleaning.md
+- clients/nikadent/md/implantation__faq__cost.md
+- clients/nikadent/md/implantation__faq__duration.md
+- clients/nikadent/md/implantation__faq__osseointegration.md
+- clients/nikadent/md/implantation__faq__pain.md
+- clients/nikadent/md/implantation__faq__safety.md
+- clients/nikadent/md/implantation__faq__tooth_loss.md
+- clients/nikadent/md/implantation__faq__tooth_one_day.md
+- clients/nikadent/md/implantation__faq__what_included.md
+- clients/nikadent/md/implantation__info__aftercare.md
+- clients/nikadent/md/implantation__info__contraindications.md
+- clients/nikadent/md/implantation__info__methods_overview.md
+- clients/nikadent/md/implantation__info__steps.md
+- clients/nikadent/md/implantation__service__all_on_4.md
+- clients/nikadent/md/implantation__service__all_on_6.md
+- clients/nikadent/md/implantation__service__bone_graft.md
+- clients/nikadent/md/implantation__service__classic.md
+- clients/nikadent/md/implantation__service__one_stage.md
+- clients/nikadent/md/implantation__service__sinus_lift.md
+- clients/nikadent/md/periodontology__service__periodontitis.md
+- clients/nikadent/md/prosthetics__service__ceramic_inlays.md
+- clients/nikadent/md/prosthetics__service__clasp_dentures.md
+- clients/nikadent/md/prosthetics__service__consultation.md
+- clients/nikadent/md/prosthetics__service__core_inlay.md
+- clients/nikadent/md/prosthetics__service__denture_repair.md
+- clients/nikadent/md/prosthetics__service__fixed_bridge.md
+- clients/nikadent/md/prosthetics__service__implant_supported_prosthetics.md
+- clients/nikadent/md/prosthetics__service__metal_ceramic_crowns.md
+- clients/nikadent/md/prosthetics__service__removable_dentures.md
+- clients/nikadent/md/prosthetics__service__veneers.md
+- clients/nikadent/md/prosthetics__service__zirconia_crowns.md
+- clients/nikadent/md/treatment__service__caries.md
+- clients/nikadent/md/treatment__service__pulpitis.md
+- clients/nikadent/md/treatment__service__teeth_treatment.md
+- clients/nikadent/md/treatment__service__tooth_restoration.md
+- clients/nikadent/md/clinic__info__promo__free_orthopedic_consult.md
+- clients/nikadent/target_response/service_catalog.json
+- clients/nikadent/target_response/pricebook/facts.json
+- clients/nikadent/target_response/pricebook/services/prosthetics_consultation.default.json
+- tests/test_nikadent_client_pack_offline.py
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md
+- docs/evidence/client_pack/NIKADENT_CONTENT_EDITORIAL_REPORT.txt
+
+Acceptance: single canonical consultation material, all declared source links/
+follow-ups and doctor refs resolve through current D2; cross-tenant and rejected
+source binding stay enforced; no reader/code changes, no client MD editorial
+notes or education; protected facts/metadata and existing prices retained.
+Small offline pack/source checks and existing relevant tests; independent Checker
+at coherent checkpoint. Historical policy JSON/replay and price-detail failures
+are known baseline debt, not acceptance failures to repair in this content pass.
+Evidence:45 focused tests PASS;1existing format smoke failure references missing
+old test_multibranch_contact_authority.py; same unchanged function reproduced
+FileNotFoundError in clean git archive2a2f2f1. No assertion weakening for that debt.
+Data proof:49existing MD rewritten,1promo created,2duplicates retired;54->53MD,
+64->29authored followups, all29resolve through actual D2 with wrong-source reject.
+Retained metadata/doctor refs/topic-service bindings, price/availability fields
+and protected demo/foreign WIP preserved. Nikadent production validator PASS.
+No editorial notes/education in client MD. Separate report records unresolved
+conditions and provenance. Independent Checker PASS:53MD reviewed,68protected hashes unchanged,29valid/29wrong-source actions checked; own25tests PASS. diff--check PASS.
+No model/provider/SMTP, staging/commit/push/merge/deploy.
+
+
+## 73. MD alias cleanup — owner GO 2026-10-15
+
+Owner approved cleanup after the per-file audit of all115 MD in demo/Nikadent.
+Data cleanup/bug fix, not implemented D2 architecture simplification. Remove98
+aliases from53 MD:19 normalized heading repeats and79 repetitive formulations.
+Retain distinct questions, terminology, uncertain broad associations and spelling
+variants except those already repeated in a heading. No new aliases or fields.
+Preserve every document body/heading/anchor, remaining metadata and filename;
+no change to topic/suggest_h3/CTA/video, runtime readers, prompts or routing.
+FullContext still receives the complete MD; model owns ordinary interpretation
+per Target Contract section3. No lead/privacy/price/UI responsibility changes.
+Root/top C:/Cursor Projects/artgents-bot-active; continuation branch
+codex/nikadent-technical-onboarding; HEAD/baseline2a2f2f1,
+origin/main and mergebasee93cb12. Staging initially empty; foreign local
+static/clients/nikadent/avatar.png and otzyv-1/2/3.jpg preserved/excluded.
+Exact allowlist:53 MD below and this task card (54paths). No commit/push/merge/
+deploy in this checkpoint; model/provider/SMTP budget0.
+Verify all115 bodies and non-alias metadata against baseline, exact alias-only
+removals/retained audit distinctions, production pack validators, D2 model corpus
+and source-UI equality; existing focused offline tests and independent Checker.
+Previous legacy JSON policy-replay and price-detail/replay failures remain scoped;
+no claim of live-model answer quality from offline metadata checks.
+
+- clients/demo/md/clinic__info__advantages.md
+- clients/demo/md/clinic__info__contacts.md
+- clients/demo/md/clinic__info__first_visit.md
+- clients/demo/md/clinic__info__payment_terms.md
+- clients/demo/md/clinic__info__results.md
+- clients/demo/md/comparison__bone_graft_vs_all_on_4.md
+- clients/demo/md/comparison__classic_vs_one_stage.md
+- clients/demo/md/comparison__implant_vs_bridge.md
+- clients/demo/md/diagnostics__service__tomography.md
+- clients/demo/md/doctors__doctor__overview.md
+- clients/demo/md/extraction__service__tooth_extraction.md
+- clients/demo/md/implantation__faq__cost.md
+- clients/demo/md/implantation__faq__duration.md
+- clients/demo/md/implantation__faq__pain.md
+- clients/demo/md/implantation__faq__safety.md
+- clients/demo/md/implantation__faq__tooth_one_day.md
+- clients/demo/md/implantation__faq__what_included.md
+- clients/demo/md/implantation__info__aftercare.md
+- clients/demo/md/implantation__info__contraindications.md
+- clients/demo/md/implantation__info__methods_overview.md
+- clients/demo/md/implantation__info__steps.md
+- clients/demo/md/implantation__service__benefits.md
+- clients/demo/md/treatment__service__teeth_treatment.md
+- clients/nikadent/md/clinic__info__advantages.md
+- clients/nikadent/md/clinic__info__consultation.md
+- clients/nikadent/md/clinic__info__contacts.md
+- clients/nikadent/md/comparison__bone_graft_vs_all_on_4.md
+- clients/nikadent/md/comparison__classic_vs_one_stage.md
+- clients/nikadent/md/comparison__implant_vs_bridge.md
+- clients/nikadent/md/comparison__metal_ceramic_vs_zirconia.md
+- clients/nikadent/md/doctors__doctor__danilov.md
+- clients/nikadent/md/doctors__doctor__gadzhimuradov.md
+- clients/nikadent/md/doctors__doctor__kadiev.md
+- clients/nikadent/md/doctors__doctor__kitasova.md
+- clients/nikadent/md/doctors__doctor__lavrenov.md
+- clients/nikadent/md/doctors__doctor__overview.md
+- clients/nikadent/md/implantation__faq__cost.md
+- clients/nikadent/md/implantation__faq__duration.md
+- clients/nikadent/md/implantation__faq__osseointegration.md
+- clients/nikadent/md/implantation__faq__pain.md
+- clients/nikadent/md/implantation__faq__safety.md
+- clients/nikadent/md/implantation__faq__tooth_loss.md
+- clients/nikadent/md/implantation__faq__tooth_one_day.md
+- clients/nikadent/md/implantation__faq__what_included.md
+- clients/nikadent/md/implantation__info__aftercare.md
+- clients/nikadent/md/implantation__info__contraindications.md
+- clients/nikadent/md/implantation__info__methods_overview.md
+- clients/nikadent/md/implantation__info__steps.md
+- clients/nikadent/md/prosthetics__service__clasp_dentures.md
+- clients/nikadent/md/prosthetics__service__consultation.md
+- clients/nikadent/md/prosthetics__service__core_inlay.md
+- clients/nikadent/md/prosthetics__service__denture_repair.md
+- clients/nikadent/md/prosthetics__service__metal_ceramic_crowns.md
+
+Evidence:25 focused existing offline tests PASS (validator, CTA sources, D2
+snapshot;2 known legacy JSON policy-replay cases deselected). All115 MD compared
+against2a2f2f1: bodies/anchors/non-alias metadata identical; exact planned98
+alias-only removals, no additions. Demo295->246, Nikadent202->153 (49each).
+Both production pack validators PASS; D2 content/catalogs and source UI/followups/
+CTA/video projections preserved. Comparison normalizes LF/CRLF: initial raw
+Git-archive comparison exposed pre-existing mixed checkout line endings only;
+final text equality and Git deletion-only diff establish this edit's boundary.
+Normalized MD corpus94091->92482 demo,67946->66282 Nikadent:3273 fewer characters,
+about2.02% of the MD portion only, not a measured token/full-prompt reduction.
+Runtime/model behavior is unchanged by code; free-text model quality not tested.
+Independent Checker PASS:20 existing tests PASS; all115 bodies/metadata,
+protected distinctions and actual D2 source UI independently verified. No stage/commit/push/live/provider/SMTP/deploy.
+
+
 ## 72. Demo catalog alias cleanup — owner GO 2026-10-15
 
 Owner approved fixing the audited demo service_catalog.json:26 price templates,

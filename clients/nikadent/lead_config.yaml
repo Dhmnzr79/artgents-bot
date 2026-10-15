@@ -3,6 +3,7 @@
 delivery: email
 recipients:
   - gothica@mail.ru
+  - vikadent2025@mail.ru
 subject_template: "Заявка с бота Nikadent"
 store_in_postgres: false
 success_message_key: lead_submit_ok

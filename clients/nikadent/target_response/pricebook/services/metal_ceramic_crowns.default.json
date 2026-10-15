@@ -1,0 +1,22 @@
+{
+  "offer_id": "metal_ceramic_crowns.default",
+  "service_id": "metal_ceramic_crowns",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 22000,
+    "currency": "RUB",
+    "billing_unit": "tooth"
+  },
+  "package": {
+    "label": "за одну коронку на свой зуб",
+    "includes": [],
+    "excludes": []
+  },
+  "fact_refs": [],
+  "followups": [],
+  "applies_to_extents": [
+    "one_tooth",
+    "few_teeth"
+  ]
+}

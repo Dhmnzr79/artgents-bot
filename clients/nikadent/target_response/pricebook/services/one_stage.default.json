@@ -1,0 +1,35 @@
+{
+  "offer_id": "one_stage.default",
+  "service_id": "one_stage",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 35000,
+    "currency": "RUB",
+    "billing_unit": "implant"
+  },
+  "package": {
+    "label": "за установку одного импланта с формирователем десны; хирургический этап",
+    "includes": [
+      "Установка одного импланта с формирователем десны"
+    ],
+    "excludes": [
+      "Коронка и протезирование не входят в эту сумму."
+    ]
+  },
+  "fact_refs": [],
+  "followups": [],
+  "applies_to_extents": [
+    "one_tooth",
+    "few_teeth"
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Коронка и протезирование не входят в эту сумму."
+      }
+    ]
+  }
+}

@@ -4,14 +4,19 @@
   "active": true,
   "price": {
     "mode": "from",
-    "min_amount": 5000,
+    "min_amount": 5500,
     "currency": "RUB",
     "billing_unit": "tooth"
   },
   "package": {
-    "label": "за удаление; зависит от сложности",
-    "includes": []
+    "label": "за удаление одного зуба; зависит от сложности",
+    "includes": [],
+    "excludes": []
   },
   "fact_refs": [],
-  "followups": []
+  "followups": [],
+  "applies_to_extents": [
+    "one_tooth",
+    "few_teeth"
+  ]
 }

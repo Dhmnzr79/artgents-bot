@@ -1,0 +1,20 @@
+{
+  "offer_id": "teeth_treatment.default",
+  "service_id": "teeth_treatment",
+  "active": true,
+  "price": {
+    "mode": "no_public_price",
+    "approved_text": "Стоимость зависит от вида лечения. Установка пломбы и лечение корневых каналов — разные объёмы работы; полный план рассчитают после осмотра."
+  },
+  "package": {
+    "label": "расчёт зависит от необходимого лечения",
+    "includes": [],
+    "excludes": []
+  },
+  "fact_refs": [],
+  "followups": [],
+  "applies_to_extents": [
+    "one_tooth",
+    "few_teeth"
+  ]
+}

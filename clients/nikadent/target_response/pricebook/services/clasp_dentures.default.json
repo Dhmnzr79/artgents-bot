@@ -1,0 +1,21 @@
+{
+  "offer_id": "clasp_dentures.default",
+  "service_id": "clasp_dentures",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 65000,
+    "currency": "RUB",
+    "billing_unit": "jaw"
+  },
+  "package": {
+    "label": "за один бюгельный протез на одну челюсть; зависит от фиксации",
+    "includes": [],
+    "excludes": []
+  },
+  "fact_refs": [],
+  "followups": [],
+  "applies_to_extents": [
+    "few_teeth"
+  ]
+}

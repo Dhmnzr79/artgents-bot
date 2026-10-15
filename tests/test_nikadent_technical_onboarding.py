@@ -56,7 +56,7 @@ def test_nikadent_accepted_slots_send_once_and_replay_without_private_data(http_
     assert send(client, transport, **args) == body
     smtp.send_message.assert_called_once()
     message = smtp.send_message.call_args.args[0]
-    assert message["To"] == "gothica@mail.ru"
+    assert message["To"] == "gothica@mail.ru, vikadent2025@mail.ru"
     assert "Никадент" in message.get_content()
     assert "Анна" in message.get_content() and "+79001234567" in message.get_content()
     assert len(fake.inputs) == 1

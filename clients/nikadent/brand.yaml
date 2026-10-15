@@ -2,7 +2,7 @@ clinic_name: "Никадент"
 logo_url: null
 logo_width: null
 logo_height: null
-avatar_url: null
+avatar_url: "/static/clients/nikadent/avatar-placeholder.svg"
 
 colors:
   brand: "#1F4E79"

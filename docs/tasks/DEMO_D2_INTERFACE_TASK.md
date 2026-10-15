@@ -1,4 +1,63 @@
-# Текущая карточка — чистка документации и тестов
+# Текущая карточка — НикаДент
+
+## 65. Nikadent technical onboarding — owner GO 2026-10-15
+
+Type: bug fix / integration, not architecture simplification. User approved real
+email leads, bot operation using the current Nikadent pack, local demo/Nikadent
+switching, deployment and customer-site testing. User installs the supplied embed
+code; no customer CMS/browser access. Content authoring and price completion are
+explicitly postponed. Existing contact/doctor MD must remain tenant-owned.
+
+Preflight: repository/top C:/Cursor Projects/artgents-bot-active;
+branch codex/nikadent-technical-onboarding; HEAD/baseline/origin-main/merge-base
+e93cb121e8ea45c31dc45b435720a556fda8033d, fetched before branch creation.
+Latest docs read on fc84066 / open PR #30 before switching. Tracked tree clean;
+foreign WIP otzyv-1.jpg, otzyv-2.jpg, otzyv-3.jpg preserved.
+
+Exact tracked allowlist:
+- core/d2_dialogue.py, core/d2_lead_bridge.py, core/d2_dialogue_store.py;
+- lead_service.py;
+- clients/nikadent/lead_config.yaml, clients/nikadent/widget_integration.json;
+- clients/nikadent/brand.yaml, clients/nikadent/target_response/pricebook/facts.json;
+- static/clients/nikadent/avatar-placeholder.svg;
+- static/widget/widget.js, static/widget-test.html, static/widget-test-panel.js;
+- static/multiclient/index.html;
+- tests/test_nikadent_technical_onboarding.py, tests/js/nikadent_panel_harness.mjs;
+- tests/release/offline.txt;
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md, docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md,
+  docs/tasks/DEMO_D2_CURRENT_STATUS.md.
+Local-only allowlist: .env (SMTP nonsecret values + blank password entry, explicit
+ALLOWED_CLIENTS demo,nikadent); never stage credentials, .env, DB or dialogue logs.
+
+Mechanism: accepted private slots are captured request-locally before existing
+PII cleanup, then existing handle_lead/SMTP selects the tenant delivery mode.
+Only actual submission requests an effect. Replace universal stub with actual
+delivery; demo still selects demo_stub through its existing pack. Save final
+response and existing effect status atomically for terminal replay. Pending or
+ambiguous SMTP result never claims success; no automatic retry/queue/exactly-once
+claim. Example: missing SMTP -> cannot send; SMTP exception -> delivery unconfirmed.
+No model/parser/router changes. Sole delivery result owner is the existing lead
+path; ordinary semantic decisions remain with the model per Target Contract §3.
+Astra consulted: capture before exit_lead_flow; clear before durable commit; do not
+reparse the phone in the adapter or expose active collection during SMTP.
+
+Acceptance: offline actual JSON/SSE + mocked SMTP, correct accepted name/phone,
+tenant recipient, demo zero SMTP, sent/failed/unknown + replay, commit failure
+zero sends, PII absent from D2 completion; Nikadent snapshot/model view loads;
+canonical contacts and own doctor docs reach provider; widget config/origins and
+independent browser session keys. CI release union before merge, independent Checker.
+Live hard cap 20 model calls + one synthetic test email; record actual counts.
+VPS env access, password entry and embed insertion are distinct deployment inputs;
+do not claim actual site or inbox verification from offline evidence.
+
+Checkpoint evidence: executor 32 targeted PASS; independent Checker PASS and
+13/13 onboarding tests including real panel-module Node harness. Diff check clean.
+Full release selection running separately; no live model or email sends so far.
+Public GET /health/live and same-origin /api/widget-config both 200 for demo and
+nikadent: registry/hostname already present on VPS. Admin SSH was not established;
+SMTP production values remain unverified. No customer-site/CMS access performed.
+
+## Historical cleanup receipts
 
 Действующий checkpoint — §62, ниже. Предыдущие §60–61 — receipts этой же
 чистки, не новая очередь и не повторное разрешение на runtime.

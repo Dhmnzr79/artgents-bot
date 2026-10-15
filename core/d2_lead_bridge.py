@@ -10,6 +10,7 @@ from dataclasses import dataclass, replace
 from typing import Literal
 
 from contracts.d2_tenant_snapshot import D2TenantSnapshot
+from contracts.d2_dialogue import D2LeadEffectStatus
 from contracts.request_understanding import RequestUnderstanding
 from contracts.response_plan import (
     ComposerResult,
@@ -28,6 +29,7 @@ from contracts.response_plan_materialization import (
 )
 from contracts.response_plan_post_composer import ResponseSituationDelta
 from core.client_config_loader import resolve_lead_name_prompt, tone_to_txt_dict
+from lead_service import handle_lead, resolve_lead_submit_message
 from core.clinic_policy_resolver import resolve_clinic_policies, resolve_clinic_policy_operations
 from core.d2_snapshot_sources import d2_authored_policy_answers
 from core.lead_phone_input import parse_unambiguous_lead_phone
@@ -82,6 +84,45 @@ class D2LeadBridgeResult:
     response: MaterializedResponseOutcome
     booking_request_id: str | None = None
     request_effect: bool = False
+
+
+def prepare_d2_lead_dispatcher(session_key: SessionKey, request_id: str):
+    """Capture accepted private slots before cleanup; never persist this payload in D2."""
+    if not d2_lead_session_client_matches(session_key):
+        raise ValueError("d2_lead_session_client_required")
+    profile = mem_get(session_key.sid).get("profile") or {}
+    payload = {"name": str(profile.get("name") or ""),
+               "phone": str(profile.get("phone") or ""),
+               "sid": session_key.sid, "request_id": request_id}
+
+    class ClinicLeadDispatcher:
+        def dispatch(self, *, effect_id: str):
+            result, status = handle_lead(payload, client_id=session_key.client_id)
+            delivery = result.get("delivery_status") or result.get("delivery")
+            if status == 200 and delivery in {"email", "email_pg_enqueue_failed"}:
+                return "sent"
+            if status == 200 and delivery == "demo_stub":
+                return "demo_stub"
+            if delivery in {"email_smtp_not_configured", "email_no_recipients",
+                            "email_smtp_invalid_config"} or result.get("error_code") in {"bad_phone", "unknown_client"}:
+                return "failed"
+            # SMTP failure can follow server acceptance. Never automatically resend.
+            return "unknown"
+
+    return ClinicLeadDispatcher()
+
+
+def resolve_d2_lead_delivery_response(
+    snapshot: D2TenantSnapshot, *, session_key: SessionKey, status: D2LeadEffectStatus,
+) -> MaterializedResponseOutcome:
+    """The lead owner freezes the same truthful delivery result for HTTP and replay."""
+    if status in {"sent", "demo_stub"}:
+        text = resolve_lead_submit_message(session_key.client_id, tone_to_txt_dict(session_key.client_id))
+    elif status == "failed":
+        text = "Не удалось отправить заявку. Пожалуйста, свяжитесь с клиникой напрямую."
+    else:
+        text = "Подтверждение отправки заявки пока не получено. Пожалуйста, свяжитесь с клиникой напрямую."
+    return _plain_answer(snapshot, session_key=session_key, text=text, quick=())
 
 
 @dataclass(frozen=True, slots=True)
@@ -358,8 +399,8 @@ def resolve_d2_lead_pre_provider(
         step = (st.get("lead_intent") or "").strip()
         if step == "collecting_phone":
             update_profile(sid, phone=decision.slot_value)
-            exit_lead_flow(sid)
-            text = txt.get("lead_submit_ok") or "Спасибо! Заявку передали администратору."
+            # The runner captures accepted slots and clears them before committing.
+            text = "Подтверждение отправки заявки пока не получено."
             return D2LeadBridgeResult(
                 kind="submitted",
                 response=_plain_answer(snapshot, session_key=session_key, text=text, quick=()),

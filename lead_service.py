@@ -171,14 +171,15 @@ def handle_lead(data: dict[str, Any], *, client_id: str) -> tuple[dict[str, Any]
             else:
                 delivery_status = "pg_enqueue_failed"
 
+    delivery_ok = delivery_status in {"email", "email_pg_enqueue_failed", "queued"}
     _emit_lead_event(
         client_id=tenant,
-        status="ok",
+        status="ok" if delivery_ok else "error",
         details={
-            "ok": True,
+            "ok": delivery_ok,
             "delivery": mode,
             "delivery_status": delivery_status,
-            "error_code": None,
+            "error_code": None if delivery_ok else delivery_status,
             "has_name": bool(name),
             "has_situation_note": bool(situation_note),
             "has_dialog_excerpt": dialog_excerpt.strip() != "—",
@@ -186,8 +187,8 @@ def handle_lead(data: dict[str, Any], *, client_id: str) -> tuple[dict[str, Any]
         },
     )
     return {
-        "ok": True,
-        "error_code": None,
+        "ok": delivery_ok,
+        "error_code": None if delivery_ok else delivery_status,
         "delivery": mode,
         "delivery_status": delivery_status,
-    }, 200
+    }, 200 if delivery_ok else 503

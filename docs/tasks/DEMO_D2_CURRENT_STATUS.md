@@ -1,5 +1,32 @@
 # D2 demo — текущее состояние
 
+## НикаДент — техническое подключение, 2026-10-15
+
+Текущий этап: Interface §65 / codex/nikadent-technical-onboarding, baseline e93cb12.
+Owner разрешил подготовку, выкладку и тестирование; контент/новые цены отложены.
+Актуальная demo handoff-документация отдельно в fc84066, PR #30 пока открыт.
+Этот раздел заменяет старые сведения о текущей ветке/релизе ниже: demo ранее
+развёрнут на e93cb12, PR #27–29 merged, Inter 400–600. Старый срез ниже исторический.
+
+Локально: Nikadent snapshot загружается после заполнения существующего обязательного
+microfact_text; назначен временный получатель gothica@mail.ru. Убран универсальный
+demo dispatcher: действующий lead/effect путь использует прежний tenant delivery
+service. Accepted PII живёт только в private session/request closure; terminal text
+и effect receipt сохраняются вместе, без автоматического resend. Demo остаётся stub.
+Панель получает конфигурацию выбранной клиники с API; SID и teaser keys разделены
+по клиентам. Nikadent41.ru и локальная панель разрешены exact-origin настройками;
+аватар временный SVG, MD и суммы не редактировались.
+
+Проверки на момент записи: 32 targeted offline PASS (actual JSON/SSE + mocked
+SMTP, replay, tenant/contact/doctor grounding, phone modes, existing SMTP unit
+tests), panel Node harness PASS. Первые ошибки новых tests относились к использованию
+historical JSON helper и неверной метке boundary; tests исправлены под current
+text protocol. Ни одного live/provider/SMTP вызова. Full CI и Checker впереди;
+Независимый Checker PASS, собственные 13 onboarding tests PASS. Full release
+selection выполняется отдельно. Публичные health/config demo и nikadent вернули
+200 при корректном Origin: hostname/registry уже подключены. SMTP на VPS,
+получение письма и установка на сайт клиента ещё не подтверждены.
+
 Срез 2026-10-13. Здесь только актуальные факты и незакрытые задачи.
 Датированные записи прежних веток, экспериментов и checkpoint сохранены целиком
 в [архиве состояния](../archive/pre-d2/tasks/DEMO_D2_CURRENT_STATUS.md).

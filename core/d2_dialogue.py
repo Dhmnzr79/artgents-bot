@@ -20,6 +20,7 @@ from contracts.d2_session_context import (
     D2SessionActivity, D2SessionTtlPolicy, D2SessionState, D2SessionSnapshot,
     D2_SESSION_SCHEMA_VERSION, empty_d2_session_snapshot,
 )
+from contracts.d2_tenant_snapshot import D2TenantSnapshot
 from contracts.response_plan import D2PriceDetailUiAction, D2PriceSelectUiAction, SessionKey
 from contracts.d2_dialogue_result import (
     DiscussionScope, DiscussionVolume, D2DialogueResult, PriceOperation, ExplanationOperation, DetailOperation,
@@ -46,6 +47,8 @@ from core.d2_lead_bridge import (
     reconcile_d2_lead_pause,
     resolve_d2_booking_lead_entry,
     resolve_d2_lead_pre_provider,
+    prepare_d2_lead_dispatcher,
+    resolve_d2_lead_delivery_response,
 )
 from core.d2_session_context import project_d2_session_context
 from core.d2_snapshot_sources import (
@@ -522,12 +525,10 @@ def _run_lead_pre_provider_turn(
     if bridge.request_effect:
         if effect_id is None:
             effect_id = f"lead-{request_id}"
-
-            class _DemoStubDispatcher:
-                def dispatch(self, *, effect_id: str):
-                    return "demo_stub"
-
-            effect_dispatcher = effect_dispatcher or _DemoStubDispatcher()
+        effect_dispatcher = effect_dispatcher or prepare_d2_lead_dispatcher(session_key, request_id)
+        # exit_lead_flow erases PII. Dispatch retains it only in this request's closure.
+        from session import exit_lead_flow
+        exit_lead_flow(session_key.sid)
     return _commit_non_price_d2_turn(
         session_key=session_key,
         store=store,
@@ -542,6 +543,7 @@ def _run_lead_pre_provider_turn(
         lead_effect_dispatcher=(
             effect_dispatcher if bridge.request_effect else lead_effect_dispatcher
         ),
+        lead_delivery_snapshot=tenant if bridge.request_effect else None,
     )
 
 
@@ -561,6 +563,7 @@ def _commit_non_price_d2_turn(
     clarify_task: ClarifiedOperation | None = None,
     prepared_state=None, safe_user_message=None, selected_ui_ref=None, ttl_policy=None,
     lead_pause_response: bool = False,
+    lead_delivery_snapshot: D2TenantSnapshot | None = None,
 ) -> D2DialogueTurn:
     """Commit a result and its receipt references in the sole D2 store."""
     if lead_pause_response:
@@ -625,10 +628,16 @@ def _commit_non_price_d2_turn(
                 raise ValueError("d2_lead_effect_dispatch_status_invalid")
         except Exception:
             effect_status = "unknown"
+        final_response = (
+            resolve_d2_lead_delivery_response(
+                lead_delivery_snapshot, session_key=session_key, status=effect_status,
+            ) if lead_delivery_snapshot is not None else None
+        )
         completion = store.update_lead_effect(
             session_key,
             request_id=request_id,
             effect=D2LeadEffect(effect_id=lead_effect_id, status=effect_status),
+            response=final_response,
         )
         full_audit("effect_result", status=effect_status, completion=completion)
     turn_result = _turn_from_completion(completion, idempotent_replay=False)

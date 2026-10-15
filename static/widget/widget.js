@@ -677,6 +677,8 @@ export function mountWidget(root, config) {
 
   const apiBase = config.apiBase ?? "";
   const clientId = String(config.clientId).trim();
+  const sidStorageKey = `${STORAGE_SID}:${clientId}`;
+  const teaserStorageKey = `${STORAGE_LAUNCHER_TEASER}:${clientId}`;
   const resolvedAvatarUrl = resolvePackAssetUrl(
     apiBase,
     (config.avatarUrl || "").trim() || DEFAULT_AVATAR_URL
@@ -1054,7 +1056,7 @@ export function mountWidget(root, config) {
 
   function wasLauncherTeaserShown() {
     try {
-      return sessionStorage.getItem(STORAGE_LAUNCHER_TEASER) === "1";
+      return sessionStorage.getItem(teaserStorageKey) === "1";
     } catch {
       return false;
     }
@@ -1062,7 +1064,7 @@ export function mountWidget(root, config) {
 
   function markLauncherTeaserShown() {
     try {
-      sessionStorage.setItem(STORAGE_LAUNCHER_TEASER, "1");
+      sessionStorage.setItem(teaserStorageKey, "1");
     } catch {
       /* ignore */
     }
@@ -1105,7 +1107,7 @@ export function mountWidget(root, config) {
 
   function getSid() {
     try {
-      return localStorage.getItem(STORAGE_SID) || "";
+      return localStorage.getItem(sidStorageKey) || "";
     } catch {
       return "";
     }
@@ -1114,7 +1116,7 @@ export function mountWidget(root, config) {
   function setSid(sid) {
     if (!sid) return;
     try {
-      localStorage.setItem(STORAGE_SID, sid);
+      localStorage.setItem(sidStorageKey, sid);
     } catch {
       /* ignore */
     }
@@ -1122,7 +1124,7 @@ export function mountWidget(root, config) {
 
   function clearStoredSid() {
     try {
-      localStorage.removeItem(STORAGE_SID);
+      localStorage.removeItem(sidStorageKey);
     } catch {
       /* ignore */
     }

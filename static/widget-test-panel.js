@@ -51,7 +51,30 @@ async function checkConnection() {
 window.addEventListener("pagehide", () => clearTimeout(timer));
 void checkConnection();
 
-const config = JSON.parse(document.getElementById("clinic-widget-config").textContent);
+const clientSelect = document.getElementById("client-select");
+const requestedClient = new URL(location.href).searchParams.get("client") || "demo";
+const clientId = ["demo", "nikadent"].includes(requestedClient) ? requestedClient : "demo";
+clientSelect.value = clientId;
+const clientUrl = id => {
+  const url = new URL(location.href);
+  url.searchParams.set("client", id);
+  return url;
+};
+document.getElementById("client-new-tab").href = clientUrl(clientId).href;
+clientSelect.addEventListener("change", () => location.assign(clientUrl(clientSelect.value).href));
+document.querySelector(".footer span").textContent = `${clientId === "demo" ? "Демо" : "НикаДент"} · ${location.host}`;
+let config;
+try {
+  const response = await fetch(`/api/widget-config?client_id=${encodeURIComponent(clientId)}`, {cache:"no-store"});
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  config = await response.json();
+  if (config.clientId !== clientId) throw new Error("Клиент в настройках не совпадает с выбранным");
+  config.apiBase = "";
+} catch (error) {
+  report(`Не удалось загрузить настройки ${clientId}: ${error.message}`);
+  for (const id of ["open-chat", "reset-chat"]) document.getElementById(id).disabled = true;
+  throw error;
+}
 const mount = document.createElement("div");
 document.body.appendChild(mount);
 const widget = mountWidget(mount, config);

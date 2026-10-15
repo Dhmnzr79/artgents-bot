@@ -1,5 +1,14 @@
 # Текущая дорожная карта demo-бота
 
+## Текущая очередь — launcher concept1, owner GO 2026-10-15
+
+Interface §68: первый вариант из widget-concepts.html владельца, белая капсула,
+аватар/зелёная точка, синяя стрелка, anchored expansion10s. Продолжение локального
+НикаДент, baseline50d61af, та же ветка/PR31. Заменить прежнюю отдельную подсказку
+одной поверхностью, повтор анимации из тестовой панели, mobile/reduced-motion,
+offline DOM checks и Checker. Это presentation feature; demo и D2 paths прежние.
+Model/SMTP calls0, merge/deploy не входят.
+
 ## Текущая очередь — согласие перед заявкой, owner GO 2026-10-15
 
 Interface §67, продолжение локального подключения НикаДент, baseline2beb02b,

@@ -96,6 +96,12 @@ pageSelect.addEventListener("change", () => {
 });
 document.body.appendChild(mount);
 const widget = mountWidget(mount, config, {pagePath});
+const repeatInvitation = document.getElementById("repeat-invitation");
+repeatInvitation.disabled = config.demoLauncher || !config.launcherTeaser;
+repeatInvitation.addEventListener("click", () => {
+  widget.restartLauncherTeaser();
+  report("Приглашение свернуто и раскроется через 10 секунд.");
+});
 const launcher = mount.querySelector("[data-clinic-launcher-open], [data-clinic-launcher]");
 const input = mount.querySelector("[data-clinic-input]");
 const form = mount.querySelector("[data-clinic-composer-form]");

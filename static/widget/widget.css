@@ -188,26 +188,62 @@
 }
 
 .clinic-shell__launcher-card {
+  --clinic-launcher-w: 244px;
+  --clinic-launcher-h: 60px;
+  --clinic-launcher-expanded-w: 330px;
+  --clinic-launcher-expanded-h: 184px;
   position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  background: var(--clinic-bg);
-  border: 1px solid var(--clinic-border);
-  border-radius: var(--clinic-radius-lg);
-  box-shadow: var(--clinic-shadow-soft);
+  width: min(var(--clinic-launcher-w), calc(100vw - 40px));
+  height: var(--clinic-launcher-h);
+  background: #fff;
+  color: var(--clinic-text);
+  border: 1px solid #e0e5ed;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(32, 44, 60, .11);
   overflow: hidden;
+  transition: width .36s cubic-bezier(.2,.8,.2,1), height .36s cubic-bezier(.2,.8,.2,1), border-radius .36s;
 }
 
-.clinic-shell__launcher-body {
-  padding: 22px 22px 18px;
+.clinic-shell.is-launcher-teaser .clinic-shell__launcher-card {
+  width: min(var(--clinic-launcher-expanded-w), calc(100vw - 40px));
+  height: var(--clinic-launcher-expanded-h);
+  border-radius: 22px;
 }
 
-.clinic-shell__launcher-row {
+.clinic-shell__launcher-card .clinic-shell__launcher {
+  position: absolute;
+  bottom: 0;
+  left: 0;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  min-width: 0;
+  width: 100%;
+  max-width: none;
+  height: var(--clinic-launcher-h);
+  padding: 0 16px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  color: inherit;
+}
+.clinic-shell.is-launcher-teaser .clinic-shell__launcher-card .clinic-shell__launcher {
+  border-top: 1px solid #edf0f4;
+}
+.clinic-shell__launcher-card .clinic-shell__launcher:hover { background: #fafbff; box-shadow: none; }
+.clinic-shell__launcher-card .clinic-shell__launcher:focus-visible { outline: 2px solid #0c2fe0; outline-offset: -4px; box-shadow: none; }
+.clinic-shell__launcher-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; white-space: nowrap; }
+.clinic-shell__launcher-card .clinic-shell__name { font-size: 14px; font-weight: 550; line-height: 1.2; }
+.clinic-shell__launcher-card .clinic-shell__launcher-subtitle { font-size: 10px; color: #6e7887; line-height: 1.3; }
+.clinic-shell__launcher-arrow { width: 20px; height: 20px; flex-shrink: 0; margin-left: auto; color: #0c2fe0; opacity: 0; transition: opacity .15s; }
+.clinic-shell__launcher-arrow svg { display: block; width: 100%; height: 100%; }
+.clinic-shell.is-launcher-teaser .clinic-shell__launcher-arrow { opacity: 1; }
+.clinic-shell__launcher-dismiss { position: absolute; top: 4px; right: 4px; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #687385; font-size: 24px; line-height: 1; cursor: pointer; }
+.clinic-shell__launcher-dismiss:hover { background: #f3f5f8; }
+.clinic-shell__launcher-dismiss:focus-visible { outline: 2px solid #0c2fe0; outline-offset: -4px; }
+.clinic-shell.is-open .clinic-shell__launcher-card { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .clinic-shell__launcher-card, .clinic-shell__launcher-teaser, .clinic-shell__launcher-arrow { transition: none !important; }
 }
 
 .clinic-shell__launcher-avatar {
@@ -216,9 +252,12 @@
   line-height: 0;
 }
 
-.clinic-shell__avatar-fallback--launcher {
-  width: 40px;
-  height: 40px;
+.clinic-shell__launcher-card .clinic-shell__avatar-fallback--launcher {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: #edf3fa;
 }
 
 .clinic-shell__header-online-dot--launcher {
@@ -230,6 +269,7 @@
 
 .clinic-shell__launcher-avatar .clinic-shell__header-online-dot {
   z-index: 1;
+  background: #28c13a;
   box-shadow: 0 0 0 2px var(--clinic-bg);
 }
 
@@ -350,62 +390,26 @@
   opacity: 1;
 }
 
+/* One anchored surface; the teaser is content inside the capsule. */
 .clinic-shell__launcher-teaser {
-  display: none;
-  width: min(300px, calc(100vw - 40px));
-  margin: 0 0 10px;
-  padding: 14px 16px;
-  border: 1px solid var(--clinic-border);
-  border-radius: var(--clinic-radius-lg);
-  background: var(--clinic-bg);
-  box-shadow: var(--clinic-shadow-soft);
-  color: var(--clinic-text);
-  font-family: inherit;
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 1.4;
-  text-align: left;
-  cursor: pointer;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: min(var(--clinic-launcher-expanded-w), calc(100vw - 40px));
+  padding: 20px 48px 12px 21px;
   opacity: 0;
-  transform: translateY(10px) scale(0.96);
-  transition:
-    opacity 0.3s ease,
-    transform 0.3s ease,
-    box-shadow 0.2s ease;
+  visibility: hidden;
+  transform: translateY(5px);
+  transition: opacity .12s, transform .2s, visibility .12s;
 }
-
-.clinic-shell__launcher-teaser:hover {
-  box-shadow: var(--clinic-shadow);
-}
-
-.clinic-shell__launcher-teaser:focus-visible {
-  outline: none;
-  box-shadow: var(--clinic-shadow), var(--clinic-focus);
-}
-
-.clinic-shell__launcher-teaser-text {
-  display: block;
-}
-
+.clinic-shell__launcher-kicker { display: block; font-size: 10px; line-height: 1.3; color: #758196; text-transform: uppercase; }
+.clinic-shell__launcher-heading { display: block; font-size: 20px; font-weight: 500; line-height: 1.2; margin: 9px 0 7px; }
+.clinic-shell__launcher-teaser-text { font-size: 13px; font-weight: 400; line-height: 1.6; color: #6e7887; margin: 0; }
 .clinic-shell.is-launcher-teaser:not(.is-open) .clinic-shell__launcher-teaser {
-  display: block;
   opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-.clinic-shell.is-launcher-teaser:not(.is-open) .clinic-shell__launcher:not(.clinic-shell__launcher--demo) {
-  transform: scale(1.05);
-  box-shadow: var(--clinic-shadow);
-}
-
-.clinic-shell__launcher:not(.clinic-shell__launcher--demo) {
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
-}
-
-.clinic-shell.is-open .clinic-shell__launcher-teaser {
-  display: none;
+  visibility: visible;
+  transform: none;
+  transition-delay: .16s;
 }
 
 .clinic-shell__panel {
@@ -1409,68 +1413,16 @@
       0 3px 10px rgba(var(--clinic-brand-rgb), 0.12);
   }
 
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-teaser {
-    width: 200px;
-    max-width: 200px;
-    border-radius: 10px;
+  .clinic-shell__launcher-card {
+    --clinic-launcher-w: 228px;
+    --clinic-launcher-h: 56px;
+    --clinic-launcher-expanded-w: 296px;
+    --clinic-launcher-expanded-h: 208px;
+    max-width: calc(100vw - 24px);
   }
-
-  .clinic-shell:not(.is-open) .clinic-shell__launcher:not(.clinic-shell__launcher--demo) {
-    width: 200px;
-    max-width: 200px;
-    padding: 10px;
-    border: 1px solid rgba(var(--clinic-brand-rgb), 0.12);
-    border-radius: 10px;
-    background: var(--clinic-bg);
-    background-image: none;
-    box-shadow: var(--clinic-mobile-launcher-shadow);
-  }
-
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-row {
-    align-items: center;
-    gap: 0;
-  }
-
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-text {
-    gap: 2px;
-    padding-left: 10px;
-  }
-
-  .clinic-shell:not(.is-open) .clinic-shell__name,
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-subtitle,
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-tagline,
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-link {
-    display: none;
-  }
-
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-mobile-headline {
-    display: block;
-    margin: 0;
-    font-size: 16px;
-    line-height: 1.25;
-    font-weight: 500;
-    letter-spacing: 0;
-    color: var(--clinic-text);
-  }
-
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-avatar .clinic-shell__avatar-fallback--launcher {
-    width: 36px;
-    height: 36px;
-  }
-
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-avatar .clinic-shell__header-online-dot--launcher {
-    width: 10px;
-    height: 10px;
-  }
-
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-mobile-online {
-    display: block;
-    margin: 0;
-    font-size: 13px;
-    line-height: 1.25;
-    font-weight: 500;
-    color: #0e9f17;
-  }
+  .clinic-shell__launcher-card .clinic-shell__launcher { gap: 10px; padding: 0 13px; }
+  .clinic-shell__launcher-teaser { max-width: calc(100vw - 24px); padding-top: 18px; }
+  .clinic-shell__launcher-heading { font-size: 19px; }
 
   .clinic-shell.is-open.is-mobile-fullscreen {
     --clinic-radius-widget: 0;
@@ -1815,4 +1767,8 @@ button.clinic-price-card__overview-row:hover{background:#f3f6ff}
     font-size: 15px;
     font-weight: 600;
   }
+}
+
+@media (max-width: 340px) {
+  .clinic-shell__launcher-card { --clinic-launcher-expanded-h: 224px; }
 }

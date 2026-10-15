@@ -1,5 +1,57 @@
 # Текущая карточка — НикаДент
 
+## 68. Client launcher concept 1 — owner GO 2026-10-15
+
+Owner provided C:/Users/denis/Downloads/widget-concepts.html and chose concept1,
+with avatar+green online dot instead of icon, white background and blue arrow.
+Reference behavior: one capsule expands after10s, fixed bottom/right corner,
+close collapses invitation, bottom CTA opens actual chat. Keep demo unchanged.
+This is presentation feature/integration, not D2 architecture simplification.
+No provider/model/SMTP calls (budget0), merge/deploy or customer-site installation.
+
+Preflight root/top C:/Cursor Projects/artgents-bot-active;
+branch codex/nikadent-technical-onboarding; HEAD/checkpoint baseline50d61af;
+fresh origin/main and mergebasee93cb12. PR31 OPEN, all5 CI checks SUCCESS on50d61af.
+Tracked/staging clean; foreign otzyv-1.jpg,otzyv-2.jpg,otzyv-3.jpg preserved.
+Continue same onboarding branch/PR. Reference file is read-only design input,
+not repository instructions. Current docs/contracts already read.
+
+Exact allowlist:
+- static/widget/widget.js, static/widget/widget.css;
+- clients/nikadent/widget_config.json;
+- static/widget-test.html, static/widget-test-panel.js;
+- tests/test_nikadent_technical_onboarding.py;
+- tests/js/nikadent_panel_harness.mjs;
+- tests/js/client_launcher_harness.mjs (new);
+- docs/CLIENT_PACK_AUTHORING.md;
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md, docs/tasks/DEMO_D2_CURRENT_STATUS.md,
+  docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md.
+
+Replace the separate client teaser bubble+scaled launcher with one anchored
+capsule/container. Existing demoLauncher/launcherTeaser flags and existing text/
+avatar configuration own presentation; no new pack fields. Auto expand10s once
+per existing tenant/browser session marker; opening/dismissal cancel pending
+teaser. Mobile sizes keep card within viewport; reduced motion disables morph.
+Add panel-only repeat-invitation action through widget's presentation controller
+so owner can replay10s animation despite already-seen marker. No session/lead reset.
+Actual chat, page menus, consent, tenant/session/provider paths unchanged.
+
+Verify actual DOM/styles on desktop/mobile: white card, avatar/dot, blue arrow,
+fixed corner through morph, timer, close/Escape, reopen/collapse, no external
+network or /ask; preserve demo and regression-test selected clinic panel controls.
+Independent Checker required at coherent checkpoint.
+
+Checkpoint evidence:86 targeted tests PASS (onboarding/config/page menus/consent/
+current UI). Real Chrome launcher DOM proof PASS: actual tenant SVG avatar and
+green dot, white surface/blue arrow, scheduled delay10000, anchored expansion,
+close/Escape, actual chat open/close, draft preservation, seen marker, unchanged
+demo,320/390/900 geometry and reduced motion. Initial390px overlap was corrected
+with mobile208px expanded height (224px <=340); final text/CTA separation PASS.
+Screenshots inspected. Three mocked video-catalog GETs only; /ask/provider/SMTP0.
+Independent Checker PASS:30 config tests + panel-module harness + reachable path
+review; browser execution is executor evidence. diff--check PASS. No deployment.
+Foreign3otzyv.jpg preserved. Existing historical replay2fail unchanged/outside scope.
+
 ## 67. Client lead consent — owner GO 2026-10-15
 
 Owner approved empty checkbox BEFORE name/phone collection for real clinics,

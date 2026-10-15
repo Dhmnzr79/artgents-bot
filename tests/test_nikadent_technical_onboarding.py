@@ -1,6 +1,8 @@
 """Current HTTP/SSE -> existing SMTP with private slots and durable receipts."""
 import json
 import subprocess
+import os
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -164,3 +166,12 @@ def test_test_panel_uses_selected_pack_config():
     harness = Path(__file__).parent/"js/nikadent_panel_harness.mjs"
     result = subprocess.run(["node", "--experimental-vm-modules", str(harness)], capture_output=True, text=True, timeout=20)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows Chrome/Edge launcher DOM proof")
+def test_client_launcher_concept_one_browser():
+    harness = Path(__file__).parent / "js/client_launcher_harness.mjs"
+    result = subprocess.run(["node", str(harness)], capture_output=True, text=True,
+                            encoding="utf-8", env=os.environ.copy(), timeout=70)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert '"passed":true' in result.stdout

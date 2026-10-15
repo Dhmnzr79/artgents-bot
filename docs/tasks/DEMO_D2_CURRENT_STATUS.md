@@ -1,5 +1,25 @@
 # D2 demo — текущее состояние
 
+## НикаДент — свёрнутый виджет concept1, 2026-10-15
+
+§68, branch codex/nikadent-technical-onboarding / PR31, baseline50d61af.
+Первый вариант из локального widget-concepts.html владельца: белая капсула,
+SVG-avatar+зелёная точка, синяя стрелка. Через10с расширяется одним контейнером
+с фиксированным bottom/right; close/Escape сворачивают, CTA открывает настоящий
+чат. Прежняя отдельная bubble/scale удалена. Demo launcher сохранён.
+Mobile320/390 и desktop900 проверены; reduced motion без morph. Существующие
+текстовые поля widget_config.json, новых pack fields нет. В панели — повтор
+приглашения, без сброса SID/messages/lead/consent. Once-per-session marker сохранён.
+
+86 targeted offline tests PASS (onboarding/config/page menus/consent/current UI),
+Chrome DOM launcher proof PASS: scheduled delay10000, actual avatar/white/green/
+blue, fixed corner, close/Escape/chat reopen/draft preservation/seen marker/demo,
+320/390/900 geometry and reduced motion. Только mocked video catalog GET3;
+model/provider/SMTP calls0. Independent Checker PASS:30 config tests, panel-module
+harness, actual call-path/diff review. diff--check PASS. CI на предыдущем50d61af
+все5SUCCESS. На VPS/сайте клиента эта версия не проверялась и не выкладывалась.
+Посторонние3otzyv.jpg сохранены; прежние historical replay2fail вне этапа.
+
 ## НикаДент — согласие перед сбором контактов, 2026-10-15
 
 §67, continuation branch codex/nikadent-technical-onboarding / PR31,

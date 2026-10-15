@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "botName": "Консультант Никадент",
   "onlineLabel": "ИИ-консультант клиники. Онлайн 24/7",
-  "launcherSubtitle": null,
+  "launcherSubtitle": "ИИ-помощник клиники",
   "launcherCtaLabel": "Задать вопрос",
   "launcherTeaser": true,
   "demoLauncher": false,
@@ -47,6 +47,6 @@
       ]
     }
   ],
-  "launcherTagline": null,
-  "launcherTeaserText": "Есть вопросы? Задайте их онлайн консультанту."
+  "launcherTagline": "Есть вопросы о клинике?",
+  "launcherTeaserText": "Расскажу об услугах, ценах и врачах. Прямо здесь."
 }

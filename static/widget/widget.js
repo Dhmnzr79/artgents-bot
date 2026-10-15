@@ -6,7 +6,7 @@ import { casesForClient, casesForMessage, appendCaseCards, isCaseGalleryReply } 
 const STORAGE_SID = "clinic_widget_sid";
 const STORAGE_LAUNCHER_TEASER = "clinic_widget_launcher_teaser_shown";
 const DEFAULT_AVATAR_URL = "/static/avatar.png";
-const LAUNCHER_TEASER_DELAY_MS = 30000;
+const LAUNCHER_TEASER_DELAY_MS = 10000;
 const WELCOME_LEAVE_MS = 240;
 const TEXTAREA_MAX_HEIGHT = 112;
 const MOBILE_MAX_WIDTH_PX = 520;
@@ -226,9 +226,9 @@ function ruPhoneToBackendE164(inputVal) {
  * @property {string} [logoUrl] — логотип первого экрана из brand.yaml
  * @property {number} [logoWidth] — ширина лого в px (как в Figma)
  * @property {number} [logoHeight] — высота лого в px (как в Figma)
- * @property {string} [launcherSubtitle] — должность на превью (fallback без clinicName)
- * @property {string} [launcherTagline] — вторая строка на превью
- * @property {boolean} [launcherTeaser] — подсказка у лаунчера через ~30 с (по умолчанию true)
+ * @property {string} [launcherSubtitle] — подпись кнопки и надзаголовок приглашения
+ * @property {string} [launcherTagline] — заголовок раскрытого приглашения
+ * @property {boolean} [launcherTeaser] — расширение капсулы через 10 с
  * @property {string} [launcherTeaserText] — текст подсказки
  */
 
@@ -700,7 +700,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
   }
   if (!isWidgetPresentationContractValid(config)) {
     renderWidgetConfigError(root);
-    return { resetSession: () => {} };
+    return { resetSession: () => {}, restartLauncherTeaser: () => {} };
   }
 
   const apiBase = config.apiBase ?? "";
@@ -794,11 +794,8 @@ export function mountWidget(root, config, { pagePath } = {}) {
     config.launcherMobileCtaLabel || launcherCtaLabel
   ).trim();
   const clinicName = String(config.clinicName || "").trim();
-  const launcherSubtitle = clinicName
-    ? `ИИ-консультант «${clinicName}»`
-    : config.launcherSubtitle == null
-      ? ""
-      : String(config.launcherSubtitle).trim();
+  const launcherSubtitle = String(config.launcherSubtitle || "").trim() ||
+    (clinicName ? `ИИ-консультант «${clinicName}»` : "");
   const launcherTagline =
     config.launcherTagline == null ? "" : String(config.launcherTagline).trim();
   const launcherTeaserEnabled = !useDemoLauncher && config.launcherTeaser === true;
@@ -815,36 +812,35 @@ export function mountWidget(root, config, { pagePath } = {}) {
         aria-controls="clinic-panel"
       ></button>`
     : `
-      <button type="button" class="clinic-shell__launcher" data-clinic-launcher aria-expanded="false" aria-controls="clinic-panel">
+      <div class="clinic-shell__launcher-card" data-clinic-launcher-card>
+        <div class="clinic-shell__launcher-teaser" data-clinic-launcher-teaser aria-hidden="true">
+          <span class="clinic-shell__launcher-kicker" data-clinic-launcher-subtitle></span>
+          <strong class="clinic-shell__launcher-heading" data-clinic-launcher-tagline></strong>
+          <p class="clinic-shell__launcher-teaser-text" data-clinic-launcher-teaser-text></p>
+        </div>
+        <button type="button" class="clinic-shell__launcher-dismiss" data-clinic-launcher-dismiss
+          aria-label="Свернуть приглашение" hidden>×</button>
+        <button type="button" class="clinic-shell__launcher" data-clinic-launcher aria-expanded="false"
+          aria-haspopup="dialog" aria-controls="clinic-panel">
         <span class="clinic-shell__unread" data-clinic-unread aria-hidden="true"></span>
-        <div class="clinic-shell__launcher-row">
-          <div class="clinic-shell__launcher-avatar">
+          <span class="clinic-shell__launcher-avatar">
             <span class="clinic-shell__avatar-fallback clinic-shell__avatar-fallback--launcher" data-clinic-avatar-fb>
               <img class="clinic-shell__avatar-fallback-img" alt="" width="40" height="40" data-clinic-avatar />
             </span>
             <span class="clinic-shell__header-online-dot clinic-shell__header-online-dot--launcher" aria-hidden="true"></span>
-          </div>
-          <div class="clinic-shell__launcher-text">
+          </span>
+          <span class="clinic-shell__launcher-text">
             <span class="clinic-shell__name" data-clinic-name></span>
             <span class="clinic-shell__launcher-subtitle" data-clinic-launcher-subtitle></span>
-            <span class="clinic-shell__launcher-tagline" data-clinic-launcher-tagline></span>
-            <span class="clinic-shell__launcher-mobile-headline" data-clinic-launcher-mobile-headline></span>
-            <span class="clinic-shell__launcher-mobile-online">Онлайн 24/7</span>
-          </div>
-        </div>
-      </button>`;
+          </span>
+          <span class="clinic-shell__launcher-arrow" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M6 18 18 6M6 6h12v12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </button>
+      </div>`;
 
   root.innerHTML = `
     <div class="clinic-shell" data-clinic-root>
-      <button
-        type="button"
-        class="clinic-shell__launcher-teaser"
-        data-clinic-launcher-teaser
-        hidden
-        aria-label="Открыть чат с консультантом"
-      >
-        <span class="clinic-shell__launcher-teaser-text" data-clinic-launcher-teaser-text></span>
-      </button>
       ${launcherHtml}
       <div class="clinic-shell__panel" id="clinic-panel" role="dialog" aria-modal="true" aria-label="Чат" data-clinic-panel>
         <main class="clinic-shell__main" aria-label="Сообщения">
@@ -904,6 +900,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
   const btnClose = root.querySelector("[data-clinic-close]");
   const launcherTeaserEl = root.querySelector("[data-clinic-launcher-teaser]");
   const launcherTeaserTextEl = root.querySelector("[data-clinic-launcher-teaser-text]");
+  const launcherDismiss = root.querySelector("[data-clinic-launcher-dismiss]");
 
   const avatarImg = root.querySelector("[data-clinic-avatar]");
   const hAvatar = root.querySelector("[data-clinic-header-avatar]");
@@ -911,7 +908,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
   const launcherNameEl = root.querySelector("[data-clinic-launcher-name]");
   if (launcherNameEl) launcherNameEl.textContent = config.botName;
   const compactNameEl = root.querySelector("[data-clinic-name]");
-  if (compactNameEl) compactNameEl.textContent = config.botName;
+  if (compactNameEl) compactNameEl.textContent = launcherCtaLabel;
   for (const el of root.querySelectorAll("[data-clinic-launcher-subtitle]")) {
     el.textContent = launcherSubtitle;
   }
@@ -1107,23 +1104,25 @@ export function mountWidget(root, config, { pagePath } = {}) {
 
   function dismissLauncherTeaser() {
     shell.classList.remove("is-launcher-teaser");
-    if (launcherTeaserEl) launcherTeaserEl.hidden = true;
+    launcherTeaserEl?.setAttribute("aria-hidden", "true");
+    if (launcherDismiss) launcherDismiss.hidden = true;
   }
 
-  function showLauncherTeaser() {
-    if (!launcherTeaserEnabled || state.isOpen || wasLauncherTeaserShown()) return;
+  function showLauncherTeaser(force = false) {
+    if (!launcherTeaserEnabled || state.isOpen || (!force && wasLauncherTeaserShown())) return;
     markLauncherTeaserShown();
     if (launcherTeaserTextEl) launcherTeaserTextEl.textContent = launcherTeaserText;
-    if (launcherTeaserEl) launcherTeaserEl.hidden = false;
+    launcherTeaserEl?.setAttribute("aria-hidden", "false");
+    if (launcherDismiss) launcherDismiss.hidden = false;
     shell.classList.add("is-launcher-teaser");
   }
 
-  function scheduleLauncherTeaser() {
-    if (!launcherTeaserEnabled || wasLauncherTeaserShown()) return;
+  function scheduleLauncherTeaser(force = false) {
+    if (!launcherTeaserEnabled || (!force && wasLauncherTeaserShown())) return;
     clearLauncherTeaserTimer();
     launcherTeaserTimer = window.setTimeout(() => {
       launcherTeaserTimer = 0;
-      if (!state.isOpen) showLauncherTeaser();
+      if (!state.isOpen) showLauncherTeaser(force);
     }, LAUNCHER_TEASER_DELAY_MS);
   }
 
@@ -1131,6 +1130,14 @@ export function mountWidget(root, config, { pagePath } = {}) {
     clearLauncherTeaserTimer();
     markLauncherTeaserShown();
     dismissLauncherTeaser();
+  }
+
+  function restartLauncherTeaser() {
+    if (!launcherTeaserEnabled) return;
+    setOpen(false);
+    clearLauncherTeaserTimer();
+    dismissLauncherTeaser();
+    scheduleLauncherTeaser(true);
   }
 
   function getSid() {
@@ -2473,9 +2480,10 @@ export function mountWidget(root, config, { pagePath } = {}) {
     sendBtn.disabled = !input.value.trim();
   }
 
-  if (launcherTeaserEl) {
-    launcherTeaserEl.addEventListener("click", () => {
-      openChatFromLauncher();
+  if (launcherDismiss) {
+    launcherDismiss.addEventListener("click", () => {
+      cancelLauncherTeaser();
+      launcherControl?.focus();
     });
   }
 
@@ -2514,8 +2522,12 @@ export function mountWidget(root, config, { pagePath } = {}) {
   });
 
   document.addEventListener("keydown", (ev) => {
-    if (ev.key === "Escape" && state.isOpen) {
-      setOpen(false);
+    if (ev.key === "Escape") {
+      if (state.isOpen) setOpen(false);
+      else if (shell.classList.contains("is-launcher-teaser")) {
+        cancelLauncherTeaser();
+        launcherControl?.focus();
+      }
     }
   });
 
@@ -2543,5 +2555,5 @@ export function mountWidget(root, config, { pagePath } = {}) {
 
   setOpen(false);
 
-  return { resetSession };
+  return { resetSession, restartLauncherTeaser };
 }

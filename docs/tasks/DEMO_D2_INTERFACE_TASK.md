@@ -1,5 +1,30 @@
 # Текущая карточка — НикаДент
 
+## 72. Demo catalog alias cleanup — owner GO 2026-10-15
+
+Owner approved fixing the audited demo service_catalog.json:26 price templates,
+3 explanatory questions and5 explicitly ambiguous aliases; apply same rule to
+6 equivalent scenario/comparison aliases in the same file. Data cleanup/bug fix,
+not D2 architecture simplification. Remove40 source aliases; preserve existing
+unhyphenated all on 4/all on 6 forms by shortening their price templates into2
+identity aliases. Existing synonyms, spelling variants and option aliases stay.
+No runtime matching/filtering/prompt instructions or new fallback. All23 service
+IDs, names, active flags, scopes, refs, offers/prices and other fields unchanged.
+Root/top C:/Cursor Projects/artgents-bot-active; same branch
+codex/nikadent-technical-onboarding; HEAD/basec456448, main/mergebasee93cb12.
+Staging clean; local avatar.png and3otzyv preserved/excluded. Exact allowlist:
+- clients/demo/target_response/service_catalog.json
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md
+Verify catalog/snapshot loading and unchanged non-alias fields against baseline;
+existing pack validators and independent Checker. No live model/provider/SMTP,
+merge or VPS deployment. Free-text quality not certified without live checks.
+Evidence:16 validator tests PASS; actual snapshot/model catalog loads with the
+cleaned aliases. Baseline comparison confirms all23serviceIDs, every non-alias
+field and all option aliases unchanged. Root aliases152->114 (remove40, add2
+shortened spelling variants). diff--check PASS. Prior policy/price/replay
+baseline failures outside this data-only edit unchanged. Independent Checker
+PASS:40 removed/2 preserved forms, all other catalog fields identical.
+
 ## 71. Client-pack cleanup first scope — owner GO 2026-10-15
 
 Owner approved exactly four annotated audit items: remove empathy_enabled,

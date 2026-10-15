@@ -140,6 +140,11 @@ def validate_client_pack(
     if errors:
         return errors
     lead_features = features.get("leads") if isinstance(features.get("leads"), dict) else {}
+    from core.d2_usage_limits import limits_from_features
+    try:
+        limits_from_features(features)
+    except ValueError:
+        errors.append("features.yaml: usage_limits_invalid")
     lead_mode = str(lead_features.get("mode") or lead_config.get("delivery") or "demo_stub").strip()
     if lead_features.get("enabled") is True and lead_mode != "demo_stub":
         try:

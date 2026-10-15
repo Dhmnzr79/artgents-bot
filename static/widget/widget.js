@@ -2431,6 +2431,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
   }
 
   function syncComposerLeadUi() {
+    if (Number.isInteger(config.messageMaxChars) && config.messageMaxChars > 0) input.maxLength = config.messageMaxChars;
     const phone = isLeadPhoneStep();
     const consent = Boolean(state.lastPayload?.ui?.lead_consent);
     input.disabled = consent;

@@ -1,5 +1,65 @@
 # Текущая карточка — НикаДент
 
+## 82. Real-client usage protection — owner GO 2026-10-16
+
+Release continuation: owner now explicitly requests commit/push then VPS.
+Resume standard PR31→main→verified image→manual deploy after green checks.
+Preflight unchanged:21exact paths from external usage-limits-82/manifest.json,
+HEAD7c7ca52; origin/main=mergebasee93cb12,foreign3JPG preserved. No new runtime
+edits beyond reviewed stage82. Prior33new+236related+AstraPASS are reused;
+fresh complete GitHub CI/PG/secret scan required for final committed source.
+No live/provider/SMTP testing in this release; public health/config/static only.
+Earlier pause statements below record the stage's original boundary, superseded
+only for this authorized publication sequence.
+
+Bug fix / approved protection feature, NOT architecture simplification. Owner
+accepted10messages/min visitor,40/min tenant+IP,40AI questions/rolling24h visitor,
+1500characters,16KiB request,1000actual provider attempts/rolling24h tenant;
+then explicitly chose3new leads/hour/visitor. New chat/page must not reset visitor.
+AI exhaustion keeps canonical contacts and authenticated model-free booking;
+minute flood protection still applies. Demo keeps existing limits. No new model
+calls/classifier, semantic branches or change in price selection. Failed provider
+attempts cost quota; replay does not. No merge/deploy; release paused at7c7ca52.
+Root/top C:/Cursor Projects/artgents-bot-active, branch onboarding, HEAD7c7ca52,
+origin/main=mergebasee93cb12. Index clean; foreignotzyv-1/2/3.jpg preserved.
+Astra consulted on existing provider admission, atomic accounting and saved UI.
+Cross-origin embed uses tenant-scoped first-party localStorage visitorUUID sent
+as an untrusted rate bucket, not authentication; missingID uses trustedpeerIP,
+never newSID. No cross-sitecookie claim or fingerprinting. IP/tenant backstops
+remain necessary; deleting storage or distributed IPs cannot be prevented here.
+
+Exact allowlist:
+app.py; core/d2_usage_limits.py; core/d2_http_adapter.py; core/d2_dialogue.py;
+core/d2_lead_bridge.py; core/d2_contacts_cta.py; core/client_config_loader.py;
+core/prod_readiness.py; core/widget_cors.py; scripts/validate_client_pack.py;
+clients/nikadent/features.yaml; clients/_template/features.yaml;
+static/widget/api.js; static/widget/widget.js;
+tests/test_client_usage_limits.py; tests/test_widget_usage_limits.py;
+tests/release/offline.txt; docs/CLIENT_PACK_AUTHORING.md;
+docs/tasks/DEMO_D2_INTERFACE_TASK.md; docs/tasks/DEMO_D2_CURRENT_STATUS.md;
+docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md.
+
+Acceptance: atomic durable counters tenant/visitor/IP across restart/concurrency;
+actual JSON/SSE quota/rate/input boundaries, free replay/code actions, samebrowser
+newSID/page counter, tenant isolation, two-callprice onequestion/twoattempts,
+failed attempts charged, no partialcard on secondcall denial, consent and lead
+still available,3lead cap and no fourth mocked SMTP, invalidconfig failclosed.
+One independent Checker at coherent checkpoint; targeted offline/browser module
+checks then affected regression set. Provider/live/SMTP0. No CI/merge/deploy now.
+
+Stage82 evidence:32new tests PASS29.14s; then discovered a failed-request
+retry could skip minute admission because message events were permanently
+deduplicated. Fixed general ingress: every new request reservation charges rate,
+completed replay still bypasses before admission. Focused9PASS8.33s includes
+new exactsameRID failure→429 case;33unique new tests covered in finalsource.
+Related236regressions PASS173.31s (consent+actualbrowser,Nika onboarding/prices,
+Demo quotas,widget/page/config,validator,release selection). Validators Nika and
+templatePASS; diffcheckPASS. Independent Astra currentcode8focused+6external
+boundary probes PASS, verdictPASS. LocalGET config only:Olga/maxchars1500 active.
+External evidence usage-limits-82/usage-tests.xml,rate-recheck.xml,CHECKER.txt.
+No live model/provider/SMTP calls. HEAD7c7ca52 remains pushed checkpoint; this
+localstage is unstaged/uncommitted, no push/merge/deploy. Foreign3JPG unchanged.
+
 ## 81. Release verification, commit/push and VPS — owner GO 2026-10-16
 
 Owner: «проверка и комит и пуш после. Потом на ВПС». Authorized sequence: verify

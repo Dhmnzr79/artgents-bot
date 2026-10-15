@@ -94,7 +94,8 @@ class D2LeadBridgeResult:
 
 
 def prepare_d2_lead_dispatcher(session_key: SessionKey, request_id: str,
-                              consent_receipt: LeadConsentReceipt | None = None):
+                              consent_receipt: LeadConsentReceipt | None = None,
+                              admission=None):
     """Capture accepted private slots before cleanup; never persist this payload in D2."""
     if not d2_lead_session_client_matches(session_key):
         raise ValueError("d2_lead_session_client_required")
@@ -105,6 +106,12 @@ def prepare_d2_lead_dispatcher(session_key: SessionKey, request_id: str,
 
     class ClinicLeadDispatcher:
         def dispatch(self, *, effect_id: str):
+            if admission is not None:
+                from core.d2_usage_limits import ClientUsageLimitReached
+                try:
+                    admission()
+                except ClientUsageLimitReached:
+                    return "failed"
             result, status = handle_lead(payload, client_id=session_key.client_id,
                                          consent_receipt=consent_receipt)
             delivery = result.get("delivery_status") or result.get("delivery")

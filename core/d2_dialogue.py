@@ -69,7 +69,8 @@ from core.d2_snapshot_sources import (
     build_d2_document_task,
 )
 from core.d2_spam_gate import build_d2_spam_gate_response, is_d2_garbage_message
-from core.d2_contacts_cta import build_d2_contact_fact_block, D2ContactReferenceError
+from core.d2_contacts_cta import build_d2_contact_fact_block, build_d2_contact_response, D2ContactReferenceError
+from core.d2_usage_limits import ClientUsageLimitReached
 from core.d2_offtopic import build_d2_offtopic_response
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
 from core.response_plan_materialization import resolve_d2_operations
@@ -149,6 +150,7 @@ def run_d2_dialogue_turn(
     lead_ui_ref: str | None = None,
     ui_revision: int | None = None,
     lead_bridge: bool = False,
+    usage_admission=None,
 ) -> D2DialogueTurn:
     """Complete one D2 turn with one state/result owner.
 
@@ -198,6 +200,8 @@ def run_d2_dialogue_turn(
             reconcile_d2_lead_pause(session_key, reservation.completed)
         return _turn_from_completion(reservation.completed, idempotent_replay=True)
     try:
+        if usage_admission is not None:
+            usage_admission.message()
         diagnostics.stage("snapshot")
         tenant = load_d2_tenant_snapshot(session_key.client_id, clients_root=clients_root)
         diagnostics.stage("state_read")
@@ -356,6 +360,7 @@ def run_d2_dialogue_turn(
                 lead_effect_id=lead_effect_id,
                 lead_effect_dispatcher=lead_effect_dispatcher,
                 lead_ui_ref=lead_ui_ref,
+                usage_admission=usage_admission,
             )
         # D2-040: one authored chance, then hard-stop. Medical ends one turn only.
         if (
@@ -409,32 +414,55 @@ def run_d2_dialogue_turn(
                 session_key, request_id=effective_request_id, request_fingerprint=fingerprint,
             )
             raise ValueError("d2_provider_input_privacy_only")
-        turn = _run_reserved_d2_dialogue_turn(
-            session_key=session_key,
-            safe_user_message=safe_user_message,
-            provider=provider,
-            clients_root=clients_root,
-            store=store,
-            now=now,
-            ttl_policy=ttl_policy,
-            request_id=effective_request_id,
-            request_fingerprint=fingerprint,
-            lead_effect_id=lead_effect_id,
-            lead_effect_dispatcher=lead_effect_dispatcher,
-            lead_bridge=lead_bridge,
-            lead_pause_response=lead_pause_response,
-            selected_ui_ref=selected_ui_ref,
-            selected_document_action=selected_document_action,
-            selected_price_detail_action=selected_price_detail_action,
-            selected_price_select_action=selected_price_select_action,
-            selected_price_select_actions=selected_price_select_actions,
-            selected_volume_price_task=selected_volume_price_task,
-            selected_service_id=(
-                lead_ui_ref.removeprefix("service:")
-                if lead_ui_ref and lead_ui_ref.startswith("service:") and ui_revision is not None
-                else None
-            ),
-        )
+        try:
+            turn = _run_reserved_d2_dialogue_turn(
+                session_key=session_key,
+                safe_user_message=safe_user_message,
+                provider=provider,
+                clients_root=clients_root,
+                store=store,
+                now=now,
+                ttl_policy=ttl_policy,
+                request_id=effective_request_id,
+                request_fingerprint=fingerprint,
+                lead_effect_id=lead_effect_id,
+                lead_effect_dispatcher=lead_effect_dispatcher,
+                lead_bridge=lead_bridge,
+                lead_pause_response=lead_pause_response,
+                selected_ui_ref=selected_ui_ref,
+                selected_document_action=selected_document_action,
+                selected_price_detail_action=selected_price_detail_action,
+                selected_price_select_action=selected_price_select_action,
+                selected_price_select_actions=selected_price_select_actions,
+                selected_volume_price_task=selected_volume_price_task,
+                selected_service_id=(
+                    lead_ui_ref.removeprefix("service:")
+                    if lead_ui_ref and lead_ui_ref.startswith("service:") and ui_revision is not None
+                    else None
+                ),
+            )
+        except ClientUsageLimitReached as exc:
+            if exc.code not in {"visitor_ai_limit", "tenant_ai_limit"}:
+                raise
+            notice = (
+                "Мы уже подробно обсудили ваши вопросы. Для дальнейшей консультации оставьте заявку или позвоните в клинику."
+                if exc.code == "visitor_ai_limit" else
+                "Сейчас ИИ-консультация временно недоступна. Оставьте заявку или свяжитесь с клиникой напрямую."
+            )
+            response = build_d2_contact_response(tenant, session_key=session_key,
+                contact_fields=("contact_phone", "contact_address", "contact_hours"),
+                notice=notice, offer_booking=True)
+            # A resource denial is not a semantic answer or a terminal dialogue lock.
+            preserved = early_snapshot.state.model_copy(update={
+                "revision": early_snapshot.state.revision + 1,
+                "last_committed_turn_index": early_snapshot.current_turn_index,
+            }) if early_context.freshness == "fresh" else None
+            turn = _commit_non_price_d2_turn(session_key=session_key, store=store,
+                snapshot=early_snapshot, context=early_context, response=response,
+                tenant_fingerprint=tenant.fingerprint, now=now,
+                request_id=effective_request_id, request_fingerprint=fingerprint,
+                lead_effect_id=None, lead_effect_dispatcher=None, prepared_state=preserved,
+                lead_pause_response=lead_pause_response)
         if lead_pause_response:
             reconcile_d2_lead_pause(session_key, store.read_latest_completion(session_key))
         return turn
@@ -496,6 +524,7 @@ def _run_lead_pre_provider_turn(
     lead_effect_id: str | None,
     lead_effect_dispatcher: D2LeadEffectDispatcher | None,
     lead_ui_ref: str | None,
+    usage_admission=None,
 ) -> D2DialogueTurn:
     """Active lead slots: no provider, existing privacy owners."""
     if not d2_lead_session_client_matches(session_key):
@@ -532,7 +561,8 @@ def _run_lead_pre_provider_turn(
         if effect_id is None:
             effect_id = f"lead-{request_id}"
         effect_dispatcher = effect_dispatcher or prepare_d2_lead_dispatcher(
-            session_key, request_id, consent_receipt=consent_receipt)
+            session_key, request_id, consent_receipt=consent_receipt,
+            admission=usage_admission.lead if usage_admission else None)
         # exit_lead_flow erases PII. Dispatch retains it only in this request's closure.
         from session import exit_lead_flow
         exit_lead_flow(session_key.sid)

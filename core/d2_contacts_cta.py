@@ -168,6 +168,8 @@ def build_d2_contact_response(
     session_key: SessionKey,
     contact_fields: tuple[str, ...],
     contact_branch_id: str | None = None,
+    notice: str | None = None,
+    offer_booking: bool = False,
 ) -> MaterializedResponseOutcome:
     """Ordinary contact question: tenant contact facts only (not medical terminal).
 
@@ -179,6 +181,9 @@ def build_d2_contact_response(
     text, phone = _d2_contact_text(
         snapshot, contact_fields=contact_fields, contact_branch_id=contact_branch_id,
     )
+    if notice:
+        text = notice + "\n\n" + text
+    booking = resolve_d2_lead_cta_button(snapshot, as_of=date.today()) if offer_booking else None
     contact_btn = UiButtonCandidate(
         source_client_id=snapshot.client_id,
         button_id="contact_call",
@@ -197,7 +202,7 @@ def build_d2_contact_response(
         active_session_service_id=None,
         selected_topic_id=None,
         price_plan=PricePlan(kind="none"),
-        ui_candidates=UiPlanCandidates(buttons=(contact_btn,) if contact_btn else ()),
+        ui_candidates=UiPlanCandidates(buttons=tuple(b for b in (contact_btn, booking) if b)),
         transport_kind="blocking",
     )
     composer = ComposerResult(

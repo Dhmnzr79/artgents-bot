@@ -6,7 +6,7 @@ import { casesForClient, casesForMessage, appendCaseCards, isCaseGalleryReply } 
 const STORAGE_SID = "clinic_widget_sid";
 const STORAGE_LAUNCHER_TEASER = "clinic_widget_launcher_teaser_shown";
 const DEFAULT_AVATAR_URL = "/static/avatar.png";
-const LAUNCHER_TEASER_DELAY_MS = 10000;
+const LAUNCHER_TEASER_DELAY_MS = 30000;
 const WELCOME_LEAVE_MS = 240;
 const TEXTAREA_MAX_HEIGHT = 112;
 const MOBILE_MAX_WIDTH_PX = 520;
@@ -236,7 +236,7 @@ function ruPhoneToBackendE164(inputVal) {
  * @property {number} [logoHeight] — высота лого в px (как в Figma)
  * @property {string} [launcherSubtitle] — подпись кнопки и надзаголовок приглашения
  * @property {string} [launcherTagline] — заголовок раскрытого приглашения
- * @property {boolean} [launcherTeaser] — расширение капсулы через 10 с
+ * @property {boolean} [launcherTeaser] — расширение капсулы через 30 с
  * @property {string} [launcherTeaserText] — текст подсказки
  */
 
@@ -1204,8 +1204,17 @@ export function mountWidget(root, config, { pagePath } = {}) {
   let mobileViewportHandler = null;
 
   function updateMobileViewportHeight() {
+    const scroller = getChatScroller(feed);
+    const scrollTop = scroller?.scrollTop ?? 0;
+    const wasNearBottom = scroller &&
+      scroller.scrollHeight - scrollTop - scroller.clientHeight < SCROLL_NEAR_BOTTOM_PX;
     const h = window.visualViewport?.height ?? window.innerHeight;
     shell.style.setProperty("--clinic-vvh", `${Math.round(h)}px`);
+    // Resize the reading area without losing the reader's place. Keep the end
+    // visible only when it was already visible before the keyboard moved.
+    if (scroller) {
+      scroller.scrollTop = wasNearBottom ? scroller.scrollHeight : scrollTop;
+    }
   }
 
   function lockHostPageScroll() {
@@ -1255,6 +1264,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
   }
 
   function setOpen(open) {
+    const wasOpen = state.isOpen;
     state.isOpen = open;
     syncMobileShellClass();
     shell.classList.toggle("is-open", open);
@@ -1277,7 +1287,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
         unlockHostPageScroll();
         unbindMobileViewportListeners();
       }
-      launcherControl?.focus();
+      if (wasOpen) launcherControl?.focus();
     }
   }
 
@@ -2505,11 +2515,6 @@ export function mountWidget(root, config, { pagePath } = {}) {
   });
 
   input.addEventListener("input", onComposerInput);
-
-  input.addEventListener("focus", () => {
-    if (!isMobileViewport()) return;
-    requestAnimationFrame(() => scrollChatPaneToEnd(feed, { force: true }));
-  });
 
   input.addEventListener("keydown", (ev) => {
     if (ev.key === "Enter" && !ev.shiftKey) {

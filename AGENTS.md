@@ -97,7 +97,7 @@ Stop if the folder, branch, baseline, or task do not match.
 
 - Follow the owner-approved change map and its current task, in sequence.
   For D2 the canonical map is `docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md`,
-  section "Текущая очередь — owner GO 2026-10-13: документация и тесты";
+  section "Текущая очередь";
   the nearest task is `docs/tasks/DEMO_D2_INTERFACE_TASK.md`.
   Audit findings are proposals, not automatic implementation authority.
 - Do not independently change product behavior, architecture, agreed limits

@@ -3,6 +3,11 @@
 Для владельца достаточно первых двух документов. Остальное — рабочая справка
 для разработчиков, Codex и Cursor. Старые планы не задают нынешнюю архитектуру.
 
+Сверка 2026-10-15: demo развёрнут на VPS (`e93cb12`), PR #27–29 merged.
+Следующий отдельный этап — НикаДент, сначала read-only аудит его pack.
+Начало нового чата: AGENTS → Current Status → текущая очередь → архитектура
+и CLIENT_PACK_AUTHORING. Не продолжать старую очистку или demo-контент автоматически.
+
 ## Основное
 
 1. [Как ведёт себя бот](BOT_BEHAVIOR.md) — обычный разговор, цены, контакты и запись.
@@ -16,15 +21,15 @@
 - [Архитектура](CURRENT_ARCHITECTURE.md), [конфигурация](FLAGS_AND_STATUS.md),
   [маршрутизация](ROUTING_MAP.md), [release-тесты](TEST_SUITE_ARCHITECTURE.md).
 - [Текущая очередь](tasks/DEMO_D2_DELIVERY_ROADMAP.md) — только верхняя текущая очередь;
-  [карточка чистки §60](tasks/DEMO_D2_INTERFACE_TASK.md#60-cleanup-checkpoint--2026-10-13);
+  [карточка закрытия §64](tasks/DEMO_D2_INTERFACE_TASK.md#64-release-handoff--2026-10-15);
   [назначение текущих task документов](tasks/README.md).
 - [Execution Lock](tasks/DEMO_D2_EXECUTION_LOCK.md),
   [Target Contract §3](tasks/DEMO_D2_TARGET_CONTRACT.md),
   [Product Decisions](tasks/DEMO_D2_PRODUCT_DECISIONS.md) — сохраняемые protections
   и ответственность. Позднейшие явные решения владельца заменяют противоречащие
   старые записи; весь исторический текст не является действующей инструкцией.
-- [Client pack authoring](CLIENT_PACK_AUTHORING.md) — данные клиента;
-  чистка demo KB выполняется отдельно.
+- [Client pack authoring](CLIENT_PACK_AUTHORING.md) — данные клиента.
+  НикаДент не аттестован; техническая чистка demo KB и экономия tokens отложены.
 
 ## История — не использовать для новых задач
 
@@ -38,10 +43,10 @@ one-call/patient-scope/hybrid и инциденты. Материалы сохр
 классифицируются: не считать весь корпус уже очищенным.
 
 Secret scan, deployment/security/PostgreSQL contracts и tenant/lead/privacy
-защиты действуют. Архивирование не отменяет их. Клиентская база знаний
-и документы для ответов пациентам не переносились этим этапом.
+защиты действуют. Архивирование не отменяет их. Этап архивирования не переносил
+клиентскую базу; последующая редактура demo-контента уже входит в релиз.
 
 Старые50 task cards/prompts и полные прежние Interface/Roadmap теперь в архиве.
-На прежних currentпутях оставлены только текущая очередь и карточкаdocs/tests.
+На прежних current-путях оставлены текущая очередь и карточка закрытия этапа.
 
 Июльский backlog TECH_DEBT архивирован; [нынешние остатки](TECH_DEBT.md) — указатель на текущую очередь.

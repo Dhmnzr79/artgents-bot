@@ -1,6 +1,6 @@
 # Текущая архитектура D2 demo
 
-Срез 2026-10-13. Описывает существующий код, не обещает безошибочный выбор
+Срез 2026-10-15, deployed demo `e93cb12`. Описывает существующий код, не обещает безошибочный выбор
 моделью и не закрывает всю историческую SIM/REC приёмку. Старое описание
 Composer/playbook/router сохранено в [архиве](archive/pre-d2/CURRENT_ARCHITECTURE.md).
 
@@ -29,6 +29,10 @@ Policy IDs ссылаются через text_ref на authored MD, а не inli
 него отдельными строками. Непустая строка `{invalid` не structural JSON error:
 в нынешнем protocol это prose. Это не разрешение обходить action/security guards.
 Для обычного уточнения и вопроса о составе отдельные команды не требуются.
+
+Первый документ в model `sources` — основной и единственный источник follow-up UI.
+Остальные дают дополнительные факты; неверный основной не заменяется следующим.
+Все claims проверяются. При документном клике задача и источник уже определены сервером.
 
 ## Цена и интерактивные карточки
 
@@ -61,6 +65,28 @@ Tenant isolation, forged/stale UI rejection, quota boundaries, transactional
 commit/error и replay — действующие проверки, не legacy-долг для удаления.
 Situation intake выключен; его старые действия не должны запускать модель/заявку.
 
+## Локальная галерея demo
+
+`static/widget/cases.js` содержит demo-only каталог All-on-4 и циркониевых коронок:
+service/document связи, пути к `static/clients/demo/cases/` и тексты каждой фазы.
+Это UI-данные, не model corpus и не общий механизм подключения новых tenants.
+Общий `clients/demo/md/clinic__info__results.md` — краткий вводный документ.
+Его точный проверенный quick reply виджет заменяет существующей локальной галереей.
+Нет поиска ключевых слов в вопросе или нового model action для кейсов.
+
+Меню, ссылки после услуги и authored results reply открывают тот же renderer.
+Фото/описание меняются кнопками «До»/«После»; кейсы — стрелками/свайпом,
+220 мс с reduced motion. Открытие/переключение галереи не вызывает модель.
+Прямой results reply допускает повторный просмотр; обычные service offers скрывают
+открытые кейсы. Новая серверная semantic memory о выбранном кейсе не добавлена.
+
+Gallery CTA переносит опубликованный `ref`/`revision`, когда он есть. Без него
+«Я хочу так же» отправляет обычный booking request существующему model/lead пути;
+форма зависит от `start_booking`, не появляется принудительно при произвольной prose.
+Current revision, pending/retry и active/paused lead guards сохраняются.
+Локальный Inter использует 400–600; цены, заголовки и service names имеют 600
+на desktop/touch. Размеры остаются CSS presentation, не свойством model response.
+
 ## Модель и запуск
 
 Согласованная модель — DeepSeek Flash:
@@ -71,7 +97,7 @@ Readiness разрешает точный api.deepseek.com, сохраняя HTT
 Секреты и .env не коммитятся. Native first/second response имеют одного provider owner.
 
 Локальный запуск: [WORKFLOW_GIT](WORKFLOW_GIT.md), scripts/start_local_widget.ps1.
-На VPS есть demo deployment; последний подтверждённый release8888fdd.
+На VPS есть demo deployment; последний подтверждённый release — `e93cb12`, PR #29 merged.
 CI → Publish verified immutable Docker image → manual Deploy production.
 Изменение локальных файлов или push topic branch само по себе VPS не обновляет.
 Runtime fallback, миграцию пользователей и новые гарантии не предполагать.
@@ -80,7 +106,9 @@ Runtime fallback, миграцию пользователей и новые га
 
 [Текущий статус](tasks/DEMO_D2_CURRENT_STATUS.md),
 [очередь](tasks/DEMO_D2_DELIVERY_ROADMAP.md),
-[карточка чистки §60](tasks/DEMO_D2_INTERFACE_TASK.md#60-cleanup-checkpoint--2026-10-13).
+[карточка закрытия §64](tasks/DEMO_D2_INTERFACE_TASK.md#64-release-handoff--2026-10-15).
 Temporary demo gate не означает полный historical suite PASS. Полезные старые
 tests мигрируются, проверки удалённых механизмов и доказанные дубли можно убрать.
-KB cleanup/экономия context tokens и optional doctor/case UI — отдельно позже.
+Техническая KB cleanup/экономия tokens, doctor UI и общий multi-client gallery
+отложены. Demo gallery уже реализована. Следующий отдельный этап — НикаДент,
+сначала read-only аудит; существующая папка клиента не означает его готовность.

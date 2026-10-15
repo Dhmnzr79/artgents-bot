@@ -1,12 +1,44 @@
-# Текущая карточка — чистка документации и тестов
+# Текущая карточка — закрытие demo и передача следующему чату
 
-Действующий checkpoint — §62, ниже. Предыдущие §60–61 — receipts этой же
-чистки, не новая очередь и не повторное разрешение на runtime.
+Действующий checkpoint — §64, ниже. Предыдущие §§60–63 — исторические receipts,
+не новая очередь и не повторное разрешение на runtime.
 Прежние интерфейсные этапы1–59 и полный исходный snapshot сохранены
 в [архиве checkpoint](../archive/checkpoints/DEMO_D2_INTERFACE_TASK.md).
 Этот перенос не закрывает SIM/REC и не меняет владельцев решений.
 Порядок работ — [Roadmap](DEMO_D2_DELIVERY_ROADMAP.md),
 правила — [AGENTS](../../AGENTS.md), [Checker](../WORKFLOW_CHECKER.md).
+
+## 64. Release handoff — 2026-10-15
+
+Owner: привести основные документы к фактической версии demo, проверить,
+сохранить commit/push. Следующий отдельный этап — подключение НикаДент;
+его реализация и новый deploy в этот checkpoint не входят.
+
+Classification: documentation only, без заявлений об архитектурном упрощении.
+Root: C:/Cursor Projects/artgents-bot-active; branch codex/release-handoff-docs;
+HEAD/origin-main/merge-base baseline e93cb121e8ea45c31dc45b435720a556fda8033d.
+Foreign WIP: root otzyv-1/2/3.jpg; сохранить, не публиковать.
+
+Allowlist: AGENTS.md (только указатель очереди); docs/README.md;
+docs/BOT_BEHAVIOR.md; docs/CURRENT_ARCHITECTURE.md; docs/tasks/README.md;
+docs/tasks/DEMO_D2_CURRENT_STATUS.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md;
+this card. Runtime, workflows, tests, client packs и assets не менять.
+
+Документы фиксируют merged PR #27–29, deployed e93cb12, 878 Linux publish PASS,
+успешные CI/Secret scan/PostgreSQL/Docker/deploy и read-only public health/assets.
+Windows 37 FAIL отделены от регрессий: все воспроизведены на clean 3404c2f;
+Linux gate их выполнил. Не объявлять whole historical suite или НикаДент готовыми.
+Предел gallery CTA без опубликованного ref — обычный модельный booking request,
+а не гарантированное открытие формы. JS-описания кейсов не входят в model corpus.
+
+Acceptance: сверка с кодом и GitHub evidence, relative-link/anchor checks,
+diff --check и independent read-only Checker. Для docs-only не повторять bot/provider
+tests и не запускать deploy. Эта карточка не авторизует merge; разрешены commit/push.
+
+Проверено 2026-10-15: 57 relative links/anchors PASS, diff --check PASS,
+independent docs-only Checker PASS. Bot/provider calls: 0. Изменены только
+восемь файлов allowlist; три root JPG сохранены. Git commit/push state проверять
+по репозиторию, а не по историческим HEAD в receipts ниже.
 
 ## 60. Cleanup checkpoint — 2026-10-13
 

@@ -1,5 +1,69 @@
 # Текущая карточка — НикаДент
 
+## 66. Page-specific welcome menus — owner GO 2026-10-15
+
+Owner explicitly requests implementation now: tenant-authored greeting and three
+questions per selected website page, common default elsewhere, one shared top
+promotion, local panel page preview, authoring instructions. Continuation of the
+same Nikadent onboarding task/branch and open PR #31; no merge/VPS/site installation.
+Type: presentation feature / integration of missing page menus, not architecture
+simplification or a D2 semantic change. Astra consulted; Target Contract §3 applies.
+
+Preflight root/top: C:/Cursor Projects/artgents-bot-active; branch
+codex/nikadent-technical-onboarding; checkpoint baseline/HEAD 8161637;
+freshly fetched origin/main = merge base e93cb12. PR #30 fc84066 and #31 still OPEN;
+handoff docs read. Tracked checkout/staging clean before edits. Foreign WIP:
+otzyv-1.jpg, otzyv-2.jpg, otzyv-3.jpg preserved. No branch switch.
+
+Exact allowlist for this continuation:
+- contracts/widget_config.py;
+- clients/nikadent/widget_config.json;
+- static/widget/widget.js, static/widget-test.html, static/widget-test-panel.js;
+- tests/test_widget_config_contract.py, tests/test_widget_page_menus.py;
+- tests/js/nikadent_panel_harness.mjs, tests/js/widget_page_menus_harness.mjs;
+- tests/release/offline.txt;
+- docs/CLIENT_PACK_AUTHORING.md;
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md, docs/tasks/DEMO_D2_CURRENT_STATUS.md,
+  docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md.
+
+Mechanism: optional pageMenus in existing widget_config.json, exact paths with
+trailing slash normalized (case/percent encoding preserved). Query/hash ignored.
+Top-level welcomeText/starterPrompts own the default; each explicit menu has
+exactly three nonblank label/q pairs. Duplicate normalized paths are invalid;
+wildcards/full URLs/query/hash are invalid authored paths. Existing strict model
+rejects nested promotion/security overrides. welcomePromotion stays top-level.
+Tenant config is sole menu owner: when pageMenus is present, renderer does not
+automatically append the gallery shortcut. Existing demo without pageMenus stays
+unchanged. Selection occurs on initial welcome/reset; active conversation stays.
+Preview pathname is an optional mount argument, separate from tenant/API config.
+No new /ask field, model context, semantic route, memory, model call or lead effect.
+Buttons remain ordinary authored text questions, not invented verified UI refs.
+
+Acceptance: API exposes only selected tenant's menus; matched/unmatched paths,
+slash/query/hash, exactly three rendered prompts, same promotion, configured q
+click payload, reset, mobile geometry, unchanged demo/gallery and panel switching.
+Run targeted config/onboarding/widget tests + independent read-only Checker.
+No live/provider/SMTP calls authorized or needed for this UI checkpoint (budget0).
+
+Remaining limits: texts are editable initial suggestions on current content;
+not clinical/content acceptance, deployed rendering or live-model quality proof.
+
+Checkpoint evidence:106 targeted offline tests PASS across widget page menus,
+widget config, onboarding, current visual contract, embed CORS, pack validation
+and release selection tests. Actual Chrome DOM harness PASS:10 routes/31 mocked
+question+promo clicks, correct q/tenant, no fabricated refs or page context;
+shared promo, exactly3 buttons including unmatched defaults, reset/preview,
+unchanged demo gallery,390/900px geometry. Local running API returns new menus.
+Independent Checker PASS:50 nonbrowser tests + panel harness and reachable-path
+review. Provider/model/real SMTP calls0. No runtime simplification certified.
+
+Additional historical replay suite:2FAIL/1PASS reproduced on clean archive of
+baseline8161637 (same StopIteration expecting removed scope quick_replies,
+before JS execution). Outside current release selection, left untouched.
+Initial headless browser CDP timeout under sandbox resolved by approved local
+browser execution; old Nikadent-promo-None expectation updated to actual authored
+promotion. No new app/transport defect found. ForeignWIP preserved.
+
 ## 65. Nikadent technical onboarding — owner GO 2026-10-15
 
 LATEST OWNER SCOPE: local test widget only for now. User explicitly deferred

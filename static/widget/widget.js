@@ -647,6 +647,26 @@ function isWidgetPresentationContractValid(config) {
   if (typeof config.launcherTeaser !== "boolean") return false;
   if (config.videoAspect !== "horizontal" && config.videoAspect !== "vertical") return false;
   if (!starterPromptsValid(config.starterPrompts)) return false;
+  if (config.pageMenus != null) {
+    const questionsValid = prompts => Array.isArray(prompts) && prompts.length === 3 &&
+      prompts.every(p => p && typeof p.label === "string" && p.label.trim() &&
+        typeof p.q === "string" && p.q.trim() && !p.videoKey && !p.soon);
+    if (!Array.isArray(config.pageMenus) || !questionsValid(config.starterPrompts) ||
+        !String(config.welcomeText || "").trim()) return false;
+    const paths = new Set();
+    for (const menu of config.pageMenus) {
+      if (!menu || !Array.isArray(menu.paths) || !menu.paths.length ||
+          typeof menu.welcomeText !== "string" || !menu.welcomeText.trim() ||
+          !questionsValid(menu.starterPrompts)) return false;
+      for (const path of menu.paths) {
+        if (typeof path !== "string" || !path.startsWith("/") || path.startsWith("//") ||
+            /[?#*\\\s]/.test(path)) return false;
+        const normalized = path.replace(/\/+$/, "") || "/";
+        if (paths.has(normalized)) return false;
+        paths.add(normalized);
+      }
+    }
+  }
   if (config.launcherTeaser === true) {
     if (typeof config.launcherTeaserText !== "string" || !config.launcherTeaserText.trim()) {
       return false;
@@ -663,7 +683,14 @@ function renderWidgetConfigError(root) {
     </div>`;
 }
 
-export function mountWidget(root, config) {
+// Presentation only: never sends page URLs, query strings or hashes to /ask.
+function welcomeMenuForPath(config, pathname) {
+  const path = String(pathname || "/").split(/[?#]/, 1)[0].replace(/\/+$/, "") || "/";
+  return (config.pageMenus || []).find(menu => menu.paths.some(candidate =>
+    (candidate.replace(/\/+$/, "") || "/") === path)) || config;
+}
+
+export function mountWidget(root, config, { pagePath } = {}) {
   let waitingLabelTimers = [];
 
   function clearWaitingLabelTimers() {
@@ -1134,6 +1161,7 @@ export function mountWidget(root, config) {
     clearWaitingLabelTimers();
     if (state.pending) return;
     clearStoredSid();
+    feed.querySelector(".clinic-shell__welcome-screen")?.remove();
     state.messages = [];
     state.lastPayload = null;
     state.retryBody = null;
@@ -1822,6 +1850,7 @@ export function mountWidget(root, config) {
     if (keepWelcome && prevWelcome) {
       feed.appendChild(prevWelcome);
     } else if (!state.started) {
+      const welcomeMenu = welcomeMenuForPath(config, pagePath ?? window.location.pathname);
       const screen = document.createElement("section");
       screen.className = "clinic-shell__welcome-screen";
       screen.setAttribute("aria-label", "Приветствие");
@@ -1835,7 +1864,7 @@ export function mountWidget(root, config) {
       textP.className = "clinic-shell__welcome-text";
       const textBody = document.createElement("span");
       textBody.className = "clinic-shell__welcome-text-body";
-      textBody.textContent = String(config.welcomeText || "").trim();
+      textBody.textContent = String(welcomeMenu.welcomeText || "").trim();
       textP.classList.add("is-done");
       textP.appendChild(textBody);
       lead.appendChild(textP);
@@ -1847,7 +1876,7 @@ export function mountWidget(root, config) {
       const linksBox = document.createElement("div");
       linksBox.className = "clinic-msg__links";
       let firstVideoButton = null;
-      for (const s of config.starterPrompts || []) {
+      for (const s of welcomeMenu.starterPrompts || []) {
         const b = document.createElement("button");
         b.type = "button";
         b.className = "clinic-msg__link";
@@ -1884,7 +1913,7 @@ export function mountWidget(root, config) {
         }
         linksBox.appendChild(b);
       }
-      if (casesForClient(clientId).length) {
+      if (config.pageMenus == null && casesForClient(clientId).length) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "clinic-msg__link";

@@ -95,6 +95,46 @@ class WidgetWelcomePromotionV1(_WidgetStrictModel):
     q: str = Field(min_length=1)
 
 
+class WidgetPagePromptV1(_WidgetStrictModel):
+    label: str = Field(min_length=1)
+    q: str = Field(min_length=1)
+
+    @field_validator("label", "q", mode="after")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("empty")
+        return value
+
+
+class WidgetPageMenuV1(_WidgetStrictModel):
+    paths: list[str] = Field(min_length=1)
+    welcomeText: str = Field(min_length=1)
+    starterPrompts: list[WidgetPagePromptV1] = Field(min_length=3, max_length=3)
+
+    @field_validator("paths", mode="after")
+    @classmethod
+    def _exact_paths(cls, values: list[str]) -> list[str]:
+        out = []
+        for value in values:
+            if (not value.startswith("/") or value.startswith("//")
+                    or any(c in value for c in "?#*\\") or value.strip() != value
+                    or any(c.isspace() for c in value)):
+                raise ValueError("exact_path_required")
+            path = value.rstrip("/") or "/"
+            if path in out:
+                raise ValueError("duplicate_path")
+            out.append(path)
+        return out
+
+    @field_validator("welcomeText", mode="after")
+    @classmethod
+    def _welcome_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("empty")
+        return value
+
+
 class WidgetPresentationV1(_WidgetStrictModel):
     schemaVersion: Literal[1]
     botName: str
@@ -102,6 +142,7 @@ class WidgetPresentationV1(_WidgetStrictModel):
     welcomeText: str | None
     starterPrompts: list[WidgetStarterPromptV1]
     welcomePromotion: WidgetWelcomePromotionV1 | None = None
+    pageMenus: list[WidgetPageMenuV1] | None = None
     videoAspect: Literal["horizontal", "vertical"]
     demoLauncher: StrictBool
     launcherCtaLabel: str
@@ -122,6 +163,21 @@ class WidgetPresentationV1(_WidgetStrictModel):
     def _launcher_teaser_text_required_when_enabled(self) -> WidgetPresentationV1:
         if self.launcherTeaser and not (self.launcherTeaserText or "").strip():
             raise ValueError("launcher_teaser_text_required")
+        return self
+
+    @model_validator(mode="after")
+    def _page_menu_defaults_and_unique_paths(self) -> WidgetPresentationV1:
+        if self.pageMenus is None:
+            return self
+        if not (self.welcomeText or "").strip() or len(self.starterPrompts) != 3:
+            raise ValueError("page_menu_default_requires_welcome_and_three_prompts")
+        for prompt in self.starterPrompts:
+            WidgetPagePromptV1.model_validate(prompt.model_dump(include={"label", "q"}))
+            if prompt.videoKey or prompt.soon:
+                raise ValueError("page_menu_prompts_must_be_questions")
+        paths = [path for menu in self.pageMenus for path in menu.paths]
+        if len(paths) != len(set(paths)):
+            raise ValueError("duplicate_page_menu_path")
         return self
 
 

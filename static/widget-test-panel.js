@@ -58,6 +58,7 @@ clientSelect.value = clientId;
 const clientUrl = id => {
   const url = new URL(location.href);
   url.searchParams.set("client", id);
+  if (id !== clientId) url.searchParams.delete("page");
   return url;
 };
 document.getElementById("client-new-tab").href = clientUrl(clientId).href;
@@ -76,8 +77,25 @@ try {
   throw error;
 }
 const mount = document.createElement("div");
+const pageSelect = document.getElementById("page-select");
+const pagePaths = [...new Set(["/", ...(config.pageMenus || []).flatMap(menu => menu.paths)])];
+const requestedPage = new URL(location.href).searchParams.get("page") || "/";
+const pagePath = pagePaths.includes(requestedPage) ? requestedPage : "/";
+for (const path of pagePaths) {
+  const option = document.createElement("option");
+  option.value = path;
+  option.textContent = path === "/" ? "Главная / общие страницы" : path;
+  pageSelect.appendChild(option);
+}
+pageSelect.value = pagePath;
+document.getElementById("page-preview-path").textContent = pagePath;
+pageSelect.addEventListener("change", () => {
+  const url = clientUrl(clientId);
+  url.searchParams.set("page", pageSelect.value);
+  location.assign(url.href);
+});
 document.body.appendChild(mount);
-const widget = mountWidget(mount, config);
+const widget = mountWidget(mount, config, {pagePath});
 const launcher = mount.querySelector("[data-clinic-launcher-open], [data-clinic-launcher]");
 const input = mount.querySelector("[data-clinic-input]");
 const form = mount.querySelector("[data-clinic-composer-form]");

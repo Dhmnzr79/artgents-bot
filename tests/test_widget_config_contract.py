@@ -75,7 +75,9 @@ def test_nikadent_presentation_valid_v1() -> None:
     out = validate_widget_presentation_document(raw, client_id="nikadent")
     assert out["botName"] == "Консультант Никадент"
     assert out["demoLauncher"] is False
-    assert out["welcomeText"] is None
+    assert "НикаДент" in out["welcomeText"]
+    assert len(out["starterPrompts"]) == 3
+    assert len(out["pageMenus"]) == 3
 
 
 def test_template_presentation_valid_v1_scaffold() -> None:
@@ -288,7 +290,9 @@ def test_demo_welcome_promotion_reaches_public_config() -> None:
         "subtitle": "При оплате в день обращения",
         "q": "Расскажите об условиях скидки до 15% на имплантацию при оплате в день обращения",
     }
-    assert build_public_widget_config("nikadent")["welcomePromotion"] is None
+    nika = build_public_widget_config("nikadent")["welcomePromotion"]
+    assert nika == _load_json(_NIKADENT / "widget_config.json")["welcomePromotion"]
+    assert nika["title"] == "Бесплатная консультация"
 
 
 def test_integration_valid_demo() -> None:

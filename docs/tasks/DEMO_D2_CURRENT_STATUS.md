@@ -1,5 +1,31 @@
 # D2 demo — текущее состояние
 
+## НикаДент — стартовое меню по странице, 2026-10-15
+
+Продолжение §66 в ветке codex/nikadent-technical-onboarding / PR #31,
+checkpoint baseline8161637. Локально реализовано: общее приветствие/три вопроса,
+меню для All-on-4, съёмных протезов и коронок по точным URL сайта; общая карточка
+бесплатной консультации из существующей базы. Источник настройки —
+clients/nikadent/widget_config.json; инструкция в CLIENT_PACK_AUTHORING.md.
+В тестовой панели появился выбор страницы. На клиентском сайте путь будет
+читаться автоматически после выкладки; эта выкладка не выполнялась.
+
+106 targeted offline tests PASS (schema, API, origin/tenant, panel, real browser
+DOM/clicks, existing visual/lead and authoring/release checks). Browser:
+10 routes, 31 mocked clicks, shared promo, exactly3 buttons, reset, demo gallery,
+mobile390/desktop900 geometry. Independent Checker PASS:50 schema/API tests,
+panel module harness, call-path review; browser execution — executor evidence.
+Model calls0, actual SMTP0 for this checkpoint. No /ask contract, D2 memory,
+semantic/model/price/lead delivery changes. Existing demo presentation preserved.
+
+Additional historical tests/test_d2_widget_replay.py:2 FAIL/1 PASS, reproduced
+identically on a clean archive of baseline8161637 before any changes. Both fail
+before browser launch while expecting removed legacy scope quick_replies.
+This file is outside current release selections; not changed or claimed fixed.
+Initial new-browser sandbox CDP timeout disappeared in approved headless execution;
+one old config assertion expecting no Nikadent promotion updated to own promo.
+No customer-site/live-model acceptance or SPA navigation integration claimed.
+
 ## НикаДент — техническое подключение, 2026-10-15
 
 Текущий этап: Interface §65 / codex/nikadent-technical-onboarding, baseline e93cb12.

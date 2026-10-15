@@ -47,3 +47,4 @@ tests/test_d2_primary_source_followups.py
 tests/test_widget_config_contract.py
 tests/test_d2_results_document.py
 tests/test_nikadent_technical_onboarding.py
+tests/test_widget_page_menus.py

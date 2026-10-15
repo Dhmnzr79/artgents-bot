@@ -1,13 +1,22 @@
 # clients/_template/features.yaml — скопировать в clients/{new_client_id}/
 leads:
-  enabled: true
+  enabled: false
   mode: email
 
 admin:
-  enabled: true
+  enabled: false
 
 postgres_events:
-  enabled: true
+  enabled: false
 
 ingress:
   strict: true
+
+usage_limits:
+  visitor_messages_per_minute: 10
+  ip_messages_per_minute: 40
+  visitor_ai_questions_per_day: 40
+  tenant_model_calls_per_day: 1000
+  message_max_chars: 1500
+  request_max_bytes: 16384
+  visitor_leads_per_hour: 3

@@ -1,0 +1,20 @@
+{
+  "offer_id": "implant_supported_prosthetics.full_arch",
+  "service_id": "implant_supported_prosthetics",
+  "active": true,
+  "price": {
+    "mode": "no_public_price",
+    "approved_text": "Стоимость протеза на имплантах для всей челюсти определяется по плану лечения. Цена одной коронки не является ценой полного зубного ряда."
+  },
+  "package": {
+    "label": "общая стоимость определяется по плану лечения",
+    "includes": [],
+    "excludes": []
+  },
+  "fact_refs": [],
+  "followups": [],
+  "applies_to_extents": [
+    "full_arch"
+  ],
+  "option_id": "full_arch"
+}

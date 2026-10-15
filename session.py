@@ -486,6 +486,7 @@ def get_last_content_ui_payload(session_id: str) -> dict | None:
 
 def is_active_lead_flow(session_state: dict) -> bool:
     return (session_state or {}).get("lead_intent") in {
+        "collecting_consent",
         "collecting_name",
         "collecting_phone",
         "confirming_name",
@@ -776,6 +777,29 @@ def set_lead_intent(session_id: str, intent: str) -> None:
             st["lead_interrupt_kind"] = ""
         if intent == "none":
             st["lead_paused_answer_count"] = 0
+            st["lead_consent_request_id"] = ""
+            st["lead_consent_pending_version"] = ""
+        _persist_unlocked(session_id, st)
+
+
+def begin_lead_consent(session_id: str, definition_fingerprint: str) -> None:
+    clear_lead_pii(session_id)
+    clear_lead_pending_interruption(session_id)
+    with _lock:
+        st = mem_get(session_id)
+        st["lead_intent"] = "collecting_consent"
+        st["lead_consent_pending_version"] = definition_fingerprint
+        st["lead_consent_request_id"] = ""
+        st["lead_resume_step"] = ""
+        _persist_unlocked(session_id, st)
+
+
+def accept_lead_consent_reference(session_id: str, request_id: str) -> None:
+    with _lock:
+        st = mem_get(session_id)
+        st["lead_intent"] = "collecting_name"
+        st["lead_consent_request_id"] = request_id
+        st["lead_consent_pending_version"] = ""
         _persist_unlocked(session_id, st)
 
 
@@ -846,6 +870,8 @@ def exit_lead_flow(session_id: str) -> None:
     with _lock:
         st = mem_get(session_id)
         st["lead_intent"] = "none"
+        st["lead_consent_request_id"] = ""
+        st["lead_consent_pending_version"] = ""
         st["lead_resume_step"] = ""
         st["lead_return_doc_id"] = ""
         st["lead_interrupt_kind"] = ""

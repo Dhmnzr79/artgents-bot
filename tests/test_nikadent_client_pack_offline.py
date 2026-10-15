@@ -145,11 +145,11 @@ def test_nikadent_pack_passes_production_validator() -> None:
     assert validate_client_pack(_NIKADENT) == []
 
 
-def test_nikadent_bundle_loads_family_prices_without_implant_brand_offers() -> None:
+def test_nikadent_bundle_uses_exact_unbranded_offers_without_broad_family_prices() -> None:
     bundle = load_response_schema_bundle(_TARGET)
-    assert len(bundle.family_prices.records) == 4
+    assert bundle.family_prices.records == []
     implant_ids = {offer.service_id for offer in bundle.offers if offer.service_id in {"classic", "one_stage", "all_on_4", "all_on_6"}}
-    assert implant_ids == set()
+    assert implant_ids == {"classic", "one_stage", "all_on_4", "all_on_6"}
     assert all(offer.brand_id is None for offer in bundle.offers)
 
 
@@ -161,7 +161,7 @@ def test_nikadent_inactive_not_offered_services_have_no_content_ref() -> None:
         assert service.content_ref is None
 
 
-def test_nikadent_fixed_bridge_is_active_with_offer_and_content() -> None:
+def test_nikadent_fixed_bridge_is_active_without_unsupported_numeric_price() -> None:
     bundle = load_response_schema_bundle(_TARGET)
     service = bundle.services["fixed_bridge"]
     assert service.active is True
@@ -169,10 +169,8 @@ def test_nikadent_fixed_bridge_is_active_with_offer_and_content() -> None:
     assert (_MD_ROOT / service.content_ref).is_file()
     offer = next((o for o in bundle.offers if o.offer_id == "fixed_bridge.default"), None)
     assert offer is not None
-    assert offer.price.mode == "from"
-    assert offer.price.min_amount == 10000
-    assert offer.price.currency == "RUB"
-    assert offer.price.billing_unit == "unit"
+    assert offer.price.mode == "no_public_price"
+    assert "после осмотра" in offer.price.approved_text
 
 
 def test_nikadent_core_inlay_is_active_with_offer_and_content() -> None:
@@ -206,7 +204,7 @@ def test_nikadent_active_service_count_includes_bridge_and_core_inlay() -> None:
     assert "fixed_bridge" in active_ids
     assert "core_inlay" in active_ids
     assert "fixed_bridge" not in _INACTIVE_KNOWN_NOT_OFFERED
-    assert len(active_ids) == 24
+    assert len(active_ids) == 27
 
 
 def test_nikadent_marketing_free_consult_scope_and_priority() -> None:
@@ -286,7 +284,9 @@ def test_nikadent_removable_denture_owner_facts_present() -> None:
     assert "мягкой щёткой" in body.casefold()
     assert "рацион можно постепенно расширять" in body.casefold()
     assert "изменении формы дёсен" in body.casefold()
-    assert "относительно быстрая и недорогая процедура" in body.casefold()
+    # Owner keeps unresolved repair/warranty conditions outside patient MD.
+    assert "возможность ремонта и стоимость" in body.casefold()
+    assert "бесплат" not in body.casefold()
 
 
 def test_nikadent_sedation_inactive_known_not_offered_service() -> None:
@@ -454,7 +454,7 @@ def test_nikadent_wip_files_are_well_formed() -> None:
         Path(__file__).resolve(),
         _REPO / "core" / "clinic_contact_policies.py",
         _REPO / "core" / "target_contact_authority.py",
-        _REPO / "tests" / "test_multibranch_contact_authority.py",
+        _REPO / "tests" / "test_d2_af1b_contacts_http.py",
     ]
     paths.extend(_personal_doctor_md_paths())
     paths.append(_MD_ROOT / _OVERVIEW_MD)
@@ -467,3 +467,44 @@ def test_nikadent_wip_files_are_well_formed() -> None:
             json.loads(text)
         if path.suffix in {".yaml", ".yml"}:
             yaml.safe_load(text)
+
+def test_nikadent_consultation_promo_retains_service_and_click_binding() -> None:
+    from contracts.response_plan import SessionKey
+    from core.d2_tenant_snapshot import load_d2_tenant_snapshot, build_d2_model_view
+    from core.d2_snapshot_sources import (
+        build_d2_snapshot_sources, resolve_d2_selected_document_action,
+        D2SnapshotBindingError,
+    )
+
+    snapshot = load_d2_tenant_snapshot("nikadent", clients_root=_REPO / "clients")
+    promo_ref = "clinic__info__promo__free_orthopedic_consult.md"
+    assert snapshot.bundle.services["prosthetics_consultation"].content_ref == promo_ref
+    assert not (_MD_ROOT / "clinic__info__consultation.md").exists()
+    assert not (_MD_ROOT / "prosthetics__service__consultation.md").exists()
+    promo = next(row for row in snapshot.content if row.content_ref == promo_ref)
+    assert "prosthetics_consultation" in promo.allowed_service_ids
+    assert snapshot.service_topics["prosthetics_consultation"] == "prosthetics"
+    offer = next(row for row in snapshot.bundle.offers
+                 if row.offer_id == "prosthetics_consultation.default")
+    assert offer.price.amount == 0
+    assert len(offer.package.includes) == 4
+    assert offer.fact_refs == ["free_orthopedic_consult"]
+    sources = build_d2_snapshot_sources(
+        snapshot, model_view=build_d2_model_view(snapshot), operations=(),
+        session_key=SessionKey(client_id="nikadent", sid="editorial-promo"),
+    )
+    row = next(row for row in sources.d2_source_ui if row.content_ref == promo_ref)
+    assert row.cta is not None
+    assert row.quick_replies
+    for button in row.quick_replies:
+        selected = resolve_d2_selected_document_action(
+            snapshot, reply_id=button.reply_id, source_revision=1,
+            shown_source_content_ref=promo_ref,
+        )
+        assert selected is not None and selected.content_ref == promo_ref
+        assert selected.section_ref in {section.section_ref for section in promo.sections}
+        with pytest.raises(D2SnapshotBindingError, match="selected_document_binding_mismatch"):
+            resolve_d2_selected_document_action(
+                snapshot, reply_id=button.reply_id, source_revision=1,
+                shown_source_content_ref="clinic__info__warranty.md",
+            )

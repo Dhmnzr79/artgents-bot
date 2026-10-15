@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "directions": [
+    {
+      "topic_id": "prosthetics",
+      "service_ids": [
+        "removable_dentures",
+        "metal_ceramic_crowns",
+        "zirconia_crowns",
+        "clasp_dentures",
+        "implant_supported_prosthetics",
+        "all_on_4",
+        "all_on_6"
+      ],
+      "offer_ids": [
+        "removable_dentures.jaw.partial",
+        "metal_ceramic_crowns.default",
+        "zirconia_crowns.default",
+        "removable_dentures.jaw.full",
+        "clasp_dentures.default",
+        "implant_supported_prosthetics.crown",
+        "all_on_4.default",
+        "all_on_6.default"
+      ],
+      "introduction_text": "Это разные способы протезирования. Цена указана за один зуб, один протез или одну челюсть — единица подписана в каждом варианте. Для всей челюсти нужен полный протез; подходящий способ определит врач после осмотра.",
+      "unknown_extent_text": "Какой объём вас интересует: один зуб, вся челюсть или пока не знаете?"
+    },
+    {
+      "topic_id": "implantation",
+      "service_ids": [
+        "classic",
+        "all_on_4",
+        "all_on_6"
+      ],
+      "offer_ids": [
+        "classic.default",
+        "all_on_4.default",
+        "all_on_6.default"
+      ],
+      "introduction_text": "Установка одного импланта и восстановление всей челюсти — разные объёмы лечения. Цена установки одного импланта не включает коронку и не является ценой комплекса All-on-4/6.",
+      "unknown_extent_text": "Какой объём вас интересует: один зуб, вся челюсть или пока не знаете?"
+    },
+    {
+      "topic_id": "restoration",
+      "service_ids": [
+        "classic",
+        "removable_dentures",
+        "zirconia_crowns",
+        "all_on_4",
+        "all_on_6"
+      ],
+      "offer_ids": [
+        "classic.default",
+        "removable_dentures.jaw.partial",
+        "zirconia_crowns.default",
+        "removable_dentures.jaw.full",
+        "all_on_4.default",
+        "all_on_6.default"
+      ],
+      "introduction_text": "Это разные способы восстановления зубов. Единица цены указана у каждого варианта; стоимость отдельного зуба не является суммой за всю челюсть. Подходящий способ выбирают после осмотра.",
+      "unknown_extent_text": "Какой объём вас интересует: один зуб, вся челюсть или пока не знаете?"
+    }
+  ]
+}

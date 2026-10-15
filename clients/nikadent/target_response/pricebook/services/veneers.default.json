@@ -1,0 +1,22 @@
+{
+  "offer_id": "veneers.default",
+  "service_id": "veneers",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 30000,
+    "currency": "RUB",
+    "billing_unit": "tooth"
+  },
+  "package": {
+    "label": "за один зуб",
+    "includes": [],
+    "excludes": []
+  },
+  "fact_refs": [],
+  "followups": [],
+  "applies_to_extents": [
+    "one_tooth",
+    "few_teeth"
+  ]
+}

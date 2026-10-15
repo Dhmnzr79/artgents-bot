@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from email.message import EmailMessage
 from unittest.mock import MagicMock, patch
 
@@ -28,6 +29,15 @@ from tests.test_tenant_ingress_prod_boundary_offline import (
 
 _CLINIC_A = "clinic-a-lead@example.test"
 _CLINIC_B = "clinic-b-lead@example.test"
+
+
+def _receipt(client_id, sid):
+    """Trusted internal proof for service-unit tests; HTTP cannot supply this object."""
+    from contracts.lead_consent import LeadConsentReceipt
+    from core.lead_consent import lead_consent_definition
+    definition = lead_consent_definition(client_id)
+    return LeadConsentReceipt(client_id=client_id,sid=sid,request_id="unit-acceptance",
+        accepted_at=datetime.now(timezone.utc),definition=definition) if definition else None
 
 
 def _cfg_a() -> dict:
@@ -79,7 +89,9 @@ def test_lead_path_reuses_send_lead_email_not_parallel_sender(
         {"name": "A", "phone": "+79001112233", "intent": "lead", "sid": "s1"},
         client_id="demo",
     )
-    assert status == 200
+    assert status == 503
+    assert payload["ok"] is False
+    assert payload["error_code"] == "email_smtp_not_configured"
     assert calls == ["send_lead_email"]
     assert payload["delivery_status"] == "email_smtp_not_configured"
 
@@ -122,6 +134,7 @@ def test_recipients_clinic_b_only(
     handle_lead(
         {"name": "B", "phone": "+79002223344", "intent": "lead", "sid": "s-b"},
         client_id="nikadent",
+        consent_receipt=_receipt("nikadent", "s-b"),
     )
     assert sent[0]["client_id"] == "nikadent"
     assert sent[0]["lead_cfg"]["recipients"] == [_CLINIC_B]
@@ -140,8 +153,8 @@ def test_recipient_routing_cache_warm_order_irrelevant(
     sent = _capture_send(monkeypatch)
     monkeypatch.setattr("lead_service.load_lead_config", lambda cid: _cfg_a() if cid == "demo" else _cfg_b())
 
-    handle_lead({"phone": "+79001112233", "sid": "w1"}, client_id=first)
-    handle_lead({"phone": "+79001112244", "sid": "w2"}, client_id=second)
+    handle_lead({"phone": "+79001112233", "sid": "w1"}, client_id=first,consent_receipt=_receipt(first,"w1"))
+    handle_lead({"phone": "+79001112244", "sid": "w2"}, client_id=second,consent_receipt=_receipt(second,"w2"))
     demo_rows = [x for x in sent if x["client_id"] == "demo"]
     nika_rows = [x for x in sent if x["client_id"] == "nikadent"]
     assert demo_rows[0]["lead_cfg"]["recipients"] == [_CLINIC_A]
@@ -170,8 +183,11 @@ def test_no_recipients_honest_status_no_demo_fallback(
         "lead_service.load_lead_config",
         lambda _cid: {"recipients": [], "subject_template": "x"},
     )
-    payload, status = handle_lead({"phone": "+79001112233", "sid": "s0"}, client_id="nikadent")
-    assert status == 200
+    payload, status = handle_lead({"phone": "+79001112233", "sid": "s0"}, client_id="nikadent",
+                                  consent_receipt=_receipt("nikadent","s0"))
+    assert status == 503
+    assert payload["ok"] is False
+    assert payload["error_code"] == "email_no_recipients"
     assert payload["delivery_status"] == "email_no_recipients"
 
 
@@ -195,7 +211,7 @@ def test_same_sid_cross_tenant_dialog_isolation(
         mem_add_bot(sid, "Ответ nikadent")
 
     handle_lead({"phone": "+79001112233", "sid": sid}, client_id="demo")
-    handle_lead({"phone": "+79002223344", "sid": sid}, client_id="nikadent")
+    handle_lead({"phone": "+79002223344", "sid": sid}, client_id="nikadent",consent_receipt=_receipt("nikadent",sid))
 
     demo_body = sent[0]["dialog_excerpt"]
     nika_body = sent[1]["dialog_excerpt"]
@@ -447,7 +463,7 @@ def test_lead_post_zero_provider_calls(
     _install_sales_fast_transport(monkeypatch, backend)
     sqlite_fn, _ = isolated_sqlite_paths(tmp_path)
     monkeypatch.setattr("session.sqlite_path_for_client", sqlite_fn)
-    monkeypatch.setattr("lead_service.send_lead_email", lambda **_k: (True, "email_sent"))
+    monkeypatch.setattr("lead_service.send_lead_email", lambda **_k: (True, "email"))
     monkeypatch.setattr("lead_service.leads_mode", lambda _cid: "email")
     resp = app_module.app.test_client().post(
         "/lead",
@@ -455,7 +471,8 @@ def test_lead_post_zero_provider_calls(
         base_url=_nikadent_base_url(),
         headers=_prod_headers(origin="https://nikadent.bot.artgents.ru"),
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 403
+    assert resp.get_json()["error_code"] == "lead_consent_required"
     assert backend.call_count == 0
 
 

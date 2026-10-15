@@ -41,6 +41,11 @@ def _invalid_allowed_client_id(client_id: str) -> str | None:
     if not md_files:
         return "allowed_client_pack_invalid"
     try:
+        from core.d2_usage_limits import load_usage_limits
+        load_usage_limits(cid)
+    except (ValueError, OSError):
+        return "allowed_client_usage_limits_invalid"
+    try:
         data = load_target_client_data(cid)
     except Exception:
         return "allowed_client_pack_invalid"

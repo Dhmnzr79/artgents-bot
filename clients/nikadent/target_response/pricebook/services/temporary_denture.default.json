@@ -1,0 +1,23 @@
+{
+  "offer_id": "temporary_denture.default",
+  "service_id": "temporary_denture",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 12000,
+    "currency": "RUB",
+    "billing_unit": "unit"
+  },
+  "package": {
+    "label": "за один временный съёмный протез для замещения 1–3 зубов",
+    "includes": [],
+    "excludes": []
+  },
+  "fact_refs": [],
+  "followups": [],
+  "applies_to_extents": [
+    "one_tooth",
+    "few_teeth"
+  ],
+  "max_tooth_count": 3
+}

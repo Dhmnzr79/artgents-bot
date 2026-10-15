@@ -1,0 +1,22 @@
+{
+  "offer_id": "denture_reline.default",
+  "service_id": "denture_reline",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 7500,
+    "currency": "RUB",
+    "billing_unit": "procedure"
+  },
+  "package": {
+    "label": "перебазировка одного съёмного протеза лабораторным методом",
+    "includes": [],
+    "excludes": []
+  },
+  "fact_refs": [],
+  "followups": [],
+  "applies_to_extents": [
+    "few_teeth",
+    "full_arch"
+  ]
+}

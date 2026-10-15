@@ -2,7 +2,6 @@
   "caries": {
     "name": "Лечение кариеса",
     "aliases": [
-      "лечение кариеса",
       "кариес",
       "пломба",
       "поставить пломбу"
@@ -12,14 +11,17 @@
     "active": true,
     "content_ref": "treatment__service__caries.md",
     "selection": {
-      "mode": "direct"
+      "mode": "direct",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
     },
     "options": []
   },
   "teeth_treatment": {
     "name": "Лечение зубов",
     "aliases": [
-      "лечение зубов",
       "лечить зубы",
       "терапевтическая стоматология"
     ],
@@ -28,14 +30,17 @@
     "active": true,
     "content_ref": "treatment__service__teeth_treatment.md",
     "selection": {
-      "mode": "context"
+      "mode": "context",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
     },
     "options": []
   },
   "pulpitis": {
     "name": "Лечение каналов",
     "aliases": [
-      "лечение каналов",
       "лечение пульпита",
       "пульпит",
       "удалить нерв"
@@ -52,7 +57,6 @@
   "tooth_restoration": {
     "name": "Реставрация зубов",
     "aliases": [
-      "реставрация зубов",
       "реставрация",
       "восстановление зуба"
     ],
@@ -68,11 +72,10 @@
   "teeth_cleaning": {
     "name": "Чистка зубов",
     "aliases": [
-      "чистка зубов",
       "профессиональная гигиена",
       "гигиена полости рта"
     ],
-        "family": "therapy",
+    "family": "therapy",
     "roles": [],
     "active": true,
     "content_ref": "hygiene__service__teeth_cleaning.md",
@@ -84,7 +87,6 @@
   "periodontitis": {
     "name": "Лечение дёсен",
     "aliases": [
-      "лечение дёсен",
       "лечение десен",
       "пародонтит",
       "пародонтоз",
@@ -102,7 +104,6 @@
   "tooth_extraction": {
     "name": "Удаление зуба",
     "aliases": [
-      "удаление зуба",
       "удалить зуб",
       "вырвать зуб"
     ],
@@ -111,14 +112,17 @@
     "active": true,
     "content_ref": "extraction__service__tooth_extraction.md",
     "selection": {
-      "mode": "direct"
+      "mode": "direct",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
     },
     "options": []
   },
   "classic": {
     "name": "Классическая имплантация",
     "aliases": [
-      "классическая имплантация",
       "имплант на один зуб",
       "двухэтапная имплантация"
     ],
@@ -140,7 +144,6 @@
   "one_stage": {
     "name": "Одномоментная имплантация",
     "aliases": [
-      "одномоментная имплантация",
       "имплант в день удаления"
     ],
     "family": "implantology",
@@ -165,7 +168,6 @@
     "name": "Имплантация All-on-4",
     "aliases": [
       "all-on-4",
-      "имплантация all-on-4",
       "все на четырёх",
       "протез на 4 имплантах"
     ],
@@ -187,7 +189,6 @@
     "name": "Имплантация All-on-6",
     "aliases": [
       "all-on-6",
-      "имплантация all-on-6",
       "все на шести",
       "протез на 6 имплантах"
     ],
@@ -208,7 +209,6 @@
   "sinus_lift": {
     "name": "Синус-лифтинг",
     "aliases": [
-      "синус-лифтинг",
       "синус лифтинг",
       "сколько стоит синус-лифтинг"
     ],
@@ -224,7 +224,6 @@
   "bone_graft": {
     "name": "Костная пластика",
     "aliases": [
-      "костная пластика",
       "наращивание костной ткани",
       "сколько стоит костная пластика"
     ],
@@ -253,6 +252,9 @@
       "extent": [
         "one_tooth",
         "few_teeth"
+      ],
+      "stage": [
+        "natural_tooth_present"
       ]
     },
     "options": []
@@ -274,14 +276,16 @@
       "extent": [
         "one_tooth",
         "few_teeth"
+      ],
+      "stage": [
+        "natural_tooth_present"
       ]
     },
     "options": []
   },
   "veneers": {
-    "name": "Виниры",
+    "name": "Виниры из пресс-керамики",
     "aliases": [
-      "виниры",
       "виниры на зубы",
       "керамические виниры"
     ],
@@ -297,7 +301,6 @@
   "core_inlay": {
     "name": "Культевая вкладка",
     "aliases": [
-      "культевая вкладка",
       "культёвая вкладка",
       "вкладка под коронку",
       "восстановление культи зуба"
@@ -314,7 +317,6 @@
   "ceramic_inlays": {
     "name": "Керамические накладки",
     "aliases": [
-      "керамические накладки",
       "накладки на зубы",
       "вкладки на зуб"
     ],
@@ -331,13 +333,12 @@
     "name": "Консультация по протезированию",
     "aliases": [
       "консультация ортопеда",
-      "консультация по протезированию",
       "консультация протезиста"
     ],
     "family": "prosthodontics",
     "roles": [],
     "active": true,
-    "content_ref": "prosthetics__service__consultation.md",
+    "content_ref": "clinic__info__promo__free_orthopedic_consult.md",
     "selection": {
       "mode": "direct"
     },
@@ -362,12 +363,62 @@
         "full_arch"
       ]
     },
-    "options": []
+    "options": [
+      {
+        "option_id": "partial",
+        "name": "Частичный пластиночный протез",
+        "active": true,
+        "aliases": [],
+        "selection": {
+          "extent": [
+            "few_teeth"
+          ]
+        }
+      },
+      {
+        "option_id": "full",
+        "name": "Полный пластиночный протез",
+        "active": true,
+        "aliases": [],
+        "selection": {
+          "extent": [
+            "full_arch"
+          ]
+        }
+      },
+      {
+        "option_id": "acry_free",
+        "name": "Полный протез Acry Free",
+        "active": true,
+        "aliases": [
+          "акри фри",
+          "термопластмассовый протез"
+        ],
+        "selection": {
+          "extent": [
+            "full_arch"
+          ]
+        }
+      },
+      {
+        "option_id": "nylon",
+        "name": "Частичный нейлоновый / ацеталовый протез",
+        "active": true,
+        "aliases": [
+          "нейлоновый протез",
+          "ацеталовый протез"
+        ],
+        "selection": {
+          "extent": [
+            "few_teeth"
+          ]
+        }
+      }
+    ]
   },
   "clasp_dentures": {
     "name": "Бюгельные протезы",
     "aliases": [
-      "бюгельные протезы",
       "бюгельный протез",
       "протез с дугой"
     ],
@@ -386,7 +437,6 @@
   "implant_supported_prosthetics": {
     "name": "Протезы на имплантах",
     "aliases": [
-      "протезы на имплантах",
       "протезирование на имплантах",
       "зубы на имплантах"
     ],
@@ -405,12 +455,35 @@
         "implant_placed"
       ]
     },
-    "options": []
+    "options": [
+      {
+        "option_id": "crown",
+        "name": "Коронка на импланте",
+        "active": true,
+        "aliases": [],
+        "selection": {
+          "extent": [
+            "one_tooth",
+            "few_teeth"
+          ]
+        }
+      },
+      {
+        "option_id": "full_arch",
+        "name": "Протез на имплантах на всю челюсть",
+        "active": true,
+        "aliases": [],
+        "selection": {
+          "extent": [
+            "full_arch"
+          ]
+        }
+      }
+    ]
   },
   "denture_repair": {
     "name": "Ремонт протезов",
     "aliases": [
-      "ремонт протезов",
       "починить протез",
       "ремонт зубного протеза"
     ],
@@ -426,7 +499,6 @@
   "braces": {
     "name": "Брекеты",
     "aliases": [
-      "брекеты",
       "брекет-система",
       "установка брекетов",
       "ставите брекеты"
@@ -442,7 +514,6 @@
   "aligners": {
     "name": "Элайнеры",
     "aliases": [
-      "элайнеры",
       "капы для зубов",
       "прозрачные капы"
     ],
@@ -458,7 +529,6 @@
     "name": "Отбеливание зубов",
     "aliases": [
       "отбеливание",
-      "отбеливание зубов",
       "профессиональное отбеливание"
     ],
     "family": "aesthetics",
@@ -490,7 +560,6 @@
   "zygomatic_implants": {
     "name": "Скуловая имплантация",
     "aliases": [
-      "скуловая имплантация",
       "скуловые импланты",
       "зигоматические импланты"
     ],
@@ -507,7 +576,6 @@
   "pterygoid_implants": {
     "name": "Птеригоидные импланты",
     "aliases": [
-      "птеригоидные импланты",
       "птеригоидная имплантация"
     ],
     "family": "implantology",
@@ -523,7 +591,6 @@
   "sedation": {
     "name": "Лечение под седацией",
     "aliases": [
-      "лечение под седацией",
       "седация",
       "имплантация под седацией",
       "лечение во сне",
@@ -558,6 +625,65 @@
       "extent": [
         "one_tooth",
         "few_teeth"
+      ]
+    },
+    "options": []
+  },
+  "emax_crowns": {
+    "name": "Коронки E-MAX",
+    "aliases": [
+      "коронка Emax",
+      "коронка из пресс-керамики",
+      "имакс коронка"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__emax_crowns.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
+    },
+    "options": []
+  },
+  "temporary_denture": {
+    "name": "Временный съёмный протез на 1–3 зуба",
+    "aliases": [
+      "иммедиат-протез",
+      "бабочка на зуб",
+      "временный съемный протез"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__temporary_denture.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
+    },
+    "options": []
+  },
+  "denture_reline": {
+    "name": "Перебазировка съёмного протеза",
+    "aliases": [
+      "перебазировка протеза",
+      "протез плохо прилегает"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__denture_reline.md",
+    "selection": {
+      "mode": "direct",
+      "extent": [
+        "few_teeth",
+        "full_arch"
       ]
     },
     "options": []

@@ -18,6 +18,7 @@ from config import DEBUG_TOKEN, PORT
 from core.client_host import resolve_request_client_id
 from core.d2_http_adapter import run_d2_ask_json
 from core.d2_demo_limits import D2DemoLimitReached
+from core.d2_usage_limits import ClientUsageLimitReached, load_usage_limits
 from core import d2_diagnostics as diagnostics
 from core.d2_full_audit import full_audit, full_audit_enabled, full_audit_exception
 from core.d2_dialogue_store import D2RequestIdConflict, D2RequestInProgress
@@ -244,13 +245,37 @@ def dashboard_events_api():
     return jsonify(payload)
 
 
+def _bounded_widget_payload():
+    """Bound public chat/lead input before JSON parsing and transcript auditing."""
+    from pathlib import Path
+    from config import ALLOWED_CLIENTS
+    from werkzeug.exceptions import RequestEntityTooLarge
+    root = Path(os.getenv("D2_CLIENTS_ROOT") or Path(__file__).resolve().parent / "clients")
+    configured = {cid: load_usage_limits(cid, clients_root=root) for cid in ALLOWED_CLIENTS}
+    # A shared wire ceiling also protects the local multiplexed test endpoint,
+    # where client_id is inside the not-yet-parsed body. Demo quotas are unchanged.
+    request.max_content_length = max((v.request_max_bytes for v in configured.values() if v), default=16384)
+    data = request.get_json(force=True, silent=True)
+    if isinstance(data, dict):
+        cid = resolve_request_client_id(data.get("client_id"), host=request.host)
+        limits = configured.get(cid)
+        if limits and len(request.get_data()) > limits.request_max_bytes:
+            raise RequestEntityTooLarge()
+    return data
+
+
+@app.errorhandler(413)
+def request_too_large(_exc):
+    return safe_jsonify({"error": "request_too_large"}), 413
+
+
 @app.post("/ask")
 @diagnostics.http_attempt
 def ask():
     """Return the durable D2 final result through the JSON transport."""
+    data = _bounded_widget_payload()
     try:
         _audit_d2_request("/ask")
-        data = request.get_json(force=True)
         if not isinstance(data, dict):
             full_audit("http_result", route="/ask", status=400, payload={"error": "invalid_request"})
             return safe_jsonify({"error": "invalid_request"}), 400
@@ -270,6 +295,8 @@ def ask():
         diagnostics.stage("transport")
         full_audit("http_result", route="/ask", status=200, payload=result)
         return safe_jsonify(result)
+    except ClientUsageLimitReached as exc:
+        return safe_jsonify({"error": exc.code, "retry_after": exc.retry_after}), 429, {"Retry-After": str(exc.retry_after)}
     except D2DemoLimitReached as exc:
         diagnostics.failure(exc)
         log_json(logger, "demo_model_limit", reason=exc.code)
@@ -288,7 +315,7 @@ def ask():
         diagnostics.failure(exc)
         full_audit_exception("/ask", exc)
         full_audit("http_result", route="/ask", status=400, payload={"error": "d2_invalid_turn"})
-        return safe_jsonify({"error": "d2_invalid_turn"}), 400
+        return safe_jsonify({"error": "message_too_long" if str(exc) == "message_too_long" else "d2_invalid_turn"}), 400
     except Exception as exc:
         diagnostics.failure(exc)
         full_audit_exception("/ask", exc)
@@ -317,8 +344,8 @@ def _sse_status_line(message: str) -> str:
 @diagnostics.http_attempt
 def ask_stream():
     """SSE framing of the same durable D2 result returned by JSON /ask."""
+    data = _bounded_widget_payload()
     _audit_d2_request("/ask/stream")
-    data = request.get_json(force=True, silent=True)
     if not isinstance(data, dict):
         full_audit("http_result", route="/ask/stream", status=400, payload={"error": "invalid_request"})
         return safe_jsonify({"error": "invalid_request"}), 400
@@ -343,6 +370,8 @@ def ask_stream():
             yield _sse_status_line(_SSE_INITIAL_STATUS_PHRASE)
             try:
                 out = run_d2_ask_json(data, client_id=client_id, peer_ip=peer_ip)
+            except ClientUsageLimitReached as exc:
+                error = exc.code
             except D2DemoLimitReached as exc:
                 diagnostics.failure(exc)
                 log_json(logger, "demo_model_limit", reason=exc.code)
@@ -358,7 +387,7 @@ def ask_stream():
             except ValueError as exc:
                 diagnostics.failure(exc)
                 full_audit_exception("/ask/stream", exc)
-                error = "d2_invalid_turn"
+                error = "message_too_long" if str(exc) == "message_too_long" else "d2_invalid_turn"
             except Exception as exc:
                 diagnostics.failure(exc)
                 full_audit_exception("/ask/stream", exc)
@@ -484,9 +513,8 @@ def static_files(path):
 
 @app.post("/lead")
 def create_lead():
-    try:
-        data = request.get_json(force=True) or {}
-    except Exception:
+    data = _bounded_widget_payload()
+    if not isinstance(data, dict):
         return jsonify({"ok": False, "error_code": "bad_json", "delivery": None}), 400
     client_id = resolve_request_client_id(data.get("client_id"), host=request.host)
     if client_id is None:

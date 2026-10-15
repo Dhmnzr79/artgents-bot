@@ -347,6 +347,7 @@ class TargetOffer(TargetSchemaModel):
     brand_id: NonBlankStr | None = None
     active: bool = True
     applies_to_extents: list[PatientExtent] | None = None
+    max_tooth_count: Annotated[StrictInt, Field(ge=1)] | None = None
     price: TargetPrice
     package: TargetPricePackage
     payment_stages: list[TargetPaymentStage] | None = None

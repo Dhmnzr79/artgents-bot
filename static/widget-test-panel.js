@@ -51,10 +51,57 @@ async function checkConnection() {
 window.addEventListener("pagehide", () => clearTimeout(timer));
 void checkConnection();
 
-const config = JSON.parse(document.getElementById("clinic-widget-config").textContent);
+const clientSelect = document.getElementById("client-select");
+const requestedClient = new URL(location.href).searchParams.get("client") || "demo";
+const clientId = ["demo", "nikadent"].includes(requestedClient) ? requestedClient : "demo";
+clientSelect.value = clientId;
+const clientUrl = id => {
+  const url = new URL(location.href);
+  url.searchParams.set("client", id);
+  if (id !== clientId) url.searchParams.delete("page");
+  return url;
+};
+document.getElementById("client-new-tab").href = clientUrl(clientId).href;
+clientSelect.addEventListener("change", () => location.assign(clientUrl(clientSelect.value).href));
+document.querySelector(".footer span").textContent = `${clientId === "demo" ? "Демо" : "НикаДент"} · ${location.host}`;
+let config;
+try {
+  const response = await fetch(`/api/widget-config?client_id=${encodeURIComponent(clientId)}`, {cache:"no-store"});
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  config = await response.json();
+  if (config.clientId !== clientId) throw new Error("Клиент в настройках не совпадает с выбранным");
+  config.apiBase = "";
+} catch (error) {
+  report(`Не удалось загрузить настройки ${clientId}: ${error.message}`);
+  for (const id of ["open-chat", "reset-chat"]) document.getElementById(id).disabled = true;
+  throw error;
+}
 const mount = document.createElement("div");
+const pageSelect = document.getElementById("page-select");
+const pagePaths = [...new Set(["/", ...(config.pageMenus || []).flatMap(menu => menu.paths)])];
+const requestedPage = new URL(location.href).searchParams.get("page") || "/";
+const pagePath = pagePaths.includes(requestedPage) ? requestedPage : "/";
+for (const path of pagePaths) {
+  const option = document.createElement("option");
+  option.value = path;
+  option.textContent = path === "/" ? "Главная / общие страницы" : path;
+  pageSelect.appendChild(option);
+}
+pageSelect.value = pagePath;
+document.getElementById("page-preview-path").textContent = pagePath;
+pageSelect.addEventListener("change", () => {
+  const url = clientUrl(clientId);
+  url.searchParams.set("page", pageSelect.value);
+  location.assign(url.href);
+});
 document.body.appendChild(mount);
-const widget = mountWidget(mount, config);
+const widget = mountWidget(mount, config, {pagePath});
+const repeatInvitation = document.getElementById("repeat-invitation");
+repeatInvitation.disabled = config.demoLauncher || !config.launcherTeaser;
+repeatInvitation.addEventListener("click", () => {
+  widget.restartLauncherTeaser();
+  report("Приглашение свернуто и раскроется через 10 секунд.");
+});
 const launcher = mount.querySelector("[data-clinic-launcher-open], [data-clinic-launcher]");
 const input = mount.querySelector("[data-clinic-input]");
 const form = mount.querySelector("[data-clinic-composer-form]");

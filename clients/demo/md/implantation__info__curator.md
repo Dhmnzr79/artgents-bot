@@ -13,7 +13,7 @@ aliases:
 cta_key: booking
 cta_action: lead
 
-situation_allowed: true
+
 ---
 
 ## Персональный куратор

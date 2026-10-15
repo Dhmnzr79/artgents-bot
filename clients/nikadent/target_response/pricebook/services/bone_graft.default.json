@@ -9,9 +9,15 @@
     "billing_unit": "procedure"
   },
   "package": {
-    "label": "за процедуру; объём работ уточняется на консультации",
-    "includes": []
+    "label": "за процедуру; объём и состав согласуются после осмотра",
+    "includes": [],
+    "excludes": []
   },
   "fact_refs": [],
-  "followups": []
+  "followups": [],
+  "applies_to_extents": [
+    "one_tooth",
+    "few_teeth",
+    "full_arch"
+  ]
 }

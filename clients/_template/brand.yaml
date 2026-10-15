@@ -1,5 +1,5 @@
 # clients/_template/brand.yaml
-# brand — glow, пузырь; action — ссылки и focus; button_1/button_2 — градиент кнопок
+# brand — основной цвет; promo_background/promo_accent — фон и акценты стартовой акции.
 clinic_name: "REPLACE_CLINIC_NAME"
 logo_url: null
 logo_width: null
@@ -8,6 +8,5 @@ avatar_url: null
 
 colors:
   brand: null
-  action: null
-  button_1: null
-  button_2: null
+  promo_background: null
+  promo_accent: null

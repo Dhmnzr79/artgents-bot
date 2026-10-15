@@ -1,0 +1,22 @@
+{
+  "offer_id": "removable_dentures.jaw.acry_free",
+  "service_id": "removable_dentures",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 55000,
+    "currency": "RUB",
+    "billing_unit": "jaw"
+  },
+  "package": {
+    "label": "за одну челюсть",
+    "includes": [],
+    "excludes": []
+  },
+  "fact_refs": [],
+  "followups": [],
+  "applies_to_extents": [
+    "full_arch"
+  ],
+  "option_id": "acry_free"
+}

@@ -392,6 +392,7 @@ def resolve_d2_operations(
                 published_terms=sources.d2_published_terms_by_offer,
                 brand_id=price_part.brand_id,
                 applied_extent=applied_extent,
+                tooth_count=price_part.volume.tooth_count if price_part.volume is not None else None,
                 ordered_offer_ids=direction_order,
                 direct_service_only=direct_service_only,
                 selected_offer_id=selected_price_offer_id,
@@ -765,6 +766,7 @@ def resolve_d2_operations(
                 client_id=client_id, service_ids=(service_id,),
                 published_terms=sources.d2_published_terms_by_offer,
                 brand_id=price_part.brand_id, applied_extent=applied_extent,
+                tooth_count=price_part.volume.tooth_count if price_part.volume is not None else None,
                 direct_service_only=True)[0].rows)
         for row in price_tab_rows:
             offer = offers_by_id[row.offer_id]
@@ -781,7 +783,8 @@ def resolve_d2_operations(
             for index, action in enumerate(actions):
                 offer = offers_by_id.get(action.offer_id)
                 service = sources.material_authority.bundle.services.get(action.service_id)
-                extent = action.discussion_scope.volume.extent if action.discussion_scope.volume else None
+                volume = action.discussion_scope.volume
+                extent = volume.extent if volume and volume.extent != "unknown" else None
                 if (action.source_client_id != client_id or offer is None or not offer.active
                         or service is None or not service.active or offer.service_id != action.service_id
                         or offer.brand_id != action.discussion_scope.brand_id
@@ -789,7 +792,9 @@ def resolve_d2_operations(
                         or (offer.option_id is not None and not any(
                             option.option_id == offer.option_id and option.active is not False
                             for option in service.options))
-                        or (extent not in {None, "unknown"} and not _d2_offer_applies(offer, service, extent))):
+                        or not _d2_offer_applies(
+                            offer, service, extent,
+                            tooth_count=volume.tooth_count if volume is not None else None)):
                     raise MaterializationOwnershipError("d2_price_select_offer_unavailable")
                 actions[index] = action.model_copy(update={"service_name":service.name})
                 replies.append(UiQuickReplyCandidate(source_client_id=client_id,
@@ -1125,10 +1130,18 @@ def _d2_scope_offer_ids(
     return tuple(ids)
 
 
-def _d2_offer_applies(offer: TargetOffer, service: TargetService, extent: str) -> bool:
-    if offer.applies_to_extents is None and not service.selection.extent:
+def _d2_offer_applies(
+    offer: TargetOffer, service: TargetService, extent: str | None,
+    *, tooth_count: int | None = None,
+) -> bool:
+    if extent is not None and (
+        (offer.applies_to_extents is None and not service.selection.extent)
+        or not offer_applies_to_extent(offer, service, extent)  # type: ignore[arg-type]
+    ):
         return False
-    return offer_applies_to_extent(offer, service, extent)  # type: ignore[arg-type]
+    # Extent and a known count are independent authored constraints. Unknown
+    # counts retain the scoped reference; never guess a count or calculate totals.
+    return offer.max_tooth_count is None or tooth_count is None or tooth_count <= offer.max_tooth_count
 
 
 def _d2_validate_selected_document_binding(
@@ -1229,6 +1242,7 @@ def _d2_price_block(
     published_terms: dict[str, D2PublishedOfferTerms],
     brand_id: str | None = None,
     applied_extent: str | None = None,
+    tooth_count: int | None = None,
     ordered_offer_ids: tuple[str, ...] = (),
     direct_service_only: bool = False,
     selected_offer_id: str | None = None,
@@ -1257,7 +1271,7 @@ def _d2_price_block(
                 offer.option_id is None
                 or (offer.option_id in options_by_id and options_by_id[offer.option_id].active is not False)
             )
-            and (applied_extent is None or _d2_offer_applies(offer, service, applied_extent))
+            and _d2_offer_applies(offer, service, applied_extent, tooth_count=tooth_count)
         ]
         if not offers:
             # Recoverable empty catalog for this service (C02 / D2-065): keep
@@ -1280,7 +1294,7 @@ def _d2_price_block(
                 raise MaterializationOwnershipError("d2_direction_service_unavailable")
             if brand_id is not None and offer.brand_id != brand_id:
                 continue
-            if applied_extent is not None and not _d2_offer_applies(offer, service, applied_extent):
+            if not _d2_offer_applies(offer, service, applied_extent, tooth_count=tooth_count):
                 continue
             if offer.service_id not in represented_services:
                 offers.append(offer)
@@ -1425,7 +1439,11 @@ def _d2_frozen_price_row(
             scope_text=None,
             approved_text=price.approved_text,
             condition_texts=_d2_brief_price_conditions(
-                offer, package_label=terms.package_label, already_shown=price.approved_text,
+                # The first label clause is the billing scope. Without a
+                # numeric price it is not a separate patient-facing condition.
+                # Keep subsequent authored clauses and mandatory caveats.
+                offer, package_label=terms.package_label.partition(";")[2],
+                already_shown=price.approved_text,
             ),
         )
     else:  # pragma: no cover - TargetPrice is a discriminated union.

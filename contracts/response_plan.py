@@ -6,6 +6,7 @@ from contracts.d2_dialogue_result import DiscussionScope
 from typing import Annotated, Literal, Self, Union
 
 from contracts.response_schema import RequestedDisplayPolicy
+from contracts.lead_consent import LeadConsentPrompt
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Discriminator, Field, Tag, model_validator
 
@@ -866,6 +867,7 @@ def _validate_price_detail_ui_actions(
 
 
 class UiPlanCandidates(ResponsePlanModel):
+    lead_consent: LeadConsentPrompt | None = None
     quick_replies: tuple[UiQuickReplyCandidate, ...] = ()
     buttons: tuple[UiButtonCandidate, ...] = ()
     widget: UiWidgetCandidate | None = None
@@ -1339,6 +1341,7 @@ class ResolvedTextualCtaBlock(ResponsePlanModel):
 
 
 class ResolvedUiPlan(ResponsePlanModel):
+    lead_consent: LeadConsentPrompt | None = None
     quick_replies: tuple[UiQuickReplyCandidate, ...] = ()
     buttons: tuple[UiButtonCandidate, ...] = ()
     widget: UiWidgetCandidate | None = None
@@ -1841,6 +1844,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
 
 
 class ResponseUIProjection(ResponsePlanModel):
+    lead_consent: LeadConsentPrompt | None = None
     composer_input_mode: Literal["text", "phone"] = "text"
     quick_replies: tuple[UiQuickReplyCandidate, ...] = ()
     buttons: tuple[UiButtonCandidate, ...] = ()

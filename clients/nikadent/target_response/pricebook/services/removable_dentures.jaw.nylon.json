@@ -1,0 +1,22 @@
+{
+  "offer_id": "removable_dentures.jaw.nylon",
+  "service_id": "removable_dentures",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 40000,
+    "currency": "RUB",
+    "billing_unit": "unit"
+  },
+  "package": {
+    "label": "за один частичный протез",
+    "includes": [],
+    "excludes": []
+  },
+  "fact_refs": [],
+  "followups": [],
+  "applies_to_extents": [
+    "few_teeth"
+  ],
+  "option_id": "nylon"
+}

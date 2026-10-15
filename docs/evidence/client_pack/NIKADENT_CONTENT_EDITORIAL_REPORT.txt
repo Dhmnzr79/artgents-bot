@@ -1,0 +1,235 @@
+ДОПОЛНЕНИЕ §77 — ОМС И ДМС
+По прямому указанию владельца добавлено: «В НикаДент лечение по ОМС и ДМС
+не проводится». Отдельный раздел в clinic__info__policies.md; правило приёма
+только взрослых и metadata сохранены. Content bug fix, не упрощение архитектуры.
+Allowlist: policy MD, текущая карточка и этот отчёт. Baseline после §76:
+nikadent-policy-insurance-baseline. Прежний WIP сохранён.
+Проверки и Checker: pending. Ветка codex/nikadent-technical-onboarding,
+HEAD 2a2f2f1, staging пустой; provider/SMTP/commit/push/merge/deploy 0.
+
+ДОПОЛНЕНИЕ §76 — ВЫБРАННЫЙ ВЛАДЕЛЬЦЕМ ТЕКСТ ГАРАНТИИ
+2026-10-15. Content bug fix; не архитектурное упрощение.
+Владелец явно разрешил пять выбранных фрагментов demo для НикаДент.
+Они добавлены: обязательства в договоре, сертифицированные системы/паспорт,
+условия сохранения гарантии, обращение при проблеме, переезд и объяснение срока.
+Срок выполненных работ — 1 год. Брендовые сроки demo и невыбранное обещание
+бесплатной коррекции/замены не переносились. Два самостоятельных follow-up.
+Прежнее ограничение «только одна строка о гарантии» заменено этим поручением;
+остальные вопросы §75 и её результаты сохраняются как история этапа.
+Это одобренный владельцем текст, а не независимое подтверждение условий клиники.
+Baseline/allowlist: карточка §76 и внешний nikadent-warranty-owner-selection-baseline.
+Проверки: pack validator и diff--check PASS; metadata сохранена; оба follow-up
+разрешаются D2, обе подмены источника отклонены; 752 защищённых SHA256 совпадают.
+Независимый Checker PASS. Полный suite для текстовой правки не повторялся;
+известные baseline-падения предыдущего этапа остаются вне объёма.
+Provider/SMTP 0; staging пустой;
+HEAD 2a2f2f1, ветка codex/nikadent-technical-onboarding. Публикаций нет.
+
+ПОВТОРНАЯ РЕДАКТУРА НИКАДЕНТ — ПОЛНОЦЕННЫЕ ОБЪЯСНЕНИЯ
+2026-10-15. C:/Cursor Projects/artgents-bot-active.
+Ветка codex/nikadent-technical-onboarding; HEAD2a2f2f1; main/mergebasee93cb12.
+Карточка §75. База — рабочий вариант после §74; его тексты владелец отклонил как чрезмерно сокращённые. Предыдущий Checker PASS подтверждал технические границы, а не принятие владельцем редакторского результата.
+
+ЧТО ИСПРАВЛЕНО
+Переписан51из53MD. Это полный повторный редакторский проход, а не дальнейшее сокращение. Сохранены только две специально короткие записи: гарантия1год по прямому указанию владельца и существующее правило приёма взрослых.
+Основной критерий — полнота полезного ответа по образцу demo: задача пациента, выгода подхода, ход лечения, ожидания и ограничения. Количество символов и кнопок не используется как KPI качества.
+
+- Боль: возвращены спокойное объяснение тревоги, работа местной анестезии, проверка её действия, общение с врачом во время процедуры. Подробно раскрыты ощущения после установки и восстановление. Седация/наркоз — отдельный вопрос с фактическим отказом НикаДент, без переноса возможностей demo.
+- Оплата: прямо указаны фиксация согласованной стоимости в договоре и отсутствие скрытых доплат; раскрыты состав плана, обсуждение последовательности оплаты, помощь с документами для вычета. Нет demo-рассрочки12месяцев, скидок, выдуманных способов оплаты и трёх бюджетов.
+- Классическая/одномоментная имплантация: возвращены смысл метода, сохранение соседних зубов, планирование, подготовка при дефиците кости, временный зуб и ограничения нагрузки. Отдельные вопросы раскрывают разные ситуации; постоянная/временная конструкция и установка опоры не смешиваются.
+- Костная пластика/синус-лифтинг: объяснено, зачем нужна подготовка, как она связана с будущим зубом, какие альтернативы можно обсуждать и как проходит восстановление. Не перенесены недоступные скуловые/птеригоидные методы.
+- All-on: полноценное объяснение результата и планирования, временного и постоянного протеза, сроков, адаптации, питания и контроля. Нет обещания полного завершения за несколько дней или безусловного превосходства большего числа имплантов.
+- Коронки/мосты/протезы: возвращены показания, польза, подготовка, примерка, удобство, отличие материалов, уход и обращение при проблемах. Ключевые сроки и свойства остаются в основном ответе; дополнительные разделы отвечают на отдельные вопросы.
+- Лечение/реставрация/гигиена/дёсны: объяснена помощь пациенту и последовательность работы, без новых приборов, материалов, брендов и квалификаций.
+- Сравнения: сохранены содержательные различия, ситуации выбора и ограничения; убраны только реальные круговые пересказы. Длину не сводили к одной строке ради формального отсутствия дублей.
+- Врачи: сохранён согласованный компактный формат — специальность/направления, стаж,2–3 продающие фразы из описаний личных страниц. Образования и новых достижений нет.
+- Акция: сохранены4согласованных бесплатных пункта, постоянный срок и предварительная запись. Добавлена полноценная подача пользы консультации и сравнения с лечением в Китае без новых цен/обязательств.
+
+ГРАНИЦЫ
+Только тела53MD и списки suggest_h3, карточка задачи и этот отчёт. Все остальные parsed metadata, цены, service/fact/offer refs и identities, доступность, контакты/lead/privacy/config, тесты и код сохранены относительно базы этого прохода.
+Каноническая акция остаётся clinic__info__promo__free_orthopedic_consult.md; удалённые ранее дубли не восстановлены. Полный MD-корпус по-прежнему читает существующий D2. Новых механизмов, полей runtime или модельных вызовов нет.
+Demo использован как образец полноты и подачи общих объяснений. Цифры/условия НикаДент сохранены; собственная лаборатория, оборудование, E-max для виниров, седация, наркоз, demo-цены и условия не перенесены.
+
+ВОПРОСЫ ДЛЯ ПОСЛЕДУЮЩЕГО СОГЛАСОВАНИЯ — ТОЛЬКО ЗДЕСЬ
+1. Подробные условия бесплатной замены импланта/коррекции/переделки. В MD пока только согласованная гарантия1год; дополнительные обещания не публикуются.
+2. Точный состав пакетов имплантации «под ключ» и оплата временных/постоянных конструкций. Сейчас общее объяснение полного плана; бесплатен расчёт на консультации, не все возможные процедуры.
+3. Фактические материалы и конкретные методы гигиены, лечения дёсен, реставрации и виниров. Тексты раскрывают общую помощь, оборудование и технологии не придуманы.
+4. Дополнительные лично выполняемые операции врачей; опубликованы только указанные направления. Старые provisional service_ids не превращены в новые публичные квалификации.
+5. Цены владелец обновляет отдельно. Медицинская/юридическая достоверность исходных цифр и классификаций не пересматривалась рекламной редактурой. Сохраняются условия оценки врачом, medical/handoff boundaries и налогового вычета при наличии права.
+
+ИСТОЧНИКИ И ОБРАЗЦЫ
+Исходная база НикаДент до редакторских проходов; её сайт и личные страницы врачей, прочитанные ранее15.10.2026; согласованный в чате скриншот акции.
+https://nikadent41.ru/
+https://nikadent41.ru/semnoe-protezirovanie/
+https://nikadent41.ru/koronki-i-nesemnoe-protezirovanie/
+https://nikadent41.ru/all-on-4/
+https://nikadent41.ru/doctors/
+Demo: implantation__faq__pain.md; clinic__info__payment_terms.md; implantation__service__classic.md; implantation__service__one_stage.md; implantation__service__sinus_lift.md; prosthetics__service__implant_supported_prosthetics.md; prosthetics__service__zirconia_crowns.md; removable_dentures/clasp_dentures; treatment__service__caries.md и pulpitis.md. Для новых Nika услуг без прямого аналога применён тот же принцип объяснения, а не выдуманный demo-документ.
+
+ПРОВЕРКИ И СОСТОЯНИЕ
+45targetedoffline tests PASS,1известный format smoke исключён: он ссылается на отсутствующий test_multibranch_contact_authority.py; baseline-падение ранее воспроизведено на чистом2a2f2f1. Тесты в этом проходе не менялись. Исторические price/policy/replay ошибки вне этапа не объявляются исправленными.
+53MD, все59предложенных follow-up разрешаются текущим D2;59подмен исходного документа отклонены. Parsed metadata кроме suggest_h3 идентична.81защищённый файл совпадает по SHA256. Nikadent production validator и diff--check PASS.
+Это offline свидетельства ссылок/границ. Живую модель, SMTP, реальные диалоги и сайт-вставку не проверяли; медицинскую экспертизу и архитектурное упрощение не сертифицируем.
+Независимый Checker: PASS. Прочитаны все 53 MD и соответствующие demo-материалы; блокирующих замечаний нет. Независимо подтверждены metadata, 59 разрешённых follow-up/59 отклонённых подмен источника, 81 защищённый SHA256, validator, scope и diff--check. Повтор оплаты устранён до итогового PASS. 45 тестов — свидетельство исполнителя; Checker повторно suite не запускал. Это не заменяет принятие текстов владельцем и не является медицинской экспертизой.
+Staging пустой; HEAD unchanged. Commit/push/PR update/merge/deploy0; provider/SMTP0. Предыдущие WIP/demo/avatar.png/otzyv-1/2/3.jpg сохранены.
+
+ПОФАЙЛОВЫЙ УКАЗАТЕЛЬ
+
+clients/nikadent/md/clinic__info__advantages.md
+Переписан. Разделы: Коротко {#korotko}
+
+clients/nikadent/md/clinic__info__contacts.md
+Переписан. Разделы: Коротко {#korotko}
+
+clients/nikadent/md/clinic__info__payment_terms.md
+Переписан. Разделы: Коротко {#korotko}
+
+clients/nikadent/md/clinic__info__policies.md
+Сохранён по отдельному ограничению владельца/назначению. Разделы: Приём взрослых {#no_pediatric_dentistry}
+
+clients/nikadent/md/clinic__info__promo__free_orthopedic_consult.md
+Переписан. Разделы: Коротко {#korotko}; Если рассматриваете лечение в Китае {#sravnit-s-lecheniem-v-kitae}
+
+clients/nikadent/md/clinic__info__warranty.md
+Сохранён по отдельному ограничению владельца/назначению. Разделы: Коротко {#korotko}
+
+clients/nikadent/md/comparison__all_on_4_vs_all_on_6.md
+Переписан. Разделы: Коротко {#korotko}; Для верхней челюсти обязательно шесть? {#verhnyaya-chelust-i-nagruzka}
+
+clients/nikadent/md/comparison__bone_graft_vs_all_on_4.md
+Переписан. Разделы: Коротко {#korotko}; Когда нужна пластика до установки имплантов? {#kogda-nuzhny-oba-etapa}
+
+clients/nikadent/md/comparison__bugel_prosthesis_vs_fixed_bridge.md
+Переписан. Разделы: Коротко {#korotko}; Если зубов не хватает в разных местах {#esli-net-neskolkih-zubov}
+
+clients/nikadent/md/comparison__classic_vs_one_stage.md
+Переписан. Разделы: Коротко {#korotko}; Когда сначала лечат и готовят ткани? {#kogda-nuzhna-podgotovka}; Будет ли зуб сразу после удаления? {#budet-li-zub-srazu}
+
+clients/nikadent/md/comparison__implant_vs_bridge.md
+Переписан. Разделы: Коротко {#korotko}; Если не хватает одного зуба, а соседние здоровы {#esli-net-odnogo-zuba}
+
+clients/nikadent/md/comparison__metal_ceramic_vs_zirconia.md
+Переписан. Разделы: Коротко {#korotko}; Как проходит подготовка и установка? {#podgotovka-i-ustanovka}
+
+clients/nikadent/md/doctors__doctor__danilov.md
+Переписан. Разделы: Коротко {#korotko}
+
+clients/nikadent/md/doctors__doctor__gadzhimuradov.md
+Переписан. Разделы: Коротко {#korotko}
+
+clients/nikadent/md/doctors__doctor__kadiev.md
+Переписан. Разделы: Коротко {#korotko}
+
+clients/nikadent/md/doctors__doctor__kitasova.md
+Переписан. Разделы: Коротко {#korotko}
+
+clients/nikadent/md/doctors__doctor__lavrenov.md
+Переписан. Разделы: Коротко {#korotko}
+
+clients/nikadent/md/doctors__doctor__overview.md
+Переписан. Разделы: Коротко {#korotko}
+
+clients/nikadent/md/extraction__service__tooth_extraction.md
+Переписан. Разделы: Коротко {#korotko}; Что будет после процедуры? {#chto-posle-udaleniya}; Можно ли сразу установить имплант? {#mozhno-li-srazu-implant}
+
+clients/nikadent/md/hygiene__service__teeth_cleaning.md
+Переписан. Разделы: Коротко {#korotko}
+
+clients/nikadent/md/implantation__faq__cost.md
+Переписан. Разделы: Коротко {#korotko}; Как уменьшить разовую нагрузку на бюджет? {#kak-sdelat-implantatsiyu-dostupnee}
+
+clients/nikadent/md/implantation__faq__duration.md
+Переписан. Разделы: Коротко {#korotko}; От чего зависит общий срок? {#ot-chego-zavisit-srok-implantatsii}; Можно ли ускорить лечение? {#mozhno-li-uskorit-implantatsiyu}
+
+clients/nikadent/md/implantation__faq__osseointegration.md
+Переписан. Разделы: Коротко {#korotko}; Что важно со стороны пациента? {#ot-chego-zavisit-prizhivlenie}; Если имплант не прижился {#a-esli-implant-ne-prizhivetsya}
+
+clients/nikadent/md/implantation__faq__pain.md
+Переписан. Разделы: Коротко {#korotko}; Что чувствуется после установки импланта? {#chto-chuvstvuetsya-posle-ustanovki}; Можно ли сделать под седацией или наркозом? {#sedatsiya-i-narkoz}
+
+clients/nikadent/md/implantation__faq__safety.md
+Переписан. Разделы: Коротко {#korotko}; Что делать, если есть хронические заболевания? {#obsudit-zdorove-do-operatsii}
+
+clients/nikadent/md/implantation__faq__tooth_loss.md
+Переписан. Разделы: Коротко {#korotko}; Если отсутствует несколько зубов или весь ряд {#esli-net-neskolkih-zubov}
+
+clients/nikadent/md/implantation__faq__tooth_one_day.md
+Переписан. Разделы: Коротко {#korotko}; Можно ли сразу есть как раньше? {#nagruzka-na-vremennyy-zub}
+
+clients/nikadent/md/implantation__faq__what_included.md
+Переписан. Разделы: Коротко {#korotko}; Если имплант уже стоит {#esli-implant-uzhe-stoit}; Коронка на своём зубе или на импланте? {#koronka-na-implant-ili-na-svoy-zub}
+
+clients/nikadent/md/implantation__info__aftercare.md
+Переписан. Разделы: Коротко {#korotko}; Что важно в первые дни? {#chto-proishodit-v-pervye-dni}
+
+clients/nikadent/md/implantation__info__contraindications.md
+Переписан. Разделы: Коротко {#korotko}; Что можно подготовить перед установкой? {#nuzhna-li-podgotovka-pered-implantatsiey}; Не поздно ли ставить импланты в старшем возрасте? {#vozrast-i-all-on}
+
+clients/nikadent/md/implantation__info__methods_overview.md
+Переписан. Разделы: Коротко {#korotko}; Если нет нескольких зубов подряд {#neskolko-zubov-podryad}
+
+clients/nikadent/md/implantation__info__steps.md
+Переписан. Разделы: Коротко {#korotko}; Что может понадобиться до операции? {#podgotovka-do-operatsii}
+
+clients/nikadent/md/implantation__service__all_on_4.md
+Переписан. Разделы: Коротко {#korotko}; Можно ли обойтись без костной пластики? {#komu-podhodit-all-on-4}; Как пользоваться временным протезом? {#ogranicheniya-i-uhod}
+
+clients/nikadent/md/implantation__service__all_on_6.md
+Переписан. Разделы: Коротко {#korotko}; Кому могут понадобиться дополнительные опоры? {#komu-podhodit-all-on-6}; Когда можно вернуться к привычной еде? {#sroki-i-osobennosti}
+
+clients/nikadent/md/implantation__service__bone_graft.md
+Переписан. Разделы: Коротко {#korotko}; Можно ли восстановить зубы без наращивания? {#mozhno-li-bez-narashchivaniya}; Как проходит восстановление после пластики? {#vosstanovlenie-posle-plastiki}
+
+clients/nikadent/md/implantation__service__classic.md
+Переписан. Разделы: Коротко {#korotko}; Если зуба давно нет или не хватает кости {#esli-zuba-davno-net}; Буду ли я без зуба во время лечения? {#vremennyy-zub-na-vremya-lecheniya}
+
+clients/nikadent/md/implantation__service__one_stage.md
+Переписан. Разделы: Коротко {#korotko}; Когда лучше выбрать другой протокол? {#kogda-ne-podhodit-odnomomentnaya}; Можно ли сразу поставить временную коронку? {#vremennaya-koronka-srazu}
+
+clients/nikadent/md/implantation__service__sinus_lift.md
+Переписан. Разделы: Коротко {#korotko}; Можно ли обойтись без синус-лифтинга? {#mozhno-li-bez-sinus-liftinga}; Как проходит процедура? {#kak-prohodit-protsedura}
+
+clients/nikadent/md/periodontology__service__periodontitis.md
+Переписан. Разделы: Коротко {#korotko}; Можно ли сразу поставить протез или имплант? {#podgotovka-k-vosstanovleniyu}
+
+clients/nikadent/md/prosthetics__service__ceramic_inlays.md
+Переписан. Разделы: Коротко {#korotko}; Накладка или коронка? {#nakladka-ili-koronka}
+
+clients/nikadent/md/prosthetics__service__clasp_dentures.md
+Переписан. Разделы: Коротко {#korotko}; Будут ли видны крепления? {#pokazaniya-i-fiksatsiya}; Будет ли удобно носить и можно ли спать с протезом? {#noshchenie-i-srok-sluzhby}
+
+clients/nikadent/md/prosthetics__service__core_inlay.md
+Переписан. Разделы: Коротко {#korotko}; Чем отличается от керамической накладки? {#otlichie-ot-keramicheskoy-nakladki}
+
+clients/nikadent/md/prosthetics__service__denture_repair.md
+Переписан. Разделы: Коротко {#korotko}; Если протез целый, но хуже держится {#remont-i-perebazirovka}
+
+clients/nikadent/md/prosthetics__service__fixed_bridge.md
+Переписан. Разделы: Коротко {#korotko}; Как устанавливают мост? {#kak-ustanavlivaetsya}; Если не хватает надёжных опор {#esli-net-nadezhnyh-opor}
+
+clients/nikadent/md/prosthetics__service__implant_supported_prosthetics.md
+Переписан. Разделы: Коротко {#korotko}; Какие конструкции можно поставить? {#kakoy-variant-podoydet}; Что будет на время приживления? {#vremennaya-konstruktsiya}
+
+clients/nikadent/md/prosthetics__service__metal_ceramic_crowns.md
+Переписан. Разделы: Коротко {#korotko}; Как проходит установка? {#etapy-ustanovki}; Когда стоит сравнить с цирконием? {#sravnit-s-tsirkoniem}
+
+clients/nikadent/md/prosthetics__service__removable_dentures.md
+Переписан. Разделы: Коротко {#korotko}; Что будет до получения готового протеза? {#etapy-lecheniya}; Как привыкнуть и что делать, если натирает? {#priverkanie-i-ukhod}; Если протез стал хуже держаться или сломался {#remont-i-perebazirovka}
+
+clients/nikadent/md/prosthetics__service__veneers.md
+Переписан. Разделы: Коротко {#korotko}; Нужно ли обрабатывать зубы и больно ли это? {#podgotovka-zubov}; Как проходит установка? {#ustanovka-vinirov}
+
+clients/nikadent/md/prosthetics__service__zirconia_crowns.md
+Переписан. Разделы: Коротко {#korotko}; Как готовят зуб и устанавливают коронку? {#etapy-ustanovki}; Коронка на зубе и на импланте — одно и то же? {#koronka-na-zube-ili-implante}
+
+clients/nikadent/md/treatment__service__caries.md
+Переписан. Разделы: Коротко {#korotko}
+
+clients/nikadent/md/treatment__service__pulpitis.md
+Переписан. Разделы: Коротко {#korotko}
+
+clients/nikadent/md/treatment__service__teeth_treatment.md
+Переписан. Разделы: Коротко {#korotko}
+
+clients/nikadent/md/treatment__service__tooth_restoration.md
+Переписан. Разделы: Коротко {#korotko}; Если одной реставрации недостаточно {#esli-nuzhno-drugoe-vosstanovlenie}

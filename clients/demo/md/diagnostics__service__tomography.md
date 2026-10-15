@@ -7,9 +7,6 @@ subtopic: tomography
 aliases:
   - "своё кт"
   - "свое кт"
-  - "свой снимок кт"
-  - "можно ли со своим кт"
-  - "прийти со своим кт"
   - "повторное кт"
 
 suggest_h3: []
@@ -17,8 +14,6 @@ suggest_h3: []
 cta_key: plan
 cta_action: lead
 
-empathy_enabled: true
-situation_allowed: false
 
 ---
 

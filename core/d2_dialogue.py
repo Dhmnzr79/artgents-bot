@@ -16,10 +16,13 @@ from contracts.d2_dialogue import (
     D2CompletedTurn, D2DialogueRecord, D2DialogueTurn, D2LeadEffect,
     D2LeadEffectDispatcher, D2ProviderInput, D2RawProvider, D2SelectedUiRef,
 )
+from contracts.lead_consent import LeadConsentReceipt
+from core.lead_consent import read_lead_consent_receipt
 from contracts.d2_session_context import (
     D2SessionActivity, D2SessionTtlPolicy, D2SessionState, D2SessionSnapshot,
     D2_SESSION_SCHEMA_VERSION, empty_d2_session_snapshot,
 )
+from contracts.d2_tenant_snapshot import D2TenantSnapshot
 from contracts.response_plan import D2PriceDetailUiAction, D2PriceSelectUiAction, SessionKey
 from contracts.d2_dialogue_result import (
     DiscussionScope, DiscussionVolume, D2DialogueResult, PriceOperation, ExplanationOperation, DetailOperation,
@@ -46,6 +49,9 @@ from core.d2_lead_bridge import (
     reconcile_d2_lead_pause,
     resolve_d2_booking_lead_entry,
     resolve_d2_lead_pre_provider,
+    prepare_d2_lead_dispatcher,
+    resolve_d2_lead_delivery_response,
+    d2_lead_consent_missing,
 )
 from core.d2_session_context import project_d2_session_context
 from core.d2_snapshot_sources import (
@@ -63,7 +69,8 @@ from core.d2_snapshot_sources import (
     build_d2_document_task,
 )
 from core.d2_spam_gate import build_d2_spam_gate_response, is_d2_garbage_message
-from core.d2_contacts_cta import build_d2_contact_fact_block, D2ContactReferenceError
+from core.d2_contacts_cta import build_d2_contact_fact_block, build_d2_contact_response, D2ContactReferenceError
+from core.d2_usage_limits import ClientUsageLimitReached
 from core.d2_offtopic import build_d2_offtopic_response
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
 from core.response_plan_materialization import resolve_d2_operations
@@ -143,6 +150,7 @@ def run_d2_dialogue_turn(
     lead_ui_ref: str | None = None,
     ui_revision: int | None = None,
     lead_bridge: bool = False,
+    usage_admission=None,
 ) -> D2DialogueTurn:
     """Complete one D2 turn with one state/result owner.
 
@@ -192,6 +200,8 @@ def run_d2_dialogue_turn(
             reconcile_d2_lead_pause(session_key, reservation.completed)
         return _turn_from_completion(reservation.completed, idempotent_replay=True)
     try:
+        if usage_admission is not None:
+            usage_admission.message()
         diagnostics.stage("snapshot")
         tenant = load_d2_tenant_snapshot(session_key.client_id, clients_root=clients_root)
         diagnostics.stage("state_read")
@@ -323,8 +333,9 @@ def run_d2_dialogue_turn(
                 context=early_context,
             )
         session_matched = d2_lead_session_client_matches(session_key)
+        consent_missing = bool(lead_bridge and session_matched and d2_lead_consent_missing(session_key, store))
         pending_answer = None
-        if lead_ui_ref == LEAD_PENDING_ANSWER_REF:
+        if lead_ui_ref == LEAD_PENDING_ANSWER_REF and not consent_missing:
             pending_answer = prepare_d2_pending_lead_answer(session_key)
         lead_pause_response = lead_paused or pending_answer is not None
         lead_gate = bool(
@@ -332,11 +343,11 @@ def run_d2_dialogue_turn(
             or session_matched
             or (lead_ui_ref or "").strip()
         )
-        if pending_answer is None and lead_gate and d2_lead_needs_pre_provider(
+        if pending_answer is None and lead_gate and (consent_missing or d2_lead_needs_pre_provider(
             session_key=session_key,
             lead_ui_ref=lead_ui_ref,
             user_message=user_message,
-        ):
+        )):
             return _run_lead_pre_provider_turn(
                 session_key=session_key,
                 user_message=user_message,
@@ -349,6 +360,7 @@ def run_d2_dialogue_turn(
                 lead_effect_id=lead_effect_id,
                 lead_effect_dispatcher=lead_effect_dispatcher,
                 lead_ui_ref=lead_ui_ref,
+                usage_admission=usage_admission,
             )
         # D2-040: one authored chance, then hard-stop. Medical ends one turn only.
         if (
@@ -402,32 +414,55 @@ def run_d2_dialogue_turn(
                 session_key, request_id=effective_request_id, request_fingerprint=fingerprint,
             )
             raise ValueError("d2_provider_input_privacy_only")
-        turn = _run_reserved_d2_dialogue_turn(
-            session_key=session_key,
-            safe_user_message=safe_user_message,
-            provider=provider,
-            clients_root=clients_root,
-            store=store,
-            now=now,
-            ttl_policy=ttl_policy,
-            request_id=effective_request_id,
-            request_fingerprint=fingerprint,
-            lead_effect_id=lead_effect_id,
-            lead_effect_dispatcher=lead_effect_dispatcher,
-            lead_bridge=lead_bridge,
-            lead_pause_response=lead_pause_response,
-            selected_ui_ref=selected_ui_ref,
-            selected_document_action=selected_document_action,
-            selected_price_detail_action=selected_price_detail_action,
-            selected_price_select_action=selected_price_select_action,
-            selected_price_select_actions=selected_price_select_actions,
-            selected_volume_price_task=selected_volume_price_task,
-            selected_service_id=(
-                lead_ui_ref.removeprefix("service:")
-                if lead_ui_ref and lead_ui_ref.startswith("service:") and ui_revision is not None
-                else None
-            ),
-        )
+        try:
+            turn = _run_reserved_d2_dialogue_turn(
+                session_key=session_key,
+                safe_user_message=safe_user_message,
+                provider=provider,
+                clients_root=clients_root,
+                store=store,
+                now=now,
+                ttl_policy=ttl_policy,
+                request_id=effective_request_id,
+                request_fingerprint=fingerprint,
+                lead_effect_id=lead_effect_id,
+                lead_effect_dispatcher=lead_effect_dispatcher,
+                lead_bridge=lead_bridge,
+                lead_pause_response=lead_pause_response,
+                selected_ui_ref=selected_ui_ref,
+                selected_document_action=selected_document_action,
+                selected_price_detail_action=selected_price_detail_action,
+                selected_price_select_action=selected_price_select_action,
+                selected_price_select_actions=selected_price_select_actions,
+                selected_volume_price_task=selected_volume_price_task,
+                selected_service_id=(
+                    lead_ui_ref.removeprefix("service:")
+                    if lead_ui_ref and lead_ui_ref.startswith("service:") and ui_revision is not None
+                    else None
+                ),
+            )
+        except ClientUsageLimitReached as exc:
+            if exc.code not in {"visitor_ai_limit", "tenant_ai_limit"}:
+                raise
+            notice = (
+                "Мы уже подробно обсудили ваши вопросы. Для дальнейшей консультации оставьте заявку или позвоните в клинику."
+                if exc.code == "visitor_ai_limit" else
+                "Сейчас ИИ-консультация временно недоступна. Оставьте заявку или свяжитесь с клиникой напрямую."
+            )
+            response = build_d2_contact_response(tenant, session_key=session_key,
+                contact_fields=("contact_phone", "contact_address", "contact_hours"),
+                notice=notice, offer_booking=True)
+            # A resource denial is not a semantic answer or a terminal dialogue lock.
+            preserved = early_snapshot.state.model_copy(update={
+                "revision": early_snapshot.state.revision + 1,
+                "last_committed_turn_index": early_snapshot.current_turn_index,
+            }) if early_context.freshness == "fresh" else None
+            turn = _commit_non_price_d2_turn(session_key=session_key, store=store,
+                snapshot=early_snapshot, context=early_context, response=response,
+                tenant_fingerprint=tenant.fingerprint, now=now,
+                request_id=effective_request_id, request_fingerprint=fingerprint,
+                lead_effect_id=None, lead_effect_dispatcher=None, prepared_state=preserved,
+                lead_pause_response=lead_pause_response)
         if lead_pause_response:
             reconcile_d2_lead_pause(session_key, store.read_latest_completion(session_key))
         return turn
@@ -489,6 +524,7 @@ def _run_lead_pre_provider_turn(
     lead_effect_id: str | None,
     lead_effect_dispatcher: D2LeadEffectDispatcher | None,
     lead_ui_ref: str | None,
+    usage_admission=None,
 ) -> D2DialogueTurn:
     """Active lead slots: no provider, existing privacy owners."""
     if not d2_lead_session_client_matches(session_key):
@@ -508,12 +544,14 @@ def _run_lead_pre_provider_turn(
         activity=previous.activity if previous else None, policy=ttl_policy, now=now,
     )
     diagnostics.stage("materialize")
+    consent_receipt = read_lead_consent_receipt(store, session_key)
     bridge = resolve_d2_lead_pre_provider(
         snapshot=tenant,
         session_key=session_key,
         user_message=user_message,
         lead_ui_ref=lead_ui_ref,
         published_revision=snapshot.state.revision + 1,
+        request_id=request_id, consent_receipt=consent_receipt,
     )
     if not bridge.response.rendered_text.strip():
         raise ValueError("d2_experiment_lead_not_resolved")
@@ -522,12 +560,12 @@ def _run_lead_pre_provider_turn(
     if bridge.request_effect:
         if effect_id is None:
             effect_id = f"lead-{request_id}"
-
-            class _DemoStubDispatcher:
-                def dispatch(self, *, effect_id: str):
-                    return "demo_stub"
-
-            effect_dispatcher = effect_dispatcher or _DemoStubDispatcher()
+        effect_dispatcher = effect_dispatcher or prepare_d2_lead_dispatcher(
+            session_key, request_id, consent_receipt=consent_receipt,
+            admission=usage_admission.lead if usage_admission else None)
+        # exit_lead_flow erases PII. Dispatch retains it only in this request's closure.
+        from session import exit_lead_flow
+        exit_lead_flow(session_key.sid)
     return _commit_non_price_d2_turn(
         session_key=session_key,
         store=store,
@@ -542,6 +580,11 @@ def _run_lead_pre_provider_turn(
         lead_effect_dispatcher=(
             effect_dispatcher if bridge.request_effect else lead_effect_dispatcher
         ),
+        lead_delivery_snapshot=tenant if bridge.request_effect else None,
+        consent_receipt=(LeadConsentReceipt(client_id=session_key.client_id, sid=session_key.sid,
+            request_id=request_id, accepted_at=now, definition=bridge.accepted_consent)
+            if bridge.accepted_consent is not None else None),
+        lead_consent_request_id=consent_receipt.request_id if bridge.request_effect and consent_receipt else None,
     )
 
 
@@ -561,6 +604,9 @@ def _commit_non_price_d2_turn(
     clarify_task: ClarifiedOperation | None = None,
     prepared_state=None, safe_user_message=None, selected_ui_ref=None, ttl_policy=None,
     lead_pause_response: bool = False,
+    lead_delivery_snapshot: D2TenantSnapshot | None = None,
+    consent_receipt: LeadConsentReceipt | None = None,
+    lead_consent_request_id: str | None = None,
 ) -> D2DialogueTurn:
     """Commit a result and its receipt references in the sole D2 store."""
     if lead_pause_response:
@@ -608,6 +654,8 @@ def _commit_non_price_d2_turn(
         context=context,
         committed_revision=state.revision,
         lead_effect=initial_effect,
+        consent_receipt=consent_receipt,
+        lead_consent_request_id=lead_consent_request_id,
     )
     full_audit("commit_intent", state=state, completion=completion, branch="non_price")
     diagnostics.stage("commit")
@@ -625,10 +673,16 @@ def _commit_non_price_d2_turn(
                 raise ValueError("d2_lead_effect_dispatch_status_invalid")
         except Exception:
             effect_status = "unknown"
+        final_response = (
+            resolve_d2_lead_delivery_response(
+                lead_delivery_snapshot, session_key=session_key, status=effect_status,
+            ) if lead_delivery_snapshot is not None else None
+        )
         completion = store.update_lead_effect(
             session_key,
             request_id=request_id,
             effect=D2LeadEffect(effect_id=lead_effect_id, status=effect_status),
+            response=final_response,
         )
         full_audit("effect_result", status=effect_status, completion=completion)
     turn_result = _turn_from_completion(completion, idempotent_replay=False)

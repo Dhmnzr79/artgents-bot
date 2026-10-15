@@ -6,7 +6,7 @@ import { casesForClient, casesForMessage, appendCaseCards, isCaseGalleryReply } 
 const STORAGE_SID = "clinic_widget_sid";
 const STORAGE_LAUNCHER_TEASER = "clinic_widget_launcher_teaser_shown";
 const DEFAULT_AVATAR_URL = "/static/avatar.png";
-const LAUNCHER_TEASER_DELAY_MS = 30000;
+const LAUNCHER_TEASER_DELAY_MS = 10000;
 const WELCOME_LEAVE_MS = 240;
 const TEXTAREA_MAX_HEIGHT = 112;
 const MOBILE_MAX_WIDTH_PX = 520;
@@ -103,6 +103,15 @@ function _darkenHex(hex, ratio = 0.1) {
  */
 function applyWidgetTheme(shellEl, theme) {
   if (!shellEl || !theme || typeof theme !== "object") return;
+  const promoBackground = String(theme.promoBackground || "").trim();
+  const promoAccent = String(theme.promoAccent || "").trim();
+  if (/^#[0-9a-f]{6}$/i.test(promoBackground)) {
+    shellEl.style.setProperty("--clinic-promo-bg", promoBackground);
+    shellEl.style.setProperty("--clinic-promo-hover", _darkenHex(promoBackground, 0.025));
+  }
+  if (/^#[0-9a-f]{6}$/i.test(promoAccent)) {
+    shellEl.style.setProperty("--clinic-promo-accent", promoAccent);
+  }
   const brand = String(theme.brand || "").trim();
   if (!brand) return;
   const action = brand;
@@ -117,7 +126,6 @@ function applyWidgetTheme(shellEl, theme) {
   if (brandRgb) {
     const rgb = _rgbCss(brandRgb);
     shellEl.style.setProperty("--clinic-brand-rgb", rgb);
-    shellEl.style.setProperty("--clinic-bg-subtle", `rgba(${rgb}, 0.06)`);
     shellEl.style.setProperty("--clinic-chip-border", brand);
     shellEl.style.setProperty("--clinic-shadow", `0 8px 32px rgba(${rgb}, 0.14)`);
     shellEl.style.setProperty("--clinic-shadow-soft", `0 4px 16px rgba(${rgb}, 0.1)`);
@@ -226,9 +234,9 @@ function ruPhoneToBackendE164(inputVal) {
  * @property {string} [logoUrl] — логотип первого экрана из brand.yaml
  * @property {number} [logoWidth] — ширина лого в px (как в Figma)
  * @property {number} [logoHeight] — высота лого в px (как в Figma)
- * @property {string} [launcherSubtitle] — должность на превью (fallback без clinicName)
- * @property {string} [launcherTagline] — вторая строка на превью
- * @property {boolean} [launcherTeaser] — подсказка у лаунчера через ~30 с (по умолчанию true)
+ * @property {string} [launcherSubtitle] — подпись кнопки и надзаголовок приглашения
+ * @property {string} [launcherTagline] — заголовок раскрытого приглашения
+ * @property {boolean} [launcherTeaser] — расширение капсулы через 10 с
  * @property {string} [launcherTeaserText] — текст подсказки
  */
 
@@ -254,6 +262,7 @@ function botTurnFromPayload(data, expectedClientId) {
     bodyParts: Array.isArray(ui.body_parts) ? ui.body_parts : [],
     followups: [],
     quickReplies,
+    leadConsent: ui.lead_consent?.source_client_id === expectedClientId ? ui.lead_consent : null,
     revision: data.revision,
     linksDismissed: false,
     videoKey: vk,
@@ -647,6 +656,26 @@ function isWidgetPresentationContractValid(config) {
   if (typeof config.launcherTeaser !== "boolean") return false;
   if (config.videoAspect !== "horizontal" && config.videoAspect !== "vertical") return false;
   if (!starterPromptsValid(config.starterPrompts)) return false;
+  if (config.pageMenus != null) {
+    const questionsValid = prompts => Array.isArray(prompts) && prompts.length === 3 &&
+      prompts.every(p => p && typeof p.label === "string" && p.label.trim() &&
+        typeof p.q === "string" && p.q.trim() && !p.videoKey && !p.soon);
+    if (!Array.isArray(config.pageMenus) || !questionsValid(config.starterPrompts) ||
+        !String(config.welcomeText || "").trim()) return false;
+    const paths = new Set();
+    for (const menu of config.pageMenus) {
+      if (!menu || !Array.isArray(menu.paths) || !menu.paths.length ||
+          typeof menu.welcomeText !== "string" || !menu.welcomeText.trim() ||
+          !questionsValid(menu.starterPrompts)) return false;
+      for (const path of menu.paths) {
+        if (typeof path !== "string" || !path.startsWith("/") || path.startsWith("//") ||
+            /[?#*\\\s]/.test(path)) return false;
+        const normalized = path.replace(/\/+$/, "") || "/";
+        if (paths.has(normalized)) return false;
+        paths.add(normalized);
+      }
+    }
+  }
   if (config.launcherTeaser === true) {
     if (typeof config.launcherTeaserText !== "string" || !config.launcherTeaserText.trim()) {
       return false;
@@ -663,7 +692,14 @@ function renderWidgetConfigError(root) {
     </div>`;
 }
 
-export function mountWidget(root, config) {
+// Presentation only: never sends page URLs, query strings or hashes to /ask.
+function welcomeMenuForPath(config, pathname) {
+  const path = String(pathname || "/").split(/[?#]/, 1)[0].replace(/\/+$/, "") || "/";
+  return (config.pageMenus || []).find(menu => menu.paths.some(candidate =>
+    (candidate.replace(/\/+$/, "") || "/") === path)) || config;
+}
+
+export function mountWidget(root, config, { pagePath } = {}) {
   let waitingLabelTimers = [];
 
   function clearWaitingLabelTimers() {
@@ -672,11 +708,13 @@ export function mountWidget(root, config) {
   }
   if (!isWidgetPresentationContractValid(config)) {
     renderWidgetConfigError(root);
-    return { resetSession: () => {} };
+    return { resetSession: () => {}, restartLauncherTeaser: () => {} };
   }
 
   const apiBase = config.apiBase ?? "";
   const clientId = String(config.clientId).trim();
+  const sidStorageKey = `${STORAGE_SID}:${clientId}`;
+  const teaserStorageKey = `${STORAGE_LAUNCHER_TEASER}:${clientId}`;
   const resolvedAvatarUrl = resolvePackAssetUrl(
     apiBase,
     (config.avatarUrl || "").trim() || DEFAULT_AVATAR_URL
@@ -764,11 +802,8 @@ export function mountWidget(root, config) {
     config.launcherMobileCtaLabel || launcherCtaLabel
   ).trim();
   const clinicName = String(config.clinicName || "").trim();
-  const launcherSubtitle = clinicName
-    ? `ИИ-консультант «${clinicName}»`
-    : config.launcherSubtitle == null
-      ? ""
-      : String(config.launcherSubtitle).trim();
+  const launcherSubtitle = String(config.launcherSubtitle || "").trim() ||
+    (clinicName ? `ИИ-консультант «${clinicName}»` : "");
   const launcherTagline =
     config.launcherTagline == null ? "" : String(config.launcherTagline).trim();
   const launcherTeaserEnabled = !useDemoLauncher && config.launcherTeaser === true;
@@ -785,36 +820,34 @@ export function mountWidget(root, config) {
         aria-controls="clinic-panel"
       ></button>`
     : `
-      <button type="button" class="clinic-shell__launcher" data-clinic-launcher aria-expanded="false" aria-controls="clinic-panel">
+      <div class="clinic-shell__launcher-card" data-clinic-launcher-card>
+        <div class="clinic-shell__launcher-teaser" data-clinic-launcher-teaser aria-hidden="true">
+          <strong class="clinic-shell__launcher-heading" data-clinic-launcher-tagline></strong>
+          <p class="clinic-shell__launcher-teaser-text" data-clinic-launcher-teaser-text></p>
+        </div>
+        <button type="button" class="clinic-shell__launcher-dismiss" data-clinic-launcher-dismiss
+          aria-label="Свернуть приглашение" hidden>×</button>
+        <button type="button" class="clinic-shell__launcher" data-clinic-launcher aria-expanded="false"
+          aria-haspopup="dialog" aria-controls="clinic-panel">
         <span class="clinic-shell__unread" data-clinic-unread aria-hidden="true"></span>
-        <div class="clinic-shell__launcher-row">
-          <div class="clinic-shell__launcher-avatar">
+          <span class="clinic-shell__launcher-avatar">
             <span class="clinic-shell__avatar-fallback clinic-shell__avatar-fallback--launcher" data-clinic-avatar-fb>
               <img class="clinic-shell__avatar-fallback-img" alt="" width="40" height="40" data-clinic-avatar />
             </span>
             <span class="clinic-shell__header-online-dot clinic-shell__header-online-dot--launcher" aria-hidden="true"></span>
-          </div>
-          <div class="clinic-shell__launcher-text">
+          </span>
+          <span class="clinic-shell__launcher-text">
             <span class="clinic-shell__name" data-clinic-name></span>
             <span class="clinic-shell__launcher-subtitle" data-clinic-launcher-subtitle></span>
-            <span class="clinic-shell__launcher-tagline" data-clinic-launcher-tagline></span>
-            <span class="clinic-shell__launcher-mobile-headline" data-clinic-launcher-mobile-headline></span>
-            <span class="clinic-shell__launcher-mobile-online">Онлайн 24/7</span>
-          </div>
-        </div>
-      </button>`;
+          </span>
+          <span class="clinic-shell__launcher-arrow" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M6 18 18 6M6 6h12v12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </button>
+      </div>`;
 
   root.innerHTML = `
     <div class="clinic-shell" data-clinic-root>
-      <button
-        type="button"
-        class="clinic-shell__launcher-teaser"
-        data-clinic-launcher-teaser
-        hidden
-        aria-label="Открыть чат с консультантом"
-      >
-        <span class="clinic-shell__launcher-teaser-text" data-clinic-launcher-teaser-text></span>
-      </button>
       ${launcherHtml}
       <div class="clinic-shell__panel" id="clinic-panel" role="dialog" aria-modal="true" aria-label="Чат" data-clinic-panel>
         <main class="clinic-shell__main" aria-label="Сообщения">
@@ -852,14 +885,9 @@ export function mountWidget(root, config) {
   const launcher = root.querySelector("[data-clinic-launcher]");
   const launcherOpenBtn = root.querySelector("[data-clinic-launcher-open]");
   const launcherControl = launcherOpenBtn || launcher;
-  const launcherLinkEl = root.querySelector(".clinic-shell__launcher-link");
-  if (launcherLinkEl) launcherLinkEl.textContent = launcherCtaLabel;
   if (launcherOpenBtn && useDemoLauncher) {
     launcherOpenBtn.textContent = launcherCtaLabel;
     launcherOpenBtn.setAttribute("aria-label", launcherCtaLabel);
-  }
-  for (const el of root.querySelectorAll("[data-clinic-launcher-mobile-headline]")) {
-    el.textContent = launcherMobileCtaLabel;
   }
   if (launcher) launcher.setAttribute("aria-label", launcherMobileCtaLabel);
   const panel = root.querySelector("[data-clinic-panel]");
@@ -874,14 +902,13 @@ export function mountWidget(root, config) {
   const btnClose = root.querySelector("[data-clinic-close]");
   const launcherTeaserEl = root.querySelector("[data-clinic-launcher-teaser]");
   const launcherTeaserTextEl = root.querySelector("[data-clinic-launcher-teaser-text]");
+  const launcherDismiss = root.querySelector("[data-clinic-launcher-dismiss]");
 
   const avatarImg = root.querySelector("[data-clinic-avatar]");
   const hAvatar = root.querySelector("[data-clinic-header-avatar]");
 
-  const launcherNameEl = root.querySelector("[data-clinic-launcher-name]");
-  if (launcherNameEl) launcherNameEl.textContent = config.botName;
   const compactNameEl = root.querySelector("[data-clinic-name]");
-  if (compactNameEl) compactNameEl.textContent = config.botName;
+  if (compactNameEl) compactNameEl.textContent = launcherCtaLabel;
   for (const el of root.querySelectorAll("[data-clinic-launcher-subtitle]")) {
     el.textContent = launcherSubtitle;
   }
@@ -1054,7 +1081,7 @@ export function mountWidget(root, config) {
 
   function wasLauncherTeaserShown() {
     try {
-      return sessionStorage.getItem(STORAGE_LAUNCHER_TEASER) === "1";
+      return sessionStorage.getItem(teaserStorageKey) === "1";
     } catch {
       return false;
     }
@@ -1062,7 +1089,7 @@ export function mountWidget(root, config) {
 
   function markLauncherTeaserShown() {
     try {
-      sessionStorage.setItem(STORAGE_LAUNCHER_TEASER, "1");
+      sessionStorage.setItem(teaserStorageKey, "1");
     } catch {
       /* ignore */
     }
@@ -1077,23 +1104,25 @@ export function mountWidget(root, config) {
 
   function dismissLauncherTeaser() {
     shell.classList.remove("is-launcher-teaser");
-    if (launcherTeaserEl) launcherTeaserEl.hidden = true;
+    launcherTeaserEl?.setAttribute("aria-hidden", "true");
+    if (launcherDismiss) launcherDismiss.hidden = true;
   }
 
-  function showLauncherTeaser() {
-    if (!launcherTeaserEnabled || state.isOpen || wasLauncherTeaserShown()) return;
+  function showLauncherTeaser(force = false) {
+    if (!launcherTeaserEnabled || state.isOpen || (!force && wasLauncherTeaserShown())) return;
     markLauncherTeaserShown();
     if (launcherTeaserTextEl) launcherTeaserTextEl.textContent = launcherTeaserText;
-    if (launcherTeaserEl) launcherTeaserEl.hidden = false;
+    launcherTeaserEl?.setAttribute("aria-hidden", "false");
+    if (launcherDismiss) launcherDismiss.hidden = false;
     shell.classList.add("is-launcher-teaser");
   }
 
-  function scheduleLauncherTeaser() {
-    if (!launcherTeaserEnabled || wasLauncherTeaserShown()) return;
+  function scheduleLauncherTeaser(force = false) {
+    if (!launcherTeaserEnabled || (!force && wasLauncherTeaserShown())) return;
     clearLauncherTeaserTimer();
     launcherTeaserTimer = window.setTimeout(() => {
       launcherTeaserTimer = 0;
-      if (!state.isOpen) showLauncherTeaser();
+      if (!state.isOpen) showLauncherTeaser(force);
     }, LAUNCHER_TEASER_DELAY_MS);
   }
 
@@ -1103,9 +1132,17 @@ export function mountWidget(root, config) {
     dismissLauncherTeaser();
   }
 
+  function restartLauncherTeaser() {
+    if (!launcherTeaserEnabled) return;
+    setOpen(false);
+    clearLauncherTeaserTimer();
+    dismissLauncherTeaser();
+    scheduleLauncherTeaser(true);
+  }
+
   function getSid() {
     try {
-      return localStorage.getItem(STORAGE_SID) || "";
+      return localStorage.getItem(sidStorageKey) || "";
     } catch {
       return "";
     }
@@ -1114,7 +1151,7 @@ export function mountWidget(root, config) {
   function setSid(sid) {
     if (!sid) return;
     try {
-      localStorage.setItem(STORAGE_SID, sid);
+      localStorage.setItem(sidStorageKey, sid);
     } catch {
       /* ignore */
     }
@@ -1122,7 +1159,7 @@ export function mountWidget(root, config) {
 
   function clearStoredSid() {
     try {
-      localStorage.removeItem(STORAGE_SID);
+      localStorage.removeItem(sidStorageKey);
     } catch {
       /* ignore */
     }
@@ -1132,6 +1169,7 @@ export function mountWidget(root, config) {
     clearWaitingLabelTimers();
     if (state.pending) return;
     clearStoredSid();
+    feed.querySelector(".clinic-shell__welcome-screen")?.remove();
     state.messages = [];
     state.lastPayload = null;
     state.retryBody = null;
@@ -1690,11 +1728,12 @@ export function mountWidget(root, config) {
       });
       controls.appendChild(retry);
     }
-    if (clientId === "demo") {
+    if (clientId === "demo" || state.lastPayload?.ui?.lead_consent) {
       const fresh = document.createElement("button");
       fresh.type = "button";
       fresh.className = "clinic-btn-ghost";
       fresh.textContent = "Новая беседа";
+      fresh.dataset.clinicErrorReset = "";
       fresh.addEventListener("click", resetSession);
       controls.appendChild(fresh);
     }
@@ -1712,6 +1751,7 @@ export function mountWidget(root, config) {
     const cardRows = (m.bodyParts || []).filter(part => part.kind === "price_card")
       .flatMap(part => part.price?.rows || []);
     const items = (m.quickReplies || []).filter((it) => {
+      if (m.leadConsent && [m.leadConsent.accept_ref, "lead:cancel"].includes(it.ref)) return false;
       if (isCaseGalleryReply(clientId, it)) return false;
       if (String(it.ref).startsWith("price_select:") && cardRows.length) return false;
       if (String(it.ref).startsWith("volume:") && m.volumeNavigation) return false;
@@ -1753,6 +1793,58 @@ export function mountWidget(root, config) {
       });
       box.appendChild(btn);
     }
+  }
+
+  function renderLeadConsent(bubble, m) {
+    const consent = m.leadConsent;
+    if (!consent || m.linksDismissed || m.revision !== state.lastPayload?.revision) return;
+    const accept = (m.quickReplies || []).find(it => it.ref === consent.accept_ref);
+    const cancel = (m.quickReplies || []).find(it => it.ref === "lead:cancel");
+    if (!accept || !cancel) return;
+    const block = document.createElement("div");
+    block.className = "clinic-lead-consent";
+    const label = document.createElement("label");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = false;
+    checkbox.disabled = state.pending || Boolean(state.retryBody);
+    checkbox.dataset.leadConsentCheck = "";
+    const text = document.createElement("span");
+    text.textContent = consent.checkbox_text;
+    label.append(checkbox, text);
+    const links = document.createElement("div");
+    links.className = "clinic-lead-consent__links";
+    for (const [title, url] of [["Согласие на обработку", consent.consent_url],
+                                ["Политика обработки данных", consent.policy_url]]) {
+      let parsed;
+      try { parsed = new URL(url); } catch { continue; }
+      if (parsed.protocol !== "https:" || parsed.username || parsed.password) continue;
+      const a = document.createElement("a");
+      a.href = parsed.href; a.target = "_blank"; a.rel = "noopener noreferrer"; a.textContent = title;
+      links.appendChild(a);
+    }
+    const actions = document.createElement("div");
+    actions.className = "clinic-lead-consent__actions";
+    const next = document.createElement("button");
+    next.type = "button"; next.textContent = "Продолжить"; next.disabled = true;
+    next.dataset.leadConsentAccept = "";
+    checkbox.addEventListener("change", () => {
+      next.disabled = !checkbox.checked || state.pending || Boolean(state.retryBody);
+    });
+    const submit = (action, echo) => {
+      if (state.pending || state.retryBody) return;
+      m.linksDismissed = true;
+      void sendAsk({ref: action.ref, ui_revision: m.revision, q: "", userEcho: echo});
+    };
+    next.addEventListener("click", () => {
+      if (checkbox.checked) submit(accept, "Согласие на обработку контактов подтверждено");
+    });
+    const skip = document.createElement("button");
+    skip.type = "button"; skip.textContent = "Без записи";
+    skip.className = "clinic-lead-consent__skip"; skip.dataset.leadConsentCancel = "";
+    skip.disabled = state.pending || Boolean(state.retryBody);
+    skip.addEventListener("click", () => submit(cancel, "Продолжить без записи"));
+    actions.append(next, skip); block.append(label, links, actions); bubble.appendChild(block);
   }
 
   /**
@@ -1820,6 +1912,7 @@ export function mountWidget(root, config) {
     if (keepWelcome && prevWelcome) {
       feed.appendChild(prevWelcome);
     } else if (!state.started) {
+      const welcomeMenu = welcomeMenuForPath(config, pagePath ?? window.location.pathname);
       const screen = document.createElement("section");
       screen.className = "clinic-shell__welcome-screen";
       screen.setAttribute("aria-label", "Приветствие");
@@ -1833,7 +1926,7 @@ export function mountWidget(root, config) {
       textP.className = "clinic-shell__welcome-text";
       const textBody = document.createElement("span");
       textBody.className = "clinic-shell__welcome-text-body";
-      textBody.textContent = String(config.welcomeText || "").trim();
+      textBody.textContent = String(welcomeMenu.welcomeText || "").trim();
       textP.classList.add("is-done");
       textP.appendChild(textBody);
       lead.appendChild(textP);
@@ -1845,7 +1938,7 @@ export function mountWidget(root, config) {
       const linksBox = document.createElement("div");
       linksBox.className = "clinic-msg__links";
       let firstVideoButton = null;
-      for (const s of config.starterPrompts || []) {
+      for (const s of welcomeMenu.starterPrompts || []) {
         const b = document.createElement("button");
         b.type = "button";
         b.className = "clinic-msg__link";
@@ -1882,7 +1975,7 @@ export function mountWidget(root, config) {
         }
         linksBox.appendChild(b);
       }
-      if (casesForClient(clientId).length) {
+      if (config.pageMenus == null && casesForClient(clientId).length) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "clinic-msg__link";
@@ -1987,6 +2080,7 @@ export function mountWidget(root, config) {
         appendCaseOffer(bubble, m);
       }
       appendVideoOffer(bubble, m, idx);
+      renderLeadConsent(bubble, m);
       renderInlineLinks(bubble, m, idx);
       wrap.appendChild(bubble);
       renderTrail(wrap, m, idx);
@@ -2176,10 +2270,11 @@ export function mountWidget(root, config) {
         const choice=allChoices.find(choice=>choice.reply_id===`price_select:${row.offer_id}`);
         const item=document.createElement(overview&&choice?'button':'div');
         item.className=overview?'clinic-price-card__overview-row':'clinic-price-card__price-area';
+        if(overview&&row.mode==='no_public_price')item.classList.add('clinic-price-card__overview-row--description');
         if(overview&&choice){item.type='button';item.disabled=disabled();item.addEventListener('click',()=>select(choice,message.revision));}
         if(overview){const name=document.createElement('span');name.className='clinic-price-card__overview-name';name.textContent=row.service_name;item.appendChild(name);}
         const amount=document.createElement('strong');amount.className='clinic-price-card__amount';
-        amount.textContent=row.mode==='no_public_price'?row.display_text:row.price_display_text;
+        amount.textContent=row.price_display_text;
         if(row.mode==='no_public_price')amount.classList.add('clinic-price-card__amount--description');
         else if(!overview)amount.classList.add('clinic-price-card__amount--single');item.appendChild(amount);
         if(overview&&choice){const arrow=svg('arrow');arrow.classList.add('clinic-price-card__row-arrow');item.appendChild(arrow);}
@@ -2284,7 +2379,7 @@ export function mountWidget(root, config) {
   }
 
   async function sendFromComposer() {
-    if (state.pending || state.retryBody) return;
+    if (state.pending || state.retryBody || state.lastPayload?.ui?.lead_consent) return;
 
     const raw = input.value.trim();
     if (isSecretSessionResetCommand(raw, config)) {
@@ -2336,10 +2431,14 @@ export function mountWidget(root, config) {
   }
 
   function syncComposerLeadUi() {
+    if (Number.isInteger(config.messageMaxChars) && config.messageMaxChars > 0) input.maxLength = config.messageMaxChars;
     const phone = isLeadPhoneStep();
+    const consent = Boolean(state.lastPayload?.ui?.lead_consent);
+    input.disabled = consent;
     input.inputMode = phone ? "tel" : "text";
     input.classList.toggle("clinic-shell__textarea--phone", phone);
-    input.placeholder = phone ? "+7(999) 999-99-99" : "Введите сообщение";
+    input.placeholder = consent ? "Подтвердите согласие или выберите «Без записи»" :
+      phone ? "+7(999) 999-99-99" : "Введите сообщение";
   }
 
   function onComposerInput(event) {
@@ -2372,7 +2471,7 @@ export function mountWidget(root, config) {
   }
 
   function syncSendState() {
-    if (state.pending || state.retryBody) {
+    if (state.pending || state.retryBody || state.lastPayload?.ui?.lead_consent) {
       sendBtn.disabled = true;
       return;
     }
@@ -2383,9 +2482,10 @@ export function mountWidget(root, config) {
     sendBtn.disabled = !input.value.trim();
   }
 
-  if (launcherTeaserEl) {
-    launcherTeaserEl.addEventListener("click", () => {
-      openChatFromLauncher();
+  if (launcherDismiss) {
+    launcherDismiss.addEventListener("click", () => {
+      cancelLauncherTeaser();
+      launcherControl?.focus();
     });
   }
 
@@ -2424,8 +2524,12 @@ export function mountWidget(root, config) {
   });
 
   document.addEventListener("keydown", (ev) => {
-    if (ev.key === "Escape" && state.isOpen) {
-      setOpen(false);
+    if (ev.key === "Escape") {
+      if (state.isOpen) setOpen(false);
+      else if (shell.classList.contains("is-launcher-teaser")) {
+        cancelLauncherTeaser();
+        launcherControl?.focus();
+      }
     }
   });
 
@@ -2453,5 +2557,5 @@ export function mountWidget(root, config) {
 
   setOpen(false);
 
-  return { resetSession };
+  return { resetSession, restartLauncherTeaser };
 }

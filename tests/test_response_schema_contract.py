@@ -327,6 +327,22 @@ def test_missing_and_null_payment_stages_mean_no_authored_breakdown() -> None:
     assert "payment_stages" not in null_offer.model_dump(exclude_none=True)
 
 
+@pytest.mark.parametrize("cap", [0, -1, True, False, "3", 1.5])
+def test_offer_tooth_count_cap_requires_a_positive_strict_integer(cap) -> None:
+    payload = _valid_bundle_payload()["offers"][0]
+    payload["max_tooth_count"] = cap
+    with pytest.raises(ValidationError):
+        TargetOffer.model_validate(payload)
+
+
+def test_optional_offer_count_cap_roundtrips_without_imposing_a_default() -> None:
+    payload = _valid_bundle_payload()["offers"][0]
+    assert TargetOffer.model_validate(payload).max_tooth_count is None
+    payload["max_tooth_count"] = 3
+    offer = TargetOffer.model_validate(payload)
+    assert TargetOffer.model_validate(offer.model_dump()).max_tooth_count == 3
+
+
 def test_single_payment_stage_without_followup_is_valid() -> None:
     payload = _valid_bundle_payload()["offers"][0]
     payload["payment_stages"] = [

@@ -1,11 +1,27 @@
 export const TECHNICAL_ERROR_MESSAGE = "Сейчас не получилось ответить. Понимаю, что это неудобно. Попробуйте задать другой вопрос.";
 
+const visitorMemory = new Map();
+export function visitorIdForClient(clientId) {
+  const key = `clinic_widget_visitor_${clientId}`;
+  let id;
+  try { id = globalThis.localStorage?.getItem(key); } catch { /* storage denied */ }
+  if (!/^[a-f0-9-]{36}$/i.test(id || "")) {
+    id = visitorMemory.get(key) || globalThis.crypto.randomUUID();
+    try { globalThis.localStorage?.setItem(key, id); } catch { /* best effort */ }
+  }
+  visitorMemory.set(key, id);
+  return id;
+}
+
 // Presentation only: never publish exception details or claim a lead outcome.
 export function friendlyErrorMessage(error) {
   if (["demo_session_limit", "demo_daily_limit"].includes(error)) {
     return "Вы посмотрели возможности демо. Чтобы обсудить бота для вашего проекта, свяжитесь с автором через контакты на сайте.";
   }
   if (error === "demo_ip_limit") return "Слишком много вопросов подряд. Подождите минуту и продолжите.";
+  if (["visitor_rate_limit", "ip_rate_limit"].includes(error)) return "Слишком много сообщений подряд. Подождите минуту и продолжите.";
+  if (error === "message_too_long") return "Сообщение слишком длинное. Пожалуйста, сократите его.";
+  if (error === "request_too_large") return "Сообщение слишком большое. Пожалуйста, сократите его.";
   return error ? TECHNICAL_ERROR_MESSAGE : "";
 }
 
@@ -15,6 +31,7 @@ export function friendlyErrorMessage(error) {
  * @param {Record<string, unknown>} body
  */
 export async function postAsk(apiBase, body) {
+  body = { ...body, visitor_id: visitorIdForClient(body.client_id) };
   const base = (apiBase || "").replace(/\/$/, "");
   const url = `${base}/ask`;
   // PERF-0: local-only timing (no PII, no network report) — see PERF-0 seam
@@ -72,6 +89,7 @@ export async function postAsk(apiBase, body) {
  * }} callbacks
  */
 export async function streamAsk(apiBase, body, { onStatus, onTyping, onDelta, onUi, onDone, onError } = {}) {
+  body = { ...body, visitor_id: visitorIdForClient(body.client_id) };
   const base = (apiBase || "").replace(/\/$/, "");
   const url = `${base}/ask/stream`;
   // PERF-0: local-only client timing per SSE event kind — no PII, no network

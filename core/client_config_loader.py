@@ -363,9 +363,8 @@ def lead_cta_dict_for_menu(
 
 _BRAND_COLOR_TO_THEME: tuple[tuple[str, str], ...] = (
     ("brand", "brand"),
-    ("action", "action"),
-    ("button_1", "button_1"),
-    ("button_2", "button_2"),
+    ("promo_background", "promoBackground"),
+    ("promo_accent", "promoAccent"),
 )
 
 
@@ -504,6 +503,10 @@ def build_public_widget_config(client_id: str | None) -> dict[str, Any]:
     presentation = load_widget_presentation_v1(client_id)
     merged = merge_widget_brand_presentation(client_id, presentation)
     merged["clientId"] = pack
+    from core.d2_usage_limits import limits_from_features
+    limits = limits_from_features(load_features(client_id))
+    if limits:
+        merged["messageMaxChars"] = limits.message_max_chars
     return merged
 
 

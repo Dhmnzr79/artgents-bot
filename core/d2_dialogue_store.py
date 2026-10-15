@@ -14,6 +14,7 @@ from pathlib import Path
 
 from contracts.d2_dialogue import D2CompletedTurn, D2DialogueRecord, D2LeadEffect
 from contracts.response_plan import SessionKey
+from contracts.response_plan_materialization import MaterializedResponseOutcome
 from contracts.response_plan_session import ResponsePlanSessionRevisionConflict
 
 
@@ -196,6 +197,7 @@ class D2DialogueStore:
 
     def update_lead_effect(
         self, key: SessionKey, *, request_id: str, effect: D2LeadEffect,
+        response: MaterializedResponseOutcome | None = None,
     ) -> D2CompletedTurn:
         """Persist one terminal receipt; ``unknown`` is never retried here."""
         with self._connection:
@@ -211,7 +213,12 @@ class D2DialogueStore:
                 return completion
             if completion.lead_effect.effect_id != effect.effect_id or effect.status in {"pending", "not_requested"}:
                 raise ValueError("d2_effect_transition_invalid")
-            updated = completion.model_copy(update={"lead_effect": effect})
+            if response is not None and response.resolved.session_delta.session_key != key:
+                raise ValueError("d2_effect_response_owner_mismatch")
+            updated = completion.model_copy(update={
+                "lead_effect": effect,
+                "response": response if response is not None else completion.response,
+            })
             self._connection.execute(
                 "UPDATE d2_turn_request SET payload=? WHERE client_id=? AND sid=? AND request_id=?",
                 (updated.model_dump_json(), key.client_id, key.sid, request_id),

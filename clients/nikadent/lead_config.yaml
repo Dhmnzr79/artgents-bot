@@ -1,7 +1,14 @@
 # Canonical lead delivery config (recipients from server pack only).
 # Owner must set a real clinic inbox before enabling live email delivery.
 delivery: email
-recipients: []
+recipients:
+  - gothica@mail.ru
+  - vikadent2025@mail.ru
 subject_template: "Заявка с бота Nikadent"
 store_in_postgres: false
 success_message_key: lead_submit_ok
+consent:
+  version: "2026-10-15-v1"
+  checkbox_text: "Даю согласие на обработку имени и телефона для связи по моей заявке."
+  consent_url: "https://nikadent41.ru/personal-data-consent/"
+  policy_url: "https://nikadent41.ru/privacy-policy-2/"

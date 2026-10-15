@@ -27,7 +27,7 @@ from the deployed demo.
 
 ## Mandatory preflight
 
-Before editing, report:
+At the start of a task or substantive stage, before editing, report:
 
 - absolute repository path and Git top level;
 - branch, HEAD, `origin/main`, and merge base;
@@ -36,6 +36,8 @@ Before editing, report:
 - any pre-existing or foreign WIP.
 
 Stop if the folder, branch, baseline, or task do not match.
+Within the same stage, do not repeat the full preflight for every message or
+small edit. Recheck it if the checkout, scope, baseline or foreign WIP changes.
 
 ## Editing and Git safety
 
@@ -48,6 +50,37 @@ Stop if the folder, branch, baseline, or task do not match.
 - A paused task must have a named checkpoint commit pushed to its remote branch.
 
 ## Verification
+
+### Verification cadence — stages, not individual edits
+
+- A stage is a coherent deliverable: one substantive change or a batch of related
+  small edits. A user message, file save, wording correction or CSS adjustment
+  does not by itself start a new stage or require another review.
+- For small text/content edits, typo fixes, labels and cosmetic CSS adjustments
+  that do not change runtime logic, data contracts, references or protection
+  mechanisms, read the affected text/diff and finish the edit. Do not launch
+  Checker, test suites, browser runs, repository-wide audits or protected-file
+  hash scans after each such edit. Do not create a separate task-card section,
+  evidence report or checkpoint just to record a micro-edit. Record related
+  changes together when the stage is complete.
+- Batch simple edits and run only relevant checks once at the end of the block,
+  when those checks can detect a plausible error. For prose-only changes, reading
+  the final text/diff is normally enough. Check syntax, schema or references when
+  the edit affects them. Do not add tests that merely repeat the edited wording.
+- Use targeted offline tests for substantive code/behavior changes at meaningful
+  checkpoints. Run one independent Checker for a completed substantive stage
+  involving runtime logic, architecture, contracts, tenant isolation,
+  lead/privacy, prices, transport or a broad cross-file restructuring. A batch
+  of simple content/cosmetic edits does not automatically require Checker;
+  use it when the owner requests review or the scope introduces a concrete
+  integration risk. Never spawn a reviewer solely because another small edit
+  has been made.
+- After checks pass, repeat only checks affected by a new change or an unresolved
+  finding. Do not rerun a full review or CI for punctuation or other unrelated
+  cosmetic corrections. Required release/merge checks and protections remain
+  in force. Judge scope by what the change affects, not by its character count.
+- Apply this cadence to the checkpoint/review instructions below and in
+  `docs/WORKFLOW_CHECKER.md`; those instructions do not require review per edit.
 
 ### Architecture simplification — mandatory acceptance
 
@@ -68,7 +101,7 @@ Stop if the folder, branch, baseline, or task do not match.
 - For D2, use the single responsibility table in
   `docs/tasks/DEMO_D2_TARGET_CONTRACT.md` §3. Apply it to every changed path;
   do not copy the table into task cards or ask the owner to approve it again.
-- Before implementation, state in the existing card/report whether the change
+- Before a substantive implementation stage, state in the existing card/report whether the change
   is architecture simplification, a bug fix, or documentation only. For
   simplification, give a concrete **before → after → removed dependency**,
   name the sole decision owner, and identify the old reachable decision paths
@@ -86,8 +119,10 @@ Stop if the folder, branch, baseline, or task do not match.
   required. Unrelated existing debt remains explicitly scoped, not silently
   declared fixed. Report bug-fix success separately from architecture success.
 
-- During implementation, run the smallest targeted offline tests that cover the change.
-- Run one independent Checker review when a coherent checkpoint is ready.
+- For substantive implementation stages, run the smallest targeted offline tests
+  that cover the change at meaningful checkpoints, following the cadence above.
+- Run one independent Checker review for a completed stage that requires it
+  under the cadence above, not for each individual edit or user message.
 - After a REJECT, run a focused recheck of the findings; do not restart a full review unless scope changed materially.
 - Run the repository CI set before merge, not after every small edit.
 - Compare failures with a clean baseline before labeling them regressions.
@@ -122,8 +157,10 @@ Stop if the folder, branch, baseline, or task do not match.
 
 ## Completion report
 
-Report the branch, commit, changed files, tests, known baseline failures, provider calls,
+For a substantive stage, report the branch, commit, changed files, tests, known baseline failures, provider calls,
 staging state, push/PR state, and remaining foreign WIP. A report is evidence to verify,
 not permission to merge or deploy.
+For a micro-edit, give a short confirmation of what changed; do not repeat the
+full technical report or create additional reporting files for it.
 
 See `docs/WORKFLOW_GIT.md` for commands and `docs/WORKFLOW_CHECKER.md` for review rules.

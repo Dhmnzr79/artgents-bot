@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from flask import Response, request
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from core.client_host import resolve_request_client_id
 from core.origin_guard import matching_widget_origin
@@ -31,7 +32,12 @@ def resolve_widget_cors_client_id() -> str | None:
     """Resolve client_id for CORS / preflight (query, JSON body, or Host subdomain)."""
     raw = (request.args.get("client_id") or "").strip()
     if not raw and request.method in {"POST", "PUT", "PATCH"}:
-        data = request.get_json(silent=True)
+        try:
+            data = request.get_json(silent=True)
+        except RequestEntityTooLarge:
+            # The input cap already rejected this body; resolve only from trusted
+            # host/query and never turn the bounded 413 response into an error.
+            data = None
         if isinstance(data, dict):
             raw = str(data.get("client_id") or "").strip()
     if raw:

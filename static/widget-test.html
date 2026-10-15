@@ -46,7 +46,7 @@
       .panel .command code { flex-basis: 100%; }
       .panel header p, .panel #connection-heading,
       .panel [aria-labelledby="controls-heading"] h2,
-      .panel [aria-labelledby="controls-heading"] p,
+      .panel [aria-labelledby="controls-heading"] p:not(.client-picker),
       .panel #view-questions > p { display: none; }
     }
     @media (max-height: 800px), (max-width: 580px) {
@@ -86,10 +86,22 @@
     </section>
     <section class="card" aria-labelledby="controls-heading">
       <h2 id="controls-heading">Чат</h2>
+      <p class="client-picker"><label for="client-select">Клиника</label>
+        <select id="client-select" style="font:inherit;padding:8px;margin:0 8px 12px">
+          <option value="demo">Демо</option>
+          <option value="nikadent">НикаДент</option>
+        </select>
+        <a id="client-new-tab" target="_blank" rel="noopener" style="color:#b5c4ff">Открыть отдельно</a>
+      </p>
+      <p class="client-picker"><label for="page-select">Страница сайта</label>
+        <select id="page-select" style="font:inherit;padding:8px;margin:0 8px 12px"></select>
+        <span id="page-preview-path" class="muted"></span>
+      </p>
       <div class="actions">
         <button type="button" class="primary" id="open-chat">Открыть чат</button>
         <button type="button" id="reset-chat">Новая беседа</button>
         <button type="button" id="refresh-page">Обновить страницу</button>
+        <button type="button" id="repeat-invitation">Повторить приглашение · 10 с</button>
       </div>
       <p class="muted">После правок интерфейса нажмите «Обновить страницу».</p>
     </section>
@@ -115,36 +127,6 @@
     <p id="panel-notice" class="notice" role="status" aria-live="polite"></p>
     <div class="footer"><span>Demo · 127.0.0.1:9001</span><a href="debug/ask-inspector.html">Диагностика</a></div>
   </main>
-  <script type="application/json" id="clinic-widget-config">
-  {
-    "apiBase": "",
-    "clientId": "demo",
-    "avatarUrl": "/static/avatar.png",
-    "botName": "Надежда",
-    "onlineLabel": "ИИ-консультант клиники. Онлайн 24/7",
-    "launcherSubtitle": "Демо ИИ-консультанта клиники",
-    "launcherCtaLabel": "Посмотреть демо",
-    "launcherTeaser": false,
-    "demoLauncher": true,
-    "schemaVersion": 1,
-    "theme": {
-      "brand": "#0C2FE0"
-    },
-    "welcomeText": "Здравствуйте! Я демо ИИ-консультант для стоматологии. Задайте мне любой вопрос о клинике, услугах или лечении и посмотрите, как я отвечаю. Такого консультанта можно подключить и к сайту вашей клиники.",
-    "videoAspect": "horizontal",
-    "videoCatalog": {
-      "pain-doctor-explains": {
-        "title": "Комментарий врача",
-        "src": "/api/media/pain-doctor-explains?client_id=demo"
-      }
-    },
-    "welcomePromotion": { "title": "До 15% на имплантацию", "subtitle": "При оплате в день обращения", "q": "Расскажите об условиях скидки до 15% на имплантацию при оплате в день обращения" },
-    "starterPrompts": [
-      { "label": "Давно не был у стоматолога", "q": "Давно не был у стоматолога. С чего начать?" },
-      { "label": "Посмотреть видео с врачом", "videoKey": "pain-doctor-explains" }
-    ]
-  }
-  </script>
   <script type="application/json" id="test-questions">
 [
   {
@@ -205,8 +187,8 @@
       "Кто у вас занимается имплантацией?",
       "Кто занимается протезированием?",
       "Кто лечит кариес?",
-      "Расскажите о Кузнецове Дмитрии Андреевиче.",
-      "Расскажите об Орлове Никите Владимировиче.",
+      "Какие врачи принимают в клинике?",
+      "Расскажите об опыте врачей клиники.",
       "Кто у вас главный врач?"
     ]
   },

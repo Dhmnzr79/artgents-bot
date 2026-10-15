@@ -44,7 +44,6 @@
   --clinic-shadow: 0 8px 32px rgba(var(--clinic-brand-rgb), 0.14);
   --clinic-shadow-soft: 0 4px 16px rgba(var(--clinic-brand-rgb), 0.1);
   --clinic-bg: #ffffff;
-  --clinic-bg-subtle: rgba(var(--clinic-brand-rgb), 0.06);
   --clinic-bg-tint: #f8f6fe;
   --clinic-border: rgba(43, 30, 78, 0.1);
   --clinic-text: #211632;
@@ -54,14 +53,15 @@
   --clinic-chip-border: var(--clinic-brand);
   --clinic-focus: 0 0 0 2px rgba(255, 255, 255, 0.95), 0 0 0 4px rgba(var(--clinic-action-rgb), 0.32);
   --clinic-gradient-online: linear-gradient(135deg, #8af447 0%, #32d33d 48%, #10b83a 100%);
-  --clinic-online: #32d33d;
   --clinic-bubble-user: #F3F4F6;
-  --clinic-line: rgba(43, 30, 78, 0.09);
   --clinic-composer-bg: var(--clinic-bg-tint);
   --clinic-composer-border: var(--clinic-brand);
   --clinic-composer-focus-border: var(--clinic-brand);
   --clinic-composer-focus-shadow: 0 10px 28px rgba(var(--clinic-brand-rgb), 0.12);
   --clinic-placeholder: #aaa0bb;
+  --clinic-promo-bg: #f0f4ff;
+  --clinic-promo-hover: #eaf0fc;
+  --clinic-promo-accent: #6c7ea6;
   --clinic-panel-w: 440px;
   --clinic-panel-h: min(720px, calc(100vh - 48px));
   --clinic-font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -188,26 +188,62 @@
 }
 
 .clinic-shell__launcher-card {
+  --clinic-launcher-w: 244px;
+  --clinic-launcher-h: 60px;
+  --clinic-launcher-expanded-w: 330px;
+  --clinic-launcher-expanded-h: 184px;
   position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  background: var(--clinic-bg);
-  border: 1px solid var(--clinic-border);
-  border-radius: var(--clinic-radius-lg);
-  box-shadow: var(--clinic-shadow-soft);
+  width: min(var(--clinic-launcher-w), calc(100vw - 40px));
+  height: var(--clinic-launcher-h);
+  background: #fff;
+  color: var(--clinic-text);
+  border: 1px solid #e0e5ed;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(32, 44, 60, .11);
   overflow: hidden;
+  transition: width .36s cubic-bezier(.2,.8,.2,1), height .36s cubic-bezier(.2,.8,.2,1), border-radius .36s;
 }
 
-.clinic-shell__launcher-body {
-  padding: 22px 22px 18px;
+.clinic-shell.is-launcher-teaser .clinic-shell__launcher-card {
+  width: min(var(--clinic-launcher-expanded-w), calc(100vw - 40px));
+  height: var(--clinic-launcher-expanded-h);
+  border-radius: 22px;
 }
 
-.clinic-shell__launcher-row {
+.clinic-shell__launcher-card .clinic-shell__launcher {
+  position: absolute;
+  bottom: 0;
+  left: 0;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  min-width: 0;
+  width: 100%;
+  max-width: none;
+  height: var(--clinic-launcher-h);
+  padding: 0 16px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  color: inherit;
+}
+.clinic-shell.is-launcher-teaser .clinic-shell__launcher-card .clinic-shell__launcher {
+  border-top: 1px solid #edf0f4;
+}
+.clinic-shell__launcher-card .clinic-shell__launcher:hover { background: #fafbff; box-shadow: none; }
+.clinic-shell__launcher-card .clinic-shell__launcher:focus-visible { outline: 2px solid var(--clinic-brand); outline-offset: -4px; box-shadow: none; }
+.clinic-shell__launcher-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; white-space: nowrap; }
+.clinic-shell__launcher-card .clinic-shell__name { font-size: 14px; font-weight: 550; line-height: 1.2; }
+.clinic-shell__launcher-card .clinic-shell__launcher-subtitle { font-size: 12px; color: #6e7887; line-height: 1.3; }
+.clinic-shell__launcher-arrow { width: 20px; height: 20px; flex-shrink: 0; margin-left: auto; color: var(--clinic-brand); opacity: 0; transition: opacity .15s; }
+.clinic-shell__launcher-arrow svg { display: block; width: 100%; height: 100%; }
+.clinic-shell.is-launcher-teaser .clinic-shell__launcher-arrow { opacity: 1; }
+.clinic-shell__launcher-dismiss { position: absolute; top: 4px; right: 4px; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #687385; font-size: 24px; line-height: 1; cursor: pointer; }
+.clinic-shell__launcher-dismiss:hover { background: #f3f5f8; }
+.clinic-shell__launcher-dismiss:focus-visible { outline: 2px solid var(--clinic-brand); outline-offset: -4px; }
+.clinic-shell.is-open .clinic-shell__launcher-card { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .clinic-shell__launcher-card, .clinic-shell__launcher-teaser, .clinic-shell__launcher-arrow { transition: none !important; }
 }
 
 .clinic-shell__launcher-avatar {
@@ -216,9 +252,12 @@
   line-height: 0;
 }
 
-.clinic-shell__avatar-fallback--launcher {
-  width: 40px;
-  height: 40px;
+.clinic-shell__launcher-card .clinic-shell__avatar-fallback--launcher {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: #edf3fa;
 }
 
 .clinic-shell__header-online-dot--launcher {
@@ -230,18 +269,11 @@
 
 .clinic-shell__launcher-avatar .clinic-shell__header-online-dot {
   z-index: 1;
+  background: #28c13a;
   box-shadow: 0 0 0 2px var(--clinic-bg);
 }
 
-.clinic-shell__name--launcher {
-  font-size: 19px;
-  line-height: 1.25;
-  letter-spacing: 0;
-  white-space: normal;
-}
-
-.clinic-shell__launcher-subtitle,
-.clinic-shell__launcher-tagline {
+.clinic-shell__launcher-subtitle {
   display: block;
   margin: 0;
   font-size: 14px;
@@ -257,25 +289,6 @@
   z-index: 2;
 }
 
-.clinic-shell__unread--launcher {
-  top: 14px;
-  right: 14px;
-}
-
-.clinic-shell__launcher-link {
-  display: inline-block;
-  margin: 8px 0 0;
-  font-size: 14px;
-  line-height: 1.35;
-  font-weight: 600;
-  color: #d52a7d;
-}
-
-.clinic-shell__launcher-mobile-headline,
-.clinic-shell__launcher-mobile-online {
-  display: none;
-}
-
 /* Рамка-круг: внутри только img (аватар), без отдельного img снаружи */
 .clinic-shell__avatar-fallback {
   width: 48px;
@@ -287,11 +300,6 @@
   overflow: hidden;
   display: block;
   line-height: 0;
-}
-
-.clinic-shell__avatar-fallback--sm {
-  width: 36px;
-  height: 36px;
 }
 
 .clinic-shell__avatar-fallback--header {
@@ -325,17 +333,6 @@
   text-overflow: ellipsis;
 }
 
-.clinic-shell__online {
-  font-size: 13px;
-  color: var(--clinic-text-soft);
-  font-weight: 500;
-}
-
-.clinic-shell__launcher .clinic-shell__online {
-  color: var(--clinic-action);
-  font-weight: 600;
-}
-
 .clinic-shell__unread {
   width: 8px;
   height: 8px;
@@ -350,62 +347,25 @@
   opacity: 1;
 }
 
+/* One anchored surface; the teaser is content inside the capsule. */
 .clinic-shell__launcher-teaser {
-  display: none;
-  width: min(300px, calc(100vw - 40px));
-  margin: 0 0 10px;
-  padding: 14px 16px;
-  border: 1px solid var(--clinic-border);
-  border-radius: var(--clinic-radius-lg);
-  background: var(--clinic-bg);
-  box-shadow: var(--clinic-shadow-soft);
-  color: var(--clinic-text);
-  font-family: inherit;
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 1.4;
-  text-align: left;
-  cursor: pointer;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: min(var(--clinic-launcher-expanded-w), calc(100vw - 40px));
+  padding: 20px 48px 12px 21px;
   opacity: 0;
-  transform: translateY(10px) scale(0.96);
-  transition:
-    opacity 0.3s ease,
-    transform 0.3s ease,
-    box-shadow 0.2s ease;
+  visibility: hidden;
+  transform: translateY(5px);
+  transition: opacity .12s, transform .2s, visibility .12s;
 }
-
-.clinic-shell__launcher-teaser:hover {
-  box-shadow: var(--clinic-shadow);
-}
-
-.clinic-shell__launcher-teaser:focus-visible {
-  outline: none;
-  box-shadow: var(--clinic-shadow), var(--clinic-focus);
-}
-
-.clinic-shell__launcher-teaser-text {
-  display: block;
-}
-
+.clinic-shell__launcher-heading { display: block; font-size: 18px; font-weight: 600; line-height: 1.2; margin: 0 0 7px; }
+.clinic-shell__launcher-teaser-text { font-size: 14px; font-weight: 400; line-height: 1.6; color: #6e7887; margin: 0; }
 .clinic-shell.is-launcher-teaser:not(.is-open) .clinic-shell__launcher-teaser {
-  display: block;
   opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-.clinic-shell.is-launcher-teaser:not(.is-open) .clinic-shell__launcher:not(.clinic-shell__launcher--demo) {
-  transform: scale(1.05);
-  box-shadow: var(--clinic-shadow);
-}
-
-.clinic-shell__launcher:not(.clinic-shell__launcher--demo) {
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
-}
-
-.clinic-shell.is-open .clinic-shell__launcher-teaser {
-  display: none;
+  visibility: visible;
+  transform: none;
+  transition-delay: .16s;
 }
 
 .clinic-shell__panel {
@@ -475,6 +435,20 @@
   width: 0;
   height: 0;
 }
+
+.clinic-lead-consent {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.clinic-lead-consent label { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
+.clinic-lead-consent input[type="checkbox"] { flex-shrink: 0; width: 17px; height: 17px; margin: 1px 0 0; accent-color: var(--clinic-action); }
+.clinic-lead-consent__links { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 7px 0 0 25px; font-size: 12px; }
+.clinic-lead-consent__links a { color: var(--clinic-text-soft); text-decoration: underline; text-underline-offset: 2px; }
+.clinic-lead-consent__actions { display: flex; gap: 12px; align-items: center; margin: 9px 0 0 25px; }
+.clinic-lead-consent__actions button { min-height: 32px; padding: 5px 12px; border: 0; border-radius: 8px; font: inherit; color: #fff; background: var(--clinic-action); cursor: pointer; }
+.clinic-lead-consent__actions button:disabled { opacity: .45; cursor: default; }
+.clinic-lead-consent__actions .clinic-lead-consent__skip { padding: 5px 0; color: var(--clinic-text-soft); background: transparent; }
 
 .clinic-shell__header {
   position: relative;
@@ -886,7 +860,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .clinic-msg__link:hover { background: #ecedf0; }
-  .clinic-shell__welcome-promo:hover { background: #eaf0fc; }
+  .clinic-shell__welcome-promo:hover { background: var(--clinic-promo-hover); }
 }
 
 .clinic-msg__link:focus-visible {
@@ -979,62 +953,6 @@
   box-shadow: var(--clinic-focus);
 }
 
-.clinic-turn__btn--video {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 48px;
-  padding: 12px 16px;
-  border-radius: var(--clinic-radius-md);
-  border: 1px solid var(--clinic-chip-border);
-  background: var(--clinic-chip-bg);
-  color: var(--clinic-text);
-  font-size: 16px;
-  line-height: 1.6;
-  font-weight: 600;
-  text-align: left;
-}
-
-.clinic-turn__btn-play {
-  font-size: 19px;
-  opacity: 0.85;
-  flex-shrink: 0;
-}
-
-.clinic-turn__btn--ghost-wide {
-  min-height: 48px;
-  padding: 12px 16px;
-  border-radius: var(--clinic-radius-md);
-  border: 1px solid var(--clinic-chip-border);
-  background: var(--clinic-bg);
-  color: var(--clinic-text-muted);
-  font-size: 16px;
-  line-height: 1.6;
-  font-weight: 500;
-  text-align: center;
-}
-
-.clinic-turn__btn--cta-secondary {
-  height: 56px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 16px;
-  font-size: 16px;
-  line-height: 1;
-  font-weight: 400;
-  text-align: center;
-  transition:
-    background-color 0.16s ease,
-    border-color 0.16s ease;
-  background: transparent;
-  border: 1px solid var(--clinic-action);
-  color: var(--clinic-action);
-  box-shadow: none;
-}
-
 .clinic-turn__btn--cta-primary {
   height: 56px;
   border-radius: 10px;
@@ -1053,12 +971,10 @@
   text-align: center;
 }
 
-.clinic-turn__btn--cta-secondary:hover,
 .clinic-turn__btn--cta-primary:hover {
   transform: none;
 }
 
-.clinic-turn__btn--cta-secondary:active,
 .clinic-turn__btn--cta-primary:active {
   transform: none;
 }
@@ -1305,71 +1221,6 @@
   color: var(--clinic-action-hover);
 }
 
-.clinic-shell__video-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(15, 23, 42, 0.45);
-  padding: 20px;
-}
-
-.clinic-shell__video-overlay[hidden] {
-  display: none;
-}
-
-.clinic-shell__video-card {
-  max-width: min(420px, 100%);
-  width: 100%;
-  padding: 0;
-  overflow: hidden;
-  background: #0f172a;
-  border-radius: var(--clinic-radius-lg);
-  border: none;
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.28);
-}
-
-.clinic-shell__video-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
-  background: var(--clinic-bg);
-  border-bottom: 1px solid var(--clinic-border);
-}
-
-.clinic-shell__video-card-title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.35;
-  color: var(--clinic-text, #0f172a);
-  flex: 1;
-  min-width: 0;
-}
-
-.clinic-shell__video-close {
-  flex-shrink: 0;
-  font-size: 14px;
-}
-
-.clinic-shell__video-player {
-  display: block;
-  width: 100%;
-  max-height: min(72vh, 520px);
-  aspect-ratio: 16 / 9;
-  background: #000;
-  vertical-align: middle;
-}
-
-.clinic-shell__video-player:focus-visible {
-  outline: 2px solid var(--clinic-action);
-  outline-offset: -2px;
-}
-
 @media (max-width: 520px) {
   .clinic-shell {
     transition: none;
@@ -1390,73 +1241,17 @@
     right: 12px;
     bottom: 12px;
     align-items: flex-end;
-    --clinic-mobile-launcher-shadow:
-      0 8px 26px rgba(var(--clinic-brand-rgb), 0.2),
-      0 3px 10px rgba(var(--clinic-brand-rgb), 0.12);
   }
 
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-teaser {
-    width: 200px;
-    max-width: 200px;
-    border-radius: 10px;
+  .clinic-shell__launcher-card {
+    --clinic-launcher-w: 228px;
+    --clinic-launcher-h: 56px;
+    --clinic-launcher-expanded-w: 296px;
+    --clinic-launcher-expanded-h: 208px;
+    max-width: calc(100vw - 24px);
   }
-
-  .clinic-shell:not(.is-open) .clinic-shell__launcher:not(.clinic-shell__launcher--demo) {
-    width: 200px;
-    max-width: 200px;
-    padding: 10px;
-    border: 1px solid rgba(var(--clinic-brand-rgb), 0.12);
-    border-radius: 10px;
-    background: var(--clinic-bg);
-    background-image: none;
-    box-shadow: var(--clinic-mobile-launcher-shadow);
-  }
-
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-row {
-    align-items: center;
-    gap: 0;
-  }
-
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-text {
-    gap: 2px;
-    padding-left: 10px;
-  }
-
-  .clinic-shell:not(.is-open) .clinic-shell__name,
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-subtitle,
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-tagline,
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-link {
-    display: none;
-  }
-
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-mobile-headline {
-    display: block;
-    margin: 0;
-    font-size: 16px;
-    line-height: 1.25;
-    font-weight: 500;
-    letter-spacing: 0;
-    color: var(--clinic-text);
-  }
-
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-avatar .clinic-shell__avatar-fallback--launcher {
-    width: 36px;
-    height: 36px;
-  }
-
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-avatar .clinic-shell__header-online-dot--launcher {
-    width: 10px;
-    height: 10px;
-  }
-
-  .clinic-shell:not(.is-open) .clinic-shell__launcher-mobile-online {
-    display: block;
-    margin: 0;
-    font-size: 13px;
-    line-height: 1.25;
-    font-weight: 500;
-    color: #0e9f17;
-  }
+  .clinic-shell__launcher-card .clinic-shell__launcher { gap: 10px; padding: 0 13px; }
+  .clinic-shell__launcher-teaser { max-width: calc(100vw - 24px); padding-top: 18px; }
 
   .clinic-shell.is-open.is-mobile-fullscreen {
     --clinic-radius-widget: 0;
@@ -1674,8 +1469,9 @@
 .clinic-price-card__price-area{padding:16px}
 .clinic-price-card__amount{font-size:16px;line-height:1.3;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
 .clinic-price-card__amount--single{font-size:26px;letter-spacing: 0}
-.clinic-price-card__amount--description{font-size:15px;font-weight:400;white-space:normal}
-.clinic-price-card__caption{font-size:14px;color:#7a818b;line-height:1.55;margin:4px 0 0}
+.clinic-price-card__amount--description{font-weight:400;white-space:normal}
+.clinic-price-card__caption,.clinic-price-card__amount--description{font-size:14px;color:#7a818b;line-height:1.55}
+.clinic-price-card__caption{margin:4px 0 0}
 .clinic-price-card__condition{display:flex;align-items:flex-start;gap:7px;margin:12px 0 0;font-size:14px;line-height:1.6;color:#7a818b}
 .clinic-price-card__icon{width:16px;height:16px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.6}
 .clinic-price-card__condition>.clinic-price-card__icon{width:14px;height:14px;margin-top:3px}
@@ -1688,6 +1484,9 @@ button.clinic-price-card__overview-row:hover{background:#f3f6ff}
 .clinic-price-card__overview-row>.clinic-price-card__caption{grid-column:1;grid-row:2;margin:0}
 .clinic-price-card__overview-row>.clinic-price-card__condition{grid-column:1/-1;margin:0}
 .clinic-price-card__row-arrow{grid-column:2;grid-row:2;justify-self:end;width:17px;height:17px;margin-top:2px;color:#6f7886;stroke-width:1.5}
+.clinic-price-card__overview-row--description>.clinic-price-card__overview-name{grid-column:1/-1;min-width:0}
+.clinic-price-card__overview-row--description>.clinic-price-card__amount{grid-column:1/-1;grid-row:2;justify-self:stretch;text-align:left;min-width:0}
+.clinic-price-card__overview-row--description>.clinic-price-card__caption,.clinic-price-card__overview-row--description>.clinic-price-card__row-arrow{grid-row:3}
 .clinic-price-card__detail{margin:0;padding:0;border-top:1px solid #eff0f2;font-size:15px}
 .clinic-price-card__detail summary{display:flex;align-items:center;gap:9px;list-style:none;padding:13px 16px;font-size:15px;font-weight:400;cursor:pointer;color:inherit}
 .clinic-price-card__detail summary::-webkit-details-marker{display:none}
@@ -1706,7 +1505,7 @@ button.clinic-price-card__overview-row:hover{background:#f3f6ff}
 .clinic-price-card__promotion>.clinic-price-card__icon{margin-top:3px}
 .clinic-price-card__promotion .clinic-price-card__detail-body{padding:0;color:#727985;font-size:15px}
 .clinic-price-card__promotion .clinic-price-card__detail-body p{margin:0}
-@media(max-width:380px){.clinic-price-card__tab{font-size:13px}.clinic-price-card__overview-row{gap:5px}.clinic-price-card__overview-row>.clinic-price-card__amount{font-size:16px}}
+@media(max-width:380px){.clinic-price-card__tab{font-size:13px}.clinic-price-card__overview-row{gap:5px}.clinic-price-card__overview-row>.clinic-price-card__amount:not(.clinic-price-card__amount--description){font-size:16px}}
 
 .clinic-price-card__selected-variant{margin:12px 17px 0;font-size:14px;font-weight:400;color:var(--clinic-brand)}
 
@@ -1740,14 +1539,14 @@ button.clinic-price-card__overview-row:hover{background:#f3f6ff}
 .clinic-price-card__promotion>.clinic-price-card__icon{width:16px;height:16px;margin-top:3px}
 
 .clinic-shell__menu-label { margin: 0 0 8px; color: #677487; font-size: 13px; line-height: 1.5; }
-.clinic-shell__welcome-promo { display: flex; align-items: flex-start; gap: 12px; width: 100%; margin-top: 14px; padding: 12px; border: 0; border-radius: 12px; background: #f0f4ff; color: #293447; text-align: left; font: inherit; line-height: 1.45; cursor: pointer; transition: background-color .16s ease; }
-.clinic-shell__welcome-promo:focus-visible { outline: 2px solid #6f7886; outline-offset: 2px; }
-.clinic-shell__promo-icon { width: 21px; height: 21px; flex-shrink: 0; color: #6c7ea6; margin-top: 2px; }
+.clinic-shell__welcome-promo { display: flex; align-items: flex-start; gap: 12px; width: 100%; margin-top: 14px; padding: 12px; border: 0; border-radius: 12px; background: var(--clinic-promo-bg); color: #293447; text-align: left; font: inherit; line-height: 1.45; cursor: pointer; transition: background-color .16s ease; }
+.clinic-shell__welcome-promo:focus-visible { outline: 2px solid var(--clinic-promo-accent); outline-offset: 2px; }
+.clinic-shell__promo-icon { width: 21px; height: 21px; flex-shrink: 0; color: var(--clinic-promo-accent); margin-top: 2px; }
 .clinic-shell__promo-icon svg { display: block; width: 100%; height: 100%; }
 .clinic-shell__welcome-promo strong { display: block; font-size: 16px; font-weight: 500; }
 .clinic-shell__welcome-promo small { display: block; font-size: 13px; color: #626e83; margin-top: 4px; }
-.clinic-shell__promo-more { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #49576d; margin-top: 8px; }
-.clinic-shell__promo-more .clinic-msg__link-chevron { width: 14px; height: 14px; }
+.clinic-shell__promo-more { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--clinic-promo-accent); margin-top: 8px; }
+.clinic-shell__promo-more .clinic-msg__link-chevron { width: 14px; height: 14px; color: inherit; }
 
 /* Desktop typography; touch devices retain their base/mobile sizes. */
 @media (min-width: 521px) and (hover: hover) and (pointer: fine) {
@@ -1801,4 +1600,8 @@ button.clinic-price-card__overview-row:hover{background:#f3f6ff}
     font-size: 15px;
     font-weight: 600;
   }
+}
+
+@media (max-width: 340px) {
+  .clinic-shell__launcher-card { --clinic-launcher-expanded-h: 224px; }
 }

@@ -1,0 +1,34 @@
+{
+  "offer_id": "implant_supported_prosthetics.crown",
+  "service_id": "implant_supported_prosthetics",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 30000,
+    "currency": "RUB",
+    "billing_unit": "tooth"
+  },
+  "package": {
+    "label": "за одну коронку на импланте; материал и состав уточняются после осмотра",
+    "includes": [],
+    "excludes": [
+      "Установка импланта не входит в эту сумму."
+    ]
+  },
+  "fact_refs": [],
+  "followups": [],
+  "applies_to_extents": [
+    "one_tooth",
+    "few_teeth"
+  ],
+  "option_id": "crown",
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Установка импланта не входит в эту сумму."
+      }
+    ]
+  }
+}

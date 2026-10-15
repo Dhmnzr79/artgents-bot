@@ -1,0 +1,178 @@
+ПРОДОЛЖЕНИЕ §79 — ЛИШНЯЯ СТРОКА ОБЪЁМА В ОТВЕТЕ БЕЗ ЦЕНЫ
+Убрано отдельное отображение первого billing-scope clause package.label для
+no_public_price. Это служебная подпись единицы без числовой цены; полный смысл
+уже содержится в названии/approved_text. Последующие authored clauses после «;»
+и required_conditions_metadata сохранены; numeric branch не менялся.
+2 real nativeHTTP regressions PASS4sec (All4/6, отсутствие отдельной подписи,
+сохранение согласованного ответа и двух видов обязательных условий).
+Focused Astra recheck PASS; independently2PASS, existing Nika/Demo no_public
+conditions checked. Provider/SMTP/Git/deploy0. Это продолжение bug fix79,
+а не новая архитектура/семантическая эвристика или изменение суммы.
+
+ДОПОЛНЕНИЕ §79 — ВЁРСТКА ВАРИАНТОВ БЕЗ ОПУБЛИКОВАННОЙ ЦЕНЫ
+Owner screenshot выявил непокрытый browser layout mixed numeric/no_public_price.
+Обнаруженная причина: CSSgrid auto-column для длинного описания сжимала название;
+widget использовал full display_text с повторным названием вместо price_display_text.
+Исправлены только widget.js/CSS: описание под заголовком на всю ширину, исходный
+серверный price_display_text без повтора. Суммы, условия, refs и backend неизменны.
+Новый real widget browser test: actual offline nativeHTTP receipts, numeric40000+
+All4/6 descriptions, Chrome320/390/1280, геометрия и переключениеone. Доисправления
+FAIL:320px nameWidth0/nameHeight380. После — PASS за11.62s. Скриншоты сохранены
+во внешнем price-layout-proof. Проведена визуальная проверка390px. Никаких live
+provider/SMTP, commit/push/deploy. Focused независимый Astra Checker PASS;
+независимо повторён browser test1PASS на320/390/1280px, просмотрен скриншот390px.
+
+НИКАДЕНТ: СОГЛАСОВАННЫЙ ПРАЙС И ОБЪЁМ — §78, 15.10.2026
+Тип: исправление клиентских данных/подключение прайса; не архитектурное упрощение.
+Ветка codex/nikadent-technical-onboarding, HEAD2a2f2f1; main/mergebasee93cb12.
+Baseline — сохранённый dirty worktree после редакторских правок; точный37path allowlist и1081 protected SHA256 во внешнем nikadent-price-stage-manifest.json.
+
+РЕШЕНИЕ ВЛАДЕЛЬЦА
+11 основных позиций: бесплатная согласованная консультация; пломба; удаление; установка импланта; коронка на импланте; металлокерамика; цирконий; частичный и полный съёмные протезы; бюгель; ремонт.
+7 групп для точных вопросов: E-MAX; виниры; Acry Free; нейлон/ацетал; временный протез; костная пластика/синус-лифтинг; перебазировка.
+Отложены стальная коронка и армирование. Общая цена All4/6, моста, лечения каналов и полной чистки не придумывается.
+Подробные присланные скриншоты имеют приоритет: пломба от5250 вместо5000, удаление от5500 вместо5000, иммедиат12000 вместо10000. Никаких новых общих цен сайта автоматически не импортировано.
+
+МЕХАНИЗМ И ГРАНИЦЫ
+Runtime/схемы/виджет/модельные инструкции не менялись. Существующий show_price выбирается моделью; код фиксирует суммы, единицы и существенные условия; модель получает результат и пишет окончательную prose.
+Обзор направления использует существующий d2_direction_prices.json: до3 разных услуг, затем существующие кнопки one/full/unknown. Несколько зубов — свободным текстом. Сам выбор объёма не является медицинским назначением.
+Протезирование: начальный overview — partial35k, металлокерамика22k, цирконий24k; few даёт тот же набор без умножения, one — металлокерамика22k/цирконий24k/коронка на импланте30k. На full_arch — полный протез40k и All4/6 без опубликованных итоговых сумм. Бюгель65k доступен по точному запросу, но при этом order/cap3 не входит в overview; «основная позиция» не означает обязательное автоматическое продвижение в каждом обзоре.
+Имплантация: установка одного импланта35k; All4/6 без суммы. Одномоментная имплантация доступна по точному запросу без дублирования в основном обзоре.
+Восстановление: существующий формат третьего направления restoration, те же подтверждённые предложения без отдельной логики.
+Временный протез12k — отдельная услуга: не становится дешёвым вариантом обычного постоянного съёмного. AcryFree/nylon — существующие точные option tabs; они не являются отдельными ценовыми строками начального overview, но могут быть доступны как названные вкладки материала в карточке.
+Установке импланта35k и коронке на импланте30k задано one/few, full_arch исключён. Состав обеих позиций прямо разделён; полное лечение не рассчитывается сложением. Для протеза на имплантах всей челюсти отдельный no_public_price.
+Частичный35k=few, полный40k=full, AcryFree55k=full, nylon40k=few. Лечение нескольких зубов сохраняет стоимость за единицу, не умножает её автоматически.
+unknown: текущий baseline без вызова модели возвращает обзор без повторного вопроса. Более ранний документ описывал нейтральное приглашение; это существующее расхождение, не изменение этого этапа.
+Числовые цены удалены из широких family records (теперь пустой список); старый неподтверждённый bridge10k заменён на no_public_price. Культевая вкладка7k сохранена отдельно; она не керамическая накладка и не общий ориентир коронок.
+Метаданные исходных MD кроме перенесённого неоднозначного иммедиат-алиаса сохранены; в MD не добавлялись рублёвые суммы. Новые содержательные MD описывают E-MAX, временный протез, перебазировку; существующие описания дополняют варианты материалов и границы единиц.
+
+ИСТОЧНИКИ СУММ
+Подробный прайс владельца: скриншоты d6861bf6 (ортопедия), a292a5ee (протезы/прочее), 56f3f666 (терапия), 0f88f02d (хирургия), переданные в этом чате.
+Краткий сайт-прайс на214b595d/388d0a9a/dcc899c8/7e370b75 используется только для сравнения расхождений. Бесплатная акция одобрена владельцем ранее; платные обычные консультации не объявлены бесплатными.
+
+ПОДТВЕРЖДЁННЫЕ ПРЕДЛОЖЕНИЯ
+all_on_4.default: no_public_price Общую стоимость восстановления всей челюсти рассчитают после диагностики и согласования плана. Готовая цена комплекса не опубликована.; unit=none; option=none; extent=['full_arch'] | восстановление зубного ряда одной челюсти
+all_on_6.default: no_public_price Общую стоимость восстановления всей челюсти рассчитают после диагностики и согласования плана. Готовая цена комплекса не опубликована.; unit=none; option=none; extent=['full_arch'] | восстановление зубного ряда одной челюсти
+bone_graft.default: from 25000; unit=procedure; option=none; extent=['one_tooth', 'few_teeth', 'full_arch'] | за процедуру; объём и состав согласуются после осмотра
+caries.default: from 5250; unit=tooth; option=none; extent=['one_tooth', 'few_teeth'] | установка пломбы за один зуб; зависит от объёма восстановления
+clasp_dentures.default: from 65000; unit=jaw; option=none; extent=['few_teeth'] | за один бюгельный протез на одну челюсть; зависит от фиксации
+classic.default: fixed 35000; unit=implant; option=none; extent=['one_tooth', 'few_teeth'] | за установку одного импланта с формирователем десны; хирургический этап
+core_inlay.default: from 7000; unit=tooth; option=none; extent=existing | за зуб; объём работ уточняется на консультации
+denture_reline.default: fixed 7500; unit=procedure; option=none; extent=['few_teeth', 'full_arch'] | перебазировка одного съёмного протеза лабораторным методом
+denture_repair.default: fixed 7000; unit=procedure; option=none; extent=['few_teeth', 'full_arch'] | починка при переломе базиса, приварка зуба или кламмера; возможность ремонта — после осмотра
+emax_crowns.default: from 24000; unit=tooth; option=none; extent=['one_tooth', 'few_teeth'] | за одну коронку на свой зуб
+fixed_bridge.default: no_public_price Стоимость моста зависит от количества единиц, материала и подготовки опор. Общую сумму рассчитают после осмотра; подтверждённая цена моста не опубликована.; unit=none; option=none; extent=['few_teeth'] | мостовидный протез; полный расчёт после осмотра
+implant_supported_prosthetics.crown: from 30000; unit=tooth; option=crown; extent=['one_tooth', 'few_teeth'] | за одну коронку на импланте; материал и состав уточняются после осмотра
+implant_supported_prosthetics.full_arch: no_public_price Стоимость протеза на имплантах для всей челюсти определяется по плану лечения. Цена одной коронки не является ценой полного зубного ряда.; unit=none; option=full_arch; extent=['full_arch'] | общая стоимость определяется по плану лечения
+metal_ceramic_crowns.default: fixed 22000; unit=tooth; option=none; extent=['one_tooth', 'few_teeth'] | за одну коронку на свой зуб
+one_stage.default: fixed 35000; unit=implant; option=none; extent=['one_tooth', 'few_teeth'] | за установку одного импланта с формирователем десны; хирургический этап
+prosthetics_consultation.default: fixed 0; unit=procedure; option=none; extent=existing | консультация по ортопедии, имплантации и протезированию
+removable_dentures.jaw.acry_free: fixed 55000; unit=jaw; option=acry_free; extent=['full_arch'] | за одну челюсть
+removable_dentures.jaw.full: fixed 40000; unit=jaw; option=full; extent=['full_arch'] | за одну челюсть
+removable_dentures.jaw.nylon: fixed 40000; unit=unit; option=nylon; extent=['few_teeth'] | за один частичный протез
+removable_dentures.jaw.partial: fixed 35000; unit=jaw; option=partial; extent=['few_teeth'] | за одну челюсть
+sinus_lift.default: from 25000; unit=procedure; option=none; extent=['one_tooth', 'few_teeth', 'full_arch'] | за процедуру; объём и состав согласуются после осмотра
+teeth_treatment.default: no_public_price Стоимость зависит от вида лечения. Установка пломбы и лечение корневых каналов — разные объёмы работы; полный план рассчитают после осмотра.; unit=none; option=none; extent=['one_tooth', 'few_teeth'] | расчёт зависит от необходимого лечения
+temporary_denture.default: fixed 12000; unit=unit; option=none; extent=['one_tooth', 'few_teeth'] | за один временный съёмный протез для замещения 1–3 зубов
+tooth_extraction.default: from 5500; unit=tooth; option=none; extent=['one_tooth', 'few_teeth'] | за удаление одного зуба; зависит от сложности
+veneers.default: fixed 30000; unit=tooth; option=none; extent=['one_tooth', 'few_teeth'] | за один зуб
+zirconia_crowns.default: from 24000; unit=tooth; option=none; extent=['one_tooth', 'few_teeth'] | за одну коронку на свой зуб
+
+ПРОВЕРКИ
+До изменений focused baseline:34PASS,3FAIL,1deselected. Один FAIL — ранее добавленное «на сайте» в advantages MD, вне этого этапа. Ещё2FAIL — старый sales_fast bridge/core, который не является текущим HTTP-путём. Эти legacy price assertions заменены более полной проверкой текущего native D2.
+Известный format smoke ссылается на отсутствующий tests/test_multibranch_contact_authority.py; исключается явно, не объявляется исправленным.
+Production pack validator PASS. Общий целевой прогон:175PASS,10FAIL,2deselected. Из175PASS — 88 новых/перенесённых текущих D2 price-authority тестов. Все10FAIL в неизменённых historical test_d2_price_scope_selection.py и test_d2_price_modes.py воспроизведены на чистом git archive HEAD2a2f2f1:10FAIL/6PASS, совпадают имена и сообщения ошибок. Это не регрессии этого этапа. 2deselected — явно названные выше прежние MD-source и format-smoke ошибки. JUnit обоих запусков и JSON сравнения сохранены вне репозитория.
+Итоговый независимый Checker Astra (запущен как gpt-6-astra, high): PASS, P0/P1 нет. Независимо пройдено88 тестов за87.89с; дополнительно проверены4 HTTP сценария (classic count3, temporary count5, implantfull, nylon). Подтверждены реальные пути HTTP/SSE/snapshot/materializer/UI/history/replay и1081 защищённый SHA256. Это независимый анализ кода/данных с offline transport, не живое тестирование DeepSeek. P2: числовой предел1–3 у временного протеза — явная область опубликованной цены, но существующий few/count5 также получает эту карточку; механизма числовой блокировки нет. Без нового runtime-контракта его не добавляли. Рекомендованное уточнение про exact-only бюгель внесено в отчёт.
+
+ГДЕ НАСТРАИВАТЬ
+Название/вариант/применимость — service_catalog.json. Суммы/единицы/состав — pricebook/services/*.json. Состав и порядок общего обзора — d2_direction_prices.json; secondary цены не перечислять в этом overview. Дублировать цены в MD или family records не нужно. После изменения — новая беседа в локальной панели НикаДент; старые опубликованные карточки сохраняют свои данные.
+
+ОСТАЮЩИЕСЯ ОГРАНИЧЕНИЯ
+Нет live/provider/SMTP evidence. Подставленные ответы проверяют исполнение и границы, но не способность live-модели всегда выбирать правильные tool args и не её свободные ценовые формулировки.
+Материалы/подготовка/анестезия и другие строки прайса не объявлены автоматически включёнными в каждую сумму. Признак no_public_price не значит, что услугу не оказывают.
+Цена временного протеза относится к1–3 зубам. Existing runtime не имеет отдельного диапазона tooth_count в offer; лимит указан в названии/условиях и доступен модели. Новый счётчик/калькулятор/эвристика не вводились.
+Live модель/SMTP0, staging пустой, commit/push/PR update/merge/deploy0. Прежний WIP demo/редактура/AGENTS/два адреса заявок/avatar/3JPG сохранён.
+
+ТОЧНЫЙ ALLOWLIST
+clients/nikadent/target_response/service_catalog.json
+clients/nikadent/target_response/pricebook/family_prices.json
+clients/nikadent/target_response/d2_direction_prices.json
+clients/nikadent/target_response/pricebook/services/caries.default.json
+clients/nikadent/target_response/pricebook/services/teeth_treatment.default.json
+clients/nikadent/target_response/pricebook/services/tooth_extraction.default.json
+clients/nikadent/target_response/pricebook/services/classic.default.json
+clients/nikadent/target_response/pricebook/services/one_stage.default.json
+clients/nikadent/target_response/pricebook/services/all_on_4.default.json
+clients/nikadent/target_response/pricebook/services/all_on_6.default.json
+clients/nikadent/target_response/pricebook/services/metal_ceramic_crowns.default.json
+clients/nikadent/target_response/pricebook/services/zirconia_crowns.default.json
+clients/nikadent/target_response/pricebook/services/emax_crowns.default.json
+clients/nikadent/target_response/pricebook/services/veneers.default.json
+clients/nikadent/target_response/pricebook/services/implant_supported_prosthetics.crown.json
+clients/nikadent/target_response/pricebook/services/implant_supported_prosthetics.full_arch.json
+clients/nikadent/target_response/pricebook/services/removable_dentures.jaw.partial.json
+clients/nikadent/target_response/pricebook/services/removable_dentures.jaw.full.json
+clients/nikadent/target_response/pricebook/services/removable_dentures.jaw.acry_free.json
+clients/nikadent/target_response/pricebook/services/removable_dentures.jaw.nylon.json
+clients/nikadent/target_response/pricebook/services/temporary_denture.default.json
+clients/nikadent/target_response/pricebook/services/clasp_dentures.default.json
+clients/nikadent/target_response/pricebook/services/denture_repair.default.json
+clients/nikadent/target_response/pricebook/services/denture_reline.default.json
+clients/nikadent/target_response/pricebook/services/sinus_lift.default.json
+clients/nikadent/target_response/pricebook/services/bone_graft.default.json
+clients/nikadent/target_response/pricebook/services/fixed_bridge.default.json
+clients/nikadent/md/prosthetics__service__emax_crowns.md
+clients/nikadent/md/prosthetics__service__temporary_denture.md
+clients/nikadent/md/prosthetics__service__denture_reline.md
+clients/nikadent/md/prosthetics__service__removable_dentures.md
+clients/nikadent/md/prosthetics__service__implant_supported_prosthetics.md
+clients/nikadent/md/prosthetics__service__veneers.md
+tests/test_nikadent_price_authority_offline.py
+tests/test_nikadent_client_pack_offline.py
+docs/tasks/DEMO_D2_INTERFACE_TASK.md
+docs/evidence/client_pack/NIKADENT_PRICE_LAYER_REPORT.txt
+
+
+80. Full-audit corrections — owner GO 2026-10-15
+Baseline: preserved dirty worktree after79. Branch codex/nikadent-technical-onboarding,
+HEAD2a2f2f1, origin/main=mergebasee93cb12. Exact17path allowlist and baseline copies
+are external nikadent-audit-fixes/manifest.json; card80 lists each path.
+Bug fixes/data edits, not architecture simplification. No prior WIP removed.
+
+Implemented: core_inlay one/few applicability, explicit excluded crown and mandatory
+condition; consultation advance booking in existing semicolon package label and
+short promo; owner tax phrase «Помощь в получении налогового вычета 13%» in fact/twoMD
+without promising13%of entirebill; retrospective99.8% statistic without stale16year
+age or fabricated measurement date; source note removed from patientMD; repair
+reline alias removed and3e/yo duplicates removed; obsolete format-test path replaced
+with existing current D2 contacts HTTP test, no test skipped.
+
+Optional strict positive TargetOffer.max_tooth_count=3 for temporary_denture uses
+existing volume.tooth_count. One D2 applicability predicate filters native/direct,
+direction/variants and validates retained price selections; no special serviceID,
+label parser, model task change, prompt patch, count guessing or new totals.
+Known1/2/3 retain12000 per scopedprosthesis;4/5 excluded via existing unavailable
+result. Unknown count keeps clearlylabelled1–3reference. Other uncapped offers
+unchanged. Generic donor cap2 also tested through overview/direct/tabs/click/replay.
+
+Checks: initial group218PASS2FAIL/220 in105.68s. Both failures were newly authored
+fixture assumptions: a single-offer service correctly has no selectable variant
+button. Corrected test uses actual published removable variants with donorcap2;
+added directvariant cap case. Focused6PASS109deselected8.08s. Across current unique
+cases222 have passing coverage; no product failure hidden or test disabled.
+Schema positiveinteger validation, native JSON/SSE conditions/grounding/receipts,
+no multiplication, legal scope/alias/meta-source and current pack checks passed.
+Validator/refgraph:0errors;56MD,37explicitrefs,61sourcebindings,61wrongdocrejections,
+foreignsessionrejected. diff--check passed. Independent Astra Checker PASS:35
+focused tests independently passed31.48s;4additional HTTP/SSE repros passed5.91s
+cover hidden capped neighbor variants, forged refs400 and explicit option without
+substitution. All17 baseline copies match manifestSHA, all17changed paths reviewed.
+This certifies the checkpoint bug fixes only, not the whole architecture/livebot.
+
+Open content questions stay here, not patientMD: measurement period of99.8%,
+reference source ratings(as published on clinic site Oct2026, platforms not
+independently verified), named orthopedic doctor, fuller warranty conditions.
+Other volume semantics for consultation/repair/bridge and automatic promo scope
+not broadened by this fix. No claim of live model semantic accuracy.
+Provider/SMTP0; no staging/commit/push/PR update/merge/deploy. Staging empty.
+Demo, avatar,3otzyvJPG and all foreign/pre-existing WIP preserved.

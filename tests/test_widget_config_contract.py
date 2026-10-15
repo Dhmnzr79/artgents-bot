@@ -73,7 +73,7 @@ def test_demo_presentation_valid_v1() -> None:
 def test_nikadent_presentation_valid_v1() -> None:
     raw = _load_json(_NIKADENT / "widget_config.json")
     out = validate_widget_presentation_document(raw, client_id="nikadent")
-    assert out["botName"] == "Консультант Никадент"
+    assert out["botName"] == "Ольга"
     assert out["demoLauncher"] is False
     assert "НикаДент" in out["welcomeText"]
     assert len(out["starterPrompts"]) == 3
@@ -270,7 +270,7 @@ def test_integration_valid_loader_and_origin_guard(pack_dir: Path, monkeypatch: 
 
 def test_nikadent_not_demo_bot_name() -> None:
     cfg = build_public_widget_config("nikadent")
-    assert cfg["botName"] == "Консультант Никадент"
+    assert cfg["botName"] == "Ольга"
     assert cfg["botName"] != load_widget_presentation_v1("demo")["botName"]
 
 

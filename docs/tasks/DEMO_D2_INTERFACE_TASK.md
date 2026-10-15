@@ -1,5 +1,23 @@
 # Текущая карточка — НикаДент
 
+## 70. Nikadent consultant name — owner GO 2026-10-15
+
+Owner requests displayed consultant name Olga instead of Консультант Никадент.
+Presentation config bug fix, not architecture simplification; existing botName
+owns header, answer attribution, typing labels and avatar alt. Set botName Ольга;
+no new personalization fields, prompts or model behavior changes.
+Root/top C:/Cursor Projects/artgents-bot-active; branch
+codex/nikadent-technical-onboarding; baselinec7b4fee, main/mergebasee93cb12.
+Staging clean; local avatar.png WIP +3otzyv preserved/excluded. Exact allowlist:
+clients/nikadent/widget_config.json; tests/test_widget_config_contract.py;
+this task card. Existing config checks + actual local GET; focused Checker.
+Provider/SMTP0; no merge/deploy.
+Result:30 config tests PASS; focused Checker PASS; diff--check PASS. Local9001
+had no running listener/process, restarted via existing start_local_widget.ps1;
+GET widget-config confirms Ольга. No /ask/provider/SMTP calls. Prior baseline
+price/replay failures outside scope unchanged. Exact3-file checkpoint only;
+local avatar and3otzyv remain unstaged/unpushed.
+
 ## 69. Remove unused widget styling — owner GO 2026-10-15
 
 Owner explicitly authorizes cleanup of old styles for demo/Nikadent after audit.

@@ -11,13 +11,17 @@ from contracts.response_plan import SessionKey
 from core.d2_dialogue_store import D2DialogueStore
 from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
 from core.d2_live_provider import build_d2_d1r_messages
-from tests.d2_ci_http import FakeProvider, http_env, send
+from tests.d2_ci_http import FakeProvider, http_env, send, click
 from tests.test_d2_text_reply import response, action
 
 
 def begin(client, fake, *, client_id="demo", sid="lead", phone=False, transport="json"):
     fake.raw = response(actions=[action("start_booking", age_group="adult")])
-    send(client, transport, client_id=client_id, sid=sid, request_id="book", q="Хочу записаться")
+    booking = send(client, transport, client_id=client_id, sid=sid, request_id="book", q="Хочу записаться")
+    if client_id == "nikadent":
+        assert booking["ui"]["lead_consent"] is not None
+        click(client, booking, "lead:consent_accept", client_id=client_id, sid=sid,
+              request_id="consent", transport=transport)
     if phone:
         send(client, transport, client_id=client_id, sid=sid, request_id="name", q="Анна")
 

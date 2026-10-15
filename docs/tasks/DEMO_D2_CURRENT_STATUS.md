@@ -1,5 +1,36 @@
 # D2 demo — текущее состояние
 
+## НикаДент — согласие перед сбором контактов, 2026-10-15
+
+§67, continuation branch codex/nikadent-technical-onboarding / PR31,
+checkpoint baseline2beb02b. Для реальной доставки сервер теперь требует
+согласие до имени/телефона; demo_stub без изменений. В диалоге компактный блок:
+пустой checkbox, короткая подпись13px, две ссылки12px, «Продолжить»/«Без записи».
+Ссылки/версия/подпись — clients/nikadent/lead_config.yaml -> consent.
+Без галочки input заблокирован; без записи доступны обычные вопросы.
+Прямой /lead не принимает клиентский JSON за доверенное подтверждение.
+
+Доказательство UTC/version/definition хранится в существующем acceptance
+completion без контактов; private session и отправленная заявка ссылаются на
+него. Отмена/завершение/новая запись очищают активную ссылку. Старый replay,
+чужой tenant/session/revision и смена версии не открывают сбор данных.
+Модель не участвует в согласии и не получает его настройки/контакты.
+
+Проверки:47 targeted PASS до расширения adverse cases; release offline+policy
+884PASS5platformSKIP0FAIL. Затем focused16PASS, включая missing-proof name/phone/
+pause, version refresh and re-gating, actual Chrome DOM with rejected accept503 /
+cancel400 recovery, reset, compact390/900px geometry. Independent Checker first
+REJECT on UI dead end after rejected consent; fixed with existing new-chat action
+for retained consent; focused recheck PASS (4 independent lifecycle tests).
+Final UI/phone/consent nonbrowser repeat22PASS (browser covered in focused16).
+Model/provider calls0, actual SMTP0; mocked delivery only. No merge/deploy/site
+installation. Existing historical replay2 failures remain outside release scope.
+
+Временные URL переданы владельцем. Содержимое consent URL при read-only проверке
+оказалось о cookies/внешних сервисах, а не заявке с именем/телефоном: требуется
+уточнение документа у клиента перед публичным запуском. Юридическая достаточность
+не подтверждена; сбор медданных/рекламных согласий не добавлялся.
+
 ## НикаДент — стартовое меню по странице, 2026-10-15
 
 Продолжение §66 в ветке codex/nikadent-technical-onboarding / PR #31,

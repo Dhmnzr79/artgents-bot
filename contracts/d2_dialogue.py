@@ -11,6 +11,7 @@ from contracts.d2_session_context import (
 from contracts.d2_tenant_snapshot import D2ModelView
 from contracts.d2_dialogue_result import D2ExplanationTask, D2ParsedDialogueResult
 from contracts.response_plan import ResponsePlanModel
+from contracts.lead_consent import LeadConsentReceipt
 from contracts.response_plan_materialization import D2SelectedDocumentAction, MaterializedResponseOutcome
 from contracts.response_plan_session import D2SelectedUiRef
 
@@ -94,6 +95,8 @@ class D2CompletedTurn(ResponsePlanModel):
     context: D2SessionContextProjection
     committed_revision: int
     lead_effect: D2LeadEffect = D2LeadEffect()
+    consent_receipt: LeadConsentReceipt | None = None
+    lead_consent_request_id: str | None = None
 
     @model_validator(mode="after")
     def _validate_identity(self) -> Self:
@@ -103,6 +106,11 @@ class D2CompletedTurn(ResponsePlanModel):
             raise ValueError("d2_request_fingerprint_required")
         if self.committed_revision < 1:
             raise ValueError("d2_committed_revision_invalid")
+        if self.consent_receipt is not None:
+            key = self.response.resolved.session_delta.session_key
+            if (self.consent_receipt.client_id != key.client_id or self.consent_receipt.sid != key.sid
+                    or self.consent_receipt.request_id != self.request_id):
+                raise ValueError("lead_consent_receipt_owner_mismatch")
         return self
 
 

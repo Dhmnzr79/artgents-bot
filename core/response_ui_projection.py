@@ -17,6 +17,11 @@ def project_response_ui(plan: ResolvedResponsePlan) -> ResponseUIProjection:
 
     client_id = plan.session_delta.session_key.client_id
     ui = plan.ui_plan
+    if ui.lead_consent is not None:
+        if (ui.lead_consent.source_client_id != client_id or not any(
+                reply.reply_id == ui.lead_consent.accept_ref and reply.source_client_id == client_id
+                for reply in ui.quick_replies)):
+            raise ResponsePlanContractError("lead_consent_ui_authority_mismatch")
     _validate_ui_ownership(client_id, ui.quick_replies)
     _validate_ui_ownership(client_id, ui.buttons)
     if ui.widget is not None and ui.widget.source_client_id != client_id:
@@ -46,6 +51,7 @@ def project_response_ui(plan: ResolvedResponsePlan) -> ResponseUIProjection:
     if not any(isinstance(part, ResponsePriceCardPart) or part.price_owned for part in body_parts):
         body_parts = ()
     return ResponseUIProjection(
+        lead_consent=ui.lead_consent,
         quick_replies=ui.quick_replies,
         buttons=ui.buttons,
         widget=ui.widget,

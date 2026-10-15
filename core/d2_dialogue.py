@@ -16,6 +16,8 @@ from contracts.d2_dialogue import (
     D2CompletedTurn, D2DialogueRecord, D2DialogueTurn, D2LeadEffect,
     D2LeadEffectDispatcher, D2ProviderInput, D2RawProvider, D2SelectedUiRef,
 )
+from contracts.lead_consent import LeadConsentReceipt
+from core.lead_consent import read_lead_consent_receipt
 from contracts.d2_session_context import (
     D2SessionActivity, D2SessionTtlPolicy, D2SessionState, D2SessionSnapshot,
     D2_SESSION_SCHEMA_VERSION, empty_d2_session_snapshot,
@@ -49,6 +51,7 @@ from core.d2_lead_bridge import (
     resolve_d2_lead_pre_provider,
     prepare_d2_lead_dispatcher,
     resolve_d2_lead_delivery_response,
+    d2_lead_consent_missing,
 )
 from core.d2_session_context import project_d2_session_context
 from core.d2_snapshot_sources import (
@@ -326,8 +329,9 @@ def run_d2_dialogue_turn(
                 context=early_context,
             )
         session_matched = d2_lead_session_client_matches(session_key)
+        consent_missing = bool(lead_bridge and session_matched and d2_lead_consent_missing(session_key, store))
         pending_answer = None
-        if lead_ui_ref == LEAD_PENDING_ANSWER_REF:
+        if lead_ui_ref == LEAD_PENDING_ANSWER_REF and not consent_missing:
             pending_answer = prepare_d2_pending_lead_answer(session_key)
         lead_pause_response = lead_paused or pending_answer is not None
         lead_gate = bool(
@@ -335,11 +339,11 @@ def run_d2_dialogue_turn(
             or session_matched
             or (lead_ui_ref or "").strip()
         )
-        if pending_answer is None and lead_gate and d2_lead_needs_pre_provider(
+        if pending_answer is None and lead_gate and (consent_missing or d2_lead_needs_pre_provider(
             session_key=session_key,
             lead_ui_ref=lead_ui_ref,
             user_message=user_message,
-        ):
+        )):
             return _run_lead_pre_provider_turn(
                 session_key=session_key,
                 user_message=user_message,
@@ -511,12 +515,14 @@ def _run_lead_pre_provider_turn(
         activity=previous.activity if previous else None, policy=ttl_policy, now=now,
     )
     diagnostics.stage("materialize")
+    consent_receipt = read_lead_consent_receipt(store, session_key)
     bridge = resolve_d2_lead_pre_provider(
         snapshot=tenant,
         session_key=session_key,
         user_message=user_message,
         lead_ui_ref=lead_ui_ref,
         published_revision=snapshot.state.revision + 1,
+        request_id=request_id, consent_receipt=consent_receipt,
     )
     if not bridge.response.rendered_text.strip():
         raise ValueError("d2_experiment_lead_not_resolved")
@@ -525,7 +531,8 @@ def _run_lead_pre_provider_turn(
     if bridge.request_effect:
         if effect_id is None:
             effect_id = f"lead-{request_id}"
-        effect_dispatcher = effect_dispatcher or prepare_d2_lead_dispatcher(session_key, request_id)
+        effect_dispatcher = effect_dispatcher or prepare_d2_lead_dispatcher(
+            session_key, request_id, consent_receipt=consent_receipt)
         # exit_lead_flow erases PII. Dispatch retains it only in this request's closure.
         from session import exit_lead_flow
         exit_lead_flow(session_key.sid)
@@ -544,6 +551,10 @@ def _run_lead_pre_provider_turn(
             effect_dispatcher if bridge.request_effect else lead_effect_dispatcher
         ),
         lead_delivery_snapshot=tenant if bridge.request_effect else None,
+        consent_receipt=(LeadConsentReceipt(client_id=session_key.client_id, sid=session_key.sid,
+            request_id=request_id, accepted_at=now, definition=bridge.accepted_consent)
+            if bridge.accepted_consent is not None else None),
+        lead_consent_request_id=consent_receipt.request_id if bridge.request_effect and consent_receipt else None,
     )
 
 
@@ -564,6 +575,8 @@ def _commit_non_price_d2_turn(
     prepared_state=None, safe_user_message=None, selected_ui_ref=None, ttl_policy=None,
     lead_pause_response: bool = False,
     lead_delivery_snapshot: D2TenantSnapshot | None = None,
+    consent_receipt: LeadConsentReceipt | None = None,
+    lead_consent_request_id: str | None = None,
 ) -> D2DialogueTurn:
     """Commit a result and its receipt references in the sole D2 store."""
     if lead_pause_response:
@@ -611,6 +624,8 @@ def _commit_non_price_d2_turn(
         context=context,
         committed_revision=state.revision,
         lead_effect=initial_effect,
+        consent_receipt=consent_receipt,
+        lead_consent_request_id=lead_consent_request_id,
     )
     full_audit("commit_intent", state=state, completion=completion, branch="non_price")
     diagnostics.stage("commit")

@@ -35,6 +35,10 @@ from core.d2_snapshot_sources import d2_authored_policy_answers
 from core.lead_phone_input import parse_unambiguous_lead_phone
 from core.lead_provider_input_privacy import prepare_lead_pending_provider_question
 from core.lead_turn_classifier import classify_lead_active_turn
+from core.lead_consent import lead_consent_definition, read_lead_consent_receipt
+from contracts.lead_consent import (
+    LeadConsentDefinition, LeadConsentPrompt, LeadConsentReceipt, LEAD_CONSENT_ACCEPT_REF,
+)
 from core.response_plan_resolver import resolve_response_plan
 from core.response_text_renderer import render_response_text
 from core.response_ui_projection import project_response_ui
@@ -63,9 +67,11 @@ from session import (
     set_lead_intent,
     set_lead_pending_interruption,
     update_profile,
+    begin_lead_consent, accept_lead_consent_reference,
 )
 
 D2LeadKind = Literal[
+    "collecting_consent",
     "collecting_name",
     "collecting_phone",
     "cancelled",
@@ -84,9 +90,11 @@ class D2LeadBridgeResult:
     response: MaterializedResponseOutcome
     booking_request_id: str | None = None
     request_effect: bool = False
+    accepted_consent: LeadConsentDefinition | None = None
 
 
-def prepare_d2_lead_dispatcher(session_key: SessionKey, request_id: str):
+def prepare_d2_lead_dispatcher(session_key: SessionKey, request_id: str,
+                              consent_receipt: LeadConsentReceipt | None = None):
     """Capture accepted private slots before cleanup; never persist this payload in D2."""
     if not d2_lead_session_client_matches(session_key):
         raise ValueError("d2_lead_session_client_required")
@@ -97,14 +105,16 @@ def prepare_d2_lead_dispatcher(session_key: SessionKey, request_id: str):
 
     class ClinicLeadDispatcher:
         def dispatch(self, *, effect_id: str):
-            result, status = handle_lead(payload, client_id=session_key.client_id)
+            result, status = handle_lead(payload, client_id=session_key.client_id,
+                                         consent_receipt=consent_receipt)
             delivery = result.get("delivery_status") or result.get("delivery")
             if status == 200 and delivery in {"email", "email_pg_enqueue_failed"}:
                 return "sent"
             if status == 200 and delivery == "demo_stub":
                 return "demo_stub"
             if delivery in {"email_smtp_not_configured", "email_no_recipients",
-                            "email_smtp_invalid_config"} or result.get("error_code") in {"bad_phone", "unknown_client"}:
+                            "email_smtp_invalid_config"} or result.get("error_code") in {
+                                "bad_phone", "unknown_client", "lead_consent_required", "lead_consent_not_configured"}:
                 return "failed"
             # SMTP failure can follow server acceptance. Never automatically resend.
             return "unknown"
@@ -238,6 +248,7 @@ def d2_lead_needs_pre_provider(
     if ref == "d2:booking_cta":
         return True
     if ref in {
+        LEAD_CONSENT_ACCEPT_REF,
         LEAD_CANCEL_REF,
         LEAD_PENDING_ANSWER_REF,
         LEAD_PENDING_CONTINUE_NAME_REF,
@@ -310,18 +321,11 @@ def resolve_d2_booking_lead_entry(
         )
     if is_active_lead_flow(st):
         # Already collecting; re-prompt name without stacking state.
-        return D2LeadBridgeResult(
-            kind="collecting_name",
-            response=_name_prompt_response(snapshot, session_key=session_key),
-            booking_request_id=policy.active_booking_request_id,
-        )
+        if st.get("lead_intent") == "collecting_consent":
+            return _consent_prompt_result(snapshot, session_key=session_key)
     mark_booking_intent_ever(sid)
-    set_lead_intent(sid, "collecting_name")
-    return D2LeadBridgeResult(
-        kind="collecting_name",
-        response=_name_prompt_response(snapshot, session_key=session_key),
-        booking_request_id=policy.active_booking_request_id,
-    )
+    return _begin_booking(snapshot, session_key=session_key,
+                          booking_request_id=policy.active_booking_request_id)
 
 
 def resolve_d2_lead_pre_provider(
@@ -331,6 +335,8 @@ def resolve_d2_lead_pre_provider(
     user_message: str,
     lead_ui_ref: str | None = None,
     published_revision: int | None = None,
+    request_id: str | None = None,
+    consent_receipt: LeadConsentReceipt | None = None,
 ) -> D2LeadBridgeResult:
     """Handle active lead slots without a provider call."""
     sid = session_key.sid
@@ -342,11 +348,33 @@ def resolve_d2_lead_pre_provider(
 
     if ref == "d2:booking_cta":
         mark_booking_intent_ever(sid)
-        set_lead_intent(sid, "collecting_name")
-        return D2LeadBridgeResult(
-            kind="collecting_name",
-            response=_name_prompt_response(snapshot, session_key=session_key),
-        )
+        return _begin_booking(snapshot, session_key=session_key)
+
+    definition = lead_consent_definition(client_id)
+    if st.get("lead_intent") == "collecting_consent":
+        if ref == LEAD_CANCEL_REF or parse_lead_cancel(q):
+            exit_lead_flow(sid)
+            return D2LeadBridgeResult(kind="cancelled", response=_plain_answer(
+                snapshot, session_key=session_key, text="Хорошо, продолжим без записи. Задайте свой вопрос.", quick=()))
+        if ref == LEAD_CONSENT_ACCEPT_REF:
+            if (definition is None or not request_id or
+                    st.get("lead_consent_pending_version") != definition.fingerprint):
+                raise ValueError("lead_consent_version_mismatch")
+            accept_lead_consent_reference(sid, request_id)
+            return D2LeadBridgeResult(kind="collecting_name", accepted_consent=definition,
+                response=_name_prompt_response(snapshot, session_key=session_key))
+        if definition is not None and st.get("lead_consent_pending_version") != definition.fingerprint:
+            begin_lead_consent(sid, definition.fingerprint)
+        return _consent_prompt_result(snapshot, session_key=session_key)
+    if ref == LEAD_CONSENT_ACCEPT_REF:
+        raise ValueError("lead_consent_not_pending")
+    if definition is not None and consent_receipt is None:
+        if ref == LEAD_CANCEL_REF or parse_lead_cancel(q):
+            exit_lead_flow(sid)
+            return D2LeadBridgeResult(kind="cancelled", response=_plain_answer(
+                snapshot, session_key=session_key, text="Хорошо, продолжим без записи. Задайте свой вопрос.", quick=()))
+        begin_lead_consent(sid, definition.fingerprint)
+        return _consent_prompt_result(snapshot, session_key=session_key)
 
     # Pending-choice refs: the answer action enters the ordinary D2 route.
     if ref == LEAD_RESUME_REF:
@@ -478,6 +506,38 @@ def _lead_slot_quick_replies(client_id: str) -> tuple[UiQuickReplyCandidate, ...
     )
 
 
+def d2_lead_consent_missing(session_key, store):
+    state = mem_get(session_key.sid)
+    return (is_active_lead_flow(state) or is_lead_paused(state)) and (
+        lead_consent_definition(session_key.client_id) is not None
+        and read_lead_consent_receipt(store, session_key) is None)
+
+
+def _begin_booking(snapshot, *, session_key, booking_request_id=None):
+    definition = lead_consent_definition(session_key.client_id)
+    if definition is not None:
+        begin_lead_consent(session_key.sid, definition.fingerprint)
+        return _consent_prompt_result(snapshot, session_key=session_key)
+    set_lead_intent(session_key.sid, "collecting_name")
+    return D2LeadBridgeResult(kind="collecting_name", booking_request_id=booking_request_id,
+        response=_name_prompt_response(snapshot, session_key=session_key))
+
+
+def _consent_prompt_result(snapshot, *, session_key):
+    definition = lead_consent_definition(session_key.client_id)
+    if definition is None:
+        raise ValueError("lead_consent_not_configured")
+    prompt = LeadConsentPrompt(**definition.model_dump(), source_client_id=session_key.client_id,
+                               definition_fingerprint=definition.fingerprint)
+    quick = (UiQuickReplyCandidate(source_client_id=session_key.client_id,
+                                  reply_id=LEAD_CONSENT_ACCEPT_REF, label="Продолжить"),
+             UiQuickReplyCandidate(source_client_id=session_key.client_id,
+                                  reply_id=LEAD_CANCEL_REF, label="Продолжить без записи"))
+    return D2LeadBridgeResult(kind="collecting_consent", response=_plain_answer(
+        snapshot, session_key=session_key, text="Перед записью подтвердите согласие на обработку контактов.",
+        quick=quick, consent=prompt))
+
+
 def _name_prompt_response(
     snapshot: D2TenantSnapshot,
     *,
@@ -525,6 +585,7 @@ def _plain_answer(
     policy_ids: tuple[str, ...] = (),
     request_id: str | None = None,
     public_kind: Literal["clarification"] | None = None,
+    consent: LeadConsentPrompt | None = None,
 ) -> MaterializedResponseOutcome:
     if snapshot.client_id != session_key.client_id:
         raise ValueError("d2_lead_client_mismatch")
@@ -548,7 +609,7 @@ def _plain_answer(
         d2_exact_text_blocks=(D2ExactTextBlock(request_id=request_id or "r1",
             source_client_id=session_key.client_id, display_text=text,
             policy_ids=policy_ids),),
-        ui_candidates=UiPlanCandidates(quick_replies=quick),
+        ui_candidates=UiPlanCandidates(quick_replies=quick, lead_consent=consent),
         transport_kind="blocking",
     )
     composer = ComposerResult(route="ANSWER", mode="standard",

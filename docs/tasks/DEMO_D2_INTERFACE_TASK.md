@@ -1,5 +1,82 @@
 # Текущая карточка — НикаДент
 
+## 67. Client lead consent — owner GO 2026-10-15
+
+Owner approved empty checkbox BEFORE name/phone collection for real clinics,
+not demo; backend enforcement + durable timestamp/version evidence, ordinary
+questions available without booking. Nikadent links supplied by owner:
+https://nikadent41.ru/privacy-policy-2/ and
+https://nikadent41.ru/personal-data-consent/. Temporary links/content pending
+owner confirmation. Latest owner steering: small readable inline dialogue block,
+not a half-screen or modal. Explicit cancel/continue without booking returns
+to ordinary composer; unchecked consent blocks contact collection only.
+
+Type: lead/privacy bug fix + consent feature, not architecture simplification.
+Astra consulted; Target Contract §3 and current lead owner remain authoritative.
+No semantic route/model changes; no new provider/SMTP calls (budget0), merge,
+VPS deployment or site installation. Continuation of onboarding branch/PR31.
+
+Preflight: root/top C:/Cursor Projects/artgents-bot-active; branch
+codex/nikadent-technical-onboarding; HEAD/baseline2beb02b; fetched origin/main and
+mergebasee93cb12. PR30 fc84066 and PR31 OPEN. Staging/tracked tree clean;
+foreign otzyv-1.jpg, otzyv-2.jpg, otzyv-3.jpg preserved. No branch switch.
+
+Exact allowlist:
+- contracts/lead_consent.py (new), core/lead_consent.py (new);
+- contracts/d2_dialogue.py, contracts/response_plan.py;
+- core/d2_dialogue.py, core/d2_lead_bridge.py, core/response_ui_projection.py;
+- core/response_plan_resolver.py (carry the frozen consent block unchanged);
+- session.py, lead_service.py;
+- clients/nikadent/lead_config.yaml;
+- static/widget/widget.js, static/widget/widget.css;
+- tests/test_lead_consent.py (new), tests/js/lead_consent_harness.mjs (new);
+- tests/test_nikadent_technical_onboarding.py;
+- tests/test_tenant_lead_routing_context_offline.py;
+- tests/release/offline.txt;
+- docs/CLIENT_PACK_AUTHORING.md, docs/BOT_BEHAVIOR.md;
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md, docs/tasks/DEMO_D2_CURRENT_STATUS.md,
+  docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md.
+
+Mechanism: real delivery requires valid tenant-owned consent definition.
+Demo-stub delivery skips this gate. Existing lead owner adds collecting_consent
+before slot parsers; a typed frozen UI block publishes existing-style
+lead:consent_accept + cancel refs. Acceptance uses saved tenant/session/current
+revision authority and definition fingerprint; free-text yes/name/phone is not
+acceptance. Checkbox enables a compact continue action, input locked until accept
+or cancel. Existing cancel exits booking, so ordinary questions stay available.
+All booking entry/resume/slot paths share the gate; direct /lead cannot supply
+a trusted receipt through HTTP. Internal delivery takes the server-verified
+receipt. Durable proof is part of acceptance completion in the existing D2 store;
+private lead session holds only its request reference for this booking. Submit
+completion links that reference. Cancel/submit/new booking clear active consent
+reference; historical acceptance replay cannot authorize a later booking.
+No consent data joins model context; no patient fields in audit proof. Existing
+rollback applies; cross-database crash atomicity is not newly guaranteed.
+
+Acceptance: JSON/SSE booking -> consent -> name -> phone -> mocked delivery;
+bypass/unchecked/foreign/stale/version/replay/cancel/reset/new-booking cases,
+unchanged demo, no-contact receipt/provider context, compact mobile UI and links.
+Run targeted offline tests plus independent Checker. These links are configured
+as supplied, not certified as legally suitable documents.
+
+Evidence:47 targeted PASS before adverse-case extension; full current CI
+offline+policy selection884PASS5platformSKIP0FAIL. Latest focused16PASS adds
+missing-proof name/phone/paused states and definition change recovery. Chrome
+renders actual frozen API fixtures: unchecked block, configured safe links,
+composer lock, checked typed acceptance, cancel/reset, compact390/900px geometry.
+It explicitly rejects accept503/cancel400, then verifies new-chat recovery.
+
+Independent Checker REJECT: failed consent action hid controls and left the real
+composer locked. Fixed using existing reset action when consent payload remains;
+no semantic/model path added. Version refresh reissues the current pending
+fingerprint, invalidates prior accepted terms before further slots. Focused
+Checker recheck PASS (4 independent lifecycle tests). diff--check PASS.
+Final UI/phone/consent nonbrowser repeat22PASS; browser already in focused16.
+No provider/model/actual SMTP calls. No merge/deploy. ForeignWIP preserved.
+Existing historical replay2fail unchanged/outside release scope. The supplied
+consent URL displayed cookie/external-service terms; retain owner URL for local
+test, require client document confirmation before public install.
+
 ## 66. Page-specific welcome menus — owner GO 2026-10-15
 
 Owner explicitly requests implementation now: tenant-authored greeting and three

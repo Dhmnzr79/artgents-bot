@@ -17,6 +17,8 @@ from core.lead_dialog_excerpt import build_lead_dialog_excerpt, format_lead_dial
 from core.lead_email import send_lead_email
 from logging_setup import emit_bot_event, get_logger
 from session import normalize_phone
+from core.lead_consent import lead_consent_definition, consent_receipt_matches
+from contracts.lead_consent import LeadConsentReceipt
 
 logger = get_logger("bot")
 
@@ -85,11 +87,20 @@ def _unknown_client_response() -> tuple[dict[str, Any], int]:
     return {"ok": False, "error_code": "unknown_client", "delivery": None}, 403
 
 
-def handle_lead(data: dict[str, Any], *, client_id: str) -> tuple[dict[str, Any], int]:
+def handle_lead(data: dict[str, Any], *, client_id: str,
+                consent_receipt: LeadConsentReceipt | None = None) -> tuple[dict[str, Any], int]:
     try:
         tenant = require_existing_explicit_pack_client_id(client_id)
     except ExplicitPackClientIdError:
         return _unknown_client_response()
+
+    try:
+        consent = lead_consent_definition(tenant)
+    except ValueError:
+        return {"ok": False, "error_code": "lead_consent_not_configured", "delivery": None}, 403
+    if consent is not None and not consent_receipt_matches(
+            consent_receipt, client_id=tenant, sid=str(data.get("sid") or ""), definition=consent):
+        return {"ok": False, "error_code": "lead_consent_required", "delivery": None}, 403
 
     name = (data.get("name") or "").strip()
     phone = normalize_phone((data.get("phone") or "").strip() or "")

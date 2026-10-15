@@ -254,6 +254,7 @@ function botTurnFromPayload(data, expectedClientId) {
     bodyParts: Array.isArray(ui.body_parts) ? ui.body_parts : [],
     followups: [],
     quickReplies,
+    leadConsent: ui.lead_consent?.source_client_id === expectedClientId ? ui.lead_consent : null,
     revision: data.revision,
     linksDismissed: false,
     videoKey: vk,
@@ -1720,11 +1721,12 @@ export function mountWidget(root, config, { pagePath } = {}) {
       });
       controls.appendChild(retry);
     }
-    if (clientId === "demo") {
+    if (clientId === "demo" || state.lastPayload?.ui?.lead_consent) {
       const fresh = document.createElement("button");
       fresh.type = "button";
       fresh.className = "clinic-btn-ghost";
       fresh.textContent = "Новая беседа";
+      fresh.dataset.clinicErrorReset = "";
       fresh.addEventListener("click", resetSession);
       controls.appendChild(fresh);
     }
@@ -1742,6 +1744,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
     const cardRows = (m.bodyParts || []).filter(part => part.kind === "price_card")
       .flatMap(part => part.price?.rows || []);
     const items = (m.quickReplies || []).filter((it) => {
+      if (m.leadConsent && [m.leadConsent.accept_ref, "lead:cancel"].includes(it.ref)) return false;
       if (isCaseGalleryReply(clientId, it)) return false;
       if (String(it.ref).startsWith("price_select:") && cardRows.length) return false;
       if (String(it.ref).startsWith("volume:") && m.volumeNavigation) return false;
@@ -1783,6 +1786,58 @@ export function mountWidget(root, config, { pagePath } = {}) {
       });
       box.appendChild(btn);
     }
+  }
+
+  function renderLeadConsent(bubble, m) {
+    const consent = m.leadConsent;
+    if (!consent || m.linksDismissed || m.revision !== state.lastPayload?.revision) return;
+    const accept = (m.quickReplies || []).find(it => it.ref === consent.accept_ref);
+    const cancel = (m.quickReplies || []).find(it => it.ref === "lead:cancel");
+    if (!accept || !cancel) return;
+    const block = document.createElement("div");
+    block.className = "clinic-lead-consent";
+    const label = document.createElement("label");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = false;
+    checkbox.disabled = state.pending || Boolean(state.retryBody);
+    checkbox.dataset.leadConsentCheck = "";
+    const text = document.createElement("span");
+    text.textContent = consent.checkbox_text;
+    label.append(checkbox, text);
+    const links = document.createElement("div");
+    links.className = "clinic-lead-consent__links";
+    for (const [title, url] of [["Согласие на обработку", consent.consent_url],
+                                ["Политика обработки данных", consent.policy_url]]) {
+      let parsed;
+      try { parsed = new URL(url); } catch { continue; }
+      if (parsed.protocol !== "https:" || parsed.username || parsed.password) continue;
+      const a = document.createElement("a");
+      a.href = parsed.href; a.target = "_blank"; a.rel = "noopener noreferrer"; a.textContent = title;
+      links.appendChild(a);
+    }
+    const actions = document.createElement("div");
+    actions.className = "clinic-lead-consent__actions";
+    const next = document.createElement("button");
+    next.type = "button"; next.textContent = "Продолжить"; next.disabled = true;
+    next.dataset.leadConsentAccept = "";
+    checkbox.addEventListener("change", () => {
+      next.disabled = !checkbox.checked || state.pending || Boolean(state.retryBody);
+    });
+    const submit = (action, echo) => {
+      if (state.pending || state.retryBody) return;
+      m.linksDismissed = true;
+      void sendAsk({ref: action.ref, ui_revision: m.revision, q: "", userEcho: echo});
+    };
+    next.addEventListener("click", () => {
+      if (checkbox.checked) submit(accept, "Согласие на обработку контактов подтверждено");
+    });
+    const skip = document.createElement("button");
+    skip.type = "button"; skip.textContent = "Без записи";
+    skip.className = "clinic-lead-consent__skip"; skip.dataset.leadConsentCancel = "";
+    skip.disabled = state.pending || Boolean(state.retryBody);
+    skip.addEventListener("click", () => submit(cancel, "Продолжить без записи"));
+    actions.append(next, skip); block.append(label, links, actions); bubble.appendChild(block);
   }
 
   /**
@@ -2018,6 +2073,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
         appendCaseOffer(bubble, m);
       }
       appendVideoOffer(bubble, m, idx);
+      renderLeadConsent(bubble, m);
       renderInlineLinks(bubble, m, idx);
       wrap.appendChild(bubble);
       renderTrail(wrap, m, idx);
@@ -2315,7 +2371,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
   }
 
   async function sendFromComposer() {
-    if (state.pending || state.retryBody) return;
+    if (state.pending || state.retryBody || state.lastPayload?.ui?.lead_consent) return;
 
     const raw = input.value.trim();
     if (isSecretSessionResetCommand(raw, config)) {
@@ -2368,9 +2424,12 @@ export function mountWidget(root, config, { pagePath } = {}) {
 
   function syncComposerLeadUi() {
     const phone = isLeadPhoneStep();
+    const consent = Boolean(state.lastPayload?.ui?.lead_consent);
+    input.disabled = consent;
     input.inputMode = phone ? "tel" : "text";
     input.classList.toggle("clinic-shell__textarea--phone", phone);
-    input.placeholder = phone ? "+7(999) 999-99-99" : "Введите сообщение";
+    input.placeholder = consent ? "Подтвердите согласие или выберите «Без записи»" :
+      phone ? "+7(999) 999-99-99" : "Введите сообщение";
   }
 
   function onComposerInput(event) {
@@ -2403,7 +2462,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
   }
 
   function syncSendState() {
-    if (state.pending || state.retryBody) {
+    if (state.pending || state.retryBody || state.lastPayload?.ui?.lead_consent) {
       sendBtn.disabled = true;
       return;
     }

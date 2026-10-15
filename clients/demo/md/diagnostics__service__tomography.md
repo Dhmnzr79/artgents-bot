@@ -17,8 +17,6 @@ suggest_h3: []
 cta_key: plan
 cta_action: lead
 
-empathy_enabled: true
-situation_allowed: false
 
 ---
 

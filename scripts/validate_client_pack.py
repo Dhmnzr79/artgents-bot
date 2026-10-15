@@ -9,6 +9,8 @@ import re
 import sys
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -31,6 +33,7 @@ from contracts.widget_config import (  # noqa: E402
     validate_widget_integration_document,
     validate_widget_presentation_document,
 )
+from contracts.lead_consent import LeadConsentDefinition  # noqa: E402
 from core.target_contact_authority import validate_clinic_contact_section  # noqa: E402
 
 LEGACY_MIRROR_RELATIVE = (
@@ -52,7 +55,6 @@ _FRONTMATTER = re.compile(
 _PRESENTATION_KEYS = (
     "consultation_value",
     "suggest_h3",
-    "situation_allowed",
     "video_key",
 )
 
@@ -129,6 +131,25 @@ def validate_client_pack(
     if errors:
         return errors
 
+    features = yaml.safe_load(rel("features.yaml").read_text(encoding="utf-8")) or {}
+    lead_config = yaml.safe_load(rel("lead_config.yaml").read_text(encoding="utf-8")) or {}
+    tone = yaml.safe_load(rel("tone.yaml").read_text(encoding="utf-8")) or {}
+    for name, data in (("features.yaml", features), ("lead_config.yaml", lead_config), ("tone.yaml", tone)):
+        if not isinstance(data, dict):
+            errors.append(f"{name}: mapping_required")
+    if errors:
+        return errors
+    lead_features = features.get("leads") if isinstance(features.get("leads"), dict) else {}
+    lead_mode = str(lead_features.get("mode") or lead_config.get("delivery") or "demo_stub").strip()
+    if lead_features.get("enabled") is True and lead_mode != "demo_stub":
+        try:
+            LeadConsentDefinition.model_validate(lead_config.get("consent"))
+        except ValueError:
+            errors.append("lead_config.yaml: consent_required_for_enabled_real_leads")
+
+    lead_tone = tone.get("lead") if isinstance(tone.get("lead"), dict) else {}
+    cta_keys = {row.get("key") for row in lead_tone.get("cta_variants", []) if isinstance(row, dict)}
+
     tenant_id = pack_root.name
     widget_cfg_path = rel("widget_config.json")
     try:
@@ -183,8 +204,6 @@ def validate_client_pack(
 
     policies_path = rel("clinic_policies.yaml")
     if policies_path.is_file():
-        import yaml
-
         raw = yaml.safe_load(policies_path.read_text(encoding="utf-8")) or {}
         try:
             validate_policy_text_refs(raw, lambda name: (md_root / name).read_text(encoding="utf-8"))
@@ -252,8 +271,6 @@ def validate_client_pack(
     video_keys: set[str] = set()
     video_catalog = rel("video_catalog.yaml")
     if video_catalog.is_file():
-        import yaml
-
         catalog_raw = yaml.safe_load(video_catalog.read_text(encoding="utf-8")) or {}
         videos = catalog_raw.get("videos") if isinstance(catalog_raw, dict) else {}
         if isinstance(videos, dict):
@@ -264,16 +281,14 @@ def validate_client_pack(
         match = _FRONTMATTER.search(text)
         if not match:
             continue
-        import yaml
-
         meta = yaml.safe_load(match.group("yaml")) or {}
         if not isinstance(meta, dict):
             continue
         rel_path = md_path.relative_to(pack_root).as_posix()
+        if meta.get("cta_action") == "lead" and meta.get("cta_key") not in cta_keys:
+            errors.append(f"{rel_path}: cta_key_missing_in_tone")
         for key in _PRESENTATION_KEYS:
             if key in meta and meta[key] is not None and meta[key] != "":
-                if key == "situation_allowed" and not isinstance(meta[key], bool):
-                    errors.append(f"{rel_path}: situation_allowed_invalid")
                 if key == "video_key":
                     video_key = str(meta[key]).strip()
                     if video_keys and video_key not in video_keys:

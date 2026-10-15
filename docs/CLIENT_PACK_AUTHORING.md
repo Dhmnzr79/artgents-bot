@@ -111,6 +111,30 @@ price-only offer).
 python scripts/validate_client_pack.py --client-id {new_id}
 ```
 
+Шаблон начинает с `leads.enabled:false`, `admin.enabled:false` и
+`postgres_events.enabled:false`. Для реальной отправки заполнить получателя и
+`lead_config.yaml -> consent`: версию согласия, утверждённую фразу, HTTPS-ссылки
+на согласие и политику клиники. Затем включить `leads.enabled` и повторить
+проверку. Пустое согласие при включённых реальных заявках — ошибка валидатора,
+включая режим `--scaffold`. Админку и PostgreSQL включать только при их настройке.
+
+### MD и CTA после первой чистки базы
+
+Не добавлять в новые MD `empathy_enabled`, `situation_allowed`, `suggest_refs`
+и HTML-комментарии `<!-- aliases: ... -->`: текущий D2 их не использует как
+управление, а они расходуют FullContext. Общие aliases в YAML-шапках пока сохранены.
+Сохранять `topic`, `suggest_h3`, `cta_key`, `cta_action`, `video_key` и якоря
+разделов — у них есть действующие читатели.
+
+Если `cta_action: lead`, значение `cta_key` должно существовать в
+`tone.yaml -> lead.cta_variants`. Валидатор проверяет это. Шаблон содержит тот же
+словарь из семи существующих вариантов, что demo и НикаДент: default_consult,
+booking, consult, callback, plan, price, doctor. Тексты/ключи существующих вариантов
+не менять при копировании без задачи клиента.
+
+В `service_catalog.json -> aliases` не повторять `name` с отличием только в
+регистре/пробелах. Синонимы, варианты написания и алиасы брендов сохраняются.
+
 ## Required files
 
 - `target_response/service_catalog.json`

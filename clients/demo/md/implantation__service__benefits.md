@@ -12,7 +12,6 @@ aliases:
 cta_key: plan
 cta_action: lead
 
-situation_allowed: true
 
 ---
 

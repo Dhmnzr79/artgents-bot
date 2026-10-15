@@ -22,6 +22,14 @@ def test_template_validates_in_scaffold_mode() -> None:
     assert errors == []
 
 
+def test_new_client_template_waits_for_explicit_delivery_setup():
+    import yaml
+    config = yaml.safe_load((_TEMPLATE / "features.yaml").read_text(encoding="utf-8"))
+    assert not config["leads"]["enabled"]
+    assert not config["admin"]["enabled"]
+    assert not config["postgres_events"]["enabled"]
+
+
 def test_template_uses_placeholder_ids_not_demo() -> None:
     catalog = (_TEMPLATE / "target_response" / "service_catalog.json").read_text(encoding="utf-8")
     brands = (_TEMPLATE / "target_response" / "brand_catalog.json").read_text(encoding="utf-8")

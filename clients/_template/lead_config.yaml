@@ -4,3 +4,10 @@ recipients:
   - REPLACE_WITH_ADMIN_EMAIL
 subject_template: "Заявка с бота REPLACE_CLINIC_NAME"
 store_in_postgres: false
+
+# Fill with the clinic's approved text/links before enabling leads.
+consent:
+  version: null
+  checkbox_text: "Даю согласие на обработку имени и телефона для связи по моей заявке."
+  consent_url: null
+  policy_url: null

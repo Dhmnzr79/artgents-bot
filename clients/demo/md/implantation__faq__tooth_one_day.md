@@ -15,8 +15,7 @@ aliases:
 cta_key: consult
 cta_action: lead
 
-empathy_enabled: true
-situation_allowed: true
+
 ---
 
 ## Имплантация за **1 день** — сразу ли будет зуб

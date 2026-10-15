@@ -1,5 +1,123 @@
 # Текущая карточка — НикаДент
 
+## 71. Client-pack cleanup first scope — owner GO 2026-10-15
+
+Owner approved exactly four annotated audit items: remove empathy_enabled,
+situation_allowed,suggest_refs and HTML alias search comments; remove catalog
+aliases equal to title (case/whitespace only); repair missing Nikadent CTA keys;
+fix next-client template readiness. Data cleanup + bug fixes, not D2 architecture
+simplification. FullContext still receives every MD; no new runtime selection,
+model calls, states or routing. Preserve prose, anchors, filenames, topic,
+suggest_h3,cta_key/action,video_key and other metadata. Existing CTA vocabulary
+owns labels: copy missing plan/doctor/price/callback variants from demo into
+Nikadent and template; keep existing variants. Template leads/admin/PG disabled
+until configured; add existing consent fields with empty clinic-specific values.
+Offline validator uses existing LeadConsentDefinition for enabled real leads and
+validates MD CTA references against tenant tone; no runtime privacy-owner change.
+Marketing/strategy/doctor/family-price files and general MD aliases stay untouched.
+Root/top C:/Cursor Projects/artgents-bot-active; same branch
+codex/nikadent-technical-onboarding; HEAD/base8364092, main/mergebasee93cb12.
+Staging clean; modified local avatar.png and foreign3otzyv preserved/excluded.
+No model/provider/SMTP, merge/deploy.
+Evidence:30 validator/template/CTA/linter tests PASS +42 D2 snapshot/consent/page
+menu tests PASS. Two legacy policy-replay cases fail at test_d2_tenant_snapshot.py:128
+(old JSON fake reply expected to become price); same2failures reproduced on clean
+gitarchive8364092 at temp/artgents-pack-cleanup-baseline-gqe_gkzt. Unchanged tests;
+prior price/replay baseline debt stays scoped. Independent Checker PASS with
+24 targeted tests, actual CTA candidate->selection->projection traced. Every115MD
+retains all prose/anchors and remaining parsed metadata vs8364092. Catalog other
+fields identical. Removed104fields,151comment blocks,19demo+26Nika title aliases.
+Model MD corpus106564->95986 demo,76908->69747 Nika:17,739chars/9.67% reduction
+in MD portion, not measured model tokens/full prompt savings. No live-model check.
+diff--check PASS. Stage exact86 paths, photo/3otzyv preserved and excluded.
+Exact allowlist (72 MD +14 other paths):
+- clients/demo/md/clinic__info__technology.md
+- clients/demo/md/clinic__info__warranty.md
+- clients/demo/md/comparison__all_on_4_vs_all_on_6.md
+- clients/demo/md/comparison__bone_graft_vs_all_on_4.md
+- clients/demo/md/comparison__bugel_prosthesis_vs_fixed_bridge.md
+- clients/demo/md/comparison__classic_vs_one_stage.md
+- clients/demo/md/comparison__implant_vs_bridge.md
+- clients/demo/md/diagnostics__service__tomography.md
+- clients/demo/md/extraction__service__tooth_extraction.md
+- clients/demo/md/implantation__faq__cost.md
+- clients/demo/md/implantation__faq__duration.md
+- clients/demo/md/implantation__faq__osseointegration.md
+- clients/demo/md/implantation__faq__pain.md
+- clients/demo/md/implantation__faq__safety.md
+- clients/demo/md/implantation__faq__tooth_loss.md
+- clients/demo/md/implantation__faq__tooth_one_day.md
+- clients/demo/md/implantation__faq__what_included.md
+- clients/demo/md/implantation__info__aftercare.md
+- clients/demo/md/implantation__info__contraindications.md
+- clients/demo/md/implantation__info__curator.md
+- clients/demo/md/implantation__info__implant_systems.md
+- clients/demo/md/implantation__info__methods_overview.md
+- clients/demo/md/implantation__info__steps.md
+- clients/demo/md/implantation__service__all_on_4.md
+- clients/demo/md/implantation__service__all_on_6.md
+- clients/demo/md/implantation__service__benefits.md
+- clients/demo/md/implantation__service__bone_graft.md
+- clients/demo/md/implantation__service__classic.md
+- clients/demo/md/implantation__service__one_stage.md
+- clients/demo/md/implantation__service__pterygoid_implants.md
+- clients/demo/md/implantation__service__sinus_lift.md
+- clients/demo/md/implantation__service__temporary_teeth.md
+- clients/demo/md/implantation__service__zygomatic_implants.md
+- clients/demo/md/orthodontics__service__aligners.md
+- clients/demo/md/periodontology__service__periodontitis.md
+- clients/demo/md/prosthetics__service__clasp_dentures.md
+- clients/demo/md/prosthetics__service__implant_supported_prosthetics.md
+- clients/demo/md/prosthetics__service__removable_dentures.md
+- clients/demo/md/prosthetics__service__veneers.md
+- clients/demo/md/prosthetics__service__zirconia_crowns.md
+- clients/demo/md/treatment__service__caries.md
+- clients/demo/md/treatment__service__pulpitis.md
+- clients/demo/md/treatment__service__teeth_treatment.md
+- clients/demo/md/whitening__service__teeth_whitening.md
+- clients/nikadent/md/clinic__info__warranty.md
+- clients/nikadent/md/comparison__all_on_4_vs_all_on_6.md
+- clients/nikadent/md/comparison__bone_graft_vs_all_on_4.md
+- clients/nikadent/md/comparison__bugel_prosthesis_vs_fixed_bridge.md
+- clients/nikadent/md/comparison__classic_vs_one_stage.md
+- clients/nikadent/md/comparison__implant_vs_bridge.md
+- clients/nikadent/md/comparison__metal_ceramic_vs_zirconia.md
+- clients/nikadent/md/implantation__faq__cost.md
+- clients/nikadent/md/implantation__faq__duration.md
+- clients/nikadent/md/implantation__faq__osseointegration.md
+- clients/nikadent/md/implantation__faq__pain.md
+- clients/nikadent/md/implantation__faq__safety.md
+- clients/nikadent/md/implantation__faq__tooth_loss.md
+- clients/nikadent/md/implantation__faq__tooth_one_day.md
+- clients/nikadent/md/implantation__faq__what_included.md
+- clients/nikadent/md/implantation__info__aftercare.md
+- clients/nikadent/md/implantation__info__contraindications.md
+- clients/nikadent/md/implantation__info__methods_overview.md
+- clients/nikadent/md/implantation__info__steps.md
+- clients/nikadent/md/implantation__service__all_on_4.md
+- clients/nikadent/md/implantation__service__all_on_6.md
+- clients/nikadent/md/prosthetics__service__clasp_dentures.md
+- clients/nikadent/md/prosthetics__service__core_inlay.md
+- clients/nikadent/md/prosthetics__service__denture_repair.md
+- clients/nikadent/md/prosthetics__service__fixed_bridge.md
+- clients/nikadent/md/prosthetics__service__metal_ceramic_crowns.md
+- clients/nikadent/md/prosthetics__service__removable_dentures.md
+- clients/nikadent/md/prosthetics__service__zirconia_crowns.md
+- clients/demo/target_response/service_catalog.json
+- clients/nikadent/target_response/service_catalog.json
+- clients/nikadent/tone.yaml
+- clients/_template/features.yaml
+- clients/_template/lead_config.yaml
+- clients/_template/tone.yaml
+- scripts/validate_client_pack.py
+- tests/test_validate_client_pack.py
+- tests/test_client_pack_template_scaffold.py
+- tests/test_client_pack_cleanup.py
+- docs/CLIENT_PACK_AUTHORING.md
+- docs/tasks/DEMO_D2_INTERFACE_TASK.md
+- docs/tasks/DEMO_D2_CURRENT_STATUS.md
+- docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md
+
 ## 70. Nikadent consultant name — owner GO 2026-10-15
 
 Owner requests displayed consultant name Olga instead of Консультант Никадент.

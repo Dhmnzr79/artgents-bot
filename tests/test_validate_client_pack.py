@@ -53,6 +53,47 @@ def test_validator_reports_missing_target(tmp_path: Path) -> None:
     assert any("target_response" in err for err in errors)
 
 
+@pytest.mark.parametrize("broken", [None, {"version": "v1"}, {
+    "version": "v1", "checkbox_text": "Agree", "consent_url": "http://clinic.invalid/consent",
+    "policy_url": "https://clinic.invalid/policy"}])
+@pytest.mark.parametrize("scaffold", [False, True])
+def test_validator_rejects_enabled_real_leads_without_valid_consent(tmp_path, broken, scaffold):
+    import shutil
+    import yaml
+    pack = tmp_path / "clinic"
+    shutil.copytree(_TEMPLATE, pack)
+    features = yaml.safe_load((pack / "features.yaml").read_text(encoding="utf-8"))
+    features["leads"]["enabled"] = True
+    (pack / "features.yaml").write_text(yaml.safe_dump(features), encoding="utf-8")
+    config = yaml.safe_load((pack / "lead_config.yaml").read_text(encoding="utf-8"))
+    config["consent"] = broken
+    (pack / "lead_config.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
+    assert "lead_config.yaml: consent_required_for_enabled_real_leads" in validate_client_pack(pack, scaffold=scaffold)
+
+
+def test_validator_accepts_enabled_real_leads_with_consent(tmp_path):
+    import shutil
+    import yaml
+    pack = tmp_path / "clinic"
+    shutil.copytree(_TEMPLATE, pack)
+    (pack / "features.yaml").write_text("leads:\n  enabled: true\n  mode: email\n", encoding="utf-8")
+    config = yaml.safe_load((pack / "lead_config.yaml").read_text(encoding="utf-8"))
+    config["consent"] = {"version": "v1", "checkbox_text": "Agree",
+                         "consent_url": "https://clinic.invalid/consent",
+                         "policy_url": "https://clinic.invalid/policy"}
+    (pack / "lead_config.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
+    assert validate_client_pack(pack) == []
+
+
+def test_validator_rejects_unbound_document_cta(tmp_path):
+    import shutil
+    pack = tmp_path / "clinic"
+    shutil.copytree(_TEMPLATE, pack)
+    (pack / "md/sample__service__example.md").write_text(
+        "---\ntopic: general\ncta_action: lead\ncta_key: unknown\n---\n# Sample\n", encoding="utf-8")
+    assert "md/sample__service__example.md: cta_key_missing_in_tone" in validate_client_pack(pack)
+
+
 def test_demo_doctors_use_md_without_parallel_catalog():
     assert not (_DEMO / "doctor_catalog.json").exists()
     for name in ("fedorova", "grigoriev", "kuznetsov", "morozova", "orlov", "volkov"):

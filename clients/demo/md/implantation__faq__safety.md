@@ -16,8 +16,7 @@ aliases:
 cta_key: consult
 cta_action: lead
 
-empathy_enabled: true
-situation_allowed: true
+
 ---
 
 ## Безопасность и стерильность при имплантации

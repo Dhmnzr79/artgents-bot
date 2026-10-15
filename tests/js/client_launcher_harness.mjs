@@ -52,6 +52,11 @@ try{
   assert(getComputedStyle(el.querySelector('.clinic-shell__launcher-arrow')).color==='rgb(118, 46, 148)','Arrow must use tenant brand');
   dismiss.click();await sleep(400);assert(sameCorner(before,rect(card))&&Math.abs(rect(card).height-before.height)<1,'Dismiss did not collapse in place');
   launch.click();assert(getComputedStyle(card).display==='none'&&launch.getAttribute('aria-expanded')==='true','Actual chat did not open');
+  const promotion=el.querySelector('.clinic-shell__welcome-promo');
+  assert(getComputedStyle(promotion).backgroundColor==='rgb(245, 239, 248)','Promotion background ignores tenant setting');
+  assert(getComputedStyle(el.querySelector('.clinic-shell__promo-icon')).color==='rgb(118, 46, 148)','Promotion accent ignores tenant setting');
+  assert(getComputedStyle(el.querySelector('.clinic-shell__promo-more')).color==='rgb(118, 46, 148)','Promotion link ignores tenant setting');
+  assert(getComputedStyle(el.querySelector('.clinic-shell__promo-more .clinic-msg__link-chevron')).color==='rgb(118, 46, 148)','Promotion arrow ignores tenant setting');
   const input=el.querySelector('[data-clinic-input]');input.value='Черновик';
   assert(getComputedStyle(el.querySelector('[data-clinic-send]')).backgroundColor==='rgb(118, 46, 148)','Send button must use tenant brand');
   const composer=el.querySelector('.clinic-shell__composer-inner');
@@ -61,10 +66,17 @@ try{
   widget.restartLauncherTeaser();assert(input.value==='Черновик'&&pending.size===1,'Panel replay reset conversation');
   fire();document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));
   assert(dismiss.hidden,'Escape did not collapse invitation');await sleep(400);
-  const second=mount('nikadent');assert(!pending.size,'Seen marker ignored');second.el.remove();
+  const savedTheme=configs.nikadent.theme;
+  configs.nikadent.theme={promoBackground:'#E0F8EE',promoAccent:'#136943'};
+  const second=mount('nikadent');assert(!pending.size,'Seen marker ignored');
+  assert(getComputedStyle(second.el.querySelector('.clinic-shell__welcome-promo')).backgroundColor==='rgb(224, 248, 238)','Promotion-only theme needs brand or leaks other tenant');
+  assert(getComputedStyle(second.el.querySelector('.clinic-shell__promo-icon')).color==='rgb(19, 105, 67)','Promotion-only accent needs brand');
+  assert(getComputedStyle(second.el.querySelector('[data-clinic-send]')).backgroundColor==='rgb(12, 47, 224)','Promotion override changed primary color');
+  second.el.remove();configs.nikadent.theme=savedTheme;
   el.remove();const demo=mount('demo');
   assert(!demo.el.querySelector('[data-clinic-launcher-card]')&&demo.el.querySelector('[data-clinic-launcher-open]').textContent.includes('Посмотреть демо'),'Demo launcher changed');
   assert(getComputedStyle(demo.el.querySelector('[data-clinic-send]')).backgroundColor==='rgb(12, 47, 224)','Tenant color leaked into demo');
+  assert(getComputedStyle(demo.el.querySelector('.clinic-shell__welcome-promo')).backgroundColor==='rgb(240, 244, 255)','Promotion background leaked into demo');
   assert(!pending.size,'Demo scheduled client invitation');demo.el.remove();
   document.body.appendChild(el);input.value='';
   window.__CLIENT_LAUNCHER_VISUAL__=expanded=>{
@@ -106,7 +118,7 @@ async function main() {
   const configs=Object.fromEntries(["demo","nikadent"].map(id=>[id,{
     ...JSON.parse(fs.readFileSync(path.join(root,"clients",id,"widget_config.json"),"utf8")),
     clientId:id,apiBase:"",clinicName:id==="nikadent" ? "НикаДент" : "Artgents",
-    theme:{brand:id==="nikadent" ? "#762E94" : "#0C2FE0"},
+    theme:id==="nikadent" ? {brand:"#762E94",promoBackground:"#F5EFF8",promoAccent:"#762E94"} : {brand:"#0C2FE0"},
     avatarUrl:id==="nikadent" ? "/static/clients/nikadent/avatar.png" : "/static/avatar.png"}]));
   const server=http.createServer((req,res)=>{
     const pathname=new URL(req.url,"http://127.0.0.1").pathname;
@@ -168,6 +180,12 @@ async function main() {
         await cdp.send("Emulation.setEmulatedMedia",{features:[{name:"prefers-reduced-motion",value:"reduce"}]});
         const reduced=await cdp.send("Runtime.evaluate",{expression:"window.__CLIENT_LAUNCHER_GEOMETRY__().transition",returnByValue:true});
         if(reduced.result.value!=="0s")throw new Error("Reduced-motion transition remains: "+reduced.result.value);
+        if(process.env.CLIENT_LAUNCHER_VISUAL_DIR) {
+          await cdp.send("Runtime.evaluate",{expression:"document.querySelector('[data-clinic-launcher]').click()"});
+          await sleep(300);
+          const screenshot=await cdp.send("Page.captureScreenshot",{format:"png"});
+          fs.writeFileSync(path.join(path.resolve(process.env.CLIENT_LAUNCHER_VISUAL_DIR),"promotion-chat-preview.png"),Buffer.from(screenshot.data,"base64"));
+        }
         console.log("CLIENT_LAUNCHER_EVIDENCE:"+JSON.stringify(result.value.result));return;
       }
       await sleep(100);

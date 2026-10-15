@@ -2,6 +2,28 @@
 
 ## 68. Client launcher concept 1 — owner GO 2026-10-15
 
+Promotion palette follow-up frombc3d5bc: owner requests per-client color settings
+for shown welcome promotion card and audit of other widget colors. Presentation
+feature/bug fix, not architecture simplification. Explicit new brand.yaml fields
+colors.promo_background/promo_accent -> theme.promoBackground/promoAccent;
+existing loader/theme renderer owns these only. Background+hover, icon/link/focus
+of welcome card configurable; dark text stays neutral. Scope is welcome card;
+price-card promotions and remaining fixed colors are audited, not recolored.
+Root/top C:/Cursor Projects/artgents-bot-active; same onboarding branch; HEAD/base
+bc3d5bc, main/mergebasee93cb12; staging clean. Local avatar.png photo WIP and
+foreign3otzyv preserved/excluded from staging. Exact allowlist:
+clients/{nikadent,demo,_template}/brand.yaml; core/client_config_loader.py;
+static/widget/widget.js; static/widget/widget.css;
+tests/js/client_launcher_harness.mjs; tests/test_nikadent_technical_onboarding.py;
+docs/CLIENT_PACK_AUTHORING.md; this task card. Test actual card styling + HTTP
+config and demo isolation; focused independent Checker. No model/SMTP or deploy.
+Result: Chrome DOM PASS (card background/icon/link/inner arrow; independent
+promo-only theme; demo isolation; existing320/390/900 geometry). HTTP config1PASS;
+local9001GET confirms both settings, screenshot inspected. Independent Checker
+PASS + focused inner-arrow recheck PASS. diff--check PASS. Historical baseline
+failures outside scope unchanged. No provider/SMTP calls, merge or deployment.
+Photo remains excluded from commit/push; staging exact10 declared paths only.
+
 Tenant brand follow-up from6744c82, owner GO: shared client color for send button,
 launcher arrow and composer border. Owner supplied Nikadent #762E94. Bug fix/
 presentation configuration, not simplification. Existing brand.yaml colors.brand

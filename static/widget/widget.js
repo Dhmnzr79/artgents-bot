@@ -103,6 +103,15 @@ function _darkenHex(hex, ratio = 0.1) {
  */
 function applyWidgetTheme(shellEl, theme) {
   if (!shellEl || !theme || typeof theme !== "object") return;
+  const promoBackground = String(theme.promoBackground || "").trim();
+  const promoAccent = String(theme.promoAccent || "").trim();
+  if (/^#[0-9a-f]{6}$/i.test(promoBackground)) {
+    shellEl.style.setProperty("--clinic-promo-bg", promoBackground);
+    shellEl.style.setProperty("--clinic-promo-hover", _darkenHex(promoBackground, 0.025));
+  }
+  if (/^#[0-9a-f]{6}$/i.test(promoAccent)) {
+    shellEl.style.setProperty("--clinic-promo-accent", promoAccent);
+  }
   const brand = String(theme.brand || "").trim();
   if (!brand) return;
   const action = brand;

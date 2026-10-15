@@ -160,6 +160,8 @@ def test_nikadent_snapshot_loads_and_widget_origins_are_exact(http_env):
         assert body["clientId"] == "nikadent" and body["demoLauncher"] is False
         assert body["avatarUrl"] == "/static/clients/nikadent/avatar.png"
         assert body["theme"]["brand"] == "#762E94"
+        assert body["theme"]["promoBackground"] == "#F5EFF8"
+        assert body["theme"]["promoAccent"] == "#762E94"
     assert client.get("/api/widget-config?client_id=nikadent", headers={"Origin":"https://unrelated.invalid"}).status_code == 403
 
 

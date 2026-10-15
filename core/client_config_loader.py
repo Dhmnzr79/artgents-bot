@@ -363,6 +363,8 @@ def lead_cta_dict_for_menu(
 
 _BRAND_COLOR_TO_THEME: tuple[tuple[str, str], ...] = (
     ("brand", "brand"),
+    ("promo_background", "promoBackground"),
+    ("promo_accent", "promoAccent"),
     ("action", "action"),
     ("button_1", "button_1"),
     ("button_2", "button_2"),

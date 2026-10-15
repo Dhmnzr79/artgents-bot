@@ -3,7 +3,8 @@
 ## НикаДент — техническое подключение, 2026-10-15
 
 Текущий этап: Interface §65 / codex/nikadent-technical-onboarding, baseline e93cb12.
-Owner разрешил подготовку, выкладку и тестирование; контент/новые цены отложены.
+Последнее уточнение owner: **пока только локальный тестовый виджет**. Merge/deploy
+отложены. Контент/новые цены отложены. PR #31 открыт, VPS не изменён.
 Актуальная demo handoff-документация отдельно в fc84066, PR #30 пока открыт.
 Этот раздел заменяет старые сведения о текущей ветке/релизе ниже: demo ранее
 развёрнут на e93cb12, PR #27–29 merged, Inter 400–600. Старый срез ниже исторический.
@@ -24,14 +25,26 @@ historical JSON helper и неверной метке boundary; tests испра
 text protocol. Ни одного live/provider/SMTP вызова.
 Независимый Checker PASS, собственные 13 onboarding tests PASS. Full release
 selection выполняется отдельно. Публичные health/config demo и nikadent вернули
-200 при корректном Origin: hostname/registry уже подключены. SMTP на VPS,
-получение письма и установка на сайт клиента ещё не подтверждены.
+200 при корректном Origin: hostname/registry уже подключены. SMTP на VPS
+и установка на сайт клиента ещё не проверялись.
 
 Windows release union: 882 PASS, 5 SKIP, 4 FAIL. Три прежних теста ожидали успех
 при ошибке SMTP / имитировали несуществующий статус email_sent; обновлены на
 503+ok:false+точный error_code и действительный email. Четвёртый — влияние
 локальной .env на reload config. Изолированный focused repeat: 60 PASS;
-Checker focused recheck PASS. Повтор полного CI обязателен перед merge.
+Checker focused recheck PASS. Полный изолированный Windows repeat: **886 PASS,
+5 platform SKIP, 0 FAIL**. На runtime/UI checkpoint 2164c53 все пять CI jobs SUCCESS
+([CI](https://github.com/Dhmnzr79/artgents-bot/actions/runs/38719946271)).
+
+Локальный live: **5 model calls, 1 email**, без повторных model attempts. НикаДент
+назвал Елизово, свои два филиала/телефоны и врачей из собственного pack. Настоящая
+синтетическая заявка (не пациентские данные) получила sent; владелец подтвердил
+получение письма на gothica@mail.ru. Demo получил demo_stub без SMTP. Повторы
+одинаковых submit requests вернули сохранённый ответ без повторной отправки.
+SMTP пароль сохранён владельцем только в локальной ignored .env, в Git не попал.
+Локальный сервер запущен штатным scripts/start_local_widget.ps1 из текущей ветки:
+http://127.0.0.1:9001/static/widget-test.html — выбор demo/nikadent, отдельные вкладки.
+Это подтверждение локальной работы, не deployed/customer-site acceptance.
 
 Срез 2026-10-13. Здесь только актуальные факты и незакрытые задачи.
 Датированные записи прежних веток, экспериментов и checkpoint сохранены целиком

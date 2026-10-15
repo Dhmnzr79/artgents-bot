@@ -2,6 +2,9 @@
 
 ## 65. Nikadent technical onboarding — owner GO 2026-10-15
 
+LATEST OWNER SCOPE: local test widget only for now. User explicitly deferred
+merge/deployment after initial authorization; PR #31 remains OPEN. No VPS changes.
+
 Type: bug fix / integration, not architecture simplification. User approved real
 email leads, bot operation using the current Nikadent pack, local demo/Nikadent
 switching, deployment and customer-site testing. User installs the supplied embed
@@ -67,6 +70,19 @@ dotenv input for the repeat (PYTHON_DOTENV_DISABLED=1), matching CI's absent .en
 Focused repeat: 60 passed; independent focused Checker PASS. CI on the first
 checkpoint has the same outdated lead assertions; push corrected tests and
 require a successful complete CI before merge/deploy.
+
+Final local evidence: isolated release union **886 passed, 5 platform skipped,
+0 failed**; final runtime/UI commit 2164c53 CI all five jobs SUCCESS, run
+38719946271. Independent Checker PASS and focused test/CSS rechecks PASS.
+Live local only: exactly **5 model calls + 1 actual email**; own Nikadent city,
+canonical branches/phones, own doctor MD, real SMTP lead with accepted private
+slots; owner confirmed mailbox receipt. Demo retained demo_stub. Both completed
+submit replays identical, no second email. Secrets remain local ignored .env.
+Local bot running via approved launcher in the current checkout/branch.
+No actual customer-site install/render verification; no VPS SMTP confirmation.
+The automatic approval reviewer rejected the earlier merge attempt for lacking
+separate explicit merge authority; no merge/deploy mutation occurred. Owner then
+chose local testing, so no workaround or further merge attempt is authorized.
 
 ## Historical cleanup receipts
 

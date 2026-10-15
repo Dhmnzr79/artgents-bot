@@ -21,11 +21,17 @@ service. Accepted PII живёт только в private session/request closure
 SMTP, replay, tenant/contact/doctor grounding, phone modes, existing SMTP unit
 tests), panel Node harness PASS. Первые ошибки новых tests относились к использованию
 historical JSON helper и неверной метке boundary; tests исправлены под current
-text protocol. Ни одного live/provider/SMTP вызова. Full CI и Checker впереди;
+text protocol. Ни одного live/provider/SMTP вызова.
 Независимый Checker PASS, собственные 13 onboarding tests PASS. Full release
 selection выполняется отдельно. Публичные health/config demo и nikadent вернули
 200 при корректном Origin: hostname/registry уже подключены. SMTP на VPS,
 получение письма и установка на сайт клиента ещё не подтверждены.
+
+Windows release union: 882 PASS, 5 SKIP, 4 FAIL. Три прежних теста ожидали успех
+при ошибке SMTP / имитировали несуществующий статус email_sent; обновлены на
+503+ok:false+точный error_code и действительный email. Четвёртый — влияние
+локальной .env на reload config. Изолированный focused repeat: 60 PASS;
+Checker focused recheck PASS. Повтор полного CI обязателен перед merge.
 
 Срез 2026-10-13. Здесь только актуальные факты и незакрытые задачи.
 Датированные записи прежних веток, экспериментов и checkpoint сохранены целиком

@@ -79,7 +79,9 @@ def test_lead_path_reuses_send_lead_email_not_parallel_sender(
         {"name": "A", "phone": "+79001112233", "intent": "lead", "sid": "s1"},
         client_id="demo",
     )
-    assert status == 200
+    assert status == 503
+    assert payload["ok"] is False
+    assert payload["error_code"] == "email_smtp_not_configured"
     assert calls == ["send_lead_email"]
     assert payload["delivery_status"] == "email_smtp_not_configured"
 
@@ -171,7 +173,9 @@ def test_no_recipients_honest_status_no_demo_fallback(
         lambda _cid: {"recipients": [], "subject_template": "x"},
     )
     payload, status = handle_lead({"phone": "+79001112233", "sid": "s0"}, client_id="nikadent")
-    assert status == 200
+    assert status == 503
+    assert payload["ok"] is False
+    assert payload["error_code"] == "email_no_recipients"
     assert payload["delivery_status"] == "email_no_recipients"
 
 
@@ -447,7 +451,7 @@ def test_lead_post_zero_provider_calls(
     _install_sales_fast_transport(monkeypatch, backend)
     sqlite_fn, _ = isolated_sqlite_paths(tmp_path)
     monkeypatch.setattr("session.sqlite_path_for_client", sqlite_fn)
-    monkeypatch.setattr("lead_service.send_lead_email", lambda **_k: (True, "email_sent"))
+    monkeypatch.setattr("lead_service.send_lead_email", lambda **_k: (True, "email"))
     monkeypatch.setattr("lead_service.leads_mode", lambda _cid: "email")
     resp = app_module.app.test_client().post(
         "/lead",

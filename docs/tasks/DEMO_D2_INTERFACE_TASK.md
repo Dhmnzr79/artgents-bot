@@ -23,6 +23,8 @@ Exact tracked allowlist:
 - static/widget/widget.js, static/widget-test.html, static/widget-test-panel.js;
 - static/multiclient/index.html;
 - tests/test_nikadent_technical_onboarding.py, tests/js/nikadent_panel_harness.mjs;
+- tests/test_tenant_lead_routing_context_offline.py (existing failure-status
+  assertions updated for honest 503; SMTP mock uses actual existing email status);
 - tests/release/offline.txt;
 - docs/tasks/DEMO_D2_INTERFACE_TASK.md, docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md,
   docs/tasks/DEMO_D2_CURRENT_STATUS.md.
@@ -56,6 +58,15 @@ Full release selection running separately; no live model or email sends so far.
 Public GET /health/live and same-origin /api/widget-config both 200 for demo and
 nikadent: registry/hostname already present on VPS. Admin SSH was not established;
 SMTP production values remain unverified. No customer-site/CMS access performed.
+
+Full Windows union: 882 passed, 5 skipped, 4 failed. Three findings were outdated
+success expectations / invalid email_sent mock in the existing tenant lead tests;
+update those assertions without weakening recipient/privacy/provider checks.
+The config-only test reloads local .env after deleting CHAT_API_KEY; isolate local
+dotenv input for the repeat (PYTHON_DOTENV_DISABLED=1), matching CI's absent .env.
+Focused repeat: 60 passed; independent focused Checker PASS. CI on the first
+checkpoint has the same outdated lead assertions; push corrected tests and
+require a successful complete CI before merge/deploy.
 
 ## Historical cleanup receipts
 

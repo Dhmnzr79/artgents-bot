@@ -41,7 +41,7 @@ try{
   assert(card&&launch&&dismiss,'Client capsule missing');
   assert(getComputedStyle(card).backgroundColor==='rgb(255, 255, 255)','Launcher background must be white');
   const avatar=el.querySelector('[data-clinic-avatar]');await wait(()=>avatar.complete&&avatar.naturalWidth>0);
-  assert(avatar.src.includes('/static/clients/nikadent/avatar-placeholder.svg'),'Actual tenant avatar not used');
+  assert(avatar.src.includes('/static/clients/nikadent/avatar.png'),'Actual tenant avatar not used');
   const dot=getComputedStyle(el.querySelector('.clinic-shell__header-online-dot--launcher')).backgroundColor;
   assert(dot==='rgb(40, 193, 58)','Online dot is not green');
   assert(launch.textContent.includes('Задать вопрос'),'Wrong launcher label');
@@ -49,10 +49,14 @@ try{
   fire();await sleep(450);
   const expanded=rect(card);assert(expanded.width>before.width&&expanded.height>before.height&&sameCorner(before,expanded),'Morph moved anchored corner');
   assert(!dismiss.hidden&&el.querySelector('[data-clinic-launcher-teaser]').getAttribute('aria-hidden')==='false','Invitation not accessible');
-  assert(getComputedStyle(el.querySelector('.clinic-shell__launcher-arrow')).color==='rgb(12, 47, 224)','Arrow must be blue');
+  assert(getComputedStyle(el.querySelector('.clinic-shell__launcher-arrow')).color==='rgb(118, 46, 148)','Arrow must use tenant brand');
   dismiss.click();await sleep(400);assert(sameCorner(before,rect(card))&&Math.abs(rect(card).height-before.height)<1,'Dismiss did not collapse in place');
   launch.click();assert(getComputedStyle(card).display==='none'&&launch.getAttribute('aria-expanded')==='true','Actual chat did not open');
   const input=el.querySelector('[data-clinic-input]');input.value='Черновик';
+  assert(getComputedStyle(el.querySelector('[data-clinic-send]')).backgroundColor==='rgb(118, 46, 148)','Send button must use tenant brand');
+  const composer=el.querySelector('.clinic-shell__composer-inner');
+  assert(getComputedStyle(composer).borderTopColor==='rgb(118, 46, 148)','Composer border must use tenant brand');
+  input.focus();assert(getComputedStyle(composer).borderTopColor==='rgb(118, 46, 148)','Focused composer must keep tenant brand');
   el.querySelector('[data-clinic-close]').click();assert(!pending.size&&dismiss.hidden,'Chat close should return compact capsule without replay');
   widget.restartLauncherTeaser();assert(input.value==='Черновик'&&pending.size===1,'Panel replay reset conversation');
   fire();document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));
@@ -60,6 +64,7 @@ try{
   const second=mount('nikadent');assert(!pending.size,'Seen marker ignored');second.el.remove();
   el.remove();const demo=mount('demo');
   assert(!demo.el.querySelector('[data-clinic-launcher-card]')&&demo.el.querySelector('[data-clinic-launcher-open]').textContent.includes('Посмотреть демо'),'Demo launcher changed');
+  assert(getComputedStyle(demo.el.querySelector('[data-clinic-send]')).backgroundColor==='rgb(12, 47, 224)','Tenant color leaked into demo');
   assert(!pending.size,'Demo scheduled client invitation');demo.el.remove();
   document.body.appendChild(el);input.value='';
   window.__CLIENT_LAUNCHER_VISUAL__=expanded=>{
@@ -101,7 +106,8 @@ async function main() {
   const configs=Object.fromEntries(["demo","nikadent"].map(id=>[id,{
     ...JSON.parse(fs.readFileSync(path.join(root,"clients",id,"widget_config.json"),"utf8")),
     clientId:id,apiBase:"",clinicName:id==="nikadent" ? "НикаДент" : "Artgents",
-    avatarUrl:id==="nikadent" ? "/static/clients/nikadent/avatar-placeholder.svg" : "/static/avatar.png"}]));
+    theme:{brand:id==="nikadent" ? "#762E94" : "#0C2FE0"},
+    avatarUrl:id==="nikadent" ? "/static/clients/nikadent/avatar.png" : "/static/avatar.png"}]));
   const server=http.createServer((req,res)=>{
     const pathname=new URL(req.url,"http://127.0.0.1").pathname;
     if(pathname==="/configs.json"){res.setHeader("content-type","application/json");res.end(JSON.stringify(configs));return;}

@@ -2,6 +2,30 @@
 
 ## 68. Client launcher concept 1 — owner GO 2026-10-15
 
+Tenant brand follow-up from6744c82, owner GO: shared client color for send button,
+launcher arrow and composer border. Owner supplied Nikadent #762E94. Bug fix/
+presentation configuration, not simplification. Existing brand.yaml colors.brand
+-> loader theme.brand -> applyWidgetTheme is sole source; replace hardcoded
+launcher arrow/focus colors with existing token. No new fields or runtime layers.
+Avatar folder/path documented. During task owner replaced existing avatar.png
+at advised location; expand allowlist to static/clients/nikadent/avatar.png and
+connect it through existing avatar_url (no image edits). Treat as task asset,
+not unrelated WIP; foreign3otzyv remain excluded.
+Root/top C:/Cursor Projects/artgents-bot-active; same onboarding branch; main/base
+e93cb12; tracked/staging clean, foreign3otzyv preserved. Exact allowlist:
+clients/nikadent/brand.yaml; static/widget/widget.css;
+tests/js/client_launcher_harness.mjs; tests/test_nikadent_technical_onboarding.py;
+docs/CLIENT_PACK_AUTHORING.md; this task card. Test actual themed DOM+HTTP config,
+demo isolation, focused Checker. No provider/SMTP calls, merge or deployment.
+Evidence: Chrome DOM harness PASS and HTTP config test1PASS. Actual local9001
+GET already returns brand#762E94 without restart. Brand-only Checker PASS;
+focused avatar connection recheck PASS. Actual local9001 also returns avatar.png.
+Screenshots inspected; historical baseline failures unchanged/outside scope.
+No /ask/model/SMTP calls. Foreign3otzyv preserved; no merge/deploy.
+Automatic approval review rejected outbound push including the changed photo
+without explicit publication consent. User asked for permission; until answered,
+checkpoint only the six text/code/config paths, preserve avatar.png as local WIP.
+
 Typography follow-up from b05a411: UI polish/bug fix, not simplification.
 Owner requests heading18px (keep weight600), body14px, subtitle12px;
 body/subtitle same existing #6e7887 on desktop/mobile. Remove mobile19px override.

@@ -21,7 +21,7 @@ globalThis.fetch=async url=>{
 const realTimeout=window.setTimeout.bind(window),realClear=window.clearTimeout.bind(window);
 const pending=new Map(),delays=[];
 window.setTimeout=(fn,delay,...args)=>{
-  if(delay===10000){delays.push(delay);const id=realTimeout(()=>{},60000);pending.set(id,()=>fn(...args));return id;}
+  if(delay===30000){delays.push(delay);const id=realTimeout(()=>{},60000);pending.set(id,()=>fn(...args));return id;}
   return realTimeout(fn,delay,...args);
 };
 window.clearTimeout=id=>{pending.delete(id);realClear(id);};
@@ -39,13 +39,14 @@ try{
   const launch=el.querySelector('[data-clinic-launcher]');
   const dismiss=el.querySelector('[data-clinic-launcher-dismiss]');
   assert(card&&launch&&dismiss,'Client capsule missing');
+  assert(document.activeElement!==launch,'Mount must not steal focus or show a focus outline');
   assert(getComputedStyle(card).backgroundColor==='rgb(255, 255, 255)','Launcher background must be white');
   const avatar=el.querySelector('[data-clinic-avatar]');await wait(()=>avatar.complete&&avatar.naturalWidth>0);
   assert(avatar.src.includes('/static/clients/nikadent/avatar.png'),'Actual tenant avatar not used');
   const dot=getComputedStyle(el.querySelector('.clinic-shell__header-online-dot--launcher')).backgroundColor;
   assert(dot==='rgb(40, 193, 58)','Online dot is not green');
   assert(launch.textContent.includes('Задать вопрос'),'Wrong launcher label');
-  const before=rect(card);assert(dismiss.hidden&&pending.size===1&&delays[0]===10000,'Initial10s state invalid');
+  const before=rect(card);assert(dismiss.hidden&&pending.size===1&&delays[0]===30000,'Initial30s state invalid');
   fire();await sleep(450);
   const expanded=rect(card);assert(expanded.width>before.width&&expanded.height>before.height&&sameCorner(before,expanded),'Morph moved anchored corner');
   assert(!dismiss.hidden&&el.querySelector('[data-clinic-launcher-teaser]').getAttribute('aria-hidden')==='false','Invitation not accessible');
@@ -63,6 +64,7 @@ try{
   assert(getComputedStyle(composer).borderTopColor==='rgb(118, 46, 148)','Composer border must use tenant brand');
   input.focus();assert(getComputedStyle(composer).borderTopColor==='rgb(118, 46, 148)','Focused composer must keep tenant brand');
   el.querySelector('[data-clinic-close]').click();assert(!pending.size&&dismiss.hidden,'Chat close should return compact capsule without replay');
+  assert(document.activeElement===launch,'Closing an open chat must restore launcher focus');
   widget.restartLauncherTeaser();assert(input.value==='Черновик'&&pending.size===1,'Panel replay reset conversation');
   fire();document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));
   assert(dismiss.hidden,'Escape did not collapse invitation');await sleep(400);
@@ -79,6 +81,47 @@ try{
   assert(getComputedStyle(demo.el.querySelector('.clinic-shell__welcome-promo')).backgroundColor==='rgb(240, 244, 255)','Promotion background leaked into demo');
   assert(!pending.size,'Demo scheduled client invitation');demo.el.remove();
   document.body.appendChild(el);input.value='';
+  window.__CLIENT_MOBILE_SCROLL__=async()=>{
+    launch.click();
+    const feed=el.querySelector('.clinic-shell__feed');
+    const filler=document.createElement('div');
+    filler.style.cssText='height:4000px;flex-shrink:0';feed.appendChild(filler);
+    const viewport=window.visualViewport;
+    const heightDescriptor=Object.getOwnPropertyDescriptor(viewport,'height');
+    const initialHeight=viewport.height;
+    const nextFrame=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    const resize=async height=>{
+      Object.defineProperty(viewport,'height',{configurable:true,value:height});
+      viewport.dispatchEvent(new Event('resize'));await nextFrame();
+      const panel=el.querySelector('.clinic-shell__panel').getBoundingClientRect();
+      const composer=el.querySelector('.clinic-shell__composer').getBoundingClientRect();
+      assert(Math.abs(panel.height-height)<2,'Mobile panel must follow visible viewport');
+      assert(composer.bottom<=panel.bottom+1&&composer.top>=panel.top,'Composer outside visible chat');
+    };
+    try{
+      for(const readingTop of [0,240]){
+        input.blur();feed.scrollTop=readingTop;await nextFrame();
+        input.focus();await nextFrame();
+        assert(Math.abs(feed.scrollTop-readingTop)<2,'Focus lost place in older messages');
+        for(const height of [620,460,380,460,620,initialHeight]){
+          await resize(height);
+          assert(Math.abs(feed.scrollTop-readingTop)<2,'Keyboard resize lost place in older messages: '+JSON.stringify({readingTop,height,actual:feed.scrollTop,scrollHeight:feed.scrollHeight,clientHeight:feed.clientHeight}));
+        }
+      }
+      input.blur();feed.scrollTop=feed.scrollHeight;await nextFrame();
+      input.focus();await nextFrame();
+      for(const height of [620,460,380,460,620,initialHeight]){
+        await resize(height);
+        assert(Math.abs(feed.scrollHeight-feed.clientHeight-feed.scrollTop)<2,'Keyboard resize hid latest messages');
+      }
+      return {passed:true,readingPositions:2,resizeSteps:18};
+    }finally{
+      if(heightDescriptor)Object.defineProperty(viewport,'height',heightDescriptor);
+      else delete viewport.height;
+      viewport.dispatchEvent(new Event('resize'));
+      filler.remove();input.blur();el.querySelector('[data-clinic-close]').click();
+    }
+  };
   window.__CLIENT_LAUNCHER_VISUAL__=expanded=>{
     widget.restartLauncherTeaser();const initial=rect(card);if(expanded)fire();
     return {initial};
@@ -155,6 +198,10 @@ async function main() {
         if(external.length)throw new Error("External widget requests: "+JSON.stringify(external));
         for(const width of [320,390,900]) {
           await cdp.send("Emulation.setDeviceMetricsOverride",{width,height:800,deviceScaleFactor:1,mobile:width<520});
+          if(width<520){
+            const check=await cdp.send("Runtime.evaluate",{expression:"window.__CLIENT_MOBILE_SCROLL__()",awaitPromise:true,returnByValue:true});
+            if(check.exceptionDetails||!check.result.value?.passed)throw new Error('Mobile scroll: '+JSON.stringify(check));
+          }
           for(const expanded of [false,true]) {
             const initial=await cdp.send("Runtime.evaluate",{expression:`window.__CLIENT_LAUNCHER_VISUAL__(${expanded})`,returnByValue:true});
             await sleep(450);

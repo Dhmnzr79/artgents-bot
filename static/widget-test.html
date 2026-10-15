@@ -46,7 +46,7 @@
       .panel .command code { flex-basis: 100%; }
       .panel header p, .panel #connection-heading,
       .panel [aria-labelledby="controls-heading"] h2,
-      .panel [aria-labelledby="controls-heading"] p,
+      .panel [aria-labelledby="controls-heading"] p:not(.client-picker),
       .panel #view-questions > p { display: none; }
     }
     @media (max-height: 800px), (max-width: 580px) {
@@ -86,7 +86,7 @@
     </section>
     <section class="card" aria-labelledby="controls-heading">
       <h2 id="controls-heading">Чат</h2>
-      <p><label for="client-select">Клиника</label>
+      <p class="client-picker"><label for="client-select">Клиника</label>
         <select id="client-select" style="font:inherit;padding:8px;margin:0 8px 12px">
           <option value="demo">Демо</option>
           <option value="nikadent">НикаДент</option>

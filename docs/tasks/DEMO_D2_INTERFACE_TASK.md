@@ -2,6 +2,17 @@
 
 ## 68. Client launcher concept 1 — owner GO 2026-10-15
 
+Follow-up from f646158: UI bug fix/polish, not architecture simplification.
+Owner requested removal of upper assistant caption, lower caption 10px -> 11px,
+and invitation heading font-weight600. Allowlist for this follow-up: only
+static/widget/widget.js, static/widget/widget.css and this task card.
+Same branch/root/main/mergebase; tracked/staging clean, foreign3otzyv preserved.
+Verify with existing launcher DOM/geometry harness and focused Checker review;
+provider/model/SMTP budget0. No merge/deploy.
+Result: Chrome launcher harness PASS (320/390/900, demo unchanged), screenshot
+inspected; focused independent Checker PASS; diff--check PASS. Historical replay
+baseline failures unchanged/outside this visual edit. No provider/SMTP calls.
+
 Owner provided C:/Users/denis/Downloads/widget-concepts.html and chose concept1,
 with avatar+green online dot instead of icon, white background and blue arrow.
 Reference behavior: one capsule expands after10s, fixed bottom/right corner,

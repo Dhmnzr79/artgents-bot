@@ -814,7 +814,6 @@ export function mountWidget(root, config, { pagePath } = {}) {
     : `
       <div class="clinic-shell__launcher-card" data-clinic-launcher-card>
         <div class="clinic-shell__launcher-teaser" data-clinic-launcher-teaser aria-hidden="true">
-          <span class="clinic-shell__launcher-kicker" data-clinic-launcher-subtitle></span>
           <strong class="clinic-shell__launcher-heading" data-clinic-launcher-tagline></strong>
           <p class="clinic-shell__launcher-teaser-text" data-clinic-launcher-teaser-text></p>
         </div>

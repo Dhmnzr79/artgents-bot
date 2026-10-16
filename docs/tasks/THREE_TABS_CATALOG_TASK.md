@@ -21,6 +21,33 @@ tenant/privacy/consent и прежние роли Target Contract §3 сохра
 
 ## Этап 7: структура каталога и устранение повторов — owner GO 2026-10-17
 
+Уточнение owner после просмотра: внутренние variant tabs в выбранной позиции
+каталога убрать. Список вариантов → одна позиция с её названием, ценой и
+условиями → возврат к тому же списку для другого выбора. Предыдущее решение
+сохранить detail tabs ниже — неверная интерпретация исполнителя и отменено.
+Это UI bug fix текущего этапа, не изменение архитектуры D2. Preflight:
+repo/top C:/Cursor Projects/artgents-bot-active, codex/three-tabs-catalog,
+HEAD/baseline44bb33df7eb62c8b997a18c8c5c0963ec992d277; origin/main/mergebase
+f7629491f2bb93ed80e2f58aea53770841bbd6a3. Tracked/index чистые, foreign JPG3.
+Allowlist уточнения: static/widget/catalog.js,
+tests/test_widget_catalog_structure_browser.py, docs/tasks/THREE_TABS_CATALOG_TASK.md.
+В detail каталог передаёт только выбранную row без sibling choices;
+общий renderer показывает её variant_label. Options остаются полным списком,
+price/conditions/lead и карточки разговора не изменяются. Удаляется обработка
+переключения detail→detail в каталоге. Проверяется отсутствие tabs, сохранение
+названия/цены/точной заявки и возврата к списку у трёх клиентов.
+Результат уточнения: structure3PASS; shared-form browser demo/Nika2PASS,
+medical после одного падения первого batch прошёл focused recheck1PASS без
+изменения кода/теста. Итого6 разных cases прошли, первый прогон5PASS1FAIL;
+причина непостоянного падения не установлена (traceback вывода был усечён).
+Read-only real9001 HIFU detail просмотрен без tabs, /ask и /lead блокированы.
+Provider/SMTP/VPS0, diff --checkPASS. Изменены только три allowlist пути;
+старые baseline failures предыдущего блока не затронуты. Chat не менялся.
+Focused Checker PASS: путь catalog→общий renderer→выбранный offer→форма
+проверен; P0/P1 нет, новых P2 нет. Нестабильность первого browser прогона
+не объявляется устранённой. Checkpoint: `Remove variant tabs from catalog details`,
+push в текущую ветку и прежний draft PR34; индекс после commit пуст.
+
 Owner подтвердил перенос структуры из artgents-three-clinics-arrow-below-price.html
 в нашу дизайн-систему, затем остановил для замечания о дубле exclusions и дал
 «Ладно делай, потом смотрим». Уточнения: prototype только про каталог;

@@ -34,12 +34,11 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
         const rows=price.presentation==='options'?price.rows.filter(row=>[row.variant_label,row.service_name,row.scope_text,...service.offer_groups.filter(group=>group.offer_ids.includes(row.offer_id)).map(group=>group.title)].filter(Boolean).join(' ').toLocaleLowerCase('ru').includes(query)):price.rows;
         if(!rows.length){cardRoot.append(element('p','clinic-catalog__empty','Нет подходящих ценовых позиций'));return;}
         const groups=service.offer_groups.length?service.offer_groups.map(group=>({...group,offer_ids:group.offer_ids.filter(id=>rows.some(row=>row.offer_id===id))})).filter(group=>group.offer_ids.length):null;
-        renderPriceBody(cardRoot,{revision:state.data.catalog_version,bodyParts:[{kind:'price_card',price:{...price,rows},choices:choices(service)},...(detail?.parts||((price.presentation==='detail'?service.details[price.rows[0].offer_id]?.parts:[])||[]))]},
+        renderPriceBody(cardRoot,{revision:state.data.catalog_version,bodyParts:[{kind:'price_card',price:{...price,rows},choices:price.presentation==='options'?choices(service):[]},...(detail?.parts||((price.presentation==='detail'?service.details[price.rows[0].offer_id]?.parts:[])||[]))]},
         {clientId,rowGroups:groups,showTitle:false,isDisabled:()=>false,getLatestRevision:()=>state.data.catalog_version,
           offerIdForChoice:choice=>choice.offer_id,onSelect:choice=>{
-            const scroll=scroller().scrollTop,wasDetail=Boolean(state.offer);
-            if(!wasDetail)state.offerScroll=scroll;
-            state.offer=choice.offer_id;renderDetail();scroller().scrollTop=wasDetail?scroll:0;
+            state.offerScroll=scroller().scrollTop;
+            state.offer=choice.offer_id;renderDetail();scroller().scrollTop=0;
           }});
       };
       if(price.presentation==='options'&&price.rows.length>6){

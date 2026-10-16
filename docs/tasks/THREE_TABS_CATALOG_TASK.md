@@ -8,7 +8,148 @@ MEDICAL_DEMO_CONTENT_TASK.md; последнее решение о клиент�
 маркировок сохраняется. Начальная тема страницы входит в первую готовую
 локальную реализацию интерфейса, а не в этот отдельный schema checkpoint.
 
-## Этап 1: единый действующий каталог и сборка предложения
+## Текущее уточнение владельца: общий новый продукт для трёх клиентов
+
+2026-10-16: «не заливать без моей команды», а локально полностью новый продукт
+для старого демо, нового медцентра и НикаДент. НикаДент нужен в новом формате
+на VPS после локальных проверок и отдельной команды на выкладку. Прежняя
+read-only граница НикаДент ниже относится к уже завершённому этапу 1.
+Теперь не создаём tenant opt-in, старый price mode или исключение по client_id.
+Один новый код и UI у всех трёх, отдельные базы/цены/lead settings. Доставка,
+tenant/privacy/consent и прежние роли Target Contract §3 сохраняются.
+Вопросы владельцу — только обычным текстом с примерами, без quiz/popup.
+
+## Этап 2: варианты цен, общая карточка, точная применимость акций
+
+Baseline 2a7870e1f9973f84e067850cfe7396671090ce2e, та же task branch
+codex/three-tabs-catalog; repo/top C:/Cursor Projects/artgents-bot-active.
+origin/main и merge base f7629491f2bb93ed80e2f58aea53770841bbd6a3.
+Tracked/index перед этапом чистые; foreign три otzyv JPG сохраняются.
+
+Тип: архитектурное упрощение согласованного выбора и presentation feature;
+дополнительно исправление offer applicability промо и пустых блоков карточки.
+До → после → удаляемая зависимость:
+- Первая строка/первое совпадение option становится выбранным → публикуются все
+  допустимые варианты; ровно одно однозначное предложение или проверенный клик
+  раскрывает детали → автоматический выбор по порядку удаляется целиком.
+- Режим карточки выводится renderer из количества строк → materializer один раз
+  фиксирует options/detail в существующем D2FrozenPriceBlock до completion →
+  виджет и текстовая история больше не делают разных предположений о выборе.
+- Promo ограничено service/topic → тот же selector дополнительно проверяет
+  optional allowed_offer_ids самого факта → исчезает ошибочное расширение
+  акции выбранной зоны на соседние offers; fact_refs не становится selector.
+
+Правила публикации (завершают рекомендованный владельцу пример с ЛОР):
+прямая услуга с одним допустимым offer — detail; несколько offers — options.
+Явный option_id фильтрует offers: один — detail, несколько — options; первый
+из нескольких не выбирается. Проверенный price_select — detail конкретного
+offer. Обзор направления всегда options, даже с единственным представителем:
+он не доказывает, что услуга имеет только один вариант. Нет утверждения, что
+пациент сам выбрал единственное предложение. Новых команд модели/API нет.
+
+Один presentation field — данные уже согласованной публикации, его задаёт
+сервер; модель не выбирает режим. Completed receipt сохраняет показанные offers
+и исходный service/topic/действительные ограничения, без бренда первой строки.
+Скрытые детали списка не объявляются уже показанными в следующем model context.
+Одна карточка показывает только заполненные блоки. No-public-price остаётся
+карточкой с approved_text, исключения не зависят от наличия includes.
+
+allowed_offer_ids у TargetCommercialFact: отсутствие/[] оставляет прежнюю
+service/topic применимость; непустой список дополнительно сужает её. Unknown,
+foreign, duplicate и противоречащие service scope IDs отклоняются. Узкая акция
+автоматически прикрепляется только к точному detail offer; не к списку или
+общему информационному ответу. Обычный прямой вопрос об акции по-прежнему
+получает полный квалифицированный текст по базе. В options не вываливаем
+дополнительные коммерческие пакеты; после выбора действует прежний selector.
+
+Владелец смыслового запроса — модель; допустимых offers — существующий код по
+каталогу; сумм/состава/акции — данные; presentation — materializer до freeze;
+виджет/renderer только отображают. История/replay/revision/lead owner прежние.
+Нет нового resolver, памяти, fallback, параллельного legacy UI или вызова модели.
+
+Точный allowlist этапа 2:
+- contracts/response_plan.py
+- contracts/response_schema.py
+- core/response_plan_materialization.py
+- core/response_ui_projection.py
+- core/response_text_renderer.py
+- core/d2_commercial_plan.py
+- core/one_call_exact_commercial_catalog.py
+- clients/demo_medical/target_response/pricebook/facts.json
+- static/widget/widget.js
+- static/widget/widget.css
+- docs/CLIENT_PACK_AUTHORING.md
+- docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md
+- docs/tasks/THREE_TABS_CATALOG_TASK.md
+- tests/test_d2_price_variants.py
+- tests/test_d2_price_variants_browser.py
+- tests/test_d2_native_price_runtime.py
+- tests/test_nikadent_price_authority_offline.py — прежние ожидания text-only для
+  no_public_price заменяются проверкой общей карточки; money/guards сохраняются.
+- tests/test_d2_catalog_generalization.py
+- tests/release/offline.txt
+
+Проверки: actual native fake provider JSON/SSE для всех трёх клиентов: список →
+точный click → replay → continuation; нет выбранного первого бренда; один offer,
+несколько offers одного option, no_public_price, пустой includes с excludes,
+однострочный обзор; чужой/поддельный/stale action; scoped promo на нужном и
+соседнем offers, data refs, сроки и прежние общие акции НикаДент. DOM/geometry
+проверки на desktop/mobile. Один independent read-only Checker на завершение.
+Provider/model/SMTP calls 0. Полный CI перед merge; merge/deploy без команды
+владельца запрещены. Ни local сервер, ни VPS в этом этапе не перезапускаются.
+Ignored результаты только drafts/three-tabs-catalog/. Новые API/три вкладки/
+форма/page context/demo admission остаются следующими этапами.
+
+### Результат этапа 2 — Checker PASS
+
+Удалён reachable auto-first в `resolve_d2_operations`: нет среза rows к первой
+строке, первого совпадения option и присвоения его бренда списку. Единственный
+владелец options/detail — `_d2_price_block`, до price completion. Реальный путь:
+HTTP JSON/SSE → native `show_price` → materializer → frozen block → completion
+→ общий UI/text/history. Проверенный `price_select` восстанавливает сохранённую
+задачу и offer, без нового определения смысла моделью. Replay читает тот же
+receipt. Topic preview остаётся options даже с одной строкой. Добавлен output
+presentation и его инвариант detail/one row; новых model/API commands нет.
+
+Изменение поведения общее для demo, demo_medical, nikadent: цены вариантов
+сначала; подробности после точного запроса/клика. No-public предложения теперь
+карточки, а не отдельная text-only ветка. Empty includes не скрывает excludes.
+Список не публикует скрытые состав/этапы в текстовой истории; открытая карточка
+передаёт их. Существующий коммерческий selector проверяет optional offer scope;
+общие акции НикаДент не зависят от `fact_refs` и сохраняются в detail.
+
+Offline evidence (внешняя сеть заблокирована в HTTP fixtures):
+- Основной прогон: 152 passed — 98 catalog generalization, 37 native price и
+  17 новых variants; ещё один новый тест имел неверный test adapter, исправлен.
+  Два чистых promo tests после исправления authority: 2 passed. Новый тест
+  чужого tenant/неопубликованной revision прошёл в focused run.
+- Регрессии НикаДент/current UI/schema: 191 passed. 10 старых ожиданий
+  text-only/no-public или деталей ещё не выбранного варианта обновлены по
+  согласованной новой подаче; focused recheck: 21 passed, 94 deselected.
+- Реальный Chrome DOM: четыре новых widget сценария (все три клиента,
+  no-public с excludes без includes) и прежняя смешанная no-public/numeric
+  геометрия прошли на ширинах 320/390/1280. Первоначальный sandbox запретил
+  Chrome loopback; разрешённый локальный recheck снял эту средовую ошибку.
+  Browser assertion этапов сравнивает текст с нормализацией пробелов между
+  отдельными DOM-блоками; суммы/состав проверяются целиком.
+- До этапа на 2a7870e отдельно зафиксированы 118 passed / 4 failed в старом
+  raw-JSON helper `test_d2_commercial_plan`; они не менялись и не названы
+  регрессией. Прежний stage1 historical debt также не закрывается этим этапом.
+
+Проверки офлайн не доказывают качество живой модели. Provider/model/SMTP: 0.
+Ни локальный сервер, ни VPS не перезапускались. Старые persisted price receipts
+не мигрируются: новые проверки используют новые сессии; compatibility mode не
+вводится. Полный CI, live dialogue, merge и deployment не выполнялись.
+Independent Astra Checker: PASS, собственный targeted run 20 passed; call path,
+реальное удаление auto-first, scope/history/promo и финальный CSS проверены.
+После визуального просмотра исправлено сжатие длинных подписей detail tabs;
+повторный affected Chrome run 3 passed. Скриншоты всех трёх клиентов просмотрены.
+Контрольный checkpoint `feat(prices): show options before details for all clients`
+сохраняется в этой же branch/PR34 после PASS. Foreign otzyv-1/2/3.jpg сохранены.
+Следующий этап — самостоятельный каталог/три
+вкладки и admission медцентра в локальную панель; текущий этап этого не обещает.
+
+## Этап 1: единый действующий каталог и сборка предложения (завершён)
 
 Тип: архитектурное обобщение/упрощение, дополнительно исправление startup.
 Ответственность — только таблица DEMO_D2_TARGET_CONTRACT.md §3.

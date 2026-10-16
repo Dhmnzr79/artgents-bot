@@ -2220,7 +2220,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
           const content=document.createElement('div');addText(content,part.text);promo.appendChild(content);financialCard.appendChild(promo);
         } else {
           const payment=part.price_section==='consultation';
-          addText(detail(payment?'payment':'conditions',payment?'Как оплачивается лечение':'Условия и преимущества',payment?'clock':'info'),part.text);
+          addText(detail(payment?'payment':'conditions',payment?'Порядок оплаты':'Условия и преимущества',payment?'clock':'info'),part.text);
         }
         continue;
       }
@@ -2231,7 +2231,8 @@ export function mountWidget(root, config, { pagePath } = {}) {
       if(!rows.length||rows.some(row=>row.source_client_id!==clientId))continue;
       const card=document.createElement('section');card.className='clinic-price-card';
       const overview=Boolean(part.overview);
-      card.setAttribute('aria-label',overview?'Варианты лечения':rows[0].service_name);
+      const options=part.price.presentation==='options';
+      card.setAttribute('aria-label',overview?'Услуги и цены':rows[0].service_name);
       financialCard=card;sections.clear();promotionCount=0;
       if(part.overview?.volume_choices?.length){
         message.volumeNavigation={
@@ -2261,8 +2262,8 @@ export function mountWidget(root, config, { pagePath } = {}) {
         }
       }
       const title=document.createElement('h3');title.className='clinic-price-card__title';
-      title.textContent=overview?'Варианты лечения':rows[0].service_name;card.appendChild(title);
-      if(!overview&&(part.choices||[]).length>1){
+      title.textContent=overview?'Услуги и цены':rows[0].service_name;card.appendChild(title);
+      if(!options&&(part.choices||[]).length>1){
         const tabs=document.createElement('div');tabs.className='clinic-price-card__tabs';tabs.setAttribute('role','group');tabs.setAttribute('aria-label','Вариант');
         for(const choice of part.choices){
           const active=choice.reply_id===`price_select:${rows[0].offer_id}`;
@@ -2271,26 +2272,26 @@ export function mountWidget(root, config, { pagePath } = {}) {
           tab.addEventListener('click',()=>{if(!active||message.revision!==state.lastPayload?.revision)select(choice,message.revision)});tabs.appendChild(tab);
         }card.appendChild(tabs);
       }
-      if(!overview&&(part.choices||[]).length<=1&&rows[0].variant_label){
+      if(!options&&(part.choices||[]).length<=1&&rows[0].variant_label){
         const label=document.createElement('p');label.className='clinic-price-card__selected-variant';
         label.textContent=rows[0].variant_label;card.appendChild(label);
       }
       const allChoices=[...(part.choices||[]),...(part.service_choices||[])];
       for(const row of rows){
         const choice=allChoices.find(choice=>choice.reply_id===`price_select:${row.offer_id}`);
-        const item=document.createElement(overview&&choice?'button':'div');
-        item.className=overview?'clinic-price-card__overview-row':'clinic-price-card__price-area';
-        if(overview&&row.mode==='no_public_price')item.classList.add('clinic-price-card__overview-row--description');
-        if(overview&&choice){item.type='button';item.disabled=disabled();item.addEventListener('click',()=>select(choice,message.revision));}
-        if(overview){const name=document.createElement('span');name.className='clinic-price-card__overview-name';name.textContent=row.service_name;item.appendChild(name);}
+        const item=document.createElement(options&&choice?'button':'div');
+        item.className=options?'clinic-price-card__overview-row':'clinic-price-card__price-area';
+        if(options&&row.mode==='no_public_price')item.classList.add('clinic-price-card__overview-row--description');
+        if(options&&choice){item.type='button';item.disabled=disabled();item.addEventListener('click',()=>select(choice,message.revision));}
+        if(options){const name=document.createElement('span');name.className='clinic-price-card__overview-name';name.textContent=overview?row.service_name:(row.variant_label||row.service_name);item.appendChild(name);}
         const amount=document.createElement('strong');amount.className='clinic-price-card__amount';
         amount.textContent=row.price_display_text;
         if(row.mode==='no_public_price')amount.classList.add('clinic-price-card__amount--description');
-        else if(!overview)amount.classList.add('clinic-price-card__amount--single');item.appendChild(amount);
-        if(overview&&choice){const arrow=svg('arrow');arrow.classList.add('clinic-price-card__row-arrow');item.appendChild(arrow);}
-        if(row.scope_text){const caption=document.createElement('p');caption.className='clinic-price-card__caption';if(!overview)caption.appendChild(svg('extent'));const scope=document.createElement('span');scope.textContent=row.scope_text;caption.appendChild(scope);item.appendChild(caption);}
+        else if(!options)amount.classList.add('clinic-price-card__amount--single');item.appendChild(amount);
+        if(options&&choice){const arrow=svg('arrow');arrow.classList.add('clinic-price-card__row-arrow');item.appendChild(arrow);}
+        if(row.scope_text){const caption=document.createElement('p');caption.className='clinic-price-card__caption';if(!options)caption.appendChild(svg('extent'));const scope=document.createElement('span');scope.textContent=row.scope_text;caption.appendChild(scope);item.appendChild(caption);}
         // Overview is a compact preview; full authored conditions stay in detail.
-        for(const term of (overview ? [] : [...new Set(row.condition_texts||[])])){
+        for(const term of (options ? [] : [...new Set(row.condition_texts||[])])){
           if(term===row.scope_text)continue;
           const note=document.createElement('p');note.className='clinic-price-card__condition';note.appendChild(svg('info'));
           const text=document.createElement('span');text.textContent=term.charAt(0).toUpperCase()+term.slice(1);note.appendChild(text);item.appendChild(note);
@@ -2298,16 +2299,16 @@ export function mountWidget(root, config, { pagePath } = {}) {
         card.appendChild(item);
       }
       bubble.appendChild(card);
-      if(!overview&&rows.length===1){
+      if(!options&&rows.length===1){
         const row=rows[0];
         if(row.includes?.length){
           const el=detail('includes','Что входит в стоимость','layers');
           const list=document.createElement('ul');list.className='clinic-price-card__check-list';
           for(const line of row.includes){const li=document.createElement('li');li.appendChild(svg('check'));const text=document.createElement('span');text.textContent=line;li.appendChild(text);list.appendChild(li);}el.appendChild(list);
-          if(row.excludes?.length){const heading=document.createElement('p');heading.className='clinic-price-card__detail-heading';heading.textContent='Оплачивается отдельно';el.appendChild(heading);const exclusions=document.createElement('ul');for(const line of row.excludes){const li=document.createElement('li');li.textContent=line;exclusions.appendChild(li);}el.appendChild(exclusions);}
         }
+        if(row.excludes?.length){const el=detail('includes',row.includes?.length?'Что входит в стоимость':'Оплачивается отдельно','layers');if(row.includes?.length){const heading=document.createElement('p');heading.className='clinic-price-card__detail-heading';heading.textContent='Оплачивается отдельно';el.appendChild(heading);}const exclusions=document.createElement('ul');for(const line of row.excludes){const li=document.createElement('li');li.textContent=line;exclusions.appendChild(li);}el.appendChild(exclusions);}
         if(row.stages?.length){
-          const el=detail('payment','Как оплачивается лечение','clock');
+          const el=detail('payment','Порядок оплаты','clock');
           for(const line of row.stages){
             // Frozen stage formatter separates its heading/amount from timing with '. '.
             const separator=line.indexOf('. ');

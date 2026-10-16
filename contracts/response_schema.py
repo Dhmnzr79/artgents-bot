@@ -404,6 +404,7 @@ class TargetCommercialFact(TargetSchemaModel):
     active_until: IsoDate | None = None
     allowed_service_ids: list[NonBlankStr] = Field(default_factory=list)
     allowed_topics: list[NonBlankStr] = Field(default_factory=list)
+    allowed_offer_ids: list[NonBlankStr] = Field(default_factory=list)
     detail_ref: NonBlankStr | None = None
     incompatible_with: list[NonBlankStr] = Field(default_factory=list)
     requested_display_policy: RequestedDisplayPolicy | None = None
@@ -414,6 +415,8 @@ class TargetCommercialFact(TargetSchemaModel):
     def _fact_invariants(self) -> "TargetCommercialFact":
         if _duplicates(self.allowed_service_ids):
             raise ValueError("fact_allowed_service_duplicate")
+        if _duplicates(self.allowed_offer_ids):
+            raise ValueError("fact_allowed_offer_duplicate")
         if _duplicates(self.allowed_topics):
             raise ValueError("fact_allowed_topic_duplicate")
         if _duplicates(self.incompatible_with):
@@ -728,6 +731,13 @@ class ResponseDataCatalog(TargetSchemaModel):
         for fact in self.facts.values():
             if any(service_id not in self.services for service_id in fact.allowed_service_ids):
                 raise ValueError("bundle_fact_service_missing")
+            for offer_id in fact.allowed_offer_ids:
+                offer = next((item for item in self.offers if item.offer_id == offer_id), None)
+                if offer is None:
+                    raise ValueError("bundle_fact_offer_missing")
+                if (offer.service_id not in fact.allowed_service_ids
+                        or offer.service_id in fact.excluded_service_ids):
+                    raise ValueError("bundle_fact_offer_service_mismatch")
             if any(fact_id not in self.facts for fact_id in fact.incompatible_with):
                 raise ValueError("bundle_fact_incompatible_missing")
 

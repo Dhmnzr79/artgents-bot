@@ -179,10 +179,9 @@ def test_medical_prices_use_actual_http_frozen_path_and_replay_without_new_regis
     with D2DialogueStore(db) as store:
         result = store.read_latest_completion(SessionKey(client_id='demo_medical',sid='medical')).response.resolved
         rows = result.d2_price_block.rows
-        # Stage 1 preserves the current selected-first card behavior. The next
-        # UX stage will expose the variant list before opening its details.
         expected = {o.offer_id for o in snap.bundle.offers if o.service_id==service}
-        assert len(rows) == 1 and rows[0].offer_id in expected
+        assert {row.offer_id for row in rows} == expected
+        assert result.d2_price_block.presentation == ('options' if len(expected)>1 else 'detail')
         assert {action.offer_id for action in result.ui_plan.price_select_actions} == expected
         for row in rows:
             offer = next(o for o in snap.bundle.offers if o.offer_id==row.offer_id)

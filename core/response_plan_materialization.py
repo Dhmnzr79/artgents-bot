@@ -426,20 +426,14 @@ def resolve_d2_operations(
             volume_choices = ()
         else:
             if direct_service_only:
-                # A named variant selects its eligible row; otherwise open the first. Keep
-                # alternatives as UI actions, not as published financial refs.
+                # Publish every eligible offer; only an unambiguous detail has
+                # a concrete brand scope. A list never selects its first row.
                 price_tab_rows = price_block.rows
-                selected_row = next(row for row in price_block.rows if any(
-                    offer.offer_id == row.offer_id and offer.option_id == price_part.option_id
-                    for offer in sources.material_authority.bundle.offers
-                )) if price_part.option_id is not None else price_block.rows[0]
-                price_block = price_block.model_copy(update={"rows": (selected_row,)})
-                trace = replace(trace, selected_offers=tuple(
-                    offer for offer in trace.selected_offers if offer.offer_id == selected_row.offer_id))
-                offer = next(item for item in sources.material_authority.bundle.offers
-                             if item.offer_id == selected_row.offer_id)
-                price_selected_scope = DiscussionScope(target=price_part.target,
-                    volume=price_part.volume, brand_id=offer.brand_id)
+                if price_block.presentation == "detail":
+                    offer = next(item for item in sources.material_authority.bundle.offers
+                                 if item.offer_id == price_block.rows[0].offer_id)
+                    price_selected_scope = DiscussionScope(target=price_part.target,
+                        volume=price_part.volume, brand_id=offer.brand_id)
             scope_decision, volume_choices = _d2_price_scope_decision(
                 part=price_part,
                 client_id=client_id,
@@ -728,7 +722,7 @@ def resolve_d2_operations(
         ui_candidates = ui_candidates.model_copy(
             update={"quick_replies": (*ui_candidates.quick_replies, *(item.candidate for item in volume_choices))}
         )
-    elif price_block is not None:
+    elif price_block is not None and price_block.presentation == "detail":
         detail_replies, detail_actions = _d2_price_detail_ui(
             sources=sources, offer_ids=tuple(row.offer_id for row in price_block.rows),
         )
@@ -817,7 +811,11 @@ def resolve_d2_operations(
     commercial_topic_id = None
     if price_parts:
         published_services = tuple(dict.fromkeys(row.service_id for row in price_block.rows)) if price_block else ()
-        commercial_service_id = published_services[0] if len(published_services) == 1 else None
+        commercial_service_id = (
+            published_services[0]
+            if price_block is not None and price_block.presentation == "detail"
+            else None
+        )
     elif direct_promotion or auto_promo:
         commercial_service_id = content_parts[0].service_id if content_parts else None
         commercial_topic_id = selected_topic_id
@@ -828,8 +826,11 @@ def resolve_d2_operations(
         bundle=sources.material_authority.bundle,
         as_of=as_of,
         service_id=commercial_service_id,
+        offer_id=(price_block.rows[0].offer_id
+                  if price_block is not None and price_block.presentation == "detail" else None),
         topic_id=commercial_topic_id,
-        include_packages=price_block is not None and not direct_promotion and not direct_fact,
+        include_packages=(price_block is not None and price_block.presentation == "detail"
+                          and not direct_promotion and not direct_fact),
         shown_promo_fact_ids=sources.shown_promo_fact_ids,
         promo_form="full" if direct_promotion else "short",
         promotion_scope=promotion_scope if direct_promotion else "service",
@@ -1311,8 +1312,10 @@ def _d2_price_block(
         offers = [offer for offer in offers if offer.offer_id == selected_offer_id]
         if len(offers) != 1:
             raise MaterializationOwnershipError("d2_price_select_offer_unavailable")
-    if selected_option_id is not None and not any(offer.option_id == selected_option_id for offer in offers):
-        raise MaterializationContractError("d2_no_price_candidates")
+    if selected_option_id is not None:
+        offers = [offer for offer in offers if offer.option_id == selected_option_id]
+        if not offers:
+            raise MaterializationContractError("d2_no_price_candidates")
     rows = tuple(
         build_d2_price_offer_row(
             offer,
@@ -1348,7 +1351,8 @@ def _d2_price_block(
         ),
         price_candidate_service_ids=service_ids,
     )
-    return D2FrozenPriceBlock(source_client_id=client_id, rows=rows), trace
+    return D2FrozenPriceBlock(source_client_id=client_id, rows=rows,
+        presentation="detail" if direct_service_only and len(rows) == 1 else "options"), trace
 
 
 def _d2_part_failure_block(

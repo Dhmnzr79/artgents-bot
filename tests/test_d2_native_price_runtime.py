@@ -54,6 +54,10 @@ def test_card_mixed_followup_tab_and_replay(http_env, transport, monkeypatch):
     body = send(client, transport, request_id="price", q="А сколько на один зуб и больно ли?")
     row = cards(body)[0]["price"]["rows"][0]
     assert row["offer_id"] == "classic.one_tooth.implantium"
+    assert cards(body)[0]["price"]["presentation"] == "options"
+    assert len(cards(body)[0]["price"]["rows"]) == 3
+    assert next(p for p in completed(db).response.resolved.d2_request_parts
+                if p.kind == "price").discussion_scope.brand_id is None
     assert len(frozen_calls) == 1
     assert "Обезболивание обсуждается" in body["answer"]
     assert "I will" not in body["answer"]
@@ -68,10 +72,13 @@ def test_card_mixed_followup_tab_and_replay(http_env, transport, monkeypatch):
     assert not cards(follow)
     history = wire.calls[3]["messages"][1]["content"]
     assert row["offer_id"] in history and "I will" not in history
-    for text in (*row["includes"], *row["excludes"]):
-        assert text in history
+    for listed in cards(body)[0]["price"]["rows"]:
+        assert listed["offer_id"] in history
+        assert listed["price_display_text"] in history
     # A published historical tab restores exact scope, with no model call.
     tab = click(client, body, "price_select:classic.one_tooth.nobel", request_id="tab", transport=transport)
+    assert cards(tab)[0]["price"]["presentation"] == "detail"
+    assert [r["offer_id"] for r in cards(tab)[0]["price"]["rows"]] == ["classic.one_tooth.nobel"]
     assert len(wire.calls) == 4
     detail = click(client, tab, "price_detail:includes", request_id="detail", transport=transport)
     assert "В стоимость" in detail["answer"]

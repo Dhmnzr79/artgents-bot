@@ -19,14 +19,15 @@ def render_response_text(plan: ResolvedResponsePlan, *, include_lead: bool = Tru
         else:
             card_text = []
             _render_compact_price_group(part.price.rows, card_text,
-                show_service_in_each_row=len({row.service_id for row in part.price.rows}) > 1)
+                show_service_in_each_row=len({row.service_id for row in part.price.rows}) > 1,
+                include_conditions=part.price.presentation == "detail")
             texts.extend(card_text)
-            if include_card_details and len(part.price.rows) == 1:
+            if include_card_details and part.price.presentation == "detail":
                 # Match the sections available on the selected widget card.
                 # Overview alternatives have no expanded package sections.
                 row = part.price.rows[0]
                 for heading, lines in (("В стоимость входят", row.includes),
-                                       ("Отдельно оплачиваются / не входят", row.excludes if row.includes else ()),
+                                       ("Отдельно оплачиваются / не входят", row.excludes),
                                        ("Этапы оплаты", row.stages)):
                     if lines:
                         texts.append(heading + ":\n" + "\n".join("- " + line for line in lines))
@@ -156,12 +157,6 @@ def _render_d2_price_parts(plan: ResolvedResponsePlan, parts: list[str | D2Froze
         return
     assert plan.d2_price_block is not None
     rows = plan.d2_price_block.rows
-    if all(row.mode == "no_public_price" for row in rows):
-        for row in rows:
-            parts.append(ResponseTextPart(text=row.display_text.strip(), price_owned=True))
-            parts.extend(ResponseTextPart(text=text.strip(), price_owned=True)
-                         for text in row.condition_texts)
-        return
     if all(row.service_name and row.price_display_text for row in rows):
         parts.append(plan.d2_price_block)
         return
@@ -251,10 +246,12 @@ def _render_d2_price_detail(detail, parts: list[str]) -> None:
 
 def _render_compact_price_group(
     rows: tuple[D2FrozenPriceRow, ...], parts: list[str], *, show_service_in_each_row: bool,
+    include_conditions: bool = True,
 ) -> None:
     details = tuple(
         tuple(dict.fromkeys(
-            (*((row.scope_text,) if row.scope_text else ()), *row.condition_texts)
+            (*((row.scope_text,) if row.scope_text else ()),
+             *(row.condition_texts if include_conditions else ()))
         ))
         for row in rows
     )

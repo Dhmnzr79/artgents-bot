@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Три вкладки · Artgents</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main class="layout">
+    <aside class="notes">
+      <span class="eyebrow">ARTGENTS / ЛАБОРАТОРИЯ ИНТЕРФЕЙСОВ</span>
+      <h1>Разговор.<br>Выбор. Заявка.</h1>
+      <p class="intro">Один интерфейс для небольшой стоматологии и медицинского центра. Меняется только наполнение.</p>
+      <div class="pack-switch" role="group" aria-label="Вариант клиники">
+        <button data-pack="dental" aria-pressed="true">Стоматология <small>5 направлений</small></button>
+        <button data-pack="medical" aria-pressed="false">Медцентр <small>10 направлений</small></button>
+      </div>
+      <div class="instructions">
+        <p><span>01</span> Начните разговор и откройте форму прямо под ответом.</p>
+        <p><span>02</span> Выберите направление и услугу или найдите её через поиск. Заявка появится под карточкой.</p>
+        <p><span>03</span> Перейдите в «Запись»: тот же черновик, больше возможностей.</p>
+      </div>
+      <button class="reset" id="reset">Начать заново ↺</button>
+      <p class="lab-note">Интерактивный прототип. Ответы заранее подготовлены. Контакты никуда не отправляются и не сохраняются после перезагрузки. Для проверки используйте вымышленные данные.</p>
+
+    </aside>
+    <section class="widget" aria-label="Консультант клиники">
+      <header class="header"><div class="avatar">Н<span></span></div><div><strong>Надежда</strong><p>Помощник клиники</p></div><span class="header-mark">✳</span></header>
+      <nav class="tabs" role="tablist" aria-label="Разделы виджета">
+        <button id="tab-chat" role="tab" aria-controls="panel-chat" aria-selected="true" data-tab="chat">Помощник</button>
+        <button id="tab-catalog" role="tab" aria-controls="panel-catalog" aria-selected="false" tabindex="-1" data-tab="catalog">Услуги и цены</button>
+        <button id="tab-booking" role="tab" aria-controls="panel-booking" aria-selected="false" tabindex="-1" data-tab="booking">Запись<span class="draft-dot" hidden></span></button>
+      </nav>
+      <section id="panel-chat" class="panel chat-panel" role="tabpanel" aria-labelledby="tab-chat">
+        <div id="feed" class="feed" tabindex="0" aria-label="Переписка"></div>
+        <form id="composer" class="composer"><label class="sr-only" for="question">Ваш вопрос</label><input id="question" placeholder="Напишите сообщение…" autocomplete="off"><button aria-label="Отправить сообщение" class="send">↑</button></form>
+      </section>
+      <section id="panel-catalog" class="panel scroll-panel" role="tabpanel" aria-labelledby="tab-catalog" hidden>
+        <div id="catalog"></div>
+      </section>
+      <section id="panel-booking" class="panel scroll-panel" role="tabpanel" aria-labelledby="tab-booking" hidden>
+        <div class="page-heading"><span class="eyebrow">ДАВАЙТЕ ПОЗНАКОМИМСЯ</span><h2>Начнём с обращения</h2><p>Оставьте контакты. Администратор свяжется с вами и поможет согласовать время приёма.</p></div>
+        <div class="form-mount" data-place="booking"></div>
+        <div class="quiet-note">Можно пока не выбирать услугу — поможем разобраться.</div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

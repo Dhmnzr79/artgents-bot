@@ -17,6 +17,7 @@ class WidgetCatalogNavigation(ResponsePlanModel):
     label: NonBlankStr
     unpriced_text: NonBlankStr
     sections: tuple[WidgetCatalogSection, ...] = Field(min_length=1)
+    service_subtitles: dict[NonBlankStr, NonBlankStr]
 
     @model_validator(mode='after')
     def unique_refs(self):
@@ -24,6 +25,8 @@ class WidgetCatalogNavigation(ResponsePlanModel):
         services = [ref for s in self.sections for ref in s.service_ids]
         if len(set(sections)) != len(sections) or len(set(services)) != len(services):
             raise ValueError('catalog_duplicate_reference')
+        if set(self.service_subtitles) != set(services):
+            raise ValueError('catalog_service_subtitle_refs_invalid')
         return self
 
     def bind(self,client_id,active_service_ids):

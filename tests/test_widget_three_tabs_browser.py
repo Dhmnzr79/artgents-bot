@@ -98,11 +98,18 @@ def test_three_tabs_private_shared_form_and_page_remount(http_env,monkeypatch,tm
     for(const width of [390,1280]){await page.setViewportSize({width,height:900});await page.locator('[data-clinic-panel]').screenshot({path:path.join(process.env.THREE_TABS_SCREENSHOT_DIR,`${fixtures.config.clientId}-${width}-directions.png`)});}
     await page.setViewportSize({width:390,height:900});}
   await catalogPanel.locator('.clinic-catalog__row').first().click();
+  for(const row of await catalogPanel.locator('.clinic-catalog__service').all()){
+    const name=await row.locator('strong').innerText();
+    const service=fixtures.catalog.services.find(service=>service.name===name);
+    if(!service||await row.locator('small').innerText()!==service.subtitle)throw new Error('Authored service subtitle missing');
+  }
   await auditLayout('service list');
   // Search still covers the full clinic after choosing a section.
   await catalogPanel.getByRole('searchbox').fill(fixtures.service.name);
   const result=catalogPanel.locator('.clinic-catalog__row').filter({hasText:fixtures.service.name});
-  if(await result.count()!==1)throw new Error('Global search missed exact service');await result.click();
+  if(await result.count()!==1)throw new Error('Global search missed exact service');
+  if(await result.locator('small').innerText()!==fixtures.service.subtitle)throw new Error('Search replaced authored subtitle');
+  await result.click();
   const options=catalogPanel.locator('.clinic-price-card__overview-row');
   if(await options.count()!==fixtures.service.price.rows.length)throw new Error('Missing service options');
   await auditLayout('catalog price options');

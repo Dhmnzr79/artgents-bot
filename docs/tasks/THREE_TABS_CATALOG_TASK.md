@@ -19,6 +19,69 @@ read-only граница НикаДент ниже относится к уже 
 tenant/privacy/consent и прежние роли Target Contract §3 сохраняются.
 Вопросы владельцу — только обычным текстом с примерами, без quiz/popup.
 
+## Этап 6: короткая подпись каждой услуги — owner GO 2026-10-16
+
+Owner: «Мы можем добавить для каждой услуги такие описания?» после объяснения,
+что нынешняя подпись складывается из первого варианта и счётчика и потому
+отсутствует у части услуг. Добавляем authored краткое пояснение для каждой
+из70 услуг трёх клиентов; оно выводится в списке вместо этих технических данных.
+Тип: UI/data bug fix и наполнение, не архитектурное упрощение D2.
+
+Preflight repo/top C:/Cursor Projects/artgents-bot-active,
+codex/three-tabs-catalog, baseline/HEAD eced7141b5e9dea32979bcadd071d8aa7bd7e4ad.
+origin/main и merge base f7629491f2bb93ed80e2f58aea53770841bbd6a3.
+Tracked/index чистые; foreign untracked otzyv-1/2/3.jpg сохраняются.
+Продолжение того же продукта/ветки, новая ветка и merge не нужны.
+
+Единственный источник UI-подписей: существующий authored widget_catalog.json
+клиента, рядом с подписями направлений, карта service_subtitles по service_id.
+Полное совпадение ключей с service_ids валидируется; пустая/чужая/пропущенная
+подпись — ошибка базы, без fallback из вариантов, MD или модели. Endpoint
+отдаёт subtitle, renderer только выводит его. Полное описание услуги по-прежнему
+из MD; никаких новых медицинских/ценовых обещаний в кратких подписях.
+Ответственность Target Contract §3, price/selection/model/privacy/lead/transport
+не меняется. Новых runtime handlers/состояний/модельных вызовов нет.
+
+Exact allowlist:
+- contracts/widget_catalog.py
+- core/widget_catalog.py
+- static/widget/catalog.js
+- clients/demo/target_response/widget_catalog.json
+- clients/demo_medical/target_response/widget_catalog.json
+- clients/nikadent/target_response/widget_catalog.json
+- clients/_template/target_response/widget_catalog.json
+- tests/test_widget_catalog.py
+- tests/test_widget_three_tabs_browser.py
+- docs/CLIENT_PACK_AUTHORING.md
+- docs/tasks/THREE_TABS_CATALOG_TASK.md
+
+Проверки блока: completeness/invalid map refs/tenant endpoint и прежние exact
+price/read-only invariants; browser показывает authored subtitle и сохраняет
+сценарии/геометрию. Один independent Checker для нового presentation contract.
+Никаких provider/SMTP/VPS/merge/deploy; физические устройства не заявляются.
+
+Checker finding: новый обязательный presentation field нужен также scaffold
+template. Allowlist дополнен clients/_template/target_response/widget_catalog.json:
+добавлена подпись единственной sample_service без runtime/прочих шаблонных правок.
+Проверяется существующим test_client_pack_template_scaffold.py вместе с текущим
+catalog subset; это согласование нового общего поля, не расширение функций.
+По замечанию Checker также дополнен docs/CLIENT_PACK_AUTHORING.md: описание
+новой обязательной карты и её границы, чтобы следующий клиент не пропускал поле.
+
+Результат: заполнены70 service_subtitles (demo22, medical21, nikadent27),
+обновлён scaffold. Удалена сборка строки first variant + «Вариантов:N»;
+добавлена единственная прямая authored projection, без новых состояний/эвристик.
+Полные описания MD/цены/варианты/иконки/CSS/формы/consent не изменены.
+Offline18PASS (catalog15+three-tabs3), focused19PASS (template4+catalog15),
+то есть22 различных targeted cases. CheckerPASS: собственные15PASS +focused
+template validatorPASS; замечание по authoring docs устранено текстовой правкой.
+Read-only real9001: startup_check_ok всех3 клиентов, снимки списков с новыми
+подписями просмотрены; /ask и /lead блокировались. Provider/SMTP0, VPS0.
+Новых baseline failures нет; прежние datetime.utcnow warnings остаются.
+Полный release CI и физические устройства не проверялись. Foreign JPG сохранены.
+Checkpoint subject: `Add authored subtitles for every catalog service`;
+push в текущую ветку/PR34 без merge/deploy.
+
 ## Этап 5: точный перенос artgents-mobile-widget.html с Inter — owner GO 2026-10-16
 
 Owner передал HTML и подробный prompt: точный перенос интерфейса, шрифт Inter.

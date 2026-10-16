@@ -77,8 +77,7 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
         const row=button('',()=>{state.listScroll=scroller().scrollTop;state.service=service.service_id;state.offer=null;renderDetail();scroller().scrollTop=0;},'clinic-catalog__row clinic-catalog__service');
         const first=service.price?.rows[0];
         row.append(element('strong',null,service.name),element('span','clinic-catalog__row-price',first?.price_display_text||state.data.unpriced_text));
-        row.append(element('small',null,[query?sectionById(service.section_id).title:null,first?.variant_label,
-          service.price?.rows.length>1?`Вариантов: ${service.price.rows.length}`:null].filter(Boolean).join(' · ')));
+        row.append(element('small',null,service.subtitle));
         row.append(arrow());
         list.append(row);
       }

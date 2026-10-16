@@ -60,7 +60,7 @@ def build_widget_catalog(snapshot, *, as_of: date):
                     parts.append(dict(kind='text',text=block.explanation_text,price_owned=True,price_section='conditions'))
                 details[row.offer_id] = {'price':price_block((row,),'detail'),'parts':parts}
             services.append(dict(service_id=service_id,section_id=section.section_id,name=service.name,
-                aliases=service.aliases,description=description,
+                aliases=service.aliases,description=description,subtitle=nav.service_subtitles[service_id],
                 price=price_block(rows,'detail' if len(rows)==1 else 'options') if rows else None,
                 details=details))
     return dict(client_id=client_id,label=nav.label,catalog_version=snapshot.fingerprint,unpriced_text=nav.unpriced_text,

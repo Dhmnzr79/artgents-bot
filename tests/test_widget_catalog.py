@@ -37,6 +37,8 @@ def test_catalog_actual_endpoint_is_read_only_and_complete(http_env,monkeypatch,
     assert 'lead_config' not in serialized and 'recipients' not in serialized
     assert set(refs)=={s['service_id'] for s in data['services']}
     assert data['label'] and all(section['subtitle'] for section in data['sections'])
+    authored=json.loads((ROOT/'clients'/tenant/'target_response/widget_catalog.json').read_text(encoding='utf-8'))
+    assert {s['service_id']:s['subtitle'] for s in data['services']}==authored['service_subtitles']
 
 
 def test_catalog_exact_price_and_offer_promo_scope(http_env,monkeypatch):
@@ -78,6 +80,19 @@ def test_catalog_origin_guard_and_unknown_tenant(http_env):
     client=http_env[0]
     assert client.get('/api/widget-catalog?client_id=unknown').status_code==403
     assert client.get('/api/widget-catalog?client_id=demo',headers={'Origin':'https://foreign.example'}).status_code==403
+
+
+@pytest.mark.parametrize('fault',['missing','unknown','blank'])
+def test_catalog_service_subtitles_must_cover_authored_services(tmp_path,fault):
+    shutil.copytree(ROOT/'clients/demo',tmp_path/'demo')
+    path=tmp_path/'demo/target_response/widget_catalog.json'
+    data=json.loads(path.read_text(encoding='utf-8'))
+    if fault=='missing':data['service_subtitles'].pop('classic')
+    elif fault=='unknown':data['service_subtitles']['unknown_service']='Подпись'
+    else:data['service_subtitles']['classic']='   '
+    path.write_text(json.dumps(data),encoding='utf-8')
+    with pytest.raises(ValueError,match='widget_catalog_invalid'):
+        load_d2_tenant_snapshot('demo',clients_root=tmp_path)
 
 
 def test_reading_other_catalog_does_not_change_dialogue(http_env):

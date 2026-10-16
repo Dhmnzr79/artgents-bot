@@ -39,6 +39,7 @@ tests/test_d2_text_reply.py
 tests/test_d2_situation_disabled.py
 tests/test_d2_demo_limits.py
 tests/test_d2_native_price_runtime.py
+tests/test_d2_catalog_generalization.py
 tests/test_d2_demo_session_budget.py
 tests/test_d2_phone_mask.py
 tests/test_release_test_selection.py

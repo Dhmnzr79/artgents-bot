@@ -1,8 +1,7 @@
-"""Target response-data authoring contracts (S1, offline and unwired).
+"""Validated client-owned response data for the D2 catalog and legacy tooling.
 
-These models describe future client-owned schema data and validate local references in
-memory. They do not load client packs, select content, read session state, or influence
-the product response path.
+Pure models validate data and local references in memory. They perform no pack I/O,
+dialogue selection, model calls or session-state access.
 """
 
 from __future__ import annotations
@@ -67,17 +66,8 @@ FactSourceRef = Annotated[SourceRef, AfterValidator(_require_fact_ref)]
 MoneyAmount = Annotated[StrictInt, Field(ge=0)]
 Priority = StrictInt
 
-ServiceFamily = Literal[
-    "diagnostics",
-    "therapy",
-    "endodontics",
-    "surgery",
-    "periodontology",
-    "implantology",
-    "prosthodontics",
-    "orthodontics",
-    "aesthetics",
-]
+# Clinic-owned taxonomy identifiers, not a built-in list of specialties.
+ServiceFamily = NonBlankStr
 ServiceRole = Literal["protocol", "advanced_protocol", "supporting"]
 SelectionMode = Literal["scope", "context", "direct"]
 PatientExtent = Literal["one_tooth", "few_teeth", "full_arch"]
@@ -88,16 +78,8 @@ PatientStage = Literal[
 ]
 PatientJaw = Literal["upper", "lower"]
 ReportedContext = Literal["reported_bone_deficit"]
-BillingUnit = Literal[
-    "tooth",
-    "implant",
-    "tooth_package",
-    "jaw",
-    "both_jaws",
-    "procedure",
-    "unit",
-    "course",
-]
+# The human-readable scope is authored in package.label.
+BillingUnit = NonBlankStr
 MarketingScenario = Literal[
     "pain_fear",
     "cost",

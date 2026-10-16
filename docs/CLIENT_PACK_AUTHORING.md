@@ -59,9 +59,9 @@ URL/UTM в модель не отправляются. Отдельное мен
 | Цена, billing unit, пакет, payment stages | `clients/{id}/target_response/pricebook/services/{offer_id}.json` |
 | Commercial facts (акции, рассрочка, гарантия) | `clients/{id}/target_response/pricebook/facts.json` |
 | Broad family price (опционально) | `clients/{id}/target_response/pricebook/family_prices.json` |
-| Бренды имплантов и aliases | `clients/{id}/target_response/brand_catalog.json` |
-| Marketing policy (facts/scenarios/CTA contexts) | `clients/{id}/target_response/marketing.yaml` |
-| Приоритеты услуг/offers | `clients/{id}/target_response/clinic_strategy.yaml` |
+| Бренды и aliases | `clients/{id}/target_response/brand_catalog.json` |
+| Коммерческие профили, усилители, «Также», несовместимость | `clients/{id}/target_response/d2_commercial.json` |
+| Явный порядок готовых offers в ценовом обзоре направления | `clients/{id}/target_response/d2_direction_prices.json` |
 | Текст услуги / FAQ (FullContext) | `clients/{id}/md/{content_ref}` |
 | Врачи и привязка к услугам | `clients/{id}/doctor_catalog.json` |
 | Контакты, часы, парковка, «не оказываем» | `clients/{id}/clinic_policies.yaml` → `contact:` (structured: phone, whatsapp, address, hours, parking) |
@@ -75,7 +75,21 @@ URL/UTM в модель не отправляются. Отдельное мен
 | Доставка заявок и согласие до сбора контактов | `clients/{id}/lead_config.yaml` |
 
 `brand.yaml` ≠ `target_response/brand_catalog.json`  
-`clinic_policies.yaml` ≠ `target_response/clinic_strategy.yaml`
+`clinic_policies.yaml` задаёт контакты и ограничения; коммерческие профили — отдельный домен.
+
+`family` и `price.billing_unit` — непустые идентификаторы из данных клиники.
+Новые направления не требуют расширять встроенный список специальностей.
+Человеческая подпись единицы и объёма уже задаётся обязательным `package.label`:
+например, «за один первичный приём», «за зону подмышек» или «за одну челюсть».
+Код форматирует fixed/from/range суммы; no_public_price сохраняет approved_text.
+Цена не умножается по единице. Service/option/offer/brand/fact IDs по-прежнему
+проверяются на связь и принадлежность каталогу.
+
+Operational validator, startup и readiness используют тот же D2 snapshot/model
+view, что диалог. Старые `target_response/marketing.yaml` и
+`target_response/clinic_strategy.yaml` не читаются этим путём, не влияют на
+результат проверки и новым клиникам не нужны. В существующих packs они могут
+сохраняться для исторических инструментов; это не действующая настройка D2.
 
 **FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE:** canonical contact facts live **only** in
 `clinic_policies.yaml` `contact:` block. **Не дублировать** телефон, адрес, часы, WhatsApp,
@@ -104,7 +118,8 @@ price-only offer).
 1. Скопировать `clients/_template/` → `clients/{new_id}/`.
 2. Заменить placeholder IDs (`sample_service`, `template_brand`, …) на уникальные.
 3. Добавить MD-файлы под каждый `content_ref` в `service_catalog.json`.
-4. Заполнить `doctor_catalog.json` и `service_ids` врачей.
+4. Описать врачей и их услуги в MD. При необходимости заполнить текущие
+   `d2_commercial.json` профили; цены и условия оставить в offers/facts.
 5. Прогнать offline validator:
 
 ```powershell
@@ -139,16 +154,16 @@ booking, consult, callback, plan, price, doctor. Тексты/ключи сущ�
 
 - `target_response/service_catalog.json`
 - `target_response/brand_catalog.json`
-- `target_response/marketing.yaml`
-- `target_response/clinic_strategy.yaml`
 - `target_response/pricebook/facts.json`
 - `target_response/pricebook/services/*.json` (≥1 offer)
-- `doctor_catalog.json`
 - `md/*.md` (≥1)
 - `brand.yaml`, `clinic_policies.yaml`, `features.yaml`, `lead_config.yaml`, `tone.yaml`, `ui.yaml`, `widget_config.json`
 
 ## Optional
 
+- `target_response/d2_commercial.json` (пустой текущий пример есть в шаблоне)
+- `target_response/d2_direction_prices.json` (только явный обзор направления;
+  существующие dental controls пока требуют отдельного этапа обобщения)
 - `target_response/pricebook/family_prices.json`
 - `video_catalog.yaml`
 - `target_response/context_groups.json` (future, not yet implemented — see

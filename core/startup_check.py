@@ -1,4 +1,4 @@
-"""Validate per-client index artifacts before app serves traffic."""
+"""Validate the actual D2 catalogs before app serves traffic."""
 from __future__ import annotations
 
 import logging
@@ -6,14 +6,17 @@ import os
 import sys
 
 from config import ALLOWED_CLIENTS, APP_ENV, DEFAULT_LLM_MODEL, QWEN_ENABLE_THINKING
-from core.client_runtime import client_md_dir, list_buildable_client_ids
 from core.prod_readiness import evaluate_allowed_client_registry
 from core.one_call_prompt_contract import ONE_CALL_PROMPT_CONTRACT_VERSION
-from core.target_client_data import load_target_client_data
+from core.d2_tenant_snapshot import (
+    d2_clients_root, load_d2_tenant_snapshot, build_d2_model_view,
+    validate_d2_authored_content_refs,
+)
 from logging_setup import log_json
 
 
 def run_startup_check(logger: logging.Logger) -> None:
+    clients_root = d2_clients_root()
     if APP_ENV == "prod":
         registry_errors = evaluate_allowed_client_registry()
         if registry_errors:
@@ -24,14 +27,17 @@ def run_startup_check(logger: logging.Logger) -> None:
             sys.exit(1)
         client_ids = sorted(ALLOWED_CLIENTS)
     else:
-        client_ids = list_buildable_client_ids()
+        client_ids = sorted(
+            path.name for path in clients_root.iterdir()
+            if not path.name.startswith("_") and (path / "md").is_dir()
+        ) if clients_root.is_dir() else []
     if not client_ids:
         logger.error("startup_check_failed: no client packs with md/")
         sys.exit(1)
 
     total_md_files = 0
     for cid in client_ids:
-        md_dir = client_md_dir(cid)
+        md_dir = clients_root / cid / "md"
 
         if not os.path.isdir(md_dir):
             logger.error("startup_check_failed: md dir missing for %s: %s", cid, md_dir)
@@ -51,7 +57,10 @@ def run_startup_check(logger: logging.Logger) -> None:
         total_md_files += len(md_files)
 
         try:
-            data = load_target_client_data(cid)
+            snapshot = load_d2_tenant_snapshot(cid, clients_root=clients_root)
+            build_d2_model_view(snapshot)
+            if validate_d2_authored_content_refs(snapshot):
+                raise ValueError("d2_authored_content_ref_unavailable")
         except Exception as e:
             logger.error(
                 "startup_check_failed: canonical target_response invalid for %s: %s",
@@ -59,10 +68,10 @@ def run_startup_check(logger: logging.Logger) -> None:
                 e,
             )
             sys.exit(1)
-        if not data.bundle.services:
+        if not snapshot.bundle.services:
             logger.error("startup_check_failed: target service catalog empty for %s", cid)
             sys.exit(1)
-        if not data.bundle.offers:
+        if not snapshot.bundle.offers:
             logger.error("startup_check_failed: target price offers empty for %s", cid)
             sys.exit(1)
 

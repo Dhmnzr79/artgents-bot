@@ -12,9 +12,9 @@ no_public_price, составы, отдельные расходы и четыр
 Маркетинговые условия — в facts.json, текущие профили — в d2_commercial.json.
 Описания, технология визита и follow-up — в md/. Второго JS-прайса нет.
 
-Профили предложений намеренно не маскируются под зубы и челюсти. Новые family
-IDs и единицы visit/zone/package ожидают общего контракта; текущий dental enum
-их не принимает. Это зафиксированный blocker, не ошибочно зелёный validator.
+Профили предложений не маскируются под зубы и челюсти. Family IDs и единицы
+visit/zone/package проходят общий D2-каталог; подписи берутся из package.label.
+Snapshot/model view и operational validator проверяют тот же источник.
 Не созданы legacy marketing.yaml/clinic_strategy.yaml и d2_direction_prices.
 Роутинг, ALLOWED_CLIENTS, live servers и существующие клиенты не изменены.
 

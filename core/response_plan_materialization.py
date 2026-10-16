@@ -73,6 +73,9 @@ from contracts.response_plan_materialization import (
     ResponsePlanMaterializationSources,
     SelectedOfferTrace,
 )
+from core.d2_price_offer import (
+    build_d2_price_offer_row, d2_payment_stage_texts, d2_offer_variant_label,
+)
 from core.target_offer_extent_applicability import offer_applies_to_extent
 from contracts.response_plan_post_composer import PostComposerSelectionPlan, ResponseSituationDelta
 from contracts.response_schema import (
@@ -1032,10 +1035,10 @@ def _d2_price_detail_block(
     for offer_id in offer_ids:
         offer = by_id[offer_id]
         service = bundle.services[offer.service_id]
-        variant = _offer_variant_label(bundle, offer)
+        variant = d2_offer_variant_label(bundle, offer)
         label = f"{service.name} — {variant}" if variant else service.name
         available = _d2_price_detail_has_data(offer, part.price_detail_aspect)
-        stages = _d2_payment_stage_texts(offer) if available and part.price_detail_aspect == "stages" else ()
+        stages = d2_payment_stage_texts(offer) if available and part.price_detail_aspect == "stages" else ()
         rows.append(D2FrozenPriceDetailRow(
             source_client_id=sources.session_key.client_id,
             offer_id=offer.offer_id, service_id=offer.service_id,
@@ -1311,7 +1314,7 @@ def _d2_price_block(
     if selected_option_id is not None and not any(offer.option_id == selected_option_id for offer in offers):
         raise MaterializationContractError("d2_no_price_candidates")
     rows = tuple(
-        _d2_frozen_price_row(
+        build_d2_price_offer_row(
             offer,
             bundle=bundle,
             client_id=client_id,
@@ -1393,115 +1396,6 @@ def _d2_content_failure_block(
     )
 
 
-def _d2_frozen_price_row(
-    offer: TargetOffer,
-    *,
-    bundle: ResponseSchemaBundle,
-    client_id: str,
-    terms: D2PublishedOfferTerms,
-) -> D2FrozenPriceRow:
-    service = bundle.services.get(offer.service_id)
-    if service is None or not service.active:
-        raise MaterializationOwnershipError("materialization_foreign_material")
-    detail_fields = dict(includes=tuple(offer.package.includes),
-                         excludes=tuple(offer.package.excludes),
-                         stages=_d2_payment_stage_texts(offer))
-    variant = _offer_variant_label(bundle, offer)
-    service_name = f"{service.name} — {variant}" if variant else service.name
-    price = offer.price
-    unit = ""
-    if isinstance(price, TargetFixedPrice):
-        body = f"{_format_d2_amount(price.amount)}\u00a0{_d2_currency(price.currency)}"
-        unit = billing_unit_phrase(price.billing_unit)
-        mode = "fixed"
-    elif isinstance(price, TargetFromPrice):
-        body = f"от {_format_d2_amount(price.min_amount)}\u00a0{_d2_currency(price.currency)}"
-        unit = billing_unit_phrase(price.billing_unit)
-        mode = "from"
-    elif isinstance(price, TargetRangePrice):
-        body = (
-            f"{_format_d2_amount(price.min_amount)}–{_format_d2_amount(price.max_amount)}\u00a0"
-            f"{_d2_currency(price.currency)}"
-        )
-        unit = billing_unit_phrase(price.billing_unit)
-        mode = "range"
-    elif isinstance(price, TargetNoPublicPrice):
-        return D2FrozenPriceRow(
-            **detail_fields,
-            source_client_id=client_id,
-            offer_id=offer.offer_id,
-            service_id=offer.service_id,
-            mode="no_public_price",
-            display_text=f"{service_name} — {price.approved_text}",
-            service_name=service.name,
-            variant_label=variant,
-            price_display_text=price.approved_text,
-            scope_text=None,
-            approved_text=price.approved_text,
-            condition_texts=_d2_brief_price_conditions(
-                # The first label clause is the billing scope. Without a
-                # numeric price it is not a separate patient-facing condition.
-                # Keep subsequent authored clauses and mandatory caveats.
-                offer, package_label=terms.package_label.partition(";")[2],
-                already_shown=price.approved_text,
-            ),
-        )
-    else:  # pragma: no cover - TargetPrice is a discriminated union.
-        raise MaterializationContractError("d2_price_mode_invalid")
-    package_scope = terms.package_label.strip()
-    scope_text = package_scope.split(";", 1)[0].strip() if package_scope else unit
-    return D2FrozenPriceRow(
-        **detail_fields,
-        source_client_id=client_id,
-        offer_id=offer.offer_id,
-        service_id=offer.service_id,
-        mode=mode,
-        display_text=f"{service_name} — {body} {scope_text}".strip(),
-        service_name=service.name,
-        variant_label=variant,
-        price_display_text=body,
-        scope_text=scope_text or None,
-        amount=price.amount if isinstance(price, TargetFixedPrice) else None,
-        min_amount=(
-            price.min_amount
-            if isinstance(price, (TargetFromPrice, TargetRangePrice))
-            else None
-        ),
-        max_amount=price.max_amount if isinstance(price, TargetRangePrice) else None,
-        currency=price.currency,
-        billing_unit=price.billing_unit,
-        condition_texts=_d2_brief_price_conditions(
-            offer, package_label=package_scope, already_shown=scope_text,
-        ),
-    )
-
-
-def _d2_payment_stage_texts(offer: TargetOffer) -> tuple[str, ...]:
-    """One formatter for frozen card details and written detail responses."""
-    return tuple(
-        f"{stage.label} — {_format_d2_amount(stage.amount)}\u00a0{_d2_currency(stage.currency)}"
-        + (f". {stage.timing_text}" if stage.timing_text else "")
-        for stage in (offer.payment_stages or ())
-    )
-
-
-def _d2_brief_price_conditions(
-    offer: TargetOffer, *, package_label: str, already_shown: str,
-) -> tuple[str, ...]:
-    """Keep authored scope and mandatory caveats, not package contents or payment stages."""
-    # The authored package label carries the precise billing scope. When it is
-    # present, the generic billing-unit phrase is not rendered a second time.
-    # Semicolon-separated clauses are authored data, not inferred from prose.
-    clauses = tuple(part.strip() for part in package_label.split(";") if part.strip())
-    conditions = (item.display_text for item in (
-        offer.required_conditions_metadata.conditions
-        if offer.required_conditions_metadata is not None else ()
-    ))
-    return tuple(dict.fromkeys(
-        item for item in (*clauses, *conditions) if item and item != already_shown
-    ))
-
-
 def _d2_terms_for_offer(
     offer: TargetOffer,
     *,
@@ -1514,16 +1408,6 @@ def _d2_terms_for_offer(
     if terms.source_client_id != client_id:
         raise MaterializationOwnershipError("materialization_foreign_material")
     return terms
-
-
-def _format_d2_amount(amount: int) -> str:
-    return f"{amount:,}".replace(",", "\u00a0")
-
-
-def _d2_currency(currency: str) -> str:
-    if currency == "RUB":
-        return "₽"
-    return currency
 
 
 def _d2_condition_texts(evidence: OfferConditionEvidence) -> tuple[str, ...]:
@@ -2216,22 +2100,6 @@ def _patient_facing_service_label(service: TargetService) -> str:
     return name
 
 
-def _offer_variant_label(bundle: ResponseSchemaBundle, offer: TargetOffer) -> str | None:
-    if offer.brand_id:
-        brand = bundle.brands.brands.get(offer.brand_id)
-        if brand is not None and str(brand.canonical_name).strip():
-            return str(brand.canonical_name).strip()
-    if offer.option_id:
-        service = bundle.services.get(offer.service_id)
-        if service is not None:
-            for option in service.options:
-                if option.option_id == offer.option_id:
-                    label = str(option.name).strip()
-                    if label:
-                        return label
-    return None
-
-
 def _offer_tab_label(bundle: ResponseSchemaBundle, offer: TargetOffer) -> str | None:
     """Button-only authored caption; never replace canonical price or model labels."""
     if offer.brand_id:
@@ -2244,7 +2112,7 @@ def _offer_tab_label(bundle: ResponseSchemaBundle, offer: TargetOffer) -> str | 
             for option in service.options:
                 if option.option_id == offer.option_id and option.tab_label:
                     return str(option.tab_label)
-    return _offer_variant_label(bundle, offer)
+    return d2_offer_variant_label(bundle, offer)
 
 
 def _offer_distinguishing_label(bundle: ResponseSchemaBundle, offer: TargetOffer) -> str:
@@ -2252,7 +2120,7 @@ def _offer_distinguishing_label(bundle: ResponseSchemaBundle, offer: TargetOffer
     if service is None:
         return offer.offer_id
     base = _patient_facing_service_label(service)
-    variant = _offer_variant_label(bundle, offer)
+    variant = d2_offer_variant_label(bundle, offer)
     if variant:
         return f"{base} {variant}"
     return base

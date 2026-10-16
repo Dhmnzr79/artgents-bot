@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from dataclasses import asdict
 from pathlib import Path
@@ -32,6 +33,11 @@ from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 
 class D2TenantSnapshotError(ValueError):
     pass
+
+
+def d2_clients_root() -> Path:
+    """One configured pack root for dialogue, startup and readiness."""
+    return Path(os.getenv("D2_CLIENTS_ROOT") or Path(__file__).resolve().parents[1] / "clients")
 
 
 _FRONTMATTER = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
@@ -211,6 +217,29 @@ def build_d2_model_view(snapshot: D2TenantSnapshot) -> D2ModelView:
         direction_prices=_direction_prices(snapshot.files, bundle),
         commercial=_commercial_contract(snapshot.files, bundle, snapshot.client_id),
     )
+
+
+def validate_d2_authored_content_refs(snapshot: D2TenantSnapshot) -> tuple[str, ...]:
+    """Operational pack integrity from captured data, without per-turn policy changes.
+
+    A model's unsupported source claim still follows the existing recoverable
+    dialogue path. Startup/readiness and the authoring validator reject broken
+    references in the clinic's own catalog before admitting that pack.
+    """
+    documents = {item.content_ref: item for item in snapshot.content}
+    refs = [service.content_ref for service in snapshot.bundle.services.values()]
+    refs.extend(option.content_ref for service in snapshot.bundle.services.values() for option in service.options)
+    missing = [ref for ref in refs if ref is not None and ref not in documents]
+    for fact in snapshot.bundle.facts.values():
+        if fact.detail_ref is None:
+            continue
+        doc, separator, anchor = fact.detail_ref.partition("#")
+        content = documents.get(doc)
+        if not separator or content is None or not any(
+            section.section_ref == f"a:{anchor}" for section in content.sections
+        ):
+            missing.append(fact.detail_ref)
+    return tuple(dict.fromkeys(missing))
 
 
 def _approved_md_corpus(snapshot: D2TenantSnapshot) -> str:

@@ -16,6 +16,7 @@ from core.d2_dialogue_store import D2DialogueStore, D2RequestIdConflict, D2Reque
 from core.d2_live_provider import D2HttpProvider
 from core.d2_demo_limits import admit_demo_call
 from core.d2_usage_limits import ClientUsageAdmission, load_usage_limits, visitor_bucket
+from core.d2_tenant_snapshot import d2_clients_root
 from session import (
     bind_session_client, capture_lead_session_row, restore_lead_session_row, sid_from_body,
 )
@@ -26,10 +27,6 @@ def _store_path(client_id: str) -> Path:
     if configured:
         return Path(configured)
     return Path(per_client_data_dir(client_id)) / "d2_dialogue.sqlite"
-
-
-def _clients_root() -> Path:
-    return Path(os.getenv("D2_CLIENTS_ROOT") or Path(__file__).resolve().parents[1] / "clients")
 
 
 def _response_payload(turn, *, session_key: SessionKey) -> dict:
@@ -91,7 +88,7 @@ def run_d2_ask_json(data: dict, *, client_id: str, peer_ip: str | None = None) -
     user_message = data.get("q") or ""
     if not isinstance(user_message, str):
         raise ValueError("d2_question_invalid")
-    limits = load_usage_limits(client_id, clients_root=_clients_root())
+    limits = load_usage_limits(client_id, clients_root=d2_clients_root())
     visitor_bucket(data.get("visitor_id"), peer_ip)
     if limits and len(user_message) > limits.message_max_chars:
         raise ValueError("message_too_long")
@@ -117,7 +114,7 @@ def run_d2_ask_json(data: dict, *, client_id: str, peer_ip: str | None = None) -
                 provider=D2HttpProvider(admission=lambda: admit_demo_call(
                     store._connection, sid=sid, peer_ip=peer_ip,
                 )) if client_id == "demo" else D2HttpProvider(admission=usage.model if usage else None),
-                clients_root=_clients_root(),
+                clients_root=d2_clients_root(),
                 store=store,
                 now=datetime.now(timezone.utc),
                 request_id=request_id,

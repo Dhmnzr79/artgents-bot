@@ -55,6 +55,7 @@
           "title": "СМ-Клиника: промывание носа методом перемещения",
           "observed_facts": [
             "При процедуре подача раствора сочетается с удалением жидкости и отделяемого.",
+            "Очищение от вязкого отделяемого и уменьшение отёка могут облегчать носовое дыхание; гарантированный срок облегчения не переносился.",
             "Для выполнения требуется соблюдать положение тела и инструкции специалиста.",
             "К ограничениям относятся кровотечения, нарушения свёртывания и ситуации, мешающие спокойно выполнять инструкции."
           ]
@@ -152,6 +153,22 @@
             "Цитология основана на исследовании клеточного материала.",
             "Лабораторное исследование имеет диагностические задачи, отличные от обычного осмотра."
           ]
+        },
+        {
+          "url": "https://www.nhs.uk/tests-and-treatments/cervical-screening/what-is-cervical-screening/",
+          "title": "NHS: What is cervical screening?",
+          "observed_facts": [
+            "Скрининг проверяет материал шейки матки на ВПЧ высокого риска и клеточные изменения в рамках принятой программы.",
+            "При исследовании получают небольшой образец клеток шейки матки."
+          ]
+        },
+        {
+          "url": "https://www.nhs.uk/tests-and-treatments/cervical-screening/your-results/",
+          "title": "NHS: Your cervical screening results",
+          "observed_facts": [
+            "Положительный ВПЧ-тест может сочетаться как с клеточными изменениями, так и с их отсутствием.",
+            "Последующие действия зависят от сочетания результатов."
+          ]
         }
       ]
     },
@@ -194,6 +211,13 @@
             "Необходимый объём диагностики зависит от клинической ситуации.",
             "Эпизодические нарушения могут потребовать длительного мониторирования, а не только короткой ЭКГ."
           ]
+        },
+        {
+          "url": "https://www.nhs.uk/conditions/heart-attack/",
+          "title": "NHS: Heart attack",
+          "observed_facts": [
+            "Сильная давящая боль в груди и выраженное затруднение дыхания требуют срочной медицинской помощи."
+          ]
         }
       ]
     },
@@ -216,6 +240,23 @@
             "ЭКГ фиксирует электрическую активность сердца и используется для оценки ритма и проведения.",
             "Запись в покое и нагрузочные варианты различаются составом.",
             "После исследования могут потребоваться дополнительные обследования."
+          ]
+        },
+        {
+          "url": "https://www.nhs.uk/tests-and-treatments/electrocardiogram/",
+          "title": "NHS: Electrocardiogram (ECG)",
+          "observed_facts": [
+            "При ЭКГ в покое электроды на груди и конечностях регистрируют электрические сигналы сердца.",
+            "Для записи требуется спокойно лежать; удобна одежда, легко открывающая нужные участки."
+          ]
+        },
+        {
+          "url": "https://www.uhs.nhs.uk/Media/UHS-website-2019/Patientinformation/Heartandlungs/Electrocardiogram-ECG-2810-PIL.pdf",
+          "title": "University Hospital Southampton: ECG patient information, reviewed February 2026",
+          "observed_facts": [
+            "Типичная длительность обычной ЭКГ составляет пять–десять минут.",
+            "При ЭКГ в тело не подают электрический ток.",
+            "Для подтверждения диагноза иногда требуются дополнительные исследования."
           ]
         }
       ]
@@ -242,5 +283,162 @@
         }
       ]
     }
-  ]
+  ],
+  "editorial_rewrite_provenance": {
+    "date": "2026-10-16",
+    "baseline": "758f0665968cc98961e88022ec741135d7fc85ad",
+    "public_name": "АртМед",
+    "scope": "Полный авторский рерайт 11 medical service MD: польза посещения, ход процедуры, получение результата, сервис и оснащение. Четыре H3, korotko и два followup-anchor; цены и условия offers не менялись.",
+    "fictional_clinic_boundary": "Публичная подача АртМед согласована владельцем. Клиника и её организационные стандарты вымышлены; источник не подтверждает существование АртМед, реальный штат, доступность записи, работу лаборатории или соблюдение сроков. Медицинские свойства проверяются по отдельным источникам, сервисные числа придуманы для этого pack.",
+    "successfully_reopened_urls": [
+      "https://www.smclinic.ru/professional-services/diagnostika-v-otolaringologii/issledovanie-endoskopicheskoe-lor-organov/",
+      "https://www.smclinic.ru/professional-services/promyvanie-nosa-metodom-peremescheniya/",
+      "https://www.smclinic.ru/diagnosis/funktsionalnaya-diagnostika/ekg-elektrokardiografiya/",
+      "https://www.smclinic.ru/analizy/zhidkostnaya-tsitologiya-sheyki-matki-i-vpch-test/",
+      "https://www.smclinic.ru/doctors/otolaringolog-lor.html",
+      "https://medsi.ru/services/priem-terapevta/",
+      "https://www.smdoctor.ru/doctors/pediatr/",
+      "https://volgograd.medsi.ru/services/section-ginekologiya/",
+      "https://www.smclinic.ru/doctors/urolog.html",
+      "https://perm.medsi.ru/services/priem-kardiologa/",
+      "https://spb.medsi.ru/services/priyem-nevrologa/"
+    ],
+    "additional_successfully_opened_urls": [
+      "https://www.nhs.uk/tests-and-treatments/electrocardiogram/",
+      "https://www.uhs.nhs.uk/Media/UHS-website-2019/Patientinformation/Heartandlungs/Electrocardiogram-ECG-2810-PIL.pdf",
+      "https://www.nhs.uk/tests-and-treatments/cervical-screening/what-is-cervical-screening/",
+      "https://www.nhs.uk/tests-and-treatments/cervical-screening/your-results/",
+      "https://www.nhs.uk/conditions/heart-attack/"
+    ],
+    "clinical_timing": [
+      {
+        "service_id": "ent_endoscopy",
+        "claim": "Обычно 10–15 минут на эндоскопическое исследование.",
+        "source_url": "https://www.smclinic.ru/professional-services/diagnostika-v-otolaringologii/issledovanie-endoskopicheskoe-lor-organov/",
+        "observed_basis": "В разделе техники проведения указана типичная длительность 10–15 минут; это время процедуры, а не срок установления окончательного диагноза."
+      },
+      {
+        "service_id": "nasal_lavage",
+        "claim": "Около 10 минут на промывание методом перемещения.",
+        "source_url": "https://www.smclinic.ru/professional-services/promyvanie-nosa-metodom-peremescheniya/",
+        "observed_basis": "На странице метода указана длительность 10 минут; численность курса из источника не переносилась."
+      },
+      {
+        "service_id": "ecg",
+        "claim": "Около 10 минут на обычную ЭКГ.",
+        "source_urls": [
+          "https://www.smclinic.ru/diagnosis/funktsionalnaya-diagnostika/ekg-elektrokardiografiya/",
+          "https://www.uhs.nhs.uk/Media/UHS-website-2019/Patientinformation/Heartandlungs/Electrocardiogram-ECG-2810-PIL.pdf"
+        ],
+        "observed_basis": "Оба материала указывают типичную длительность пять–десять минут."
+      }
+    ],
+    "invented_service_standards": [
+      {
+        "service_ids": [
+          "ent_consultation",
+          "therapist_consultation",
+          "urology_consultation"
+        ],
+        "facts": [
+          "Первичная консультация: 40 минут.",
+          "Письменное заключение и план выдаются после приёма."
+        ]
+      },
+      {
+        "service_ids": [
+          "pediatric_consultation",
+          "gynecology_consultation",
+          "cardiology_consultation",
+          "neurology_consultation"
+        ],
+        "facts": [
+          "Первичная консультация: 45 минут.",
+          "Письменное заключение и план выдаются после приёма."
+        ]
+      },
+      {
+        "service_ids": [
+          "ent_consultation"
+        ],
+        "facts": [
+          "ЛОР-комбайн с направленным освещением, обычный осмотр в одном кабинете."
+        ]
+      },
+      {
+        "service_ids": [
+          "ent_endoscopy"
+        ],
+        "facts": [
+          "Выбранные изображения сохраняются вместе с описанием.",
+          "Протокол и выбранные снимки выдаются в день посещения."
+        ]
+      },
+      {
+        "service_ids": [
+          "nasal_lavage"
+        ],
+        "facts": [
+          "Контроль переносимости и назначения на каждом посещении.",
+          "Памятка после процедуры и возможность спокойно посидеть."
+        ]
+      },
+      {
+        "service_ids": [
+          "pediatric_consultation"
+        ],
+        "facts": [
+          "Игрушки для знакомства в кабинете.",
+          "Осмотр с участием родителя и объяснения по возрасту."
+        ]
+      },
+      {
+        "service_ids": [
+          "gynecology_consultation",
+          "urology_consultation"
+        ],
+        "facts": [
+          "Отдельное место для переодевания.",
+          "Объяснение и согласование деликатных этапов осмотра."
+        ]
+      },
+      {
+        "service_ids": [
+          "cardiology_consultation"
+        ],
+        "facts": [
+          "При варианте with_ecg запись обсуждается на той же встрече; кардиограмма и заключение выдаются вместе."
+        ]
+      },
+      {
+        "service_ids": [
+          "ecg"
+        ],
+        "facts": [
+          "Врачебная расшифровка и заключение в течение 20 минут после записи.",
+          "Время на спокойный отдых до процедуры."
+        ]
+      },
+      {
+        "service_ids": [
+          "cervical_screening"
+        ],
+        "facts": [
+          "Слот на посещение: 20 минут, включая оформление и объяснения.",
+          "Электронный результат цитологии: до 7 рабочих дней со дня взятия материала.",
+          "Электронный результат расширенного исследования: до 10 рабочих дней со дня взятия материала.",
+          "При дополнительной проверке материала пациенту сообщают новый срок."
+        ]
+      },
+      {
+        "service_ids": [
+          "neurology_consultation"
+        ],
+        "facts": [
+          "Свободная зона для проверки походки и движений в кабинете."
+        ]
+      }
+    ],
+    "medical_editorial_limits": "Не заимствованы гарантии излечения, абсолютной безопасности, неизбежного диагноза за визит, универсальная частота скрининга и число процедур. Английские интервалы и маршрутизация NHS не переносились в российский pack. Клиническая длительность процедуры отделена от вымышленных сроков выдачи документов и результатов АртМед."
+  }
 }

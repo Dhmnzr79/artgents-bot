@@ -1,6 +1,90 @@
 # Подготовка контента вымышленного медцентра — owner GO 2026-10-16
 
-## Тип и границы
+## Полный редакторский рерайт — owner GO 2026-10-16
+
+Продолжение medical content в текущем общем продукте, ветка codex/three-tabs-catalog.
+Repo/top C:/Cursor Projects/artgents-bot-active. Baseline 758f0665968cc98961e88022ec741135d7fc85ad;
+origin/main и merge base f7629491f2bb93ed80e2f58aea53770841bbd6a3.
+Tracked/index чистые; foreign otzyv-1/2/3.jpg сохраняются.
+Тип: контентная редактура, без архитектурного упрощения или runtime изменений.
+
+Owner: переписать каждое описание АртМед живым продающим языком: польза,
+результаты, сроки, ход процедуры, технология и клиника; ограничения только
+содержательные и по делу. До 4 anchor-разделов включая korotko; 5 допустимы
+лишь при необходимости. Разные структуры, каждый раздел — самостоятельная
+полезная тема follow-up. Удалить язык прайса/интерфейса, отсылки к карточкам,
+каталогу и извиняющиеся метакомментарии. Допускаются придуманные организационные
+факты клиники; медицинские свойства/сроки сверяются по тематическим источникам.
+Не подменять содержательную пользу универсальными гарантиями излечения.
+Новое решение заменяет прежнее требование ссылаться в MD на ценовые карточки.
+
+Scope: аудит всех 28 MD (21 услуга + 7 clinic info), полный рерайт; редактура
+тех же публичных marketing body/text_fact без изменения цен, составов, сроков
+акций, allowed refs или механизмов выбора. Metadata ownership/CTA сохраняются,
+suggest_h3 указывают на существующие разделы. Прайс не дублируется в MD.
+Текущий пользователь уже разрешил отдельного контент-агента в этом проекте;
+исследование/редактура 10 aesthetic и 11 medical service docs делегируются
+ранее созданным профильным агентам. Общие документы и финальный аудит — root.
+
+Exact allowlist до редактирования:
+- `docs/tasks/MEDICAL_DEMO_CONTENT_TASK.md`
+- `docs/evidence/client_pack/MEDICAL_DEMO_CONTENT_REPORT.txt`
+- `docs/evidence/client_pack/MEDICAL_DEMO_RESEARCH_MEDICAL.json`
+- `docs/evidence/client_pack/MEDICAL_DEMO_RESEARCH_AESTHETIC.json`
+- `docs/evidence/client_pack/MEDICAL_DEMO_RESEARCH_CLINIC.json`
+- `clients/demo_medical/target_response/d2_commercial.json`
+- `clients/demo_medical/target_response/pricebook/facts.json`
+- `clients/demo_medical/md/cardiology__service__cardiology_consultation.md`
+- `clients/demo_medical/md/cardiology__service__ecg.md`
+- `clients/demo_medical/md/clinic__info__about.md`
+- `clients/demo_medical/md/clinic__info__faq.md`
+- `clients/demo_medical/md/clinic__info__first_visit.md`
+- `clients/demo_medical/md/clinic__info__payment.md`
+- `clients/demo_medical/md/clinic__info__promotions.md`
+- `clients/demo_medical/md/clinic__info__quality.md`
+- `clients/demo_medical/md/clinic__info__technology.md`
+- `clients/demo_medical/md/cosmetology__service__biorevitalization.md`
+- `clients/demo_medical/md/cosmetology__service__botulinum_therapy.md`
+- `clients/demo_medical/md/cosmetology__service__laser_hair_removal.md`
+- `clients/demo_medical/md/cosmetology__service__photorejuvenation.md`
+- `clients/demo_medical/md/cosmetology__service__plasma_therapy.md`
+- `clients/demo_medical/md/cosmetology__service__ultrasound_lifting.md`
+- `clients/demo_medical/md/dermatology__service__dermatology_consultation.md`
+- `clients/demo_medical/md/dermatology__service__digital_dermatoscopy.md`
+- `clients/demo_medical/md/ent__service__ent_consultation.md`
+- `clients/demo_medical/md/ent__service__ent_endoscopy.md`
+- `clients/demo_medical/md/ent__service__nasal_lavage.md`
+- `clients/demo_medical/md/general_medicine__service__therapist_consultation.md`
+- `clients/demo_medical/md/gynecology__service__cervical_screening.md`
+- `clients/demo_medical/md/gynecology__service__gynecology_consultation.md`
+- `clients/demo_medical/md/neurology__service__neurology_consultation.md`
+- `clients/demo_medical/md/pediatrics__service__pediatric_consultation.md`
+- `clients/demo_medical/md/ultrasound__service__abdominal_ultrasound.md`
+- `clients/demo_medical/md/ultrasound__service__thyroid_ultrasound.md`
+- `clients/demo_medical/md/urology__service__urology_consultation.md`
+
+Проверка: редакторское чтение каждого документа; ссылки/anchors/suggest_h3,
+реальный D2 loader/validator и границы commercial refs без вызовов модели.
+Один independent Checker из-за изменения структуры разделов и ссылок,
+пропорциональный контенту, без D2 architecture audit/всего CI/browser.
+No provider/SMTP/VPS/merge/deploy. Отчёт по каждому документу в существующем
+MEDICAL_DEMO_CONTENT_REPORT.txt, research provenance вне model corpus.
+
+Рерайт завершён: 28 MD, в каждом ровно4раздела включая korotko; новые56suggest
+refs разрешаются. Каждый документ прочитан и разобран по пользе/результату/
+срокам/процессу, индивидуальные замечания до→после в существующем report.txt.
+Переписаны также6публичных marketing facts и2commercial body без изменений
+scope/дат/цен/refs. Medical timing provenance отделена от придуманного сервиса.
+Медицинские гарантии не добавлены, срок/эффект описаны содержательно, без
+извиняющегося шаблона. Структурный check28MD/112sections/56refs и сохранности
+metadata/marketing scope PASS; canonical client-pack validator PASS.
+Independent Checker — PASS, P0/P1/P2 нет: прочитаны все28MD и marketing тексты,
+сопоставлены45offers, validator и refs повторно проверены; выборочно подтверждены
+медицинские сроки в первичных источниках. Provider/SMTP/VPS0. Checkpoint в той же
+ветке/PR34; точный commit и push state в итоговом сообщении/Git log. Scope35путей,
+foreign JPG сохраняются; индекс до review пуст. Full CI/browser/live не запускались.
+
+## Историческая подготовка: тип и границы
 
 Контент/документация, не runtime bug fix и не реализованное архитектурное упрощение.
 Владелец разрешил вымышленную клинику, содержательные продающие описания,

@@ -1,0 +1,45 @@
+{
+  "offer_id": "neurology_consultation.repeat",
+  "service_id": "neurology_consultation",
+  "option_id": "repeat",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "visit",
+    "amount": 2600
+  },
+  "package": {
+    "label": "за один повторный приём по тому же обращению в течение 30 дней",
+    "includes": [
+      "Оценка изменений по текущему обращению",
+      "Разбор назначенных результатов",
+      "Уточнение дальнейшего плана"
+    ],
+    "excludes": [
+      "МРТ, КТ, ЭЭГ и ЭНМГ",
+      "Блокады, массаж и физиопроцедуры",
+      "Приёмы других специалистов"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Отдельно: МРТ, КТ, ЭЭГ и ЭНМГ; Блокады, массаж и физиопроцедуры; Приёмы других специалистов."
+      }
+    ]
+  }
+}

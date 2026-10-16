@@ -1,0 +1,48 @@
+{
+  "offer_id": "biorevitalization.face_neck",
+  "service_id": "biorevitalization",
+  "option_id": "face_neck",
+  "active": true,
+  "price": {
+    "mode": "range",
+    "min_amount": 18900,
+    "max_amount": 22900,
+    "currency": "RUB",
+    "billing_unit": "package"
+  },
+  "package": {
+    "label": "за одну согласованную процедуру лица и шеи с включённым объёмом 2 мл; препарат и точная цена в пределах диапазона согласуются до выполнения",
+    "includes": [
+      "Осмотр перед процедурой",
+      "Препарат и указанный объём",
+      "Обработка двух названных зон",
+      "Расходники и памятка"
+    ],
+    "excludes": [
+      "Декольте и кисти",
+      "Дополнительные объёмы препарата",
+      "Курс последующих процедур"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope",
+    "demo_cosmetic_control"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Отдельно: Декольте и кисти; Дополнительные объёмы препарата; Курс последующих процедур."
+      }
+    ]
+  }
+}

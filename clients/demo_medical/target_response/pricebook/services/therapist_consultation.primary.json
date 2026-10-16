@@ -1,0 +1,46 @@
+{
+  "offer_id": "therapist_consultation.primary",
+  "service_id": "therapist_consultation",
+  "option_id": "primary",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "visit",
+    "amount": 2800
+  },
+  "package": {
+    "label": "за один первичный приём",
+    "includes": [
+      "Обсуждение жалоб и истории обращения",
+      "Осмотр терапевта по клинической ситуации",
+      "Разбор предоставленных результатов",
+      "Письменное заключение и дальнейший план"
+    ],
+    "excludes": [
+      "Анализы",
+      "ЭКГ и УЗИ",
+      "Приёмы других специалистов"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Отдельно: Анализы; ЭКГ и УЗИ; Приёмы других специалистов."
+      }
+    ]
+  }
+}

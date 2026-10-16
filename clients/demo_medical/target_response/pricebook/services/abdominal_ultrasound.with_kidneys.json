@@ -1,0 +1,45 @@
+{
+  "offer_id": "abdominal_ultrasound.with_kidneys",
+  "service_id": "abdominal_ultrasound",
+  "option_id": "with_kidneys",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "package",
+    "amount": 4100
+  },
+  "package": {
+    "label": "за один готовый комплекс в течение визита",
+    "includes": [
+      "Состав базового исследования брюшной полости",
+      "Обе почки",
+      "Протокол и выбранные изображения"
+    ],
+    "excludes": [
+      "Мочевой пузырь",
+      "Специальные функциональные пробы",
+      "Консультация лечащего врача"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Отдельно: Мочевой пузырь; Специальные функциональные пробы; Консультация лечащего врача."
+      }
+    ]
+  }
+}

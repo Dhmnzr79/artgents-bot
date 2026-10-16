@@ -1,0 +1,46 @@
+{
+  "offer_id": "cardiology_consultation.with_ecg",
+  "service_id": "cardiology_consultation",
+  "option_id": "with_ecg",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "package",
+    "amount": 4500
+  },
+  "package": {
+    "label": "за один плановый визит: консультация и ЭКГ в покое",
+    "includes": [
+      "Состав первичного приёма кардиолога",
+      "ЭКГ в 12 отведениях",
+      "Врачебная расшифровка",
+      "Обсуждение записи на приёме"
+    ],
+    "excludes": [
+      "Нагрузочные пробы",
+      "Холтер, СМАД и ЭхоКГ",
+      "Анализы и последующие приёмы"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Отдельно: Нагрузочные пробы; Холтер, СМАД и ЭхоКГ; Анализы и последующие приёмы."
+      }
+    ]
+  }
+}

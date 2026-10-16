@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "brands": {
+    "relatox": {
+      "canonical_name": "Релатокс",
+      "tab_label": "Релатокс",
+      "country": "Россия",
+      "aliases": [
+        "relatox"
+      ]
+    }
+  }
+}

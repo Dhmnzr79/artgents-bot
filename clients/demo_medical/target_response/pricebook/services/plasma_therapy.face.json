@@ -1,0 +1,47 @@
+{
+  "offer_id": "plasma_therapy.face",
+  "service_id": "plasma_therapy",
+  "option_id": "face",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "zone",
+    "amount": 6500
+  },
+  "package": {
+    "label": "за одну процедуру лица",
+    "includes": [
+      "Забор крови",
+      "Один стандартный набор для подготовки плазмы",
+      "Подготовка плазмы и проведение процедуры",
+      "Расходные материалы и памятка"
+    ],
+    "excludes": [
+      "Шея и декольте",
+      "Отдельная первичная консультация и анализы",
+      "Следующие посещения"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope",
+    "demo_cosmetic_control"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Отдельно: Шея и декольте; Отдельная первичная консультация и анализы; Следующие посещения."
+      }
+    ]
+  }
+}

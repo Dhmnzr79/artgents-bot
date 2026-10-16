@@ -1,0 +1,48 @@
+{
+  "offer_id": "laser_hair_removal.three_zones",
+  "service_id": "laser_hair_removal",
+  "option_id": "three_zones",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "package",
+    "amount": 7900
+  },
+  "package": {
+    "label": "за готовый комплекс трёх зон в течение одного визита",
+    "includes": [
+      "Обе подмышечные области",
+      "Глубокое бикини в согласованных границах, включая межъягодичную складку",
+      "Обе голени с коленями",
+      "Осмотр, расходники и завершающий уход"
+    ],
+    "excludes": [
+      "Бёдра, ягодицы, живот",
+      "Стопы и пальцы ног",
+      "Следующие сеансы"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope",
+    "demo_cosmetic_control",
+    "demo_laser_three_zones"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Отдельно: Бёдра, ягодицы, живот; Стопы и пальцы ног; Следующие сеансы."
+      }
+    ]
+  }
+}

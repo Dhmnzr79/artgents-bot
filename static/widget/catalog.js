@@ -52,6 +52,7 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
     const list=element('div','clinic-catalog__list');
     const renderRows=()=>{
       list.replaceChildren();const query=state.query.trim().toLocaleLowerCase('ru');
+      list.classList.toggle('clinic-catalog__list--services',Boolean(query||state.section));
       title.textContent=query?'Результаты поиска':sectionById(state.section)?.title||'Услуги и цены';
       if(!query&&!state.section){
         for(const section of state.data.sections){
@@ -65,11 +66,12 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
       });
       if(!found.length)list.append(element('p','clinic-catalog__empty','Ничего не найдено. Попробуйте другое название.'));
       for(const service of found){
-        const row=button('',()=>{state.listScroll=scroller().scrollTop;state.service=service.service_id;state.offer=null;renderDetail();scroller().scrollTop=0;},'clinic-catalog__row');
+        const row=button('',()=>{state.listScroll=scroller().scrollTop;state.service=service.service_id;state.offer=null;renderDetail();scroller().scrollTop=0;},'clinic-catalog__row clinic-catalog__service');
         const first=service.price?.rows[0];
         row.append(element('strong',null,service.name),element('span','clinic-catalog__row-price',first?.price_display_text||state.data.unpriced_text));
         row.append(element('small',null,[query?sectionById(service.section_id).title:null,first?.variant_label,
           service.price?.rows.length>1?`Вариантов: ${service.price.rows.length}`:null].filter(Boolean).join(' · ')));
+        const arrow=element('span','clinic-catalog__arrow','→');arrow.setAttribute('aria-hidden','true');row.append(arrow);
         list.append(row);
       }
     };

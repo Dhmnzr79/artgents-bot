@@ -1523,8 +1523,14 @@ button.clinic-price-card__overview-row:hover{background:#f3f6ff}
 .clinic-catalog__row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:7px 12px;width:100%;border:1px solid #e7eaf0;border-radius:13px;background:#fff;padding:15px;text-align:left;font:inherit;color:#252a33;cursor:pointer}
 .clinic-catalog__row strong{grid-column:1/-1;font-size:16px;font-weight:500;line-height:1.4}
 .clinic-catalog__row small{grid-column:1/-1;font-size:13px;line-height:1.5;color:#737c8d}
-.clinic-catalog__row-price{grid-column:1/-1;font-size:15px;color:var(--clinic-brand)}
-.clinic-catalog__arrow{grid-column:2;grid-row:1;color:var(--clinic-brand)}
+.clinic-catalog__row-price{grid-column:2;grid-row:1;font-size:13px;font-weight:600;line-height:1.5;text-align:right;color:#111;max-width:140px}
+.clinic-catalog__arrow{grid-column:2;grid-row:1;justify-self:end;color:#8a94a5}
+.clinic-catalog__list--services{display:block;border:1px solid #e7eaf0;border-radius:15px;overflow:hidden}
+.clinic-catalog__service{gap:5px 14px;min-height:94px;padding:17px 15px;border:0;border-radius:0;color:#111}
+.clinic-catalog__service+.clinic-catalog__service{border-top:1px solid #e7eaf0}
+.clinic-catalog__service strong{grid-column:1;grid-row:1;min-width:0;font-size:14px;line-height:1.5}
+.clinic-catalog__service small{grid-column:1;grid-row:2;font-size:11px}
+.clinic-catalog__service .clinic-catalog__arrow{grid-row:2}
 .clinic-catalog__eyebrow{font-size:13px;color:#737c8d;margin:0 0 10px}
 .clinic-catalog__description{font-size:15px;line-height:1.65;color:#5f6979}
 .clinic-catalog__description p{margin:0 0 12px}

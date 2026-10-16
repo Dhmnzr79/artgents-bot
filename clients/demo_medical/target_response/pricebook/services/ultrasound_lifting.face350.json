@@ -1,0 +1,47 @@
+{
+  "offer_id": "ultrasound_lifting.face350",
+  "service_id": "ultrasound_lifting",
+  "option_id": "face350",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "package",
+    "amount": 39000
+  },
+  "package": {
+    "label": "за готовую процедуру лица до 350 линий; границы согласует врач",
+    "includes": [
+      "Осмотр и разметка согласованных зон лица",
+      "Аппаратная обработка в пределах готового пакета",
+      "Необходимые расходники",
+      "Памятка после процедуры"
+    ],
+    "excludes": [
+      "Шея, декольте и веки",
+      "Воздействия сверх согласованного пакета",
+      "Другие процедуры"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope",
+    "demo_cosmetic_control"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Отдельно: Шея, декольте и веки; Воздействия сверх согласованного пакета; Другие процедуры."
+      }
+    ]
+  }
+}

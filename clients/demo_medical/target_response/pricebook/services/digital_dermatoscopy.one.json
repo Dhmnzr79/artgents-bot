@@ -1,0 +1,45 @@
+{
+  "offer_id": "digital_dermatoscopy.one",
+  "service_id": "digital_dermatoscopy",
+  "option_id": "one",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "unit",
+    "amount": 1700
+  },
+  "package": {
+    "label": "за исследование одного образования кожи",
+    "includes": [
+      "Цифровая дерматоскопия выбранного образования",
+      "Фотофиксация",
+      "Заключение и дальнейшие рекомендации"
+    ],
+    "excludes": [
+      "Полноценная консультация по другим жалобам",
+      "Карта всей поверхности кожи",
+      "Удаление и гистология"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Отдельно: Полноценная консультация по другим жалобам; Карта всей поверхности кожи; Удаление и гистология."
+      }
+    ]
+  }
+}

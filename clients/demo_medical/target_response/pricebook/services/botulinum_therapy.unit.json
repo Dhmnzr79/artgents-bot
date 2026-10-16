@@ -1,0 +1,46 @@
+{
+  "offer_id": "botulinum_therapy.unit",
+  "service_id": "botulinum_therapy",
+  "option_id": "unit",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "unit",
+    "amount": 330
+  },
+  "package": {
+    "label": "за одну единицу препарата Релатокс в составе согласованной процедуры; это не цена всей процедуры; объём определяет врач, единицы не продаются для самостоятельного применения",
+    "includes": [
+      "Препарат по тарифу за единицу",
+      "Введение в составе назначенной врачом процедуры",
+      "Необходимые расходные материалы"
+    ],
+    "excludes": [
+      "Отдельная первичная консультация",
+      "Другие косметологические процедуры"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope",
+    "demo_cosmetic_control"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Отдельно: Отдельная первичная консультация; Другие косметологические процедуры."
+      }
+    ]
+  },
+  "brand_id": "relatox"
+}

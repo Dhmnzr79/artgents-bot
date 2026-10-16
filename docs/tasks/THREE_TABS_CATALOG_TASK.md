@@ -21,6 +21,63 @@ tenant/privacy/consent и прежние роли Target Contract §3 сохра
 
 ## Этап 7: структура каталога и устранение повторов — owner GO 2026-10-17
 
+Owner GO после фиксации CATALOG_INTERFACE_SPEC.md: «Можешь делать правки».
+Текущий блок — UI bug fix по этому документу, не архитектурное упрощение D2.
+Preflight repo/top C:/Cursor Projects/artgents-bot-active, branch
+codex/three-tabs-catalog, HEAD/baseline64853b363a6b30c2d998bde00ba483c3bca2bdc9;
+origin/main/mergebase f7629491f2bb93ed80e2f58aea53770841bbd6a3.
+Tracked/index чистые, foreign otzyv-1/2/3.jpg сохраняются. Exact allowlist блока:
+- core/d2_price_offer.py
+- core/widget_catalog.py
+- static/widget/catalog.js
+- static/widget/price_card.js
+- static/widget/widget.css
+- tests/test_widget_catalog.py
+- tests/test_widget_catalog_structure_browser.py
+- docs/tasks/THREE_TABS_CATALOG_TASK.md
+
+Удаляем UI label/счётчик, отдельную подпись выбранного варианта, Об услуге,
+дополнительные примечания из price-area. Добавляем summary цены сервиса
+на сервере из canonical rows прежним форматтером; у multiple — minimum «от»,
+no-public в списках пусто. Renderer сохраняет общий механизм; catalog-only
+presentation переносит существенные condition_texts в нижний блок условий,
+не меняя rows, eligibility, model/view/history/lead. Title выбранной позиции
+владеет catalog, цена/условия — прежний builder, как в Target Contract §3.
+Новых цен/акций/наполнения клиентов нет. UI-only renderer option не передаётся
+в API/model и не меняет подбор offers. Проверки: catalog unit, structure browser,
+shared form/remount, no-public chat regression, один focused Checker; provider0.
+
+Результат блока по спецификации: label и счётчики убраны; цены списка справа,
+стрелки под ними. Нет публичных rows — цены в списке нет, одна публичная row —
+её исходная fixed/from/range строка, несколько — минимум нижних границ с «от».
+Canonical rows, состав/доплаты/акции и условия клиентов не изменены. Заголовок
+выбранной позиции берётся из variant_label; отдельный повтор label и общее
+описание услуги не выводятся. Если отдельной authored расшифровки варианта нет,
+общий текст или текст условий вместо неё не придумывается. Об услуге удалён.
+Под ценой только scope_text; остальные condition_texts перенесены в conditions,
+точные совпадения со scope/excludes повторно не выводятся. Порядок непустых
+блоков: includes, excludes, conditions, payment, promotion. Chat layout прежний.
+
+Astra подтвердила границы: локальная presentation option catalog=true,
+canonical rows не меняются, summary использует прежний formatter, никаких
+семантических фильтров/классификаторов/новой памяти. Текущие packs только RUB;
+новое сравнение разных валют этим этапом не задаётся.
+Offline33PASS (включая9 fixed/from/range/min/zero/no-public cases), browser7PASS
+46.14s (structure3, three-tabs3, no-public chat1), итого40 разных cases.
+Browser проверяет отсутствие label/count/extra-notes/Об услуге, blank no-public
+списки и сохранённый no-public detail, title выбранного варианта, перенос
+обязательных условий, поиск/назад/другой вариант/точную заявку и adaptive layout.
+Real9001 read-only3tenant PASS: root/services/positions/detail снимки просмотрены;
+снимки и harness ignored drafts/three-tabs-catalog/spec-*. /ask и /lead блокированы.
+Новых failures нет; известные4 legacy failures прежнего этапа не затронуты,
+прежние datetime.utcnow warnings сохраняются. Full release CI, live model,
+physical iOS/Android/keyboard не проверялись. Provider/model/SMTP/VPS/merge0.
+Восемь файлов allowlist; foreign3JPG сохранены, иных WIP нет. Checkpoint
+`Apply agreed catalog presentation` в текущую ветку и draft PR34, без deploy.
+Independent Checker PASS: собственные33PASS, JUnit7 browserPASS без пропусков;
+P0/P1/P2 нет. Staged names/stat/diff/check проверяются перед commit;
+после checkpoint индекс пуст, push в origin/codex/three-tabs-catalog.
+
 Уточнение owner после просмотра: внутренние variant tabs в выбранной позиции
 каталога убрать. Список вариантов → одна позиция с её названием, ценой и
 условиями → возврат к тому же списку для другого выбора. Предыдущее решение

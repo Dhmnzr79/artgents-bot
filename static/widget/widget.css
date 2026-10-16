@@ -1279,12 +1279,12 @@ button.clinic-price-card__overview-row { cursor:pointer; }
 .clinic-catalog__row small { display:block;font-size:var(--clinic-font-small);line-height:1.43;color:var(--clinic-text-soft);margin-top:4px;overflow-wrap:anywhere; }
 .clinic-catalog__arrow { justify-self:end;width:20px;height:20px;flex-shrink:0;color:var(--clinic-text-soft); }
 .clinic-catalog__list--services { display:block;border:0;border-radius:0; }
-.clinic-catalog__service { display:grid;grid-template-columns:minmax(0,1fr) 18px;align-items:start;gap:0 16px;padding:20px 0;border:0;border-radius:0;background:#fff; }
+.clinic-catalog__service { display:grid;grid-template-columns:minmax(0,1fr) fit-content(45%);align-items:start;gap:0 16px;padding:20px 0;border:0;border-radius:0;background:#fff; }
 .clinic-catalog__service+.clinic-catalog__service { border-top:1px solid var(--clinic-border); }
 .clinic-catalog__service strong { grid-column:1;grid-row:1;min-width:0; }
-.clinic-catalog__row-price { grid-column:1;grid-row:3;margin-top:10px;font-size:var(--clinic-font-main);font-weight:600;line-height:1.375;text-align:left;color:var(--clinic-text);overflow-wrap:anywhere; }
+.clinic-catalog__row-price { grid-column:2;grid-row:1;justify-self:end;font-size:var(--clinic-font-main);font-weight:600;line-height:1.375;text-align:right;color:var(--clinic-text);overflow-wrap:anywhere; }
 .clinic-catalog__service small { grid-column:1;grid-row:2;margin-top:4px; }
-.clinic-catalog__service .clinic-catalog__arrow { grid-column:2;grid-row:1/4;align-self:center;width:18px;height:18px;color:var(--clinic-text-muted); }
+.clinic-catalog__service .clinic-catalog__arrow { grid-column:2;grid-row:2;align-self:start;justify-self:end;margin-top:4px;width:18px;height:18px;color:var(--clinic-text-muted); }
 .clinic-catalog__eyebrow { display:block;font-size:var(--clinic-font-eyebrow);font-weight:500;line-height:1.4;letter-spacing:.075em;color:var(--clinic-text-muted);margin:0 0 8px; }
 .clinic-catalog__description { padding-bottom:16px;font-size:var(--clinic-font-small);line-height:1.5;color:var(--clinic-text-soft);overflow-wrap:anywhere; }
 .clinic-catalog__subtitle { margin:12px 0 20px;font-size:var(--clinic-font-small);line-height:1.5;color:var(--clinic-text-soft);overflow-wrap:anywhere; }

@@ -4,7 +4,7 @@ from datetime import date
 from contracts.response_plan import D2FrozenPriceBlock
 from contracts.widget_catalog import WidgetCatalogNavigation
 from core.d2_commercial_plan import resolve_d2_commercial_plan, resolve_d2_commercial_compatibility
-from core.d2_price_offer import build_d2_price_offer_row
+from core.d2_price_offer import build_d2_price_offer_row, d2_catalog_price_summary
 from core.d2_snapshot_sources import _commercial_authority
 from core.d2_tenant_snapshot import build_d2_model_view
 
@@ -60,6 +60,7 @@ def build_widget_catalog(snapshot, *, as_of: date):
                 details[row.offer_id] = {'price':price_block((row,),'detail'),'parts':parts}
             services.append(dict(service_id=service_id,section_id=section.section_id,name=service.name,
                 aliases=service.aliases,description=description,subtitle=nav.service_subtitles[service_id],
+                price_summary_text=d2_catalog_price_summary(rows),
                 offer_groups=[group.model_dump(mode='json') for group in nav.offer_groups.get(service_id,())],
                 price=price_block(rows,'detail' if len(rows)==1 else 'options') if rows else None,
                 details=details))

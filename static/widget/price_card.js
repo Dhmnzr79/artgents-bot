@@ -1,6 +1,6 @@
 import { setBotAnswerBody } from "./answer_format.js";
 
-export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect, getLatestRevision, rowGroups = null, showTitle = true, offerIdForChoice = choice => String(choice.reply_id || "").replace(/^price_select:/, "")}) {
+export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect, getLatestRevision, rowGroups = null, showTitle = true, catalog = false, offerIdForChoice = choice => String(choice.reply_id || "").replace(/^price_select:/, "")}) {
   let texts = [];
   let financialCard = null;
   const sections = new Map();
@@ -92,7 +92,7 @@ export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect
     }
     if(showTitle){const title=document.createElement('h3');title.className='clinic-price-card__title';
       title.textContent=overview?'Услуги и цены':rows[0].service_name;card.appendChild(title);}
-    if(!options&&(part.choices||[]).length>1){
+    if(!catalog&&!options&&(part.choices||[]).length>1){
       const tabs=document.createElement('div');tabs.className='clinic-price-card__tabs';tabs.setAttribute('role','group');tabs.setAttribute('aria-label','Вариант');
       for(const choice of part.choices){
         const active=offerIdForChoice(choice)===rows[0].offer_id;
@@ -101,7 +101,7 @@ export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect
         tab.addEventListener('click',()=>{if(!active||message.revision!==getLatestRevision())select(choice,message.revision)});tabs.appendChild(tab);
       }card.appendChild(tabs);
     }
-    if(!options&&(part.choices||[]).length<=1&&rows[0].variant_label){
+    if(!catalog&&!options&&(part.choices||[]).length<=1&&rows[0].variant_label){
       const label=document.createElement('p');label.className='clinic-price-card__selected-variant';
       label.textContent=rows[0].variant_label;card.appendChild(label);
     }
@@ -113,17 +113,18 @@ export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect
       const item=document.createElement(options&&choice?'button':'div');
       item.className=options?'clinic-price-card__overview-row':'clinic-price-card__price-area';
       if(options)item.dataset.priceOfferId=row.offer_id;
-      if(options&&row.mode==='no_public_price')item.classList.add('clinic-price-card__overview-row--description');
+      if(options&&row.mode==='no_public_price'&&!catalog)item.classList.add('clinic-price-card__overview-row--description');
       if(options&&choice){item.type='button';item.disabled=disabled();item.addEventListener('click',()=>select(choice,message.revision));}
       if(options){const name=document.createElement('span');name.className='clinic-price-card__overview-name';name.textContent=overview?row.service_name:(row.variant_label||row.service_name);item.appendChild(name);}
       const amount=document.createElement('strong');amount.className='clinic-price-card__amount';
       amount.textContent=row.price_display_text;
       if(row.mode==='no_public_price')amount.classList.add('clinic-price-card__amount--description');
-      else if(!options)amount.classList.add('clinic-price-card__amount--single');item.appendChild(amount);
+      else if(!options)amount.classList.add('clinic-price-card__amount--single');
+      if(!catalog||!options||row.mode!=='no_public_price')item.appendChild(amount);
       if(options&&choice){const arrow=svg('arrow');arrow.classList.add('clinic-price-card__row-arrow');item.appendChild(arrow);}
       if(row.scope_text){const caption=document.createElement('p');caption.className='clinic-price-card__caption';if(!options)caption.appendChild(svg('extent'));const scope=document.createElement('span');scope.textContent=row.scope_text;caption.appendChild(scope);item.appendChild(caption);}
       // Overview is a compact preview; full authored conditions stay in detail.
-      for(const term of (options ? [] : [...new Set(row.condition_texts||[])])){
+      for(const term of (options||catalog ? [] : [...new Set(row.condition_texts||[])])){
         if(term===row.scope_text)continue;
         const note=document.createElement('p');note.className='clinic-price-card__condition';note.appendChild(svg('info'));
         const text=document.createElement('span');text.textContent=term.charAt(0).toUpperCase()+term.slice(1);note.appendChild(text);item.appendChild(note);
@@ -139,6 +140,10 @@ export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect
         for(const line of row.includes){const li=document.createElement('li');li.appendChild(svg('check'));const text=document.createElement('span');text.textContent=line;li.appendChild(text);list.appendChild(li);}el.appendChild(list);
       }
       if(row.excludes?.length){const el=detail('excludes','Оплачивается отдельно','info');const exclusions=document.createElement('ul');for(const line of row.excludes){const li=document.createElement('li');li.textContent=line;exclusions.appendChild(li);}el.appendChild(exclusions);}
+      if(catalog){
+        const terms=[...new Set(row.condition_texts||[])].filter(term=>term!==row.scope_text&&!(row.excludes||[]).includes(term));
+        for(const term of terms)addText(detail('conditions','Условия и преимущества','info'),term);
+      }
       if(row.stages?.length){
         const el=detail('payment','Порядок оплаты','clock');
         for(const line of row.stages){
@@ -154,7 +159,10 @@ export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect
     }
   }
   // Commercial parts may arrive after the promotion; keep the open promo last.
-  for(const card of bubble.querySelectorAll('.clinic-price-card')){const promo=card.querySelector('.clinic-price-card__promotion');if(promo)card.appendChild(promo);}
+  for(const card of bubble.querySelectorAll('.clinic-price-card')){
+    if(catalog)for(const key of ['includes','excludes','conditions','payment']){const section=card.querySelector(`[data-price-section="${key}"]`);if(section)card.appendChild(section);}
+    const promo=card.querySelector('.clinic-price-card__promotion');if(promo)card.appendChild(promo);
+  }
   flushText();
 }
 

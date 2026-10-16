@@ -106,6 +106,18 @@ def build_d2_price_offer_row(
     )
 
 
+def d2_catalog_price_summary(rows: tuple[D2FrozenPriceRow, ...]) -> str | None:
+    """List summary only; the selected offer keeps its full frozen price."""
+    numeric = [row for row in rows if row.mode != "no_public_price"]
+    if not numeric:
+        return None
+    if len(numeric) == 1:
+        return numeric[0].price_display_text
+    cheapest = min(numeric, key=lambda row: row.amount if row.amount is not None else row.min_amount)
+    lower = cheapest.amount if cheapest.amount is not None else cheapest.min_amount
+    return f"от {_format_d2_amount(lower)}\u00a0{_d2_currency(cheapest.currency)}"
+
+
 def d2_payment_stage_texts(offer: TargetOffer) -> tuple[str, ...]:
     """One formatter for frozen card details and written detail responses."""
     return tuple(

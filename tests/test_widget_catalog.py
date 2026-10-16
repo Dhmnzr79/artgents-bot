@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from core.d2_tenant_snapshot import load_d2_tenant_snapshot
 from core.widget_catalog import build_widget_catalog
+from core.d2_price_offer import d2_catalog_price_summary
 from tests.d2_ci_http import http_env,send
 from tests.test_d2_native_price_runtime import Transport,message
 from core.d2_live_provider import D2HttpProvider
@@ -52,6 +53,37 @@ def test_catalog_exact_price_and_offer_promo_scope(http_env,monkeypatch):
     special='Только пакет «Три зоны»'
     assert special in json.dumps(service['details']['laser_hair_removal.three_zones'],ensure_ascii=False)
     assert special not in json.dumps(service['details']['laser_hair_removal.underarms'],ensure_ascii=False)
+    assert service['price_summary_text']=='от 1\u00a0900\u00a0₽'
+
+
+@pytest.mark.parametrize('prices,expected',[
+    ([],None),
+    ([('no_public_price',None,None)],None),
+    ([('fixed',35000,None)],'35\u00a0000\u00a0₽'),
+    ([('from',35000,None)],'от 35\u00a0000\u00a0₽'),
+    ([('range',35000,45000)],'35\u00a0000–45\u00a0000\u00a0₽'),
+    ([('fixed',35000,None),('no_public_price',None,None)],'35\u00a0000\u00a0₽'),
+    ([('fixed',85000,None),('fixed',76200,None),('fixed',101200,None)],'от 76\u00a0200\u00a0₽'),
+    ([('fixed',5000,None),('range',2900,4000),('from',3100,None)],'от 2\u00a0900\u00a0₽'),
+    ([('fixed',0,None),('fixed',100,None)],'от 0\u00a0₽'),
+])
+def test_catalog_price_summary_uses_public_lower_bounds(prices,expected):
+    from core.d2_price_offer import build_d2_price_offer_row
+    from core.d2_published_offer_terms import build_d2_published_offer_terms
+    snapshot=load_d2_tenant_snapshot('demo',clients_root=ROOT/'clients')
+    base=next(offer for offer in snapshot.bundle.offers if offer.offer_id=='classic.one_tooth.implantium')
+    rows=[]
+    for mode,amount,maximum in prices:
+        value=dict(mode=mode)
+        if mode=='no_public_price':value['approved_text']='Стоимость уточнит администратор'
+        else:
+            value.update(currency='RUB',billing_unit='implant')
+            value['amount' if mode=='fixed' else 'min_amount']=amount
+            if mode=='range':value['max_amount']=maximum
+        offer=type(base).model_validate({**base.model_dump(mode='json'),'price':value})
+        bundle=snapshot.bundle.model_copy(update={'offers':(offer,)})
+        rows.append(build_d2_price_offer_row(offer,bundle=bundle,client_id='demo',terms=build_d2_published_offer_terms(offer=offer,source_client_id='demo')))
+    assert d2_catalog_price_summary(tuple(rows))==expected
 
 
 def test_missing_offer_services_remain_visible_without_synthetic_offer(http_env):

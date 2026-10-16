@@ -32,6 +32,13 @@ def test_catalog_flat_grouped_search_back_and_exact_form(http_env,monkeypatch,tm
             (offers/(offer['offer_id']+'.json')).write_text(json.dumps(offer),encoding='utf-8');extra.append(offer['offer_id'])
         catalog_path.write_text(json.dumps(catalog),encoding='utf-8')
         nav['offer_groups'][service_id].append(dict(title='Дополнительные зоны',offer_ids=extra))
+        option_id='individual'
+        catalog[service_id]['options'].append(dict(option_id=option_id,name='Индивидуальная зона'))
+        offer=json.loads(json.dumps(base));offer['offer_id']=service_id+'.'+option_id;offer['option_id']=option_id
+        offer['price']=dict(mode='no_public_price',approved_text='Стоимость уточнит администратор')
+        (offers/(offer['offer_id']+'.json')).write_text(json.dumps(offer),encoding='utf-8')
+        catalog_path.write_text(json.dumps(catalog),encoding='utf-8')
+        nav['offer_groups'][service_id].append(dict(title='Индивидуально',offer_ids=[offer['offer_id']]))
     nav_path.write_text(json.dumps(nav),encoding='utf-8')
     response=client.get('/api/widget-catalog',query_string={'client_id':tenant})
     assert response.status_code==200
@@ -61,11 +68,13 @@ STRUCTURE=r'''
   },fixtures);
   await page.getByRole('tab',{name:'Услуги и цены',exact:true}).click();
   const panel=page.locator('[data-clinic-catalog-panel]');await panel.locator('.clinic-catalog__service').first().waitFor();
+  if(await panel.locator('.clinic-catalog__eyebrow').count())throw new Error('Extra clinic label');
   if(await panel.locator('.clinic-catalog__service').count()!==fixtures.catalog.services.length)throw new Error('Flat root not complete');
   for(const row of await panel.locator('.clinic-catalog__service').all()){
     const name=await row.locator('strong').innerText(),service=fixtures.catalog.services.find(s=>s.name===name);
-    const summary=await row.locator('.clinic-catalog__row-price').innerText();
-    if(service.price?!summary.endsWith('в прайсе'):summary!==fixtures.catalog.unpriced_text)throw new Error('Service summary invents/misses positions');
+    const price=row.locator('.clinic-catalog__row-price');
+    if(service.price_summary_text?await price.innerText()!==service.price_summary_text:await price.count())throw new Error('Service price summary mismatch');
+    if(/в прайсе|Вариантов:|Стоимость уточнит/.test(await row.innerText()))throw new Error('Extra list copy');
   }
   const service=fixtures.catalog.services.find(s=>s.service_id===fixtures.service_id);
   await panel.locator('.clinic-catalog__service').filter({hasText:service.name}).click();
@@ -79,12 +88,19 @@ STRUCTURE=r'''
   for(const size of ['100%','200%'])for(const width of [320,360,390,430,1280]){
     await page.evaluate(size=>document.documentElement.style.fontSize=size,size);await page.setViewportSize({width,height:900});
     const bad=await rows.evaluateAll(rows=>rows.map(row=>{
-      const amount=row.querySelector('.clinic-price-card__amount').getBoundingClientRect(),arrow=row.querySelector('.clinic-price-card__row-arrow').getBoundingClientRect();
-      return row.scrollWidth>row.clientWidth+1||arrow.top<amount.bottom-1||Math.abs(arrow.right-amount.right)>1;
+      const amount=row.querySelector('.clinic-price-card__amount')?.getBoundingClientRect(),arrow=row.querySelector('.clinic-price-card__row-arrow').getBoundingClientRect();
+      return row.scrollWidth>row.clientWidth+1||(amount&&(arrow.top<amount.bottom-1||Math.abs(arrow.right-amount.right)>1));
     }).some(Boolean));
     if(bad)throw new Error('Price/arrow layout '+size+'/'+width);
   }
   await page.evaluate(()=>document.documentElement.style.fontSize='100%');await page.setViewportSize({width:390,height:900});
+  for(const source of service.price.rows.filter(row=>row.mode==='no_public_price')){
+    const row=panel.locator(`[data-price-offer-id="${source.offer_id}"]`);
+    if(await row.locator('.clinic-price-card__amount').count())throw new Error('Unpublished price description in list');
+    await row.click();
+    if(await panel.locator('.clinic-price-card__amount').innerText()!==source.price_display_text)throw new Error('No-public detail explanation lost');
+    await panel.getByRole('button',{name:'← '+service.name,exact:true}).click();
+  }
   const search=panel.getByRole('searchbox',{name:'Поиск по прайсу'});
   if(service.price.rows.length>6){
     await search.fill('Дополнительные зоны');if(await rows.count()!==6)throw new Error('Group search missed published positions');
@@ -95,7 +111,15 @@ STRUCTURE=r'''
   if(await rows.count()||!await panel.locator('.clinic-price-card__price-area').count())throw new Error('Position detail not opened');
   if(await panel.locator('.clinic-price-card__tabs').count())throw new Error('Selected position still has variant tabs');
   let expected=service.price.rows.find(row=>row.offer_id===chosen);
-  if(await panel.locator('.clinic-price-card__selected-variant').innerText()!==expected.variant_label)throw new Error('Selected position label lost');
+  if(await panel.locator('.clinic-catalog__title').innerText()!==expected.variant_label)throw new Error('Selected position title lost');
+  if(await panel.locator('.clinic-price-card__selected-variant,.clinic-catalog__subtitle').count())throw new Error('Repeated label/general description');
+  if((await panel.innerText()).includes('Об услуге'))throw new Error('Unapproved service description block');
+  if(await panel.locator('.clinic-price-card__price-area .clinic-price-card__condition').count())throw new Error('Extra notes below price');
+  if(await panel.locator('.clinic-price-card__price-area .clinic-price-card__caption').count()!==(expected.scope_text?1:0))throw new Error('Scope line changed');
+  for(const term of expected.condition_texts.filter(term=>term!==expected.scope_text)){
+    const section=expected.excludes.includes(term)?'excludes':'conditions';
+    if(!(await panel.locator(`[data-price-section="${section}"]`).textContent()).includes(term))throw new Error('Mandatory condition lost '+term);
+  }
   if(await panel.locator('.clinic-price-card__price-area .clinic-price-card__amount').innerText()!==expected.price_display_text)throw new Error('Selected position price changed');
   if(await page.getByRole('tab',{name:'Услуги и цены',exact:true}).getAttribute('aria-selected')!=='true')throw new Error('Unexpected tab switch');
   await panel.getByRole('button',{name:'← '+service.name,exact:true}).click();
@@ -106,7 +130,7 @@ STRUCTURE=r'''
   chosen=await other.getAttribute('data-price-offer-id');expected=service.price.rows.find(row=>row.offer_id===chosen);
   await other.click();
   if(await panel.locator('.clinic-price-card__tabs').count())throw new Error('Second position restored tabs');
-  if(await panel.locator('.clinic-price-card__selected-variant').innerText()!==expected.variant_label)throw new Error('Other position not selected');
+  if(await panel.locator('.clinic-catalog__title').innerText()!==expected.variant_label)throw new Error('Other position not selected');
   if(await panel.locator('.clinic-price-card__price-area .clinic-price-card__amount').innerText()!==expected.price_display_text)throw new Error('Other position price changed');
   await panel.getByRole('button',{name:'Оставить заявку',exact:true}).click();
   const form=panel.locator('.clinic-booking');await form.waitFor();

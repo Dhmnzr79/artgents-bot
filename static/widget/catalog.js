@@ -1,5 +1,4 @@
 import { renderPriceBody } from './price_card.js';
-import { setBotAnswerBody } from './answer_format.js';
 
 const element=(tag,cls,text)=>{const el=document.createElement(tag);if(cls)el.className=cls;if(text!=null)el.textContent=text;return el;};
 const button=(text,action,cls='clinic-catalog__back')=>{const el=element('button',cls,text);el.type='button';el.addEventListener('click',action);return el;};
@@ -23,9 +22,9 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
       if(position){state.offer=null;renderDetail();scroller().scrollTop=state.offerScroll;return;}
       state.service=null;state.offer=null;renderList();scroller().scrollTop=state.listScroll;
     }));
-    root.append(element('h2','clinic-catalog__title',service.name),element('p','clinic-catalog__subtitle',service.subtitle));
-    const description=element('div','clinic-catalog__description');setBotAnswerBody(description,service.description);
     const price=detail?.price||service.price;
+    root.append(element('h2','clinic-catalog__title',position?(price.rows[0].variant_label||service.name):service.name));
+    if(!position)root.append(element('p','clinic-catalog__subtitle',service.subtitle));
     if(price){
       const cardRoot=element('div');
       const renderPositions=()=>{
@@ -35,7 +34,7 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
         if(!rows.length){cardRoot.append(element('p','clinic-catalog__empty','Нет подходящих ценовых позиций'));return;}
         const groups=service.offer_groups.length?service.offer_groups.map(group=>({...group,offer_ids:group.offer_ids.filter(id=>rows.some(row=>row.offer_id===id))})).filter(group=>group.offer_ids.length):null;
         renderPriceBody(cardRoot,{revision:state.data.catalog_version,bodyParts:[{kind:'price_card',price:{...price,rows},choices:price.presentation==='options'?choices(service):[]},...(detail?.parts||((price.presentation==='detail'?service.details[price.rows[0].offer_id]?.parts:[])||[]))]},
-        {clientId,rowGroups:groups,showTitle:false,isDisabled:()=>false,getLatestRevision:()=>state.data.catalog_version,
+        {clientId,rowGroups:groups,showTitle:false,catalog:true,isDisabled:()=>false,getLatestRevision:()=>state.data.catalog_version,
           offerIdForChoice:choice=>choice.offer_id,onSelect:choice=>{
             state.offerScroll=scroller().scrollTop;
             state.offer=choice.offer_id;renderDetail();scroller().scrollTop=0;
@@ -49,8 +48,6 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
     }else{
       root.append(element('p','clinic-catalog__unpriced',state.data.unpriced_text));
     }
-    const information=element('details','clinic-price-card__detail');
-    information.append(element('summary',null,'Об услуге'),description);root.append(information);
     const apply=button('Оставить заявку',()=>{
       const offer=state.offer||(service.price?.presentation==='detail'?service.price.rows[0].offer_id:null);
       onApply({service_id:service.service_id,offer_id:offer,catalog_version:state.data.catalog_version},formMount);
@@ -66,7 +63,7 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
     }));
     const heading=element('div','clinic-catalog__heading');
     const title=element('h2','clinic-catalog__title');
-    heading.append(element('span','clinic-catalog__eyebrow',state.data.label),title);
+    heading.append(title);
     const input=element('input','clinic-catalog__search');input.type='search';input.placeholder='Найти услугу или направление…';
     input.setAttribute('aria-label','Поиск по всему каталогу');input.value=state.query;
     const list=element('div','clinic-catalog__list');
@@ -89,9 +86,8 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
       if(!found.length)list.append(element('p','clinic-catalog__empty','Ничего не найдено. Попробуйте другое название.'));
       for(const service of found){
         const row=button('',()=>{state.listScroll=scroller().scrollTop;state.service=service.service_id;state.offer=null;state.offerQuery='';state.offerScroll=0;renderDetail();scroller().scrollTop=0;},'clinic-catalog__row clinic-catalog__service');
-        const count=service.price?.rows.length||0;
-        const word={one:'позиция',few:'позиции',many:'позиций',other:'позиции'}[new Intl.PluralRules('ru').select(count)];
-        row.append(element('strong',null,service.name),element('span','clinic-catalog__row-price',count?`${count} ${word} в прайсе`:state.data.unpriced_text));
+        row.append(element('strong',null,service.name));
+        if(service.price_summary_text)row.append(element('span','clinic-catalog__row-price',service.price_summary_text));
         row.append(element('small',null,service.subtitle));
         row.append(arrow());
         list.append(row);

@@ -9,6 +9,9 @@ receipt is persisted here.
 from __future__ import annotations
 
 import sqlite3
+import secrets
+import hmac
+from hashlib import sha256
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +19,7 @@ from contracts.d2_dialogue import D2CompletedTurn, D2DialogueRecord, D2LeadEffec
 from contracts.response_plan import SessionKey
 from contracts.response_plan_materialization import MaterializedResponseOutcome
 from contracts.response_plan_session import ResponsePlanSessionRevisionConflict
+from contracts.booking_form import BookingFormReceipt
 
 
 class D2RequestIdConflict(ValueError):
@@ -30,7 +34,7 @@ class D2RequestInProgress(RuntimeError):
 class D2RequestReservation:
     request_id: str
     request_fingerprint: str
-    completed: D2CompletedTurn | None = None
+    completed: D2CompletedTurn | BookingFormReceipt | None = None
 
     @property
     def is_replay(self) -> bool:
@@ -82,6 +86,16 @@ class D2DialogueStore:
         ).fetchone()
         return D2CompletedTurn.model_validate_json(row[0]) if row and row[0] else None
 
+    def read_dialogue_history(self, key: SessionKey, *, before_revision=None, limit=50):
+        rows = self._connection.execute(
+            "SELECT payload FROM d2_turn_request WHERE client_id=? AND sid=? AND status='complete' "
+            "AND (? IS NULL OR json_extract(payload,'$.committed_revision')<?) "
+            "ORDER BY rowid DESC LIMIT ?",(key.client_id,key.sid,before_revision,before_revision,limit+1)).fetchall()
+        turns=[D2CompletedTurn.model_validate_json(row[0]) for row in rows[:limit]]
+        if any(turn.context.session_key!=key for turn in turns):
+            raise ValueError('d2_history_owner_mismatch')
+        return tuple(reversed(turns)),len(rows)>limit
+
     def read_completion(self, key: SessionKey, request_id: str) -> D2CompletedTurn | None:
         """Read an exact tenant/session receipt, never a historical price search."""
         row = self._connection.execute(
@@ -128,6 +142,11 @@ class D2DialogueStore:
                 fingerprint, status, payload = row
                 if fingerprint != request_fingerprint:
                     raise D2RequestIdConflict("d2_request_id_payload_conflict")
+                if status in {"form_pending","form_complete"} and payload is not None:
+                    receipt = BookingFormReceipt.model_validate_json(payload)
+                    if (receipt.client_id,receipt.sid,receipt.request_id) != (key.client_id,key.sid,request_id):
+                        raise ValueError("form_receipt_owner_mismatch")
+                    return D2RequestReservation(request_id=request_id,request_fingerprint=request_fingerprint,completed=receipt)
                 if status == "complete" and payload is not None:
                     return D2RequestReservation(
                         request_id=request_id,
@@ -148,6 +167,33 @@ class D2DialogueStore:
                 (key.client_id, key.sid, request_id, request_fingerprint, "inflight"),
             )
         return D2RequestReservation(request_id=request_id, request_fingerprint=request_fingerprint)
+
+    def private_fingerprint(self, payload: bytes) -> str:
+        """Persist one random server key, never a separate hash of a contact slot."""
+        with self._connection:
+            self._connection.execute('CREATE TABLE IF NOT EXISTS d2_private_metadata (name TEXT PRIMARY KEY, value BLOB NOT NULL)')
+            self._connection.execute('INSERT OR IGNORE INTO d2_private_metadata VALUES(?,?)',('form_digest_key',secrets.token_bytes(32)))
+            key = self._connection.execute('SELECT value FROM d2_private_metadata WHERE name=?',('form_digest_key',)).fetchone()[0]
+        return hmac.new(key,b'private-booking-v1\0'+payload,sha256).hexdigest()
+
+    def save_form_pending(self, receipt: BookingFormReceipt) -> None:
+        """Commit effect intent without touching ordinary state or its revision."""
+        if receipt.status != 'pending':
+            raise ValueError('form_pending_required')
+        with self._connection:
+            updated = self._connection.execute("UPDATE d2_turn_request SET status='form_pending',payload=? WHERE client_id=? AND sid=? AND request_id=? AND request_fingerprint=? AND status='inflight'",
+                (receipt.model_dump_json(),receipt.client_id,receipt.sid,receipt.request_id,receipt.request_fingerprint))
+            if updated.rowcount != 1:
+                raise D2RequestInProgress('form_reservation_unavailable')
+
+    def finish_form(self, receipt: BookingFormReceipt) -> None:
+        if receipt.status == 'pending':
+            raise ValueError('form_terminal_required')
+        with self._connection:
+            updated = self._connection.execute("UPDATE d2_turn_request SET status='form_complete',payload=? WHERE client_id=? AND sid=? AND request_id=? AND request_fingerprint=? AND status='form_pending'",
+                (receipt.model_dump_json(),receipt.client_id,receipt.sid,receipt.request_id,receipt.request_fingerprint))
+            if updated.rowcount != 1:
+                raise D2RequestInProgress('form_effect_not_pending')
 
     def abandon_request(self, key: SessionKey, *, request_id: str, request_fingerprint: str) -> None:
         """A failed, non-final request is retryable and must not look completed."""

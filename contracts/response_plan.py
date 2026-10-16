@@ -870,6 +870,7 @@ def _validate_price_detail_ui_actions(
 
 
 class UiPlanCandidates(ResponsePlanModel):
+    booking_form: bool = False
     lead_consent: LeadConsentPrompt | None = None
     quick_replies: tuple[UiQuickReplyCandidate, ...] = ()
     buttons: tuple[UiButtonCandidate, ...] = ()
@@ -1344,6 +1345,7 @@ class ResolvedTextualCtaBlock(ResponsePlanModel):
 
 
 class ResolvedUiPlan(ResponsePlanModel):
+    booking_form: bool = False
     lead_consent: LeadConsentPrompt | None = None
     quick_replies: tuple[UiQuickReplyCandidate, ...] = ()
     buttons: tuple[UiButtonCandidate, ...] = ()
@@ -1847,6 +1849,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
 
 
 class ResponseUIProjection(ResponsePlanModel):
+    booking_form: bool = False
     lead_consent: LeadConsentPrompt | None = None
     composer_input_mode: Literal["text", "phone"] = "text"
     quick_replies: tuple[UiQuickReplyCandidate, ...] = ()

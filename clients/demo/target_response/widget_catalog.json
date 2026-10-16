@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "client_id": "demo",
+  "unpriced_text": "Стоимость уточнит администратор",
+  "sections": [
+    {
+      "section_id": "implantation",
+      "title": "Имплантация",
+      "service_ids": [
+        "classic",
+        "one_stage",
+        "all_on_4",
+        "all_on_6",
+        "temporary_teeth",
+        "bone_graft",
+        "sinus_lift",
+        "zygomatic_implants",
+        "pterygoid_implants"
+      ]
+    },
+    {
+      "section_id": "prosthetics",
+      "title": "Протезирование",
+      "service_ids": [
+        "implant_supported_prosthetics",
+        "zirconia_crowns",
+        "clasp_dentures",
+        "removable_dentures"
+      ]
+    },
+    {
+      "section_id": "treatment",
+      "title": "Лечение зубов и дёсен",
+      "service_ids": [
+        "caries",
+        "pulpitis",
+        "teeth_treatment",
+        "tooth_extraction",
+        "periodontitis"
+      ]
+    },
+    {
+      "section_id": "aesthetics",
+      "title": "Эстетика улыбки",
+      "service_ids": [
+        "professional_whitening",
+        "veneers",
+        "aligners"
+      ]
+    },
+    {
+      "section_id": "diagnostics",
+      "title": "Диагностика",
+      "service_ids": [
+        "tomography"
+      ]
+    }
+  ]
+}

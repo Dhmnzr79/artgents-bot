@@ -19,6 +19,195 @@ read-only граница НикаДент ниже относится к уже 
 tenant/privacy/consent и прежние роли Target Contract §3 сохраняются.
 Вопросы владельцу — только обычным текстом с примерами, без quiz/popup.
 
+## Этап 3: рабочий каталог и три вкладки — owner GO 2026-10-16
+
+Владелец: «Давай» после описания каталога, трёх вкладок, общей формы,
+страничного входа и подключения медцентра в панель. Scope всех трёх tenants.
+Это продолжение той же задачи/ветки, а не новая ветка от старого baseline.
+Repo/top C:/Cursor Projects/artgents-bot-active, branch codex/three-tabs-catalog;
+baseline HEAD fe165d42cf995787492f5552b20459018ffd6fa5, origin/main и merge base
+f7629491f2bb93ed80e2f58aea53770841bbd6a3. До начала tracked/index чистые,
+foreign otzyv-1/2/3.jpg сохраняются.
+
+Тип: product feature; извлечение единственного renderer карточки — упрощение.
+До → после → удалённая зависимость: карточка закрыта внутри chat closure →
+один renderer получает frozen part и callbacks → каталог не копирует её DOM,
+ценовые правила или ссылки price_select диалога. Общий row builder/selector
+предыдущих этапов сохраняется. Каталог читает snapshot, не пишет dialogue
+state/revision, не публикует dialogue refs и не вызывает модель. Его локальный
+выбор варианта не объявляется новым ходом диалога. Авторские разделы задаются
+в tenant data; никаких dental списков в коде. Полнота/ownership refs проверяются.
+Нет JS-массивов с прайсом из прототипа. Отсутствие публичной суммы не скрывает
+услугу; однозначное предложение открывается сразу, несколько сначала списком.
+Browse не меняет выбранную заявку; только явная кнопка заявки переносит точный
+service/offer в общий черновик. Поля имени/телефона доступны до галочки;
+согласие не отправляет форму, нужна отдельная кнопка submit. После success
+благодарность без новой заявки. Контакты не переходят в model/D2 history.
+Форма сохраняет прежних consent/delivery/limit/replay owners; её receipt не
+подменяет ordinary dialogue completion. Детали интеграции согласуются с Astra
+по реальным paths до изменения lead runtime. VPS/merge/provider/SMTP запрещены.
+
+Первый блок allowlist (каталог, общий renderer, UI shell и описание этапа):
+- contracts/widget_catalog.py
+- core/widget_catalog.py
+- core/widget_cors.py
+- app.py
+- static/widget/price_card.js
+- static/widget/catalog.js
+- static/widget/widget.js
+- static/widget/widget.css
+- clients/demo/target_response/widget_catalog.json
+- clients/demo_medical/target_response/widget_catalog.json
+- clients/nikadent/target_response/widget_catalog.json
+- clients/_template/target_response/widget_catalog.json
+- tests/test_widget_catalog.py
+- tests/test_widget_three_tabs_browser.py
+- tests/release/offline.txt
+- docs/CLIENT_PACK_AUTHORING.md
+- docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md
+- docs/tasks/THREE_TABS_CATALOG_TASK.md
+
+Перед изменением других путей формы/page context/admission allowlist расширяется
+с объяснением, а не задним числом при staging. Целевые проверки: read-only API
+всех tenants, точные rows/условия/акции/ref isolation, browser desktop/mobile:
+направления/global search/back position/variants/tab history/общий draft.
+Один independent Checker завершённого substantive этапа, focused recheck findings.
+
+Расширение allowlist перед интеграцией общей формы (Astra consultation):
+- contracts/booking_form.py
+- contracts/response_plan.py
+- core/d2_booking_form.py
+- core/d2_dialogue_store.py
+- core/d2_lead_bridge.py
+- core/d2_dialogue.py
+- core/response_plan_resolver.py
+- core/response_ui_projection.py
+- core/lead_email.py
+- lead_service.py
+- static/widget/booking_form.js
+- tests/test_widget_booking_form.py
+
+До → после → removed dependency: booking → private slots/name/phone classifier
+и сообщения → одно предложение формы и private structured submit → удаляются
+достижимые collecting/interrupt/resume paths и phone composer режима записи.
+Согласие и доставка остаются server-owned. Тот же D2 store сохраняет приватный
+PII-free receipt через общий namespace reservation, без ordinary revision/history.
+Единственный sender handle_lead, request fingerprint keyed; unknown не resend.
+Форма учитывает существующие usage limits и server-owned catalog selection.
+В demo_stub сервер всё равно требует accepted=true, но consent_receipt=null
+как прежде; показываем текст без выдуманных юридических URLs. НикаДент требует
+existing definition fingerprint и строгий LeadConsentReceipt. Клиент не выбирает
+delivery mode; после включения реальной доставки definition обязателен.
+
+Расширение allowlist перед page entry/local admission и проверками:
+- contracts/widget_config.py
+- contracts/d2_dialogue.py
+- core/d2_tenant_snapshot.py
+- core/d2_live_provider.py
+- core/d2_http_adapter.py
+- core/d2_demo_limits.py
+- tests/test_d2_demo_session_budget.py
+- clients/demo/widget_config.json
+- clients/demo_medical/widget_config.json
+- clients/nikadent/widget_config.json
+- static/widget-test.html
+- static/widget-test-panel.js
+- scripts/start_local_widget.ps1
+- tests/test_widget_entry_context.py
+- tests/test_lead_consent.py
+- tests/test_d2_phone_mask.py
+- tests/test_d2_native_price_runtime.py
+- tests/test_widget_page_menus.py
+- tests/js/widget_page_menus_harness.mjs
+- core/widget_session.py
+- core/d2_completion_context.py
+- tests/test_widget_session.py
+
+Full navigation remount восстанавливает сохранённую публикацию из того же store.
+POST /api/widget-session read-only (SID в JSON, не в URL/access log), UUID SID,
+no-store, прежние origin/tenant guards. Страницы по 50 ordinary completions,
+private form receipts не входят. Existing current receipt ref хранится также
+у своего completion, чтобы UI не ограничивался окном model-context в 3 хода.
+Это ссылка на уже выполненный ход, не summary/второй владелец истории. История
+не продлевает TTL/revision, не переавторизует старые действия. Контакты в прозе
+маскируются, цены и canonical клинические данные не пересобираются.
+
+Начальная страница — immutable provenance в существующем D2 record, не текущая
+потребность пациента и не parallel semantic memory. Только authored exact path
+→ canonical topic из captured widget config. Даётся модели при первом ordinary
+ходе; далее его повторно не навязываем, TTL не начинает тему заново. Клиент не
+присылает тему или URL/query/hash. Общая local launcher admission включает три
+клиента; production registry/host rules не расширяются. Новый medical использует
+существующий demo admission c tenant namespace, не новый набор лимитов.
+
+### Реализация и evidence этапа 3
+
+Reachable path: `/api/widget-catalog` → captured snapshot/navigation.bind →
+existing `build_d2_price_offer_row`/commercial selector → общий `price_card.js`.
+Nav содержит только разделы и service IDs: полнота/active/tenant проверяются
+также при snapshot load. НикаДент: 5 активных услуг без offers остаются видимыми;
+никаких синтетических offers/фиктивных сумм. Полное описание свёрнуто после цен.
+Каталог: вертикальный список, поиск по всей клинике, back/scroll/variant state.
+
+Booking path: обычное понимание booking и прежний policy gate → booking_form
+UI; опубликованная CTA локально открывает ту же форму. Проверенный вариант
+передаёт service/offer и frozen catalog version. `/lead` → typed validation →
+same store reservation/HMAC fingerprint → consent/current catalog/usage owners →
+PII-free form_pending → единственный `handle_lead` → terminal receipt. Имя,
+телефон и пожелание только в private closure sender, не в payload SQLite/model.
+Удалены D2 collecting_consent/name/phone classifiers, pause/resume/reconcile и
+phone composer: следующий вопрос после открытия формы — обычный вопрос модели.
+Старые unrelated session/legacy sales_fast APIs вне reachable D2 не объявлены
+полностью удалёнными. Общий effect protocol остаётся для других D2 операций.
+Форма не меняет ordinary record/revision/activity и не ломает старые price refs.
+Pending/unknown replay не отправляет письмо заново; неподтверждённая отправка
+не сбрасывается простым открытием другой формы/выбором услуги.
+
+Page path: widget capture → HTTP pathname validation → captured exact authored
+config/topic validation → immutable D2 entry provenance → только первый ordinary
+model input. Повторный переход/TTL не задают новую тему. Default menu сохраняет
+authored video/buttons; удалено необоснованное требование, чтобы само наличие
+pageMenus превращало default menu ровно в три question-only кнопки. Отдельные
+page menus по-прежнему имеют три вопроса, blank q отклоняется.
+
+Navigation restore: POST read-only → ordinary completed receipts того же store →
+existing public_dialogue_plan masking → UI. Нет localStorage копии переписки,
+private form/lead blocks и их UI не восстанавливаются. Цена frozen, не пересчёт.
+Price clicks восстанавливаются в исходную карточку тем же mergePriceMessage,
+который используется streaming UI. Restore блокирует первый send, проверяет SID
+и generation после reset. Ошибка старого/повреждённого receipt требует явного
+нового разговора; silent migration/fallback не добавлены.
+
+Проверки: targeted form/catalog/native **69 passed**; заключительный расширенный
+offline run **141 passed** (каталог, форма, entry, restore, consent, phone,
+page-menu contracts, demo budget, native price, variants). Браузер трёх tenants
+с реальными offline API fixtures — **3 passed**, включая chat CTA exact offer,
+общий draft, checkbox gate, lost-response immutable retry, success, remount,
+price merge, геометрию 320/390/1280. Screenshots визуально проверены: dental chat
+detail, медицинский каталог и форма НикаДент на 390px. Focused старый page-menu
+Chrome harness **1 passed**: 10 routes, вопросы/promo, root video/gallery,
+исходная страница при SPA до первого send и новая страница после явного reset.
+Он выявил потерю default gallery от самого наличия pageMenus: устранено для
+default с authored video, explicit question-only меню по-прежнему без галереи.
+Initial pathname теперь фиксируется при mount/reset и используется welcome
+и запросами. Изменение базы требует явного reload в сообщении catalog_changed,
+а не повторного выбора из прежнего cache. Новые targeted файлы включены в
+release/offline.txt. Independent Checker: **PASS**, собственные **48 passed**;
+focused recheck initial-page/gallery/stale-catalog изменений без P0/P1/P2.
+
+Остаточные ограничения: живое понимание модели/SMTP не проверены; full CI перед
+merge не запускался. Старые сценарии последовательного conversational intake
+заменены тестами нового согласованного form-контракта, не пропущены условием.
+Известные до этапа raw-JSON helper failures не объявляются исправленными.
+Локальный сервер перезапущен штатным launcher после проверки PID/commandline
+только этого repo. Startup check OK, read-only API: demo 5 разделов/22 услуги,
+medical 10/21, НикаДент 5/27. Никаких POST к работающему /ask или /lead.
+Provider/SMTP/VPS calls **0**, merge/deploy нет. Review выполнен до staging;
+для checkpoint `feat(widget): ship shared three-tab catalog and private form`
+подготовлены только 51 точный путь из allowlist. Checkpoint остаётся в той же
+topic branch/PR34; hash и push state приведены в итоговом сообщении и Git log.
+Foreign otzyv JPG сохранены.
+
 ## Этап 2: варианты цен, общая карточка, точная применимость акций
 
 Baseline 2a7870e1f9973f84e067850cfe7396671090ce2e, та же task branch

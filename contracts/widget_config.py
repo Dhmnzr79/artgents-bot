@@ -88,6 +88,12 @@ class WidgetStarterPromptV1(_WidgetStrictModel):
             raise ValueError("empty")
         return value
 
+    @field_validator('q')
+    @classmethod
+    def _question_not_blank(cls,value):
+        if value is not None and not value.strip():raise ValueError('empty_question')
+        return value
+
 
 class WidgetWelcomePromotionV1(_WidgetStrictModel):
     title: str = Field(min_length=1)
@@ -108,6 +114,7 @@ class WidgetPagePromptV1(_WidgetStrictModel):
 
 
 class WidgetPageMenuV1(_WidgetStrictModel):
+    topicId: str | None = Field(default=None,min_length=1)
     paths: list[str] = Field(min_length=1)
     welcomeText: str = Field(min_length=1)
     starterPrompts: list[WidgetPagePromptV1] = Field(min_length=3, max_length=3)
@@ -169,12 +176,8 @@ class WidgetPresentationV1(_WidgetStrictModel):
     def _page_menu_defaults_and_unique_paths(self) -> WidgetPresentationV1:
         if self.pageMenus is None:
             return self
-        if not (self.welcomeText or "").strip() or len(self.starterPrompts) != 3:
-            raise ValueError("page_menu_default_requires_welcome_and_three_prompts")
-        for prompt in self.starterPrompts:
-            WidgetPagePromptV1.model_validate(prompt.model_dump(include={"label", "q"}))
-            if prompt.videoKey or prompt.soon:
-                raise ValueError("page_menu_prompts_must_be_questions")
+        if not (self.welcomeText or "").strip():
+            raise ValueError("page_menu_default_requires_welcome")
         paths = [path for menu in self.pageMenus for path in menu.paths]
         if len(paths) != len(set(paths)):
             raise ValueError("duplicate_page_menu_path")

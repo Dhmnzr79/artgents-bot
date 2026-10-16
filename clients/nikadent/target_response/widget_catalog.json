@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "client_id": "nikadent",
+  "unpriced_text": "Стоимость уточнит администратор",
+  "sections": [
+    {
+      "section_id": "implantation",
+      "title": "Имплантация",
+      "service_ids": [
+        "classic",
+        "one_stage",
+        "all_on_4",
+        "all_on_6",
+        "sinus_lift",
+        "bone_graft"
+      ]
+    },
+    {
+      "section_id": "prosthetics",
+      "title": "Протезирование",
+      "service_ids": [
+        "prosthetics_consultation",
+        "metal_ceramic_crowns",
+        "zirconia_crowns",
+        "core_inlay",
+        "removable_dentures",
+        "clasp_dentures",
+        "implant_supported_prosthetics",
+        "denture_repair",
+        "fixed_bridge",
+        "temporary_denture",
+        "denture_reline"
+      ]
+    },
+    {
+      "section_id": "treatment",
+      "title": "Лечение зубов и дёсен",
+      "service_ids": [
+        "caries",
+        "teeth_treatment",
+        "pulpitis",
+        "periodontitis",
+        "tooth_extraction"
+      ]
+    },
+    {
+      "section_id": "restoration",
+      "title": "Эстетика и реставрация",
+      "service_ids": [
+        "veneers",
+        "ceramic_inlays",
+        "tooth_restoration",
+        "emax_crowns"
+      ]
+    },
+    {
+      "section_id": "hygiene",
+      "title": "Гигиена",
+      "service_ids": [
+        "teeth_cleaning"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "client_id": "_template",
+  "unpriced_text": "Стоимость уточнит администратор",
+  "sections": [
+    {
+      "section_id": "general",
+      "title": "Услуги",
+      "service_ids": [
+        "sample_service"
+      ]
+    }
+  ]
+}

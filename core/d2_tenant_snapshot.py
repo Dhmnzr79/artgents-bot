@@ -74,7 +74,7 @@ def _read_set(client_root: Path) -> tuple[tuple[str, bytes], ...]:
             continue
         files.extend(item for item in base.rglob(pattern)
                      if item.is_file() and item not in (target / "marketing.yaml", target / "clinic_strategy.yaml"))
-    for name in ("tone.yaml", "ui.yaml", "video_catalog.yaml", "clinic_policies.yaml"):
+    for name in ("tone.yaml", "ui.yaml", "video_catalog.yaml", "clinic_policies.yaml", "widget_config.json"):
         path = client_root / name
         if path.is_file():
             files.append(path)
@@ -185,7 +185,39 @@ def load_d2_tenant_snapshot(client_id: str, *, clients_root: Path) -> D2TenantSn
             allowed_service_ids=direct or topical,
             sections=sections,
         ))
-    return D2TenantSnapshot(client_id=client_id, fingerprint=_fingerprint(client_id, first), bundle=bundle, files=first, content=tuple(content), service_topics=MappingProxyType(service_topics), diagnostics=tuple(diagnostics))
+    snapshot = D2TenantSnapshot(client_id=client_id, fingerprint=_fingerprint(client_id, first), bundle=bundle, files=first, content=tuple(content), service_topics=MappingProxyType(service_topics), diagnostics=tuple(diagnostics))
+    _validated_page_menus(snapshot)
+    nav_raw=dict(snapshot.files).get('target_response/widget_catalog.json')
+    if nav_raw is not None:
+        from contracts.widget_catalog import WidgetCatalogNavigation
+        try:
+            WidgetCatalogNavigation.model_validate_json(nav_raw).bind(client_id,
+                {key for key,service in bundle.services.items() if service.active})
+        except ValueError as exc:
+            raise D2TenantSnapshotError('widget_catalog_invalid') from exc
+    return snapshot
+
+
+def _validated_page_menus(snapshot):
+    from contracts.widget_config import WidgetPresentationV1
+    raw = dict(snapshot.files).get('widget_config.json')
+    if raw is None:return ()
+    try:
+        menus = WidgetPresentationV1.model_validate_json(raw).pageMenus or ()
+    except ValueError as exc:
+        raise D2TenantSnapshotError('widget_page_config_invalid') from exc
+    if any(menu.topicId is not None and menu.topicId not in set(snapshot.service_topics.values()) for menu in menus):
+        raise D2TenantSnapshotError('widget_page_topic_invalid')
+    return menus
+
+
+def resolve_entry_page_context(snapshot, path):
+    from contracts.d2_dialogue import D2EntryPageContext
+    if path is None:return None
+    from contracts.widget_config import WidgetPageMenuV1
+    normalized = WidgetPageMenuV1._exact_paths([path])[0]
+    menu = next((menu for menu in _validated_page_menus(snapshot) if normalized in menu.paths),None)
+    return D2EntryPageContext(path=normalized,topic_id=menu.topicId) if menu and menu.topicId else None
 
 
 def build_d2_bundle(snapshot: D2TenantSnapshot) -> ResponseDataCatalog:

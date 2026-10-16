@@ -53,6 +53,7 @@ def project_response_ui(plan: ResolvedResponsePlan) -> ResponseUIProjection:
         body_parts = ()
     return ResponseUIProjection(
         lead_consent=ui.lead_consent,
+        booking_form=ui.booking_form,
         quick_replies=ui.quick_replies,
         buttons=ui.buttons,
         widget=ui.widget,

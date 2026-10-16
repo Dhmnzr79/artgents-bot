@@ -9,6 +9,9 @@ from core.origin_guard import matching_widget_origin
 
 _WIDGET_CORS_PREFIXES = (
     "/api/widget-config",
+    "/api/widget-catalog",
+    "/api/booking-form",
+    "/api/widget-session",
     "/api/video-catalog",
     "/api/media/",
     "/ask",

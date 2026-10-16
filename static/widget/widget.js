@@ -1,3 +1,6 @@
+import { mountCatalog } from "./catalog.js";
+import { createBookingForm } from "./booking_form.js";
+import { renderPriceBody, mergePriceMessage } from "./price_card.js";
 ﻿import { streamAsk } from "./api.js";
 import { setBotAnswerBody } from "./answer_format.js";
 import { friendlyErrorMessage } from "./api.js";
@@ -173,42 +176,6 @@ function isActiveLeadFlowPayload(payload) {
     payload.ui.quick_replies.some((item) => String(item?.reply_id || "").startsWith("lead:"));
 }
 
-/** Phone-shaped input only; ordinary questions stay available during intake. */
-function isPhoneInput(raw) {
-  return Boolean(String(raw || "").trim()) && /^[\d+()\s-]+$/.test(String(raw || ""));
-}
-
-function extractNational10Digits(raw) {
-  const value = String(raw || "").trim();
-  const digits = value.replace(/\D/g, "");
-  if (value.startsWith("+7") || ((digits.length < 10 || digits.length === 11) && /^[78]/.test(digits))) {
-    return digits.slice(1);
-  }
-  return digits;
-}
-
-/** Display: +7(999) 999-99-99. Never discard excess digits. */
-function formatRuMobileDisplay(national) {
-  const n = national.replace(/\D/g, "");
-  if (n.length > 10) return n;
-  if (!n.length) return "+7";
-  let s = "+7(" + n.slice(0, 3);
-  if (n.length <= 3) return s;
-  s += ") " + n.slice(3, 6);
-  if (n.length <= 6) return s;
-  s += "-" + n.slice(6, 8);
-  if (n.length <= 8) return s;
-  return s + "-" + n.slice(8, 10);
-}
-
-function ruPhoneToBackendE164(inputVal) {
-  if (!isPhoneInput(inputVal)) return "";
-  const value = String(inputVal).trim();
-  if (value.startsWith("+") && !value.startsWith("+7")) return "";
-  const n = extractNational10Digits(value);
-  return n.length === 10 ? "+7" + n : "";
-}
-
 /**
  * @typedef {Object} StarterPrompt
  * @property {string} label
@@ -262,7 +229,8 @@ function botTurnFromPayload(data, expectedClientId) {
     bodyParts: Array.isArray(ui.body_parts) ? ui.body_parts : [],
     followups: [],
     quickReplies,
-    leadConsent: ui.lead_consent?.source_client_id === expectedClientId ? ui.lead_consent : null,
+    bookingForm: ui.booking_form === true,
+    catalogVersion: data.catalog_version,
     revision: data.revision,
     linksDismissed: false,
     videoKey: vk,
@@ -660,7 +628,7 @@ function isWidgetPresentationContractValid(config) {
     const questionsValid = prompts => Array.isArray(prompts) && prompts.length === 3 &&
       prompts.every(p => p && typeof p.label === "string" && p.label.trim() &&
         typeof p.q === "string" && p.q.trim() && !p.videoKey && !p.soon);
-    if (!Array.isArray(config.pageMenus) || !questionsValid(config.starterPrompts) ||
+    if (!Array.isArray(config.pageMenus) || !starterPromptsValid(config.starterPrompts) ||
         !String(config.welcomeText || "").trim()) return false;
     const paths = new Set();
     for (const menu of config.pageMenus) {
@@ -715,12 +683,15 @@ export function mountWidget(root, config, { pagePath } = {}) {
   const clientId = String(config.clientId).trim();
   const sidStorageKey = `${STORAGE_SID}:${clientId}`;
   const teaserStorageKey = `${STORAGE_LAUNCHER_TEASER}:${clientId}`;
+  const readEntryPagePath = () => String((typeof pagePath === 'function' ? pagePath() : pagePath) || location.pathname)
+    .split(/[?#]/, 1)[0].replace(/\/+$/, '') || '/';
   const resolvedAvatarUrl = resolvePackAssetUrl(
     apiBase,
     (config.avatarUrl || "").trim() || DEFAULT_AVATAR_URL
   );
 
   const state = {
+    entryPagePath: readEntryPagePath(),
     isOpen: false,
     messages: [],
     lastPayload: null,
@@ -850,7 +821,6 @@ export function mountWidget(root, config, { pagePath } = {}) {
     <div class="clinic-shell" data-clinic-root>
       ${launcherHtml}
       <div class="clinic-shell__panel" id="clinic-panel" role="dialog" aria-modal="true" aria-label="Чат" data-clinic-panel>
-        <main class="clinic-shell__main" aria-label="Сообщения">
           <header class="clinic-shell__header clinic-shell__header--sticky">
             <div class="clinic-shell__header-main">
               <div class="clinic-shell__header-avatar">
@@ -868,7 +838,15 @@ export function mountWidget(root, config, { pagePath } = {}) {
               <button type="button" class="clinic-shell__header-close clinic-btn-icon clinic-btn-ghost" data-clinic-close title="Свернуть" aria-label="Свернуть чат">✕</button>
             </div>
           </header>
-          <div class="clinic-shell__feed" data-clinic-feed></div>
+          <nav class="clinic-shell__tabs" role="tablist" aria-label="Разделы помощника">
+            <button type="button" role="tab" aria-selected="true" data-clinic-tab="assistant">Помощник</button>
+            <button type="button" role="tab" aria-selected="false" data-clinic-tab="catalog">Услуги и цены</button>
+            <button type="button" role="tab" aria-selected="false" data-clinic-tab="booking">Запись</button>
+          </nav>
+        <main class="clinic-shell__main" aria-label="Содержимое помощника">
+          <div class="clinic-shell__feed" role="tabpanel" aria-label="Помощник" data-clinic-feed></div>
+          <section class="clinic-shell__tab-panel" role="tabpanel" aria-label="Услуги и цены" data-clinic-catalog-panel hidden><div data-clinic-catalog></div></section>
+          <section class="clinic-shell__tab-panel" role="tabpanel" aria-label="Запись" data-clinic-booking-panel hidden><div data-clinic-booking></div></section>
         </main>
         <form class="clinic-shell__composer" data-clinic-composer-form>
           <div class="clinic-shell__composer-inner">
@@ -898,6 +876,33 @@ export function mountWidget(root, config, { pagePath } = {}) {
   const input = root.querySelector("[data-clinic-input]");
   const sendBtn = root.querySelector("[data-clinic-send]");
   const composerForm = root.querySelector("[data-clinic-composer-form]");
+  const catalogPanel=root.querySelector('[data-clinic-catalog-panel]');
+  const bookingPanel=root.querySelector('[data-clinic-booking-panel]');
+  const bookingRoot=root.querySelector('[data-clinic-booking]');
+  const catalog=mountCatalog(root.querySelector('[data-clinic-catalog]'),{apiBase,clientId,onApply:(selection,mount)=>booking.open(selection,mount)});
+  const booking=createBookingForm({apiBase,clientId,getSid:()=>{let sid=getSid();if(!sid){sid=crypto.randomUUID();setSid(sid);}return sid;},getCatalog:()=>catalog.getData()});
+  let activeTab='assistant';
+  const tabScroll={assistant:0,catalog:0,booking:0};
+  const tabPanels={assistant:feed,catalog:catalogPanel,booking:bookingPanel};
+  function switchTab(tab){
+    if(activeTab===tab)return;
+    tabScroll[activeTab]=tabPanels[activeTab].scrollTop;activeTab=tab;
+    for(const [name,element]of Object.entries(tabPanels))element.hidden=name!==tab;
+    composerForm.hidden=tab!=='assistant';
+    for(const button of root.querySelectorAll('[data-clinic-tab]')){
+      const selected=button.dataset.clinicTab===tab;button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1;
+    }
+    tabPanels[tab].scrollTop=tabScroll[tab];
+    if(tab==='catalog')void catalog.load();
+    if(tab==='booking')void booking.render(bookingRoot,{extended:true});
+  }
+  for(const [index,button]of [...root.querySelectorAll('[data-clinic-tab]')].entries()){
+    button.tabIndex=index===0?0:-1;
+    button.onclick=()=>switchTab(button.dataset.clinicTab);
+    button.onkeydown=event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();
+      const tabs=[...root.querySelectorAll('[data-clinic-tab]')],next=event.key==='Home'?0:event.key==='End'?2:(index+(event.key==='ArrowRight'?1:2))%3;
+      tabs[next].click();tabs[next].focus();};
+  }
   const unreadDot = root.querySelector("[data-clinic-unread]");
   const btnClose = root.querySelector("[data-clinic-close]");
   const launcherTeaserEl = root.querySelector("[data-clinic-launcher-teaser]");
@@ -1166,12 +1171,18 @@ export function mountWidget(root, config, { pagePath } = {}) {
   }
 
   function resetSession() {
+    state.restoreGeneration=(state.restoreGeneration||0)+1;
+    state.restoring=false;state.restoreError=false;
     clearWaitingLabelTimers();
-    if (state.pending) return;
+    if (state.pending || booking.pending) return;
+    booking.reset();
+    catalog.reset();
+    switchTab("assistant");
     clearStoredSid();
     feed.querySelector(".clinic-shell__welcome-screen")?.remove();
     state.messages = [];
     state.lastPayload = null;
+    state.entryPagePath = readEntryPagePath();
     state.retryBody = null;
     state.priceUpdate = null;
     state.typingPhase = "searching";
@@ -1345,6 +1356,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
   }
 
   function beginPendingRequest(body) {
+    body.entry_page_path=state.entryPagePath;
     clearWaitingLabelTimers();
     state.pending = true;
     const leadRequest = isLeadFlowAskBody(body, state.lastPayload)
@@ -1505,24 +1517,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
                 || (!volumeChange && !offerChange)) {
               setError("Не удалось отобразить ответ. Попробуйте ещё раз.");
             } else {
-              // Replace price-owned content at its existing anchors. Independent
-              // text (e.g. an address between price and promotion) stays in place.
-              const before = turn.bodyParts.slice(0, nextCardIndex).filter(p => p.price_owned);
-              const after = turn.bodyParts.slice(nextCardIndex + 1).filter(p => p.price_owned);
-              const merged = [];
-              let beforeInserted = false, afterInserted = false;
-              old.bodyParts.forEach((part, index) => {
-                if (part.price_owned) {
-                  if (index < cardIndex && !beforeInserted) { merged.push(...before); beforeInserted = true; }
-                  if (index > cardIndex && !afterInserted) { merged.push(...after); afterInserted = true; }
-                } else if (index === cardIndex) {
-                  if (!beforeInserted) { merged.push(...before); beforeInserted = true; }
-                  merged.push(nextCard);
-                } else merged.push(part);
-              });
-              if (!afterInserted) merged.push(...after);
-              Object.assign(old, turn, {bodyParts: merged});
-              if (volumeChange) old.volumeNavigation.selectedReplyId = body.ref;
+              mergePriceMessage(old,turn,body.ref);
             }
           } else state.messages.push(turn);
         }
@@ -1761,7 +1756,6 @@ export function mountWidget(root, config, { pagePath } = {}) {
     const cardRows = (m.bodyParts || []).filter(part => part.kind === "price_card")
       .flatMap(part => part.price?.rows || []);
     const items = (m.quickReplies || []).filter((it) => {
-      if (m.leadConsent && [m.leadConsent.accept_ref, "lead:cancel"].includes(it.ref)) return false;
       if (isCaseGalleryReply(clientId, it)) return false;
       if (String(it.ref).startsWith("price_select:") && cardRows.length) return false;
       if (String(it.ref).startsWith("volume:") && m.volumeNavigation) return false;
@@ -1805,57 +1799,6 @@ export function mountWidget(root, config, { pagePath } = {}) {
     }
   }
 
-  function renderLeadConsent(bubble, m) {
-    const consent = m.leadConsent;
-    if (!consent || m.linksDismissed || m.revision !== state.lastPayload?.revision) return;
-    const accept = (m.quickReplies || []).find(it => it.ref === consent.accept_ref);
-    const cancel = (m.quickReplies || []).find(it => it.ref === "lead:cancel");
-    if (!accept || !cancel) return;
-    const block = document.createElement("div");
-    block.className = "clinic-lead-consent";
-    const label = document.createElement("label");
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = false;
-    checkbox.disabled = state.pending || Boolean(state.retryBody);
-    checkbox.dataset.leadConsentCheck = "";
-    const text = document.createElement("span");
-    text.textContent = consent.checkbox_text;
-    label.append(checkbox, text);
-    const links = document.createElement("div");
-    links.className = "clinic-lead-consent__links";
-    for (const [title, url] of [["Согласие на обработку", consent.consent_url],
-                                ["Политика обработки данных", consent.policy_url]]) {
-      let parsed;
-      try { parsed = new URL(url); } catch { continue; }
-      if (parsed.protocol !== "https:" || parsed.username || parsed.password) continue;
-      const a = document.createElement("a");
-      a.href = parsed.href; a.target = "_blank"; a.rel = "noopener noreferrer"; a.textContent = title;
-      links.appendChild(a);
-    }
-    const actions = document.createElement("div");
-    actions.className = "clinic-lead-consent__actions";
-    const next = document.createElement("button");
-    next.type = "button"; next.textContent = "Продолжить"; next.disabled = true;
-    next.dataset.leadConsentAccept = "";
-    checkbox.addEventListener("change", () => {
-      next.disabled = !checkbox.checked || state.pending || Boolean(state.retryBody);
-    });
-    const submit = (action, echo) => {
-      if (state.pending || state.retryBody) return;
-      m.linksDismissed = true;
-      void sendAsk({ref: action.ref, ui_revision: m.revision, q: "", userEcho: echo});
-    };
-    next.addEventListener("click", () => {
-      if (checkbox.checked) submit(accept, "Согласие на обработку контактов подтверждено");
-    });
-    const skip = document.createElement("button");
-    skip.type = "button"; skip.textContent = "Без записи";
-    skip.className = "clinic-lead-consent__skip"; skip.dataset.leadConsentCancel = "";
-    skip.disabled = state.pending || Boolean(state.retryBody);
-    skip.addEventListener("click", () => submit(cancel, "Продолжить без записи"));
-    actions.append(next, skip); block.append(label, links, actions); bubble.appendChild(block);
-  }
 
   /**
    * @param {HTMLElement} wrap
@@ -1868,7 +1811,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
     const trail = document.createElement("div");
     trail.className = "clinic-turn__trail";
 
-    const publishedCta = m.cta && m.cta.text && m.revision === state.lastPayload?.revision;
+    const publishedCta = !m.bookingForm && m.cta && m.cta.text && m.revision === state.lastPayload?.revision;
     const galleryBooking = m.caseGallery && m.revision === state.lastPayload?.revision
       && !isActiveLeadFlowPayload(state.lastPayload)
       && state.lastPayload?.attribution_kind !== "lead";
@@ -1882,14 +1825,15 @@ export function mountWidget(root, config, { pagePath } = {}) {
       c.disabled = state.pending || Boolean(state.retryBody);
       c.addEventListener("click", () => {
         if (state.pending || state.retryBody) return;
-        dismissTrailingsAll(state.messages);
-        dismissLinksAll(state.messages);
-        const echo = ctaLabel;
-        if (publishedCta) {
-          void sendAsk({ ref: m.cta.ref, ui_revision: m.revision, q: "", userEcho: echo });
-        } else {
-          void sendAsk({ q: "Хочу записаться на консультацию", userEcho: echo });
+        const price=m.bodyParts?.find(part=>part.kind==='price_card')?.price;
+        if(price&&m.catalogVersion){
+          const services=new Set(price.rows.map(row=>row.service_id));
+          if(services.size===1)booking.select({service_id:price.rows[0].service_id,
+            offer_id:price.presentation==='detail'?price.rows[0].offer_id:null,catalog_version:m.catalogVersion});
         }
+        m.bookingForm=true;
+        renderFeed({preserveScroll:true});
+
       });
       trail.appendChild(c);
     }
@@ -1922,7 +1866,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
     if (keepWelcome && prevWelcome) {
       feed.appendChild(prevWelcome);
     } else if (!state.started) {
-      const welcomeMenu = welcomeMenuForPath(config, pagePath ?? window.location.pathname);
+      const welcomeMenu = welcomeMenuForPath(config, state.entryPagePath);
       const screen = document.createElement("section");
       screen.className = "clinic-shell__welcome-screen";
       screen.setAttribute("aria-label", "Приветствие");
@@ -1985,7 +1929,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
         }
         linksBox.appendChild(b);
       }
-      if (config.pageMenus == null && casesForClient(clientId).length) {
+      if ((config.pageMenus == null || (welcomeMenu === config && config.starterPrompts.some(prompt => prompt.videoKey))) && casesForClient(clientId).length) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "clinic-msg__link";
@@ -2073,7 +2017,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
       bubble.className = "clinic-msg clinic-msg--bot";
       const text = String(m.text || "").trim();
       if (m.bodyParts?.some((part) => part.kind === "price_card")) {
-        renderPriceBody(bubble, m);
+        renderPriceBody(bubble, m, {clientId, isDisabled: () => state.pending || Boolean(state.retryBody) || m.historyExpired || isActiveLeadFlowPayload(state.lastPayload), onSelect: (choice,revision) => void sendAsk({ref:choice.reply_id,ui_revision:revision,q:'',priceMessage:m}), getLatestRevision: () => state.lastPayload?.revision});
       } else if (text) {
         const body = document.createElement("div");
         body.className = "clinic-msg__body";
@@ -2090,7 +2034,10 @@ export function mountWidget(root, config, { pagePath } = {}) {
         appendCaseOffer(bubble, m);
       }
       appendVideoOffer(bubble, m, idx);
-      renderLeadConsent(bubble, m);
+      if(m.bookingForm){
+        const formMount=document.createElement('div');formMount.className='clinic-booking-mount';formMount.dataset.chatBooking='';
+        bubble.append(formMount);void booking.render(formMount);
+      }
       renderInlineLinks(bubble, m, idx);
       wrap.appendChild(bubble);
       renderTrail(wrap, m, idx);
@@ -2118,7 +2065,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
     } else {
       scrollChatPaneToEnd(feed, { force: state.messages.length > 0 });
     }
-    syncComposerLeadUi();
+    syncComposerInputMode();
     syncSendState();
   }
 
@@ -2171,160 +2118,6 @@ export function mountWidget(root, config, { pagePath } = {}) {
     getOrCreateLinksBox(bubble).appendChild(button);
   }
 
-  function renderPriceBody(bubble, message) {
-    let texts = [];
-    let financialCard = null;
-    const sections = new Map();
-    let promotionCount = 0;
-    const svg = (name) => {
-      const paths = {layers:'m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5',
-        check:'m5 12 4 4 10-10',clock:'M12 7v5l4 2',info:'M12 11v6M12 7v1',
-        gift:'M3 9h18v4H3ZM5 13v8h14v-8M12 9v12M12 9C5 9 5 3 8 3c3 0 4 6 4 6s1-6 4-6c3 0 3 6-4 6Z',
-        chevron:'m9 5 7 7-7 7',arrow:'M4 12h16M14 6l6 6-6 6',extent:'m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3ZM4 7.5l8 4.5 8-4.5M12 12v9'};
-      const el = document.createElementNS('http://www.w3.org/2000/svg','svg');
-      el.setAttribute('viewBox','0 0 24 24'); el.setAttribute('aria-hidden','true');
-      el.classList.add('clinic-price-card__icon');
-      if (name === 'info' || name === 'clock') {
-        const circle = document.createElementNS(el.namespaceURI,'circle');
-        circle.setAttribute('cx','12');circle.setAttribute('cy','12');circle.setAttribute('r','9');el.appendChild(circle);
-      }
-      const path = document.createElementNS(el.namespaceURI,'path');path.setAttribute('d',paths[name]);el.appendChild(path);
-      return el;
-    };
-    const flushText = () => {
-      if (!texts.length) return;
-      const body = document.createElement('div');body.className='clinic-msg__body';
-      setBotAnswerBody(body,texts.join('\n\n'));bubble.appendChild(body);texts=[];
-    };
-    const detail = (key, label, icon) => {
-      if (sections.has(key)) return sections.get(key);
-      const el=document.createElement('details');el.className='clinic-price-card__detail';
-      el.dataset.priceSection=key;
-      const summary=document.createElement('summary');summary.appendChild(svg(icon));
-      const title=document.createElement('span');title.textContent=label;summary.appendChild(title);
-      const arrow=svg('chevron');arrow.classList.add('clinic-price-card__chevron');summary.appendChild(arrow);
-      el.appendChild(summary);financialCard.appendChild(el);sections.set(key,el);return el;
-    };
-    const addText = (target,text) => {
-      const body=document.createElement('div');body.className='clinic-price-card__detail-body';
-      setBotAnswerBody(body,text);target.appendChild(body);
-    };
-    const disabled = () => state.pending || Boolean(state.retryBody) || isActiveLeadFlowPayload(state.lastPayload);
-    const select = (choice, revision) => void sendAsk({ref:choice.reply_id,ui_revision:revision,q:'',priceMessage:message});
-    for (const part of message.bodyParts) {
-      if (part.kind==='text' && part.price_owned && part.price_section && financialCard) {
-        flushText();
-        if (part.price_section==='promotion' && promotionCount++===0) {
-          const promo=document.createElement('section');promo.className='clinic-price-card__promotion';
-          promo.appendChild(svg('gift'));
-          const content=document.createElement('div');addText(content,part.text);promo.appendChild(content);financialCard.appendChild(promo);
-        } else {
-          const payment=part.price_section==='consultation';
-          addText(detail(payment?'payment':'conditions',payment?'Порядок оплаты':'Условия и преимущества',payment?'clock':'info'),part.text);
-        }
-        continue;
-      }
-      if(part.kind==='text'){texts.push(part.text);continue;}
-      if(part.kind!=='price_card'||part.price?.source_client_id!==clientId)continue;
-      flushText();
-      const rows=part.price.rows||[];
-      if(!rows.length||rows.some(row=>row.source_client_id!==clientId))continue;
-      const card=document.createElement('section');card.className='clinic-price-card';
-      const overview=Boolean(part.overview);
-      const options=part.price.presentation==='options';
-      card.setAttribute('aria-label',overview?'Услуги и цены':rows[0].service_name);
-      financialCard=card;sections.clear();promotionCount=0;
-      if(part.overview?.volume_choices?.length){
-        message.volumeNavigation={
-          revision:message.revision,
-          choices:part.overview.volume_choices.map(choice=>choice.candidate),
-          selectedReplyId:message.volumeNavigation?.selectedReplyId,
-        };
-      }
-      if(overview&&message.volumeNavigation?.choices.length){
-        const nav=document.createElement('div');nav.className='clinic-price-card__tabs clinic-price-card__volumes';
-        nav.setAttribute('role','group');nav.setAttribute('aria-label','Объём лечения');
-        for(const choice of message.volumeNavigation.choices){
-          const button=document.createElement('button');button.type='button';button.className='clinic-price-card__tab';
-          button.textContent=choice.label;button.disabled=disabled();
-          const selected=message.volumeNavigation.selectedReplyId
-            || (part.overview.applied_extent ? `volume:${part.overview.topic_id}:${part.overview.applied_extent}` : null);
-          button.setAttribute('aria-pressed',String(choice.reply_id===selected));
-          button.addEventListener('click',()=>select(choice,message.volumeNavigation.revision));nav.appendChild(button);
-        }
-        card.appendChild(nav);
-        if(message.volumeNavigation.selectedReplyId===`volume:${part.overview.topic_id}:unknown`){
-          const hint=document.createElement('p');
-          hint.className='clinic-price-card__volume-hint';
-          hint.setAttribute('role','status');
-          hint.textContent='Не уверены, какой вариант подходит? На консультации врач оценит состояние зубов и предложит варианты лечения с понятной стоимостью.';
-          card.appendChild(hint);
-        }
-      }
-      const title=document.createElement('h3');title.className='clinic-price-card__title';
-      title.textContent=overview?'Услуги и цены':rows[0].service_name;card.appendChild(title);
-      if(!options&&(part.choices||[]).length>1){
-        const tabs=document.createElement('div');tabs.className='clinic-price-card__tabs';tabs.setAttribute('role','group');tabs.setAttribute('aria-label','Вариант');
-        for(const choice of part.choices){
-          const active=choice.reply_id===`price_select:${rows[0].offer_id}`;
-          const tab=document.createElement('button');tab.type='button';tab.className='clinic-price-card__tab';
-          tab.textContent=choice.label;tab.setAttribute('aria-pressed',String(active));tab.disabled=disabled();
-          tab.addEventListener('click',()=>{if(!active||message.revision!==state.lastPayload?.revision)select(choice,message.revision)});tabs.appendChild(tab);
-        }card.appendChild(tabs);
-      }
-      if(!options&&(part.choices||[]).length<=1&&rows[0].variant_label){
-        const label=document.createElement('p');label.className='clinic-price-card__selected-variant';
-        label.textContent=rows[0].variant_label;card.appendChild(label);
-      }
-      const allChoices=[...(part.choices||[]),...(part.service_choices||[])];
-      for(const row of rows){
-        const choice=allChoices.find(choice=>choice.reply_id===`price_select:${row.offer_id}`);
-        const item=document.createElement(options&&choice?'button':'div');
-        item.className=options?'clinic-price-card__overview-row':'clinic-price-card__price-area';
-        if(options&&row.mode==='no_public_price')item.classList.add('clinic-price-card__overview-row--description');
-        if(options&&choice){item.type='button';item.disabled=disabled();item.addEventListener('click',()=>select(choice,message.revision));}
-        if(options){const name=document.createElement('span');name.className='clinic-price-card__overview-name';name.textContent=overview?row.service_name:(row.variant_label||row.service_name);item.appendChild(name);}
-        const amount=document.createElement('strong');amount.className='clinic-price-card__amount';
-        amount.textContent=row.price_display_text;
-        if(row.mode==='no_public_price')amount.classList.add('clinic-price-card__amount--description');
-        else if(!options)amount.classList.add('clinic-price-card__amount--single');item.appendChild(amount);
-        if(options&&choice){const arrow=svg('arrow');arrow.classList.add('clinic-price-card__row-arrow');item.appendChild(arrow);}
-        if(row.scope_text){const caption=document.createElement('p');caption.className='clinic-price-card__caption';if(!options)caption.appendChild(svg('extent'));const scope=document.createElement('span');scope.textContent=row.scope_text;caption.appendChild(scope);item.appendChild(caption);}
-        // Overview is a compact preview; full authored conditions stay in detail.
-        for(const term of (options ? [] : [...new Set(row.condition_texts||[])])){
-          if(term===row.scope_text)continue;
-          const note=document.createElement('p');note.className='clinic-price-card__condition';note.appendChild(svg('info'));
-          const text=document.createElement('span');text.textContent=term.charAt(0).toUpperCase()+term.slice(1);note.appendChild(text);item.appendChild(note);
-        }
-        card.appendChild(item);
-      }
-      bubble.appendChild(card);
-      if(!options&&rows.length===1){
-        const row=rows[0];
-        if(row.includes?.length){
-          const el=detail('includes','Что входит в стоимость','layers');
-          const list=document.createElement('ul');list.className='clinic-price-card__check-list';
-          for(const line of row.includes){const li=document.createElement('li');li.appendChild(svg('check'));const text=document.createElement('span');text.textContent=line;li.appendChild(text);list.appendChild(li);}el.appendChild(list);
-        }
-        if(row.excludes?.length){const el=detail('includes',row.includes?.length?'Что входит в стоимость':'Оплачивается отдельно','layers');if(row.includes?.length){const heading=document.createElement('p');heading.className='clinic-price-card__detail-heading';heading.textContent='Оплачивается отдельно';el.appendChild(heading);}const exclusions=document.createElement('ul');for(const line of row.excludes){const li=document.createElement('li');li.textContent=line;exclusions.appendChild(li);}el.appendChild(exclusions);}
-        if(row.stages?.length){
-          const el=detail('payment','Порядок оплаты','clock');
-          for(const line of row.stages){
-            // Frozen stage formatter separates its heading/amount from timing with '. '.
-            const separator=line.indexOf('. ');
-            const body=document.createElement('div');body.className='clinic-price-card__detail-body';
-            const heading=document.createElement('strong');heading.className='clinic-price-card__stage-title';
-            heading.textContent=separator<0?line:line.slice(0,separator+1);body.appendChild(heading);
-            if(separator>=0){const timing=document.createElement('p');timing.textContent=line.slice(separator+2);body.appendChild(timing);}
-            el.appendChild(body);
-          }
-        }
-      }
-    }
-    // Commercial parts may arrive after the promotion; keep the open promo last.
-    for(const card of bubble.querySelectorAll('.clinic-price-card')){const promo=card.querySelector('.clinic-price-card__promotion');if(promo)card.appendChild(promo);}
-    flushText();
-  }
 
   /**
    * @param {() => void} done
@@ -2343,7 +2136,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
   }
 
   async function sendAsk(extra = {}) {
-    if (state.pending || state.retryBody) return;
+    if (state.pending || state.retryBody || state.restoring || state.restoreError) return;
     const userEcho =
       typeof extra.userEcho === "string" ? extra.userEcho.trim() : "";
     const apiFields = { ...extra };
@@ -2390,7 +2183,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
   }
 
   async function sendFromComposer() {
-    if (state.pending || state.retryBody || state.lastPayload?.ui?.lead_consent) return;
+    if (state.pending || state.retryBody || state.restoring || state.restoreError) return;
 
     const raw = input.value.trim();
     if (isSecretSessionResetCommand(raw, config)) {
@@ -2401,14 +2194,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
     let q = raw;
     let userBubbleText = q;
 
-    if (isLeadPhoneStep() && isPhoneInput(raw)) {
-      const backend = ruPhoneToBackendE164(input.value);
-      if (backend.length !== 12) return;
-      q = backend;
-      userBubbleText = formatRuMobileDisplay(extractNational10Digits(input.value));
-    } else if (!q) {
-      return;
-    }
+    if (!q) return;
 
     const runSend = async () => {
       dismissTrailingsAll(state.messages);
@@ -2437,61 +2223,12 @@ export function mountWidget(root, config, { pagePath } = {}) {
     await runSend();
   }
 
-  function isLeadPhoneStep() {
-    return state.lastPayload?.ui?.composer_input_mode === "phone";
+  function syncComposerInputMode(){
+    if(Number.isInteger(config.messageMaxChars)&&config.messageMaxChars>0)input.maxLength=config.messageMaxChars;
+    input.inputMode='text';input.placeholder='Введите сообщение';
   }
-
-  function syncComposerLeadUi() {
-    if (Number.isInteger(config.messageMaxChars) && config.messageMaxChars > 0) input.maxLength = config.messageMaxChars;
-    const phone = isLeadPhoneStep();
-    const consent = Boolean(state.lastPayload?.ui?.lead_consent);
-    input.disabled = consent;
-    input.inputMode = phone ? "tel" : "text";
-    input.classList.toggle("clinic-shell__textarea--phone", phone);
-    input.placeholder = consent ? "Подтвердите согласие или выберите «Без записи»" :
-      phone ? "+7(999) 999-99-99" : "Введите сообщение";
-  }
-
-  function onComposerInput(event) {
-    // Leave deletions natural, including clearing the prefix and separators.
-    if (isLeadPhoneStep() && isPhoneInput(input.value) &&
-        !String(event?.inputType || "").startsWith("delete")) {
-      const nat = extractNational10Digits(input.value);
-      const foreignPrefix = input.value.trim().startsWith("+") && !input.value.trim().startsWith("+7");
-      if (nat.length <= 10 && !foreignPrefix) {
-        const old = input.value;
-        const caret = input.selectionStart;
-        const digitsBefore = old.slice(0, caret).replace(/\D/g, "").length;
-        const next = formatRuMobileDisplay(nat);
-        if (next !== old) {
-          input.value = next;
-          const prefixAdded = !old.trim().startsWith("+7") && old.replace(/\D/g, "").length !== 11;
-          const wanted = digitsBefore + (prefixAdded ? 1 : 0);
-          let seen = 0;
-          let pos = 0;
-          while (pos < next.length && seen < wanted) {
-            if (/\d/.test(next[pos])) seen++;
-            pos++;
-          }
-          input.selectionStart = input.selectionEnd = caret === old.length ? next.length : pos;
-        }
-      }
-    }
-    autoResizeTextarea(input);
-    syncSendState();
-  }
-
-  function syncSendState() {
-    if (state.pending || state.retryBody || state.lastPayload?.ui?.lead_consent) {
-      sendBtn.disabled = true;
-      return;
-    }
-    if (isLeadPhoneStep() && isPhoneInput(input.value)) {
-      sendBtn.disabled = !ruPhoneToBackendE164(input.value);
-      return;
-    }
-    sendBtn.disabled = !input.value.trim();
-  }
+  function onComposerInput(){autoResizeTextarea(input);syncSendState();}
+  function syncSendState(){sendBtn.disabled=state.pending||state.restoring||state.restoreError||Boolean(state.retryBody)||!input.value.trim();}
 
   if (launcherDismiss) {
     launcherDismiss.addEventListener("click", () => {
@@ -2554,7 +2291,44 @@ export function mountWidget(root, config, { pagePath } = {}) {
     });
   }
 
+  async function restoreConversation(){
+    const sid=getSid();if(!sid)return;
+    const generation=state.restoreGeneration||0;state.restoring=true;syncSendState();
+    try{
+      let before=null,latest=null,active=false;const pages=[];
+      do{
+        const response=await fetch(`${apiBase.replace(/\/$/,'')}/api/widget-session`,{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({client_id:clientId,sid,...(before?{before_revision:before}:{})})});
+        if(!response.ok)throw new Error('restore_failed');const data=await response.json();
+        if(data.client_id!==clientId||!Array.isArray(data.entries))throw new Error('restore_owner');
+        if(!latest){latest=data.current;active=data.actions_current;}
+        pages.unshift(data.entries);before=data.next_before_revision;
+      }while(before);
+      if(generation!==(state.restoreGeneration||0)||getSid()!==sid)return;
+      const messages=[],byRevision=new Map();
+      for(const entry of pages.flat()){
+        const turn=botTurnFromPayload(entry.payload,clientId);if(!turn)throw new Error('restore_invalid');
+        turn.historyExpired=!active;
+        const previous=byRevision.get(entry.source_revision);
+        if(previous&&/^(price_select:|volume:)/.test(entry.selected_ref||'')&&mergePriceMessage(previous,turn,entry.selected_ref)){
+          byRevision.set(turn.revision,previous);continue;
+        }
+        dismissLinksAll(messages);dismissTrailingsAll(messages);
+        const label=previous?.quickReplies?.find(q=>q.ref===entry.selected_ref)?.label;
+        if(entry.patient_text||label)messages.push({role:'user',text:entry.patient_text||label});
+        messages.push(turn);byRevision.set(turn.revision,turn);
+      }
+      state.messages=messages;state.lastPayload=latest;state.started=messages.length>0;
+      if(!active){dismissLinksAll(messages);dismissTrailingsAll(messages);}
+      renderFeed();
+    }catch{
+      if(generation===(state.restoreGeneration||0)){
+        state.restoreError=true;setError('Не удалось восстановить переписку. Начните новый диалог через сброс чата.');renderFeed();
+      }
+    }finally{if(generation===(state.restoreGeneration||0)){state.restoring=false;syncSendState();}}
+  }
   renderFeed();
+  void restoreConversation();
   if (launcherTeaserEnabled) scheduleLauncherTeaser();
 
   void fetchVideoCatalog().then(() => renderFeed());

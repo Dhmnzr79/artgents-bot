@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "client_id": "demo_medical",
+  "unpriced_text": "Стоимость уточнит администратор",
+  "sections": [
+    {
+      "section_id": "ent",
+      "title": "ЛОР",
+      "service_ids": [
+        "ent_consultation",
+        "ent_endoscopy",
+        "nasal_lavage"
+      ]
+    },
+    {
+      "section_id": "general_medicine",
+      "title": "Терапия",
+      "service_ids": [
+        "therapist_consultation"
+      ]
+    },
+    {
+      "section_id": "pediatrics",
+      "title": "Педиатрия",
+      "service_ids": [
+        "pediatric_consultation"
+      ]
+    },
+    {
+      "section_id": "gynecology",
+      "title": "Гинекология",
+      "service_ids": [
+        "gynecology_consultation",
+        "cervical_screening"
+      ]
+    },
+    {
+      "section_id": "urology",
+      "title": "Урология",
+      "service_ids": [
+        "urology_consultation"
+      ]
+    },
+    {
+      "section_id": "cardiology",
+      "title": "Кардиология",
+      "service_ids": [
+        "cardiology_consultation",
+        "ecg"
+      ]
+    },
+    {
+      "section_id": "neurology",
+      "title": "Неврология",
+      "service_ids": [
+        "neurology_consultation"
+      ]
+    },
+    {
+      "section_id": "ultrasound",
+      "title": "УЗИ",
+      "service_ids": [
+        "abdominal_ultrasound",
+        "thyroid_ultrasound"
+      ]
+    },
+    {
+      "section_id": "dermatology",
+      "title": "Дерматология",
+      "service_ids": [
+        "dermatology_consultation",
+        "digital_dermatoscopy"
+      ]
+    },
+    {
+      "section_id": "cosmetology",
+      "title": "Косметология",
+      "service_ids": [
+        "biorevitalization",
+        "plasma_therapy",
+        "photorejuvenation",
+        "laser_hair_removal",
+        "ultrasound_lifting",
+        "botulinum_therapy"
+      ]
+    }
+  ]
+}

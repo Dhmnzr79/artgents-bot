@@ -28,8 +28,8 @@ def _receipt(store, key, request_id, revision, turn=None):
     return result
 
 
-def _project_pair(ref, result):
-    resolved = result.response.resolved
+def public_dialogue_plan(resolved):
+    """Mask untrusted prose using the same read projection for model history and UI."""
     # Read the same frozen publication as the widget; intake has explicit provenance.
     def safe(text):
         return mask_emails_in_text(mask_phones_in_text(text)) if text else text
@@ -41,6 +41,12 @@ def _project_pair(ref, result):
         "patient_text": safe(resolved.patient_text),
         "terminal_text": safe(resolved.terminal_text),
     })
+    return public_plan
+
+
+def _project_pair(ref, result):
+    resolved = result.response.resolved
+    public_plan = public_dialogue_plan(resolved)
     safe_text = render_response_text(public_plan, include_lead=False, include_card_details=True)
     price_blocks = (*((resolved.d2_price_block,) if resolved.d2_price_block else ()),
         *resolved.d2_price_detail_blocks)

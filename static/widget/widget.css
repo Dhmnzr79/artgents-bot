@@ -1509,6 +1509,41 @@ button.clinic-price-card__overview-row:hover{background:#f3f6ff}
 @media(max-width:380px){.clinic-price-card__tab{font-size:13px}.clinic-price-card__overview-row{gap:5px}.clinic-price-card__overview-row>.clinic-price-card__amount:not(.clinic-price-card__amount--description){font-size:16px}}
 
 .clinic-price-card__selected-variant{margin:12px 17px 0;font-size:14px;font-weight:400;color:var(--clinic-brand)}
+.clinic-shell__main{overflow:hidden}
+.clinic-shell__feed{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain}
+.clinic-shell__tabs{display:flex;gap:3px;padding:0 15px 10px;flex-shrink:0;background:#fff}
+.clinic-shell__tabs button{flex:1;border:0;border-bottom:2px solid transparent;background:transparent;color:#737c8d;padding:10px 2px;font:inherit;font-size:14px;cursor:pointer;white-space:nowrap}
+.clinic-shell__tabs button[aria-selected="true"]{border-color:var(--clinic-brand);color:var(--clinic-brand)}
+.clinic-shell__tab-panel{flex:1;min-height:0;overflow:auto;padding:15px;overscroll-behavior:contain}
+.clinic-shell__tab-panel[hidden],.clinic-shell__feed[hidden],.clinic-shell__composer[hidden]{display:none!important}
+.clinic-catalog__title{font-size:21px;margin:6px 0 15px;line-height:1.35}
+.clinic-catalog__back{border:0;background:transparent;color:var(--clinic-brand);padding:6px 0 12px;font:inherit;font-size:14px;cursor:pointer;text-align:left}
+.clinic-catalog__search{width:100%;box-sizing:border-box;border:1px solid #e1e5ed;border-radius:11px;padding:13px;font:inherit;font-size:16px;outline-color:var(--clinic-brand);background:#fff;color:#252a33}
+.clinic-catalog__list{display:grid;gap:9px;margin-top:14px}
+.clinic-catalog__row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:7px 12px;width:100%;border:1px solid #e7eaf0;border-radius:13px;background:#fff;padding:15px;text-align:left;font:inherit;color:#252a33;cursor:pointer}
+.clinic-catalog__row strong{grid-column:1/-1;font-size:16px;font-weight:500;line-height:1.4}
+.clinic-catalog__row small{grid-column:1/-1;font-size:13px;line-height:1.5;color:#737c8d}
+.clinic-catalog__row-price{grid-column:1/-1;font-size:15px;color:var(--clinic-brand)}
+.clinic-catalog__arrow{grid-column:2;grid-row:1;color:var(--clinic-brand)}
+.clinic-catalog__eyebrow{font-size:13px;color:#737c8d;margin:0 0 10px}
+.clinic-catalog__description{font-size:15px;line-height:1.65;color:#5f6979}
+.clinic-catalog__description p{margin:0 0 12px}
+.clinic-catalog__unpriced{font-size:15px;color:#737c8d}
+.clinic-catalog__apply,.clinic-booking__submit{width:100%;border:0;border-radius:11px;padding:13px 16px;background:var(--clinic-brand);color:#fff;font:inherit;cursor:pointer}
+.clinic-booking-mount{margin-top:12px}
+.clinic-booking{padding:15px;border:1px solid #e5e9f1;border-radius:15px;background:#fff;color:#252a33}
+.clinic-booking h3{margin:0 0 8px;font-size:19px;font-weight:500}
+.clinic-booking__subject{font-size:14px;line-height:1.5;color:#737c8d;margin:0 0 15px}
+.clinic-booking__field{display:block;margin-bottom:13px;font-size:14px;line-height:1.5}
+.clinic-booking__field input,.clinic-booking__field select,.clinic-booking__field textarea{display:block;box-sizing:border-box;width:100%;margin-top:5px;padding:11px;border:1px solid #dce1ec;border-radius:8px;background:#fff;color:#252a33;font:inherit;font-size:16px;outline-color:var(--clinic-brand)}
+.clinic-booking__field textarea{min-height:90px;resize:vertical}
+.clinic-booking__consent{display:flex;gap:9px;align-items:flex-start;font-size:13px;line-height:1.5}
+.clinic-booking__consent input{margin:4px 0 0;flex-shrink:0;accent-color:var(--clinic-brand)}
+.clinic-booking__links{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;line-height:1.5}
+.clinic-booking__links a{color:var(--clinic-brand)}
+.clinic-booking__error{font-size:13px;color:#a13e3e;line-height:1.5}
+.clinic-booking__success{padding:18px;border-radius:14px;background:#f0f4ff;font-size:16px;line-height:1.6}
+.clinic-booking button:disabled{opacity:.6;cursor:default}
 
 /* Scope below the price, with a small decorative volume marker. */
 .clinic-price-card__price-area{display:block;padding-top:16px;padding-bottom:16px}

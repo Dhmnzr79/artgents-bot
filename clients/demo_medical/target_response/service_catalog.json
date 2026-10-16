@@ -1,0 +1,657 @@
+{
+  "ent_consultation": {
+    "name": "Консультация ЛОР-врача",
+    "aliases": [
+      "лор",
+      "отоларинголог",
+      "приём лора"
+    ],
+    "family": "ent",
+    "roles": [],
+    "active": true,
+    "content_ref": "ent__service__ent_consultation.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "primary",
+        "name": "Первичный приём",
+        "tab_label": "Первичный приём",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "repeat",
+        "name": "Повторный приём",
+        "tab_label": "Повторный приём",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "ent_endoscopy": {
+    "name": "Видеоэндоскопия носа и носоглотки",
+    "aliases": [
+      "эндоскопия носа",
+      "эндоскопия лор-органов"
+    ],
+    "family": "ent",
+    "roles": [],
+    "active": true,
+    "content_ref": "ent__service__ent_endoscopy.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "default",
+        "name": "Нос и носоглотка",
+        "tab_label": "Нос и носоглотка",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "nasal_lavage": {
+    "name": "Промывание носа методом перемещения",
+    "aliases": [
+      "кукушка",
+      "промывание по Проетцу"
+    ],
+    "family": "ent",
+    "roles": [],
+    "active": true,
+    "content_ref": "ent__service__nasal_lavage.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "single",
+        "name": "Одно посещение",
+        "tab_label": "Одно посещение",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "three_visits",
+        "name": "Пакет из трёх посещений",
+        "tab_label": "Пакет из трёх посещений",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "therapist_consultation": {
+    "name": "Консультация терапевта",
+    "aliases": [
+      "терапевт",
+      "первый приём терапевта"
+    ],
+    "family": "general_medicine",
+    "roles": [],
+    "active": true,
+    "content_ref": "general_medicine__service__therapist_consultation.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "primary",
+        "name": "Первичный приём",
+        "tab_label": "Первичный приём",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "repeat",
+        "name": "Повторный приём",
+        "tab_label": "Повторный приём",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "pediatric_consultation": {
+    "name": "Консультация педиатра",
+    "aliases": [
+      "педиатр",
+      "детский врач"
+    ],
+    "family": "pediatrics",
+    "roles": [],
+    "active": true,
+    "content_ref": "pediatrics__service__pediatric_consultation.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "primary",
+        "name": "Первичный приём",
+        "tab_label": "Первичный приём",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "repeat",
+        "name": "Повторный приём",
+        "tab_label": "Повторный приём",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "gynecology_consultation": {
+    "name": "Консультация гинеколога",
+    "aliases": [
+      "гинеколог",
+      "женское здоровье"
+    ],
+    "family": "gynecology",
+    "roles": [],
+    "active": true,
+    "content_ref": "gynecology__service__gynecology_consultation.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "primary",
+        "name": "Первичный приём",
+        "tab_label": "Первичный приём",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "repeat",
+        "name": "Повторный приём",
+        "tab_label": "Повторный приём",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "cervical_screening": {
+    "name": "Скрининг шейки матки",
+    "aliases": [
+      "жидкостная цитология",
+      "цитология и впч"
+    ],
+    "family": "gynecology",
+    "roles": [],
+    "active": true,
+    "content_ref": "gynecology__service__cervical_screening.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "basic",
+        "name": "Жидкостная цитология",
+        "tab_label": "Жидкостная цитология",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "extended",
+        "name": "Цитология и ВПЧ высокого риска",
+        "tab_label": "Цитология и ВПЧ высокого риска",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "urology_consultation": {
+    "name": "Консультация уролога",
+    "aliases": [
+      "уролог",
+      "уролог для женщин"
+    ],
+    "family": "urology",
+    "roles": [],
+    "active": true,
+    "content_ref": "urology__service__urology_consultation.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "primary",
+        "name": "Первичный приём",
+        "tab_label": "Первичный приём",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "repeat",
+        "name": "Повторный приём",
+        "tab_label": "Повторный приём",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "cardiology_consultation": {
+    "name": "Консультация кардиолога",
+    "aliases": [
+      "кардиолог",
+      "приём по давлению"
+    ],
+    "family": "cardiology",
+    "roles": [],
+    "active": true,
+    "content_ref": "cardiology__service__cardiology_consultation.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "primary",
+        "name": "Консультация кардиолога",
+        "tab_label": "Консультация кардиолога",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "with_ecg",
+        "name": "Кардиолог и ЭКГ",
+        "tab_label": "Кардиолог и ЭКГ",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "ecg": {
+    "name": "ЭКГ в покое с расшифровкой",
+    "aliases": [
+      "экг",
+      "электрокардиограмма"
+    ],
+    "family": "cardiology",
+    "roles": [],
+    "active": true,
+    "content_ref": "cardiology__service__ecg.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "default",
+        "name": "ЭКГ с врачебной расшифровкой",
+        "tab_label": "ЭКГ с врачебной расшифровкой",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "neurology_consultation": {
+    "name": "Консультация невролога",
+    "aliases": [
+      "невролог",
+      "невропатолог"
+    ],
+    "family": "neurology",
+    "roles": [],
+    "active": true,
+    "content_ref": "neurology__service__neurology_consultation.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "primary",
+        "name": "Первичный приём",
+        "tab_label": "Первичный приём",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "repeat",
+        "name": "Повторный приём",
+        "tab_label": "Повторный приём",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "abdominal_ultrasound": {
+    "name": "УЗИ органов брюшной полости",
+    "aliases": [
+      "узи живота",
+      "узи брюшной полости и почек"
+    ],
+    "family": "diagnostics",
+    "roles": [],
+    "active": true,
+    "content_ref": "ultrasound__service__abdominal_ultrasound.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "standard",
+        "name": "Брюшная полость",
+        "tab_label": "Брюшная полость",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "with_kidneys",
+        "name": "Брюшная полость и почки",
+        "tab_label": "Брюшная полость и почки",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "thyroid_ultrasound": {
+    "name": "УЗИ щитовидной железы",
+    "aliases": [
+      "узи щитовидки",
+      "узи щитовидной железы и лимфоузлов"
+    ],
+    "family": "diagnostics",
+    "roles": [],
+    "active": true,
+    "content_ref": "ultrasound__service__thyroid_ultrasound.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "standard",
+        "name": "Щитовидная железа",
+        "tab_label": "Щитовидная железа",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "with_cervical_nodes",
+        "name": "Щитовидная железа и лимфоузлы шеи",
+        "tab_label": "Щитовидная железа и лимфоузлы шеи",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "dermatology_consultation": {
+    "name": "Консультация дерматолога",
+    "aliases": [
+      "дерматолог",
+      "врач по коже"
+    ],
+    "family": "dermatology",
+    "roles": [],
+    "active": true,
+    "content_ref": "dermatology__service__dermatology_consultation.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "primary",
+        "name": "Первичный приём",
+        "tab_label": "Первичный приём",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "repeat",
+        "name": "Повторный приём",
+        "tab_label": "Повторный приём",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "digital_dermatoscopy": {
+    "name": "Цифровая дерматоскопия",
+    "aliases": [
+      "дерматоскопия",
+      "осмотр родинок",
+      "карта кожи"
+    ],
+    "family": "dermatology",
+    "roles": [],
+    "active": true,
+    "content_ref": "dermatology__service__digital_dermatoscopy.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "one",
+        "name": "Одно образование",
+        "tab_label": "Одно образование",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "three",
+        "name": "До трёх образований",
+        "tab_label": "До трёх образований",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "extended",
+        "name": "Индивидуальная карта кожи",
+        "tab_label": "Индивидуальная карта кожи",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "biorevitalization": {
+    "name": "Биоревитализация",
+    "aliases": [
+      "увлажнение кожи инъекциями",
+      "биоревитализация лица"
+    ],
+    "family": "aesthetics",
+    "roles": [],
+    "active": true,
+    "content_ref": "cosmetology__service__biorevitalization.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "face",
+        "name": "Лицо",
+        "tab_label": "Лицо",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "face_neck",
+        "name": "Лицо и шея",
+        "tab_label": "Лицо и шея",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "plasma_therapy": {
+    "name": "Плазмотерапия",
+    "aliases": [
+      "prp",
+      "плазма для лица",
+      "плазмотерапия кожи головы"
+    ],
+    "family": "aesthetics",
+    "roles": [],
+    "active": true,
+    "content_ref": "cosmetology__service__plasma_therapy.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "scalp",
+        "name": "Кожа головы",
+        "tab_label": "Кожа головы",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "face",
+        "name": "Лицо",
+        "tab_label": "Лицо",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "three_visits",
+        "name": "Три посещения для лица",
+        "tab_label": "Три посещения для лица",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "photorejuvenation": {
+    "name": "IPL-фотоомоложение",
+    "aliases": [
+      "фототерапия кожи",
+      "ipl",
+      "фотоомоложение лица"
+    ],
+    "family": "aesthetics",
+    "roles": [],
+    "active": true,
+    "content_ref": "cosmetology__service__photorejuvenation.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "face",
+        "name": "Лицо",
+        "tab_label": "Лицо",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "face_neck",
+        "name": "Лицо и шея",
+        "tab_label": "Лицо и шея",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "hands",
+        "name": "Обе кисти",
+        "tab_label": "Обе кисти",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "laser_hair_removal": {
+    "name": "Лазерная эпиляция",
+    "aliases": [
+      "эпиляция лазером",
+      "эпиляция по зонам"
+    ],
+    "family": "aesthetics",
+    "roles": [],
+    "active": true,
+    "content_ref": "cosmetology__service__laser_hair_removal.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "underarms",
+        "name": "Подмышки",
+        "tab_label": "Подмышки",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "legs",
+        "name": "Голени с коленями",
+        "tab_label": "Голени с коленями",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "three_zones",
+        "name": "Три зоны: подмышки, глубокое бикини, голени",
+        "tab_label": "Три зоны: подмышки, глубокое бикини, голени",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "ultrasound_lifting": {
+    "name": "Ультразвуковой лифтинг",
+    "aliases": [
+      "smas-лифтинг",
+      "лифтинг по линиям"
+    ],
+    "family": "aesthetics",
+    "roles": [],
+    "active": true,
+    "content_ref": "cosmetology__service__ultrasound_lifting.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "face350",
+        "name": "Лицо: до 350 линий",
+        "tab_label": "Лицо: до 350 линий",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "face_neck500",
+        "name": "Лицо и шея: до 500 линий",
+        "tab_label": "Лицо и шея: до 500 линий",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "lower_face",
+        "name": "Нижняя треть лица",
+        "tab_label": "Нижняя треть лица",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  },
+  "botulinum_therapy": {
+    "name": "Ботулинотерапия",
+    "aliases": [
+      "ботулотоксин",
+      "коррекция мимических морщин"
+    ],
+    "family": "aesthetics",
+    "roles": [],
+    "active": true,
+    "content_ref": "cosmetology__service__botulinum_therapy.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": [
+      {
+        "option_id": "unit",
+        "name": "Релатокс: тариф за единицу",
+        "tab_label": "Релатокс: тариф за единицу",
+        "aliases": [],
+        "active": true
+      },
+      {
+        "option_id": "individual",
+        "name": "Индивидуальный план коррекции",
+        "tab_label": "Индивидуальный план коррекции",
+        "aliases": [],
+        "active": true
+      }
+    ]
+  }
+}

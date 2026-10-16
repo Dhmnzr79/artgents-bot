@@ -1,0 +1,46 @@
+{
+  "offer_id": "nasal_lavage.single",
+  "service_id": "nasal_lavage",
+  "option_id": "single",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "procedure",
+    "amount": 1500
+  },
+  "package": {
+    "label": "за одну процедуру с обработкой обеих сторон по назначению врача",
+    "includes": [
+      "Проверка назначения и переносимости",
+      "Промывание методом перемещения",
+      "Раствор и расходные материалы",
+      "Памятка после процедуры"
+    ],
+    "excludes": [
+      "Первичный диагностический приём ЛОРа",
+      "Эндоскопия и КТ",
+      "Лекарства для домашнего применения"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Отдельно: Первичный диагностический приём ЛОРа; Эндоскопия и КТ; Лекарства для домашнего применения."
+      }
+    ]
+  }
+}

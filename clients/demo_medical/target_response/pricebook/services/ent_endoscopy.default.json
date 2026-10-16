@@ -1,0 +1,46 @@
+{
+  "offer_id": "ent_endoscopy.default",
+  "service_id": "ent_endoscopy",
+  "option_id": "default",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "procedure",
+    "amount": 2400
+  },
+  "package": {
+    "label": "за одно исследование носа и носоглотки",
+    "includes": [
+      "Объяснение этапов исследования",
+      "Видеоэндоскопический осмотр названных областей",
+      "Необходимые одноразовые материалы",
+      "Протокол и выбранные изображения"
+    ],
+    "excludes": [
+      "Полноценная первичная консультация ЛОРа",
+      "Биопсия и гистология",
+      "Лечебные манипуляции"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Отдельно: Полноценная первичная консультация ЛОРа; Биопсия и гистология; Лечебные манипуляции."
+      }
+    ]
+  }
+}

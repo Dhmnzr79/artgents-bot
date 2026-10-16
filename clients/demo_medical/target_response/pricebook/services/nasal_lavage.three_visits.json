@@ -1,0 +1,69 @@
+{
+  "offer_id": "nasal_lavage.three_visits",
+  "service_id": "nasal_lavage",
+  "option_id": "three_visits",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "course",
+    "amount": 3900
+  },
+  "package": {
+    "label": "за готовый пакет из трёх назначенных процедур; не универсальный курс лечения; число посещений не является обещанием результата",
+    "includes": [
+      "Три процедуры одинакового состава",
+      "Растворы и одноразовые материалы на каждом посещении",
+      "Контроль переносимости на каждом посещении"
+    ],
+    "excludes": [
+      "Первичная консультация",
+      "Дополнительные процедуры"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    },
+    {
+      "id": "stages",
+      "label": "Оплата по этапам",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Отдельно: Первичная консультация; Дополнительные процедуры."
+      }
+    ]
+  },
+  "payment_stages": [
+    {
+      "label": "Первое посещение",
+      "amount": 1300,
+      "currency": "RUB",
+      "timing_text": "В день первой выполненной процедуры."
+    },
+    {
+      "label": "Второе посещение",
+      "amount": 1300,
+      "currency": "RUB",
+      "timing_text": "В день второй выполненной процедуры."
+    },
+    {
+      "label": "Третье посещение",
+      "amount": 1300,
+      "currency": "RUB",
+      "timing_text": "В день третьей выполненной процедуры."
+    }
+  ]
+}

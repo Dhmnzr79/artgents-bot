@@ -1,0 +1,46 @@
+{
+  "offer_id": "neurology_consultation.primary",
+  "service_id": "neurology_consultation",
+  "option_id": "primary",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "visit",
+    "amount": 3400
+  },
+  "package": {
+    "label": "за один первичный приём",
+    "includes": [
+      "Обсуждение жалоб и истории обращения",
+      "Неврологический осмотр с оценкой функций по ситуации",
+      "Разбор предоставленных результатов",
+      "Письменное заключение и дальнейший план"
+    ],
+    "excludes": [
+      "МРТ, КТ, ЭЭГ и ЭНМГ",
+      "Блокады, массаж и физиопроцедуры",
+      "Приёмы других специалистов"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Отдельно: МРТ, КТ, ЭЭГ и ЭНМГ; Блокады, массаж и физиопроцедуры; Приёмы других специалистов."
+      }
+    ]
+  }
+}

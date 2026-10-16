@@ -1,0 +1,42 @@
+{
+  "offer_id": "ultrasound_lifting.lower_face",
+  "service_id": "ultrasound_lifting",
+  "option_id": "lower_face",
+  "active": true,
+  "price": {
+    "mode": "no_public_price",
+    "approved_text": "Стоимость уточнит администратор"
+  },
+  "package": {
+    "label": "за индивидуально согласованный объём нижней трети лица; расчёт стоимости по линиям не производится",
+    "includes": [
+      "Оценка зоны врачом",
+      "Согласование границ и готового предложения",
+      "Полная стоимость до согласия на выполнение"
+    ],
+    "excludes": [
+      "Другие зоны"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope",
+    "demo_cosmetic_control"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Отдельно: Другие зоны."
+      }
+    ]
+  }
+}

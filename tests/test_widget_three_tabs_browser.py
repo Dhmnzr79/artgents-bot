@@ -60,33 +60,64 @@ def test_three_tabs_private_shared_form_and_page_remount(http_env,monkeypatch,tm
     document.querySelector('[data-clinic-launcher-open],[data-clinic-launcher]').click();
   },fixtures);
   await setup();
+  const auditLayout=async state=>{
+    for(const textSize of ['100%','200%']){
+      await page.evaluate(size=>document.documentElement.style.fontSize=size,textSize);
+      for(const width of [320,360,390,430,1280]){
+        await page.setViewportSize({width,height:900});
+        await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        const problems=await page.locator('[data-clinic-panel]').evaluate(panel=>{
+          const bounds=panel.getBoundingClientRect(),bad=[];
+          for(const el of panel.querySelectorAll('*')){
+            const rect=el.getBoundingClientRect(),style=getComputedStyle(el);
+            if(!rect.width||!rect.height||style.display==='inline'||el instanceof SVGElement)continue;
+            if(rect.left<bounds.left-1||rect.right>bounds.right+1)bad.push(el.className+': bounds');
+            if(!el.matches('input,textarea,select')&&el.scrollWidth>el.clientWidth+2)bad.push(el.className+': content');
+          }
+          if(bounds.top<0||bounds.bottom>innerHeight+1)bad.push('viewport height');
+          return bad;
+        });
+        if(problems.length)throw new Error(JSON.stringify({state,width,textSize,problems}));
+      }
+    }
+    await page.evaluate(()=>document.documentElement.style.fontSize='100%');
+    await page.setViewportSize({width:390,height:900});
+  };
+  await auditLayout('assistant welcome');
   await page.locator('[data-clinic-input]').fill('Стоимость?');await page.locator('[data-clinic-send]').click();
   await page.locator('[data-clinic-feed] .clinic-price-card').waitFor();
   const chatBefore=await page.locator('[data-clinic-feed]').textContent();
   const userCount=await page.locator('.clinic-msg--user').count();
+  await auditLayout('chat price options and composer');
   await page.getByRole('tab',{name:'Услуги и цены',exact:true}).click();
   const catalogPanel=page.locator('[data-clinic-catalog-panel]');
   await catalogPanel.locator('.clinic-catalog__row').first().waitFor();
+  await auditLayout('directions');
   if((await catalogPanel.innerText()).includes('Услуг:')||(await catalogPanel.innerText()).includes('Демо-клиника'))throw new Error('Prototype presentation replaced by count/disclaimer');
   if(process.env.THREE_TABS_SCREENSHOT_DIR){fs.mkdirSync(process.env.THREE_TABS_SCREENSHOT_DIR,{recursive:true});
     for(const width of [390,1280]){await page.setViewportSize({width,height:900});await page.locator('[data-clinic-panel]').screenshot({path:path.join(process.env.THREE_TABS_SCREENSHOT_DIR,`${fixtures.config.clientId}-${width}-directions.png`)});}
     await page.setViewportSize({width:390,height:900});}
   await catalogPanel.locator('.clinic-catalog__row').first().click();
+  await auditLayout('service list');
   // Search still covers the full clinic after choosing a section.
   await catalogPanel.getByRole('searchbox').fill(fixtures.service.name);
   const result=catalogPanel.locator('.clinic-catalog__row').filter({hasText:fixtures.service.name});
   if(await result.count()!==1)throw new Error('Global search missed exact service');await result.click();
   const options=catalogPanel.locator('.clinic-price-card__overview-row');
   if(await options.count()!==fixtures.service.price.rows.length)throw new Error('Missing service options');
+  await auditLayout('catalog price options');
   const index=fixtures.service.price.rows.findIndex(row=>row.offer_id===fixtures.chosen);
   await options.nth(index).click();
   if(await catalogPanel.locator('.clinic-price-card__overview-row').count())throw new Error('Detail did not open');
+  await catalogPanel.locator('details').evaluateAll(items=>items.forEach(item=>item.open=true));
+  await auditLayout('detail, variants, expanded conditions and description');
   if(process.env.THREE_TABS_SCREENSHOT_DIR)await page.locator('[data-clinic-panel]').screenshot({path:path.join(process.env.THREE_TABS_SCREENSHOT_DIR,`${fixtures.config.clientId}-390-detail.png`)});
   await catalogPanel.getByRole('button',{name:'Оставить заявку',exact:true}).click();
   await catalogPanel.getByLabel('Как к вам обращаться').fill('Анна Проверка');
   await catalogPanel.getByLabel('Телефон',{exact:true}).fill('+79991234567');
   await catalogPanel.getByRole('button',{name:'Отправить заявку',exact:true}).click();
   if(await page.evaluate(()=>window.formRequests.length)!==0)throw new Error('Unchecked form submitted');
+  await auditLayout('inline form and validation error');
   await page.getByRole('tab',{name:'Запись',exact:true}).click();
   const booking=page.locator('[data-clinic-booking-panel]');
   await booking.getByLabel('Как к вам обращаться').waitFor();
@@ -96,6 +127,7 @@ def test_three_tabs_private_shared_form_and_page_remount(http_env,monkeypatch,tm
   const chosenLabel=fixtures.service.price.rows[index].variant_label;
   if(chosenLabel&&!(await booking.locator('.clinic-booking__subject').innerText()).includes(chosenLabel))throw new Error('Exact offer label lost');
   await booking.getByLabel('Пожелание · необязательно').fill('Позвонить после 18:00');
+  await auditLayout('extended booking form');
   await booking.getByRole('checkbox').check();
   if(await page.evaluate(()=>window.formRequests.length)!==0)throw new Error('Checkbox submitted');
   await page.getByRole('tab',{name:'Услуги и цены',exact:true}).click();
@@ -105,12 +137,14 @@ def test_three_tabs_private_shared_form_and_page_remount(http_env,monkeypatch,tm
   await page.evaluate(()=>{window.failNextLead=true;});
   await booking.getByRole('button',{name:'Отправить заявку',exact:true}).click();
   await booking.getByRole('button',{name:'Проверить отправку',exact:true}).waitFor();
+  await auditLayout('uncertain submission and retry');
   await page.getByRole('tab',{name:'Услуги и цены',exact:true}).click();
   await catalogPanel.getByRole('button',{name:'Оставить заявку',exact:true}).click();
   if(!await catalogPanel.getByLabel('Телефон',{exact:true}).isDisabled())throw new Error('Opening another form discarded uncertain request');
   await page.getByRole('tab',{name:'Запись',exact:true}).click();
   await booking.getByRole('button',{name:'Проверить отправку',exact:true}).click();
   await booking.locator('.clinic-booking__success').waitFor();
+  await auditLayout('confirmed submission');
   const formRequests=await page.evaluate(()=>window.formRequests);
   if(formRequests.length!==2||JSON.stringify(formRequests[0])!==JSON.stringify(formRequests[1])||formRequests[0].selection.offer_id!==fixtures.chosen||formRequests[0].selection.service_id!==fixtures.service.service_id)
     throw new Error('Exact selection or immutable retry lost');
@@ -153,6 +187,6 @@ def test_three_tabs_private_shared_form_and_page_remount(http_env,monkeypatch,tm
 }finally{await browser.close();await new Promise(r=>server.close(r));}
 '''
     result=subprocess.run(['node','--input-type=module','-'],input=runner,cwd=Path(__file__).resolve().parents[1],
-        env={**os.environ,'CARDS_PAYLOADS':str(payloads)},text=True,encoding='utf-8',capture_output=True,timeout=90,check=False)
+        env={**os.environ,'CARDS_PAYLOADS':str(payloads)},text=True,encoding='utf-8',capture_output=True,timeout=180,check=False)
     assert result.returncode==0,result.stdout+result.stderr
     assert '"passed":true' in result.stdout

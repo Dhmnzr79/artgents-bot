@@ -19,6 +19,110 @@ read-only граница НикаДент ниже относится к уже 
 tenant/privacy/consent и прежние роли Target Contract §3 сохраняются.
 Вопросы владельцу — только обычным текстом с примерами, без quiz/popup.
 
+## Этап 5: точный перенос artgents-mobile-widget.html с Inter — owner GO 2026-10-16
+
+Owner передал HTML и подробный prompt: точный перенос интерфейса, шрифт Inter.
+Repo/top C:/Cursor Projects/artgents-bot-active, codex/three-tabs-catalog.
+Baseline 81db5f1fb27ac0e87f2c4e9665de1afafefaf4d1, origin/main и merge base
+f7629491f2bb93ed80e2f58aea53770841bbd6a3. Tracked/index чистые;
+foreign otzyv-1/2/3.jpg сохраняются. Продолжение того же продукта/ветки.
+
+Тип: UI bug fix и адаптивное представление, не архитектурное упрощение.
+HTML прочитан целиком (CSS/JS): нейтральные tokens, основной текст16px,
+служебный14px, цена под подписью в открытом списке без внешней рамки,
+44–52px touch targets, container queries и200%text. По последнему уточнению
+owner все существующие SVG внутри details и других компонентов сохраняются.
+User отдельно требует Inter вместо Arial эталона. CSS/JS/разметка эталона
+сохранены; в архивной копии удалены только пробелы пустой строки21 для
+git diff --check. При сравнении шрифт эталона заменяется на Inter как явное исключение.
+
+Последнее уточнение owner: «Переносишь только дизайн систему! ... Логику
+не трогаем ... эти иконки сохрани». Scope сужен до CSS и проверки шрифта;
+DOM/порядок раскрытия описания, аватары, тексты, callbacks, CTA и все SVG
+сохраняются. Новых viewport/focus/draft handlers не вводить. Container styling
+и touch targets — CSS. JS допускается лишь если проверка докажет, что без
+регистрации font resource Inter не загружается в существующем Shadow DOM.
+Не копировать JS эталона, не менять текущие способы submit/выбора услуги.
+
+Runtime embed: обычный DOM в test panel, Shadow DOM через static/widget/embed.js
+на сайте; iframe механизм не добавляется. Одна разметка/стили для обоих.
+Viewport/focus/scroll handlers сохраняются; доступность и отступы проверяются
+в существующей реализации. API, tenant routing/privacy/consent/delivery/model
+semantics не меняются.
+
+Выявленные различия поведения с reference: там auto-first price, ask-service,
+new-application после success и preview-start-catalog; рабочие ранее согласованные
+options-first, отсутствие этих двух кнопок, thank-you и assistant start сохраняются.
+Реальные названия/суммы/тексты/выбор формы не заменяются demo JS. Прежняя цена справа
+из screenshot отменяется новым прямым указанием: цена под подписью. Никаких новых
+сценариев/модельных полей, источников прайса или backend изменений.
+
+Exact allowlist:
+- static/widget/widget.css
+- static/widget/fonts.css
+- static/widget/embed.js
+- core/widget_cors.py
+- tests/test_widget_embed_cors.py
+- tests/test_widget_three_tabs_browser.py
+- tests/test_widget_mobile_layout_browser.py
+- tests/release/offline.txt
+- docs/artifacts/artgents-mobile-widget.html
+- docs/artifacts/artgents-mobile-widget-prompt.txt
+- docs/tasks/THREE_TABS_CATALOG_TASK.md
+
+Проверки блока: ширины320/360/390/430 и desktop container, DOM и Shadow DOM,
+направления/длинные услуги/detail/variants/conditions/feed/composer/form/error/
+success/back/draft;200%text; real Inter platform fonts. Эмуляция viewport и
+фокуса не объявляется real-device iOS/Android/keyboard evidence. Offline fixtures,
+никаких provider/SMTP/VPS/merge/deploy. Один independent Checker завершённого
+блока из-за общего renderer/mobile behavior, без полного D2 архитектурного review.
+
+Font probe: CSS.getPlatformFontsForNode в Shadow DOM показывает Inter SemiBold,
+isCustomFont=false: используется системный Inter, а не bundled webfont.
+Добавлен fonts.css (только прежние @font-face), widget.css импортирует его,
+embed.js регистрирует этот stylesheet в document.head: Chrome не регистрирует
+@font-face из Shadow stylesheet. Это загрузка оформления, без widget handlers.
+Нейтральные поверхности получают отдельный --clinic-soft, чтобы inherited
+inline theme tint не заменял серый эталона. Действия сохраняют brand клиента.
+
+Результат локального блока: убраны старая рамка списка/карточки, вложенные
+боковые отступы, цена справа и мелкая типографика; прежние конфликтующие
+правила заменены на общую шкалу эталона, не накоплены новыми overrides.
+Добавлены CSS container query и отдельная регистрация прежних font-face.
+Выбор вариантов, все SVG paths, порядок/раскрытие описания, тексты, avatar,
+CTA, поля/согласие/доставка/история и JS обработчики widget не изменены.
+
+Offline: 7 PASS (three-tabs3, embedded presentation3, no-public-price1).
+Three-tabs:10 состояний ×5 ширин ×100/200% для каждого из3 tenants; форма,
+validation, потерянный ответ/retry, success, общий draft, история/выбор цены.
+Embed: настоящий bootstrap/Shadow DOM, CDP подтверждает bundled Inter
+isCustomFont=true, сравнение размеров/цветов/отступов с неизменённым HTML
+при390px с единственным разрешённым font override Inter. На3 tenants
+5 ширин ×100/200%, короткий viewport560px, доступность phone/host scroll.
+Дополнительно read-only real9001 screenshots направлений, услуг, деталей,
+вариантов и формы всех3 клиентов просмотрены. Все /ask и /lead при этих
+снимках блокировались; provider/SMTP0, VPS/merge/deploy0.
+Новых baseline failures нет; прежние datetime.utcnow deprecation warnings.
+Физические iOS/Android и настоящая экранная клавиатура не проверялись.
+Independent Checker: PASS после focused recheck единственного font CORS P1;
+собственный targeted run Checker16PASS. Foreign otzyv1/2/3 сохранены.
+
+Checker focused finding P1: bundled fonts не получали CORS headers на внешнем
+origin, same-origin browser не выявлял проблему. Добавлены только два точных
+Inter asset paths в существующий CORS список, с прежним разрешением tenant/origin.
+Это доставка оформления; allowedOrigins, API/lead/model и guard не меняются.
+Allowlist выше расширен на core/widget_cors.py и его существующие offline tests
+для этой конкретной причины. Browser proof дополняется двумя разными origins;
+после REJECT требуется только focused recheck этого finding.
+
+Focused result:19PASS (cross-origin embedded3 +CORS16), без повторения
+не затронутых функциональных checks. Вместе с предшествующим7PASS покрыто
+23 разных targeted cases. Браузерные снимки — локальные offline/read-only,
+не доказательство VPS диалогов. Node syntax embed.js и diff --check PASS.
+Файлы шрифтов уже находились в static/fonts; Google/CDN не подключались.
+Checkpoint этапа: commit subject `Transfer reference widget design system with Inter`;
+push в текущую codex/three-tabs-catalog, draft PR34; без merge/deploy.
+
 ## Этап 4: перенос дизайна сохранённого прототипа — owner GO 2026-10-16
 
 Owner: «Сделай все как в прототипе», после скриншотов вкладок, списка услуг

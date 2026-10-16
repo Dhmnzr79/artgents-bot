@@ -17,6 +17,8 @@ _WIDGET_CORS_PREFIXES = (
     "/ask",
     "/lead",
     "/static/widget/",
+    "/static/fonts/inter-cyrillic-wght-normal.woff2",
+    "/static/fonts/inter-latin-wght-normal.woff2",
 )
 
 _CORS_ALLOW_METHODS = "GET, POST, OPTIONS"

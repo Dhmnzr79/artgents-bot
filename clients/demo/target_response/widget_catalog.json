@@ -85,5 +85,18 @@
     "veneers": "Коррекция цвета и формы передних зубов",
     "aligners": "Выравнивание зубов прозрачными капами",
     "tomography": "Трёхмерный снимок зубов и челюстей"
+  },
+  "show_sections": true,
+  "offer_groups": {
+    "classic": [
+      {
+        "title": "Системы имплантов",
+        "offer_ids": [
+          "classic.one_tooth.implantium",
+          "classic.one_tooth.impro",
+          "classic.one_tooth.nobel"
+        ]
+      }
+    ]
   }
 }

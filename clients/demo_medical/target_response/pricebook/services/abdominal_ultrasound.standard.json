@@ -35,11 +35,6 @@
   ],
   "required_conditions_metadata": {
     "completeness": "complete",
-    "conditions": [
-      {
-        "condition_id": "mandatory_exclusion",
-        "display_text": "Отдельно: Почки и мочевой пузырь; Специальные функциональные пробы; Консультация лечащего врача."
-      }
-    ]
+    "conditions": []
   }
 }

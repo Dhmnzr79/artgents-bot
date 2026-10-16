@@ -10,7 +10,7 @@ const arrow=()=>{const svg=document.createElementNS('http://www.w3.org/2000/svg'
 
 /** Read-only navigation state belongs to this widget instance, never the dialogue. */
 export function mountCatalog(root,{apiBase,clientId,onApply}){
-  const state={data:null,loading:null,section:null,query:'',service:null,offer:null,listScroll:0,directionScroll:0};
+  const state={data:null,loading:null,section:null,query:'',service:null,offer:null,offerQuery:'',offerScroll:0,listScroll:0,directionScroll:0};
   const scroller=()=>root.closest('[data-clinic-catalog-panel]')||root;
   const serviceById=id=>state.data.services.find(s=>s.service_id===id);
   const sectionById=id=>state.data.sections.find(s=>s.section_id===id);
@@ -18,22 +18,37 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
 
   function renderDetail(){
     const service=serviceById(state.service),detail=state.offer?service.details[state.offer]:null;
-    root.replaceChildren(button('← '+(state.query.trim()?'Результаты поиска':sectionById(state.section)?.title||'Все направления'),()=>{
+    const position=Boolean(detail&&service.price.rows.length>1);
+    root.replaceChildren(button('← '+(position?service.name:state.query.trim()?'Результаты поиска':sectionById(state.section)?.title||'Все услуги'),()=>{
+      if(position){state.offer=null;renderDetail();scroller().scrollTop=state.offerScroll;return;}
       state.service=null;state.offer=null;renderList();scroller().scrollTop=state.listScroll;
     }));
-    const eyebrow=element('p','clinic-catalog__eyebrow',sectionById(service.section_id).title);
+    root.append(element('h2','clinic-catalog__title',service.name),element('p','clinic-catalog__subtitle',service.subtitle));
     const description=element('div','clinic-catalog__description');setBotAnswerBody(description,service.description);
     const price=detail?.price||service.price;
     if(price){
       const cardRoot=element('div');
-      renderPriceBody(cardRoot,{revision:state.data.catalog_version,bodyParts:[{kind:'price_card',price,choices:choices(service)},...(detail?.parts||((price.presentation==='detail'?service.details[price.rows[0].offer_id]?.parts:[])||[]))]},
-        {clientId,isDisabled:()=>false,getLatestRevision:()=>state.data.catalog_version,
+      const renderPositions=()=>{
+        cardRoot.replaceChildren();
+        const query=state.offerQuery.trim().toLocaleLowerCase('ru');
+        const rows=price.presentation==='options'?price.rows.filter(row=>[row.variant_label,row.service_name,row.scope_text,...service.offer_groups.filter(group=>group.offer_ids.includes(row.offer_id)).map(group=>group.title)].filter(Boolean).join(' ').toLocaleLowerCase('ru').includes(query)):price.rows;
+        if(!rows.length){cardRoot.append(element('p','clinic-catalog__empty','Нет подходящих ценовых позиций'));return;}
+        const groups=service.offer_groups.length?service.offer_groups.map(group=>({...group,offer_ids:group.offer_ids.filter(id=>rows.some(row=>row.offer_id===id))})).filter(group=>group.offer_ids.length):null;
+        renderPriceBody(cardRoot,{revision:state.data.catalog_version,bodyParts:[{kind:'price_card',price:{...price,rows},choices:choices(service)},...(detail?.parts||((price.presentation==='detail'?service.details[price.rows[0].offer_id]?.parts:[])||[]))]},
+        {clientId,rowGroups:groups,showTitle:false,isDisabled:()=>false,getLatestRevision:()=>state.data.catalog_version,
           offerIdForChoice:choice=>choice.offer_id,onSelect:choice=>{
-            const scroll=scroller().scrollTop;state.offer=choice.offer_id;renderDetail();scroller().scrollTop=scroll;
+            const scroll=scroller().scrollTop,wasDetail=Boolean(state.offer);
+            if(!wasDetail)state.offerScroll=scroll;
+            state.offer=choice.offer_id;renderDetail();scroller().scrollTop=wasDetail?scroll:0;
           }});
-      cardRoot.querySelector('.clinic-price-card')?.prepend(eyebrow);root.append(cardRoot);
+      };
+      if(price.presentation==='options'&&price.rows.length>6){
+        const search=element('input','clinic-catalog__search');search.type='search';search.placeholder='Найти зону или вариант…';search.setAttribute('aria-label','Поиск по прайсу');search.value=state.offerQuery;
+        search.addEventListener('input',()=>{state.offerQuery=search.value;renderPositions();});root.append(search);
+      }
+      renderPositions();root.append(cardRoot);
     }else{
-      root.append(eyebrow,element('h2','clinic-catalog__title',service.name),element('p','clinic-catalog__unpriced',state.data.unpriced_text));
+      root.append(element('p','clinic-catalog__unpriced',state.data.unpriced_text));
     }
     const information=element('details','clinic-price-card__detail');
     information.append(element('summary',null,'Об услуге'),description);root.append(information);
@@ -58,9 +73,9 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
     const list=element('div','clinic-catalog__list');
     const renderRows=()=>{
       list.replaceChildren();const query=state.query.trim().toLocaleLowerCase('ru');
-      list.classList.toggle('clinic-catalog__list--services',Boolean(query||state.section));
+      list.classList.toggle('clinic-catalog__list--services',Boolean(query||state.section||!state.data.show_sections));
       title.textContent=query?'Результаты поиска':sectionById(state.section)?.title||'Услуги и цены';
-      if(!query&&!state.section){
+      if(!query&&!state.section&&state.data.show_sections){
         for(const section of state.data.sections){
           const row=button('',()=>{state.directionScroll=scroller().scrollTop;state.section=section.section_id;renderList();scroller().scrollTop=0;},'clinic-catalog__row');
           const copy=element('span','clinic-catalog__direction-copy');
@@ -70,13 +85,14 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
       }
       const found=state.data.services.filter(service=>{
         const section=sectionById(service.section_id);
-        return query?[service.name,...service.aliases,section.title,...(service.price?.rows||[]).map(r=>r.variant_label||'')].join(' ').toLocaleLowerCase('ru').includes(query):service.section_id===state.section;
+        return query?[service.name,service.subtitle,...service.aliases,section.title,...(service.price?.rows||[]).map(r=>r.variant_label||'')].join(' ').toLocaleLowerCase('ru').includes(query):!state.section||service.section_id===state.section;
       });
       if(!found.length)list.append(element('p','clinic-catalog__empty','Ничего не найдено. Попробуйте другое название.'));
       for(const service of found){
-        const row=button('',()=>{state.listScroll=scroller().scrollTop;state.service=service.service_id;state.offer=null;renderDetail();scroller().scrollTop=0;},'clinic-catalog__row clinic-catalog__service');
-        const first=service.price?.rows[0];
-        row.append(element('strong',null,service.name),element('span','clinic-catalog__row-price',first?.price_display_text||state.data.unpriced_text));
+        const row=button('',()=>{state.listScroll=scroller().scrollTop;state.service=service.service_id;state.offer=null;state.offerQuery='';state.offerScroll=0;renderDetail();scroller().scrollTop=0;},'clinic-catalog__row clinic-catalog__service');
+        const count=service.price?.rows.length||0;
+        const word={one:'позиция',few:'позиции',many:'позиций',other:'позиции'}[new Intl.PluralRules('ru').select(count)];
+        row.append(element('strong',null,service.name),element('span','clinic-catalog__row-price',count?`${count} ${word} в прайсе`:state.data.unpriced_text));
         row.append(element('small',null,service.subtitle));
         row.append(arrow());
         list.append(row);
@@ -103,5 +119,5 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
     })();
     return state.loading;
   }
-  return {load,async getData(){await load();if(!state.data)throw new Error("catalog_unavailable");return state.data;},reset(){state.data=null;state.loading=null;state.section=null;state.query='';state.service=null;state.offer=null;root.replaceChildren();}};
+  return {load,async getData(){await load();if(!state.data)throw new Error("catalog_unavailable");return state.data;},reset(){state.data=null;state.loading=null;state.section=null;state.query='';state.service=null;state.offer=null;state.offerQuery='';state.offerScroll=0;root.replaceChildren();}};
 }

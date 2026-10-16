@@ -36,11 +36,6 @@
   ],
   "required_conditions_metadata": {
     "completeness": "complete",
-    "conditions": [
-      {
-        "condition_id": "mandatory_exclusion",
-        "display_text": "Отдельно: УЗИ; Лабораторные исследования и забор материала для них; Кольпоскопия и лечебные процедуры."
-      }
-    ]
+    "conditions": []
   }
 }

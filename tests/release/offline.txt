@@ -56,6 +56,8 @@ tests/test_widget_booking_form.py
 tests/test_widget_entry_context.py
 tests/test_widget_session.py
 tests/test_widget_three_tabs_browser.py
+tests/test_widget_catalog_structure_browser.py
+tests/test_d2_catalog_exclusions.py
 tests/test_widget_mobile_layout_browser.py
 tests/test_lead_consent.py
 tests/test_nikadent_price_authority_offline.py

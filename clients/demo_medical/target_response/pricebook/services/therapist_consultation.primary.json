@@ -36,11 +36,6 @@
   ],
   "required_conditions_metadata": {
     "completeness": "complete",
-    "conditions": [
-      {
-        "condition_id": "mandatory_exclusion",
-        "display_text": "Отдельно: Анализы; ЭКГ и УЗИ; Приёмы других специалистов."
-      }
-    ]
+    "conditions": []
   }
 }

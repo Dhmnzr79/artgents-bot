@@ -38,11 +38,6 @@
   ],
   "required_conditions_metadata": {
     "completeness": "complete",
-    "conditions": [
-      {
-        "condition_id": "mandatory_exclusion",
-        "display_text": "Отдельно: Декольте и кисти; Дополнительные объёмы препарата; Курс последующих процедур."
-      }
-    ]
+    "conditions": []
   }
 }

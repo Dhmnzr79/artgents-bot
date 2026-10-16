@@ -22,13 +22,13 @@ def render_response_text(plan: ResolvedResponsePlan, *, include_lead: bool = Tru
                 show_service_in_each_row=len({row.service_id for row in part.price.rows}) > 1,
                 include_conditions=part.price.presentation == "detail")
             texts.extend(card_text)
-            if include_card_details and part.price.presentation == "detail":
+            if part.price.presentation == "detail":
                 # Match the sections available on the selected widget card.
                 # Overview alternatives have no expanded package sections.
                 row = part.price.rows[0]
-                for heading, lines in (("В стоимость входят", row.includes),
+                for heading, lines in (("В стоимость входят", row.includes if include_card_details else ()),
                                        ("Отдельно оплачиваются / не входят", row.excludes),
-                                       ("Этапы оплаты", row.stages)):
+                                       ("Этапы оплаты", row.stages if include_card_details else ())):
                     if lines:
                         texts.append(heading + ":\n" + "\n".join("- " + line for line in lines))
     return _join_parts(texts)

@@ -191,8 +191,7 @@ def load_d2_tenant_snapshot(client_id: str, *, clients_root: Path) -> D2TenantSn
     if nav_raw is not None:
         from contracts.widget_catalog import WidgetCatalogNavigation
         try:
-            WidgetCatalogNavigation.model_validate_json(nav_raw).bind(client_id,
-                {key for key,service in bundle.services.items() if service.active})
+            WidgetCatalogNavigation.model_validate_json(nav_raw).bind(client_id,bundle)
         except ValueError as exc:
             raise D2TenantSnapshotError('widget_catalog_invalid') from exc
     return snapshot

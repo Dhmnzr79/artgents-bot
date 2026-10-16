@@ -42,12 +42,7 @@
   ],
   "required_conditions_metadata": {
     "completeness": "complete",
-    "conditions": [
-      {
-        "condition_id": "mandatory_exclusion",
-        "display_text": "Отдельно: Полноценная консультация гинеколога; Кольпоскопия и биопсия; Исследования на другие инфекции."
-      }
-    ]
+    "conditions": []
   },
   "payment_stages": [
     {

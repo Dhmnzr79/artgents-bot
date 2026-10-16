@@ -30,11 +30,6 @@
   ],
   "required_conditions_metadata": {
     "completeness": "complete",
-    "conditions": [
-      {
-        "condition_id": "mandatory_exclusion",
-        "display_text": "Отдельно: Удаление и гистология."
-      }
-    ]
+    "conditions": []
   }
 }

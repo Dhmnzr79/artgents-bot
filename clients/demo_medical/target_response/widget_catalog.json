@@ -118,5 +118,38 @@
     "laser_hair_removal": "Удаление нежелательных волос на выбранных зонах",
     "ultrasound_lifting": "Более чёткий овал лица без разрезов",
     "botulinum_therapy": "Смягчение мимических морщин с сохранением мимики"
+  },
+  "show_sections": true,
+  "offer_groups": {
+    "laser_hair_removal": [
+      {
+        "title": "Отдельные зоны",
+        "offer_ids": [
+          "laser_hair_removal.underarms",
+          "laser_hair_removal.legs"
+        ]
+      },
+      {
+        "title": "Комплекс",
+        "offer_ids": [
+          "laser_hair_removal.three_zones"
+        ]
+      }
+    ],
+    "plasma_therapy": [
+      {
+        "title": "Один сеанс",
+        "offer_ids": [
+          "plasma_therapy.face",
+          "plasma_therapy.scalp"
+        ]
+      },
+      {
+        "title": "Курс",
+        "offer_ids": [
+          "plasma_therapy.three_visits"
+        ]
+      }
+    ]
   }
 }

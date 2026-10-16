@@ -14,8 +14,7 @@ def catalog_navigation(snapshot):
     if raw is None:
         raise ValueError('widget_catalog_missing')
     nav = WidgetCatalogNavigation.model_validate_json(raw)
-    active = {key for key, service in snapshot.bundle.services.items() if service.active}
-    return nav.bind(snapshot.client_id,active)
+    return nav.bind(snapshot.client_id,snapshot.bundle)
 
 
 def build_widget_catalog(snapshot, *, as_of: date):
@@ -36,7 +35,7 @@ def build_widget_catalog(snapshot, *, as_of: date):
             # Skip only the section heading; descriptions remain authored MD.
             description = '\n'.join(line for line in summary.splitlines() if not line.startswith('#')).strip()
             offers = [offer for offer in bundle.offers if offer.active and offer.service_id == service_id
-                and (offer.option_id is None or any(o.option_id == offer.option_id and o.active for o in service.options))]
+                and (offer.option_id is None or any(o.option_id == offer.option_id and o.active is not False for o in service.options))]
             offers.sort(key=lambda offer: (
                 offer.price.mode == 'no_public_price',
                 getattr(offer.price,'amount',getattr(offer.price,'min_amount',0)),offer.offer_id))
@@ -61,7 +60,8 @@ def build_widget_catalog(snapshot, *, as_of: date):
                 details[row.offer_id] = {'price':price_block((row,),'detail'),'parts':parts}
             services.append(dict(service_id=service_id,section_id=section.section_id,name=service.name,
                 aliases=service.aliases,description=description,subtitle=nav.service_subtitles[service_id],
+                offer_groups=[group.model_dump(mode='json') for group in nav.offer_groups.get(service_id,())],
                 price=price_block(rows,'detail' if len(rows)==1 else 'options') if rows else None,
                 details=details))
-    return dict(client_id=client_id,label=nav.label,catalog_version=snapshot.fingerprint,unpriced_text=nav.unpriced_text,
+    return dict(client_id=client_id,label=nav.label,show_sections=nav.show_sections,catalog_version=snapshot.fingerprint,unpriced_text=nav.unpriced_text,
         sections=[s.model_dump(mode='json') for s in nav.sections],services=services)

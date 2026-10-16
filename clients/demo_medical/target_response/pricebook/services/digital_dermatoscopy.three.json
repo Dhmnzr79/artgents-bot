@@ -35,11 +35,6 @@
   ],
   "required_conditions_metadata": {
     "completeness": "complete",
-    "conditions": [
-      {
-        "condition_id": "mandatory_exclusion",
-        "display_text": "Отдельно: Карта всей поверхности кожи; Исследование дополнительных образований; Удаление и гистология."
-      }
-    ]
+    "conditions": []
   }
 }

@@ -1,6 +1,6 @@
 import { setBotAnswerBody } from "./answer_format.js";
 
-export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect, getLatestRevision, offerIdForChoice = choice => String(choice.reply_id || "").replace(/^price_select:/, "")}) {
+export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect, getLatestRevision, rowGroups = null, showTitle = true, offerIdForChoice = choice => String(choice.reply_id || "").replace(/^price_select:/, "")}) {
   let texts = [];
   let financialCard = null;
   const sections = new Map();
@@ -90,8 +90,8 @@ export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect
         card.appendChild(hint);
       }
     }
-    const title=document.createElement('h3');title.className='clinic-price-card__title';
-    title.textContent=overview?'Услуги и цены':rows[0].service_name;card.appendChild(title);
+    if(showTitle){const title=document.createElement('h3');title.className='clinic-price-card__title';
+      title.textContent=overview?'Услуги и цены':rows[0].service_name;card.appendChild(title);}
     if(!options&&(part.choices||[]).length>1){
       const tabs=document.createElement('div');tabs.className='clinic-price-card__tabs';tabs.setAttribute('role','group');tabs.setAttribute('aria-label','Вариант');
       for(const choice of part.choices){
@@ -106,10 +106,13 @@ export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect
       label.textContent=rows[0].variant_label;card.appendChild(label);
     }
     const allChoices=[...(part.choices||[]),...(part.service_choices||[])];
-    for(const row of rows){
+    const displayRows=options&&rowGroups!==null?rowGroups.flatMap(group=>group.offer_ids.map((id,index)=>({row:rows.find(row=>row.offer_id===id),heading:index===0?group.title:null}))).filter(item=>item.row):rows.map(row=>({row,heading:null}));
+    for(const {row,heading} of displayRows){
+      if(heading){const label=document.createElement('h4');label.className='clinic-price-card__group-title';label.textContent=heading;card.appendChild(label);}
       const choice=allChoices.find(choice=>offerIdForChoice(choice)===row.offer_id);
       const item=document.createElement(options&&choice?'button':'div');
       item.className=options?'clinic-price-card__overview-row':'clinic-price-card__price-area';
+      if(options)item.dataset.priceOfferId=row.offer_id;
       if(options&&row.mode==='no_public_price')item.classList.add('clinic-price-card__overview-row--description');
       if(options&&choice){item.type='button';item.disabled=disabled();item.addEventListener('click',()=>select(choice,message.revision));}
       if(options){const name=document.createElement('span');name.className='clinic-price-card__overview-name';name.textContent=overview?row.service_name:(row.variant_label||row.service_name);item.appendChild(name);}

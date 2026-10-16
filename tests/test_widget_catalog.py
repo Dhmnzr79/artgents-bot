@@ -62,6 +62,47 @@ def test_missing_offer_services_remain_visible_without_synthetic_offer(http_env)
     assert data['unpriced_text']=='Стоимость уточнит администратор'
 
 
+def test_catalog_authored_groups_preserve_canonical_offers(http_env,monkeypatch):
+    admit_medical(http_env,monkeypatch)
+    data=http_env[0].get('/api/widget-catalog?client_id=demo_medical').get_json()
+    service=next(s for s in data['services'] if s['service_id']=='laser_hair_removal')
+    assert data['show_sections'] is True
+    groups=service['offer_groups']
+    assert [g['title'] for g in groups]==['Отдельные зоны','Комплекс']
+    assert [ref for g in groups for ref in g['offer_ids']]==[r['offer_id'] for r in service['price']['rows']]
+
+
+@pytest.mark.parametrize('fault',['unknown','foreign','duplicate','missing','inactive','inactive_option','unknown_service','empty'])
+def test_catalog_groups_reject_noncanonical_members(tmp_path,fault):
+    shutil.copytree(ROOT/'clients/demo',tmp_path/'demo')
+    path=tmp_path/'demo/target_response/widget_catalog.json'
+    data=json.loads(path.read_text(encoding='utf-8'))
+    group=data['offer_groups']['classic'][0]
+    if fault=='unknown':group['offer_ids'][0]='unknown.offer'
+    elif fault=='foreign':group['offer_ids'][0]='all_on_4.jaw.implantium'
+    elif fault=='duplicate':group['offer_ids'].append(group['offer_ids'][0])
+    elif fault=='missing':group['offer_ids'].pop()
+    elif fault=='empty':data['offer_groups']['classic']=[]
+    elif fault=='unknown_service':data['offer_groups']['unknown_service']=data['offer_groups'].pop('classic')
+    elif fault=='inactive':
+        offer_path=tmp_path/'demo/target_response/pricebook/services/classic.one_tooth.implantium.json'
+        offer=json.loads(offer_path.read_text(encoding='utf-8'));offer['active']=False
+        offer_path.write_text(json.dumps(offer),encoding='utf-8')
+    else:
+        catalog_path=tmp_path/'demo/target_response/service_catalog.json'
+        catalog=json.loads(catalog_path.read_text(encoding='utf-8'))
+        catalog['classic']['options']=[{'option_id':'disabled','name':'Disabled','active':False}]
+        catalog_path.write_text(json.dumps(catalog),encoding='utf-8')
+        offer_path=tmp_path/'demo/target_response/pricebook/services/classic.one_tooth.implantium.json'
+        offer=json.loads(offer_path.read_text(encoding='utf-8'));offer['option_id']='disabled'
+        offer_path.write_text(json.dumps(offer),encoding='utf-8')
+    path.write_text(json.dumps(data),encoding='utf-8')
+    from contracts.widget_catalog import WidgetCatalogNavigation
+    from core.response_schema_loader import load_response_schema_bundle
+    with pytest.raises(ValueError,match='widget_catalog'):
+        WidgetCatalogNavigation.model_validate(data).bind('demo',load_response_schema_bundle(tmp_path/'demo/target_response'))
+
+
 @pytest.mark.parametrize('fault',['foreign','unknown','inactive','duplicate','missing'])
 def test_catalog_manifest_invalid_refs_rejected(tmp_path,fault):
     shutil.copytree(ROOT/'clients/demo',tmp_path/'demo')

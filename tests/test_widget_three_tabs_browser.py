@@ -61,6 +61,7 @@ def test_three_tabs_private_shared_form_and_page_remount(http_env,monkeypatch,tm
   },fixtures);
   await setup();
   const auditLayout=async state=>{
+    await page.evaluate(()=>document.fonts.ready);
     for(const textSize of ['100%','200%']){
       await page.evaluate(size=>document.documentElement.style.fontSize=size,textSize);
       for(const width of [320,360,390,430,1280]){
@@ -72,7 +73,7 @@ def test_three_tabs_private_shared_form_and_page_remount(http_env,monkeypatch,tm
             const rect=el.getBoundingClientRect(),style=getComputedStyle(el);
             if(!rect.width||!rect.height||style.display==='inline'||el instanceof SVGElement)continue;
             if(rect.left<bounds.left-1||rect.right>bounds.right+1)bad.push(el.className+': bounds');
-            if(!el.matches('input,textarea,select')&&el.scrollWidth>el.clientWidth+2)bad.push(el.className+': content');
+            if(!el.matches('input,textarea,select')&&el.scrollWidth>el.clientWidth+2)bad.push(el.tagName+'.'+el.className+': content '+el.clientWidth+'/'+el.scrollWidth+' '+el.textContent.slice(0,80));
           }
           if(bounds.top<0||bounds.bottom>innerHeight+1)bad.push('viewport height');
           return bad;
@@ -114,7 +115,7 @@ def test_three_tabs_private_shared_form_and_page_remount(http_env,monkeypatch,tm
   if(await options.count()!==fixtures.service.price.rows.length)throw new Error('Missing service options');
   await auditLayout('catalog price options');
   const index=fixtures.service.price.rows.findIndex(row=>row.offer_id===fixtures.chosen);
-  await options.nth(index).click();
+  await catalogPanel.locator(`[data-price-offer-id="${fixtures.chosen}"]`).click();
   if(await catalogPanel.locator('.clinic-price-card__overview-row').count())throw new Error('Detail did not open');
   await catalogPanel.locator('details').evaluateAll(items=>items.forEach(item=>item.open=true));
   await auditLayout('detail, variants, expanded conditions and description');

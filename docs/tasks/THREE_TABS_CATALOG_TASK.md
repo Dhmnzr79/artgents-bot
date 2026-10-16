@@ -19,6 +19,155 @@ read-only граница НикаДент ниже относится к уже 
 tenant/privacy/consent и прежние роли Target Contract §3 сохраняются.
 Вопросы владельцу — только обычным текстом с примерами, без quiz/popup.
 
+## Этап 7: структура каталога и устранение повторов — owner GO 2026-10-17
+
+Owner подтвердил перенос структуры из artgents-three-clinics-arrow-below-price.html
+в нашу дизайн-систему, затем остановил для замечания о дубле exclusions и дал
+«Ладно делай, потом смотрим». Уточнения: prototype только про каталог;
+прежняя логика карточек/conditions/lead и иконки сохраняются. Цена справа сверху,
+SVG под ценой. Повтор раздела над названием услуги убрать. Никаких prototype
+ask-service/new-lead/auto-booking, новых шрифтов/тем/данных/цен.
+
+Preflight repo/top C:/Cursor Projects/artgents-bot-active,
+branch codex/three-tabs-catalog; HEAD/baseline528b90c9bbf590fd423b0966ce8c5099c47e6135;
+origin/main и merge base f7629491f2bb93ed80e2f58aea53770841bbd6a3.
+Tracked/index чистые, foreign otzyv-1/2/3.jpg сохраняются. Продолжение той же ветки.
+Тип: UI/data bug fix и согласованная структура каталога, не упрощение всей D2 архитектуры.
+
+Astra консультация: только authored show_sections и группы canonical offers;
+полнота/tenant/service/active refs проверяются snapshot loader. Без групп —
+прежний полный список, с группами — каждый eligible offer ровно один раз.
+Новые поля — только presentation metadata по прямому GO на структуру прототипа.
+Строки/цены собирает прежний builder, показывает один общий price_card renderer;
+поиск фильтрует видимость, не eligibility и не draft. Варианты в detail сохраняются.
+Canonical medical service IDs не объединяются под широкие экраны прототипа.
+Target Contract §3 применяется к каждому пути, роли/selection/model не меняются.
+
+Причина дубля: полный перечень package.excludes повторялся агрегированной
+строкой mandatory_exclusion metadata. Удалены45 списочных копий medical и4
+дословные копии nikadent. Dental16 остаются без изменений: их отдельные краткие
+mandatory caveats нужны действующему price contract, полный перенос их authority
+не входит в UI этап. Sole owner полных списков — package.excludes; самостоятельные
+caveats, completeness и scope сохраняются. Runtime semantic/string фильтров
+не добавлять. build_d2_published_offer_terms уже включает все excludes. Plain
+detail теперь должен публиковать их один раз и при include_card_details=False,
+чтобы не потерять условия вне виджета; history читает тот же frozen row.
+Это bug fix повторной авторской записи, без нового source-ref или модели.
+
+Exact allowlist:
+- contracts/widget_catalog.py
+- core/widget_catalog.py
+- core/d2_tenant_snapshot.py
+- core/response_text_renderer.py
+- static/widget/catalog.js
+- static/widget/price_card.js
+- static/widget/widget.css
+- clients/demo/target_response/widget_catalog.json
+- clients/demo_medical/target_response/widget_catalog.json
+- clients/nikadent/target_response/widget_catalog.json
+- tests/test_widget_catalog.py
+- tests/test_widget_three_tabs_browser.py
+- tests/test_widget_catalog_structure_browser.py
+- tests/test_d2_catalog_exclusions.py
+- tests/release/offline.txt
+- docs/CLIENT_PACK_AUTHORING.md
+- docs/tasks/THREE_TABS_CATALOG_TASK.md
+- docs/artifacts/artgents-three-clinics-arrow-below-price.html
+- clients/demo_medical/target_response/pricebook/services/abdominal_ultrasound.standard.json
+- clients/demo_medical/target_response/pricebook/services/abdominal_ultrasound.with_kidneys.json
+- clients/demo_medical/target_response/pricebook/services/biorevitalization.face.json
+- clients/demo_medical/target_response/pricebook/services/biorevitalization.face_neck.json
+- clients/demo_medical/target_response/pricebook/services/botulinum_therapy.individual.json
+- clients/demo_medical/target_response/pricebook/services/botulinum_therapy.unit.json
+- clients/demo_medical/target_response/pricebook/services/cardiology_consultation.primary.json
+- clients/demo_medical/target_response/pricebook/services/cardiology_consultation.with_ecg.json
+- clients/demo_medical/target_response/pricebook/services/cervical_screening.basic.json
+- clients/demo_medical/target_response/pricebook/services/cervical_screening.extended.json
+- clients/demo_medical/target_response/pricebook/services/dermatology_consultation.primary.json
+- clients/demo_medical/target_response/pricebook/services/dermatology_consultation.repeat.json
+- clients/demo_medical/target_response/pricebook/services/digital_dermatoscopy.extended.json
+- clients/demo_medical/target_response/pricebook/services/digital_dermatoscopy.one.json
+- clients/demo_medical/target_response/pricebook/services/digital_dermatoscopy.three.json
+- clients/demo_medical/target_response/pricebook/services/ecg.default.json
+- clients/demo_medical/target_response/pricebook/services/ent_consultation.primary.json
+- clients/demo_medical/target_response/pricebook/services/ent_consultation.repeat.json
+- clients/demo_medical/target_response/pricebook/services/ent_endoscopy.default.json
+- clients/demo_medical/target_response/pricebook/services/gynecology_consultation.primary.json
+- clients/demo_medical/target_response/pricebook/services/gynecology_consultation.repeat.json
+- clients/demo_medical/target_response/pricebook/services/laser_hair_removal.legs.json
+- clients/demo_medical/target_response/pricebook/services/laser_hair_removal.three_zones.json
+- clients/demo_medical/target_response/pricebook/services/laser_hair_removal.underarms.json
+- clients/demo_medical/target_response/pricebook/services/nasal_lavage.single.json
+- clients/demo_medical/target_response/pricebook/services/nasal_lavage.three_visits.json
+- clients/demo_medical/target_response/pricebook/services/neurology_consultation.primary.json
+- clients/demo_medical/target_response/pricebook/services/neurology_consultation.repeat.json
+- clients/demo_medical/target_response/pricebook/services/pediatric_consultation.primary.json
+- clients/demo_medical/target_response/pricebook/services/pediatric_consultation.repeat.json
+- clients/demo_medical/target_response/pricebook/services/photorejuvenation.face.json
+- clients/demo_medical/target_response/pricebook/services/photorejuvenation.face_neck.json
+- clients/demo_medical/target_response/pricebook/services/photorejuvenation.hands.json
+- clients/demo_medical/target_response/pricebook/services/plasma_therapy.face.json
+- clients/demo_medical/target_response/pricebook/services/plasma_therapy.scalp.json
+- clients/demo_medical/target_response/pricebook/services/plasma_therapy.three_visits.json
+- clients/demo_medical/target_response/pricebook/services/therapist_consultation.primary.json
+- clients/demo_medical/target_response/pricebook/services/therapist_consultation.repeat.json
+- clients/demo_medical/target_response/pricebook/services/thyroid_ultrasound.standard.json
+- clients/demo_medical/target_response/pricebook/services/thyroid_ultrasound.with_cervical_nodes.json
+- clients/demo_medical/target_response/pricebook/services/ultrasound_lifting.face350.json
+- clients/demo_medical/target_response/pricebook/services/ultrasound_lifting.face_neck500.json
+- clients/demo_medical/target_response/pricebook/services/ultrasound_lifting.lower_face.json
+- clients/demo_medical/target_response/pricebook/services/urology_consultation.primary.json
+- clients/demo_medical/target_response/pricebook/services/urology_consultation.repeat.json
+- clients/nikadent/target_response/pricebook/services/classic.default.json
+- clients/nikadent/target_response/pricebook/services/core_inlay.default.json
+- clients/nikadent/target_response/pricebook/services/implant_supported_prosthetics.crown.json
+- clients/nikadent/target_response/pricebook/services/one_stage.default.json
+
+Проверки: targeted catalog/schema/группы completeness и bad refs, scaffold;
+общие цена/exclusions/plain/history, browser sections/flat/groups/search/back,
+320/360/390/430/desktop и200%text, exact draft/lead/restore. Один independent
+Checker завершённого блока; после finding focused recheck. Provider/SMTP0,
+VPS/merge/deploy0. Full releaseCI/physicaliOSAndroid не заявляются.
+
+Результаты до Checker: новый catalog/schema/exclusions subset30PASS,
+новый structure Chrome3PASS; earlier shared three-tabs/no-public4PASS.
+Новый длинный canonical pack выявил ошибку active=None: UI catalog исключал
+варианты с отсутствующим active, хотя shared builder считает их enabled.
+Исправлено единственное условие на `active is not False`, согласованное
+с общим builder; inactive=False по-прежнему исключён и проверяется тестом.
+Никаких новых fallback/eligibility heuristics. Остальные роли не меняются.
+Baseline archive528b90c: старые visual/legacy tests17PASS4FAIL (3 stale imports
+_d2_brief_price_conditions из старого модуля,1 прежнее ожидание Nika unknown
+completeness). Эти же файлы сравниваются с финальным кодом, не ослабляются.
+Первичная более широкая чистка Dental вызвала5 дополнительных legacy failures;
+Dental правки полностью отменены, отдельный renderer/adapter для legacy не добавлен.
+
+Финальный результат: разделы → услуги с числом позиций → сгруппированные
+предложения → прежняя подробная карточка. Доступен плоский список услуг через
+authored show_sections; у длинных прайсов поиск, возврат сохраняет запрос и
+прокрутку. Цена справа, прежний SVG под ценой; длинная цена без публичного
+числа остаётся читаемой. Повтор section eyebrow удалён. Inter, дизайн-токены,
+иконки, canonical выбор, detail tabs и общая форма сохранены.
+
+Финальная проверка: catalog/schema/exclusions30PASS, browser7PASS
+(three-tabs3 + structure3 + no-public1), embedded3PASS. Structure проверяет
+все три tenant, плоский каталог, группы, длинный canonical pack, фильтрацию,
+возврат, точный выбор, 5 ширин и текст100/200%. После ожидания fonts.ready
+финальный layout run полностью зелёный. Baseline/current legacy одинаковы:
+17PASS4 прежних FAIL, описанных выше; новых регрессий в этом subset нет.
+Independent Checker PASS: собственные30PASS, все49 JSON сверены по полям,
+67 изменённых/новых файлов в allowlist, P0/P1/P2 отсутствуют. Это подтверждение
+локального этапа UI/data, не сертификация всей D2 архитектуры или живой модели.
+
+Real9001 read-only скриншоты всех трёх клиентов просмотрены; финальные экраны
+demo positions и medical HIFU detail с раскрытыми исключениями проверены.
+Снимки и локальные harness находятся в ignored drafts/three-tabs-catalog/;
+/ask и /lead блокировались. Provider/model/SMTP0, VPS/merge/deploy0.
+Full release CI, физические устройства и экранная клавиатура не проверялись.
+Foreign otzyv-1/2/3.jpg сохранены. Итоговый staged diff проверяется перед commit;
+checkpoint `Transfer grouped catalog structure and remove duplicate exclusions`
+публикуется в прежнюю ветку codex/three-tabs-catalog и draft PR34, без merge.
+
 ## Этап 6: короткая подпись каждой услуги — owner GO 2026-10-16
 
 Owner: «Мы можем добавить для каждой услуги такие описания?» после объяснения,

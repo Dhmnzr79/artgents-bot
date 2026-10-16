@@ -41,12 +41,7 @@
   ],
   "required_conditions_metadata": {
     "completeness": "complete",
-    "conditions": [
-      {
-        "condition_id": "mandatory_exclusion",
-        "display_text": "Отдельно: Другие зоны; Анализы и отдельная первичная консультация."
-      }
-    ]
+    "conditions": []
   },
   "payment_stages": [
     {

@@ -23,11 +23,6 @@
   ],
   "required_conditions_metadata": {
     "completeness": "complete",
-    "conditions": [
-      {
-        "condition_id": "mandatory_exclusion",
-        "display_text": "Стоимость коронки оплачивается отдельно."
-      }
-    ]
+    "conditions": []
   }
 }

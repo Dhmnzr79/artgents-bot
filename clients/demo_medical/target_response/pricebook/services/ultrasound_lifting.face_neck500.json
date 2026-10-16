@@ -42,12 +42,7 @@
   ],
   "required_conditions_metadata": {
     "completeness": "complete",
-    "conditions": [
-      {
-        "condition_id": "mandatory_exclusion",
-        "display_text": "Отдельно: Веки, декольте и тело; Воздействия сверх пакета; Другие аппаратные методики."
-      }
-    ]
+    "conditions": []
   },
   "payment_stages": [
     {

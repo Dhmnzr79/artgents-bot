@@ -95,5 +95,24 @@
     "tooth_restoration": "Восстановление формы и цвета зуба",
     "emax_crowns": "Эстетичные безметалловые коронки из керамики",
     "teeth_cleaning": "Удаление зубного камня, налёта и полировка"
+  },
+  "show_sections": true,
+  "offer_groups": {
+    "removable_dentures": [
+      {
+        "title": "Пластиночные протезы",
+        "offer_ids": [
+          "removable_dentures.jaw.partial",
+          "removable_dentures.jaw.full"
+        ]
+      },
+      {
+        "title": "Другие материалы",
+        "offer_ids": [
+          "removable_dentures.jaw.nylon",
+          "removable_dentures.jaw.acry_free"
+        ]
+      }
+    ]
   }
 }

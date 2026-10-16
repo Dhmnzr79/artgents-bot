@@ -8,7 +8,9 @@
       "title": "Услуги",
       "service_ids": [
         "sample_service"
-      ]
+      ],
+      "subtitle": "Консультации и процедуры"
     }
-  ]
+  ],
+  "label": "Услуги клиники"
 }

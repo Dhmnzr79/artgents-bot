@@ -36,6 +36,7 @@ def test_catalog_actual_endpoint_is_read_only_and_complete(http_env,monkeypatch,
     assert 'price_select:' not in serialized and 'ui_revision' not in serialized
     assert 'lead_config' not in serialized and 'recipients' not in serialized
     assert set(refs)=={s['service_id'] for s in data['services']}
+    assert data['label'] and all(section['subtitle'] for section in data['sections'])
 
 
 def test_catalog_exact_price_and_offer_promo_scope(http_env,monkeypatch):

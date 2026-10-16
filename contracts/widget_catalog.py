@@ -7,12 +7,14 @@ from contracts.response_schema import NonBlankStr
 class WidgetCatalogSection(ResponsePlanModel):
     section_id: NonBlankStr
     title: NonBlankStr
+    subtitle: NonBlankStr
     service_ids: tuple[NonBlankStr, ...] = Field(min_length=1)
 
 
 class WidgetCatalogNavigation(ResponsePlanModel):
     version: int = Field(ge=1, le=1)
     client_id: NonBlankStr
+    label: NonBlankStr
     unpriced_text: NonBlankStr
     sections: tuple[WidgetCatalogSection, ...] = Field(min_length=1)
 

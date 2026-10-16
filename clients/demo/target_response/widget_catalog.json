@@ -16,7 +16,8 @@
         "sinus_lift",
         "zygomatic_implants",
         "pterygoid_implants"
-      ]
+      ],
+      "subtitle": "Один зуб или вся челюсть"
     },
     {
       "section_id": "prosthetics",
@@ -26,7 +27,8 @@
         "zirconia_crowns",
         "clasp_dentures",
         "removable_dentures"
-      ]
+      ],
+      "subtitle": "Коронки и восстановление зубов"
     },
     {
       "section_id": "treatment",
@@ -37,7 +39,8 @@
         "teeth_treatment",
         "tooth_extraction",
         "periodontitis"
-      ]
+      ],
+      "subtitle": "Сохранение собственных зубов"
     },
     {
       "section_id": "aesthetics",
@@ -46,14 +49,17 @@
         "professional_whitening",
         "veneers",
         "aligners"
-      ]
+      ],
+      "subtitle": "Более светлая улыбка"
     },
     {
       "section_id": "diagnostics",
       "title": "Диагностика",
       "service_ids": [
         "tomography"
-      ]
+      ],
+      "subtitle": "Обследования перед лечением"
     }
-  ]
+  ],
+  "label": "Стоматология"
 }

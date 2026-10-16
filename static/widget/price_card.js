@@ -135,7 +135,7 @@ export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect
         const list=document.createElement('ul');list.className='clinic-price-card__check-list';
         for(const line of row.includes){const li=document.createElement('li');li.appendChild(svg('check'));const text=document.createElement('span');text.textContent=line;li.appendChild(text);list.appendChild(li);}el.appendChild(list);
       }
-      if(row.excludes?.length){const el=detail('includes',row.includes?.length?'Что входит в стоимость':'Оплачивается отдельно','layers');if(row.includes?.length){const heading=document.createElement('p');heading.className='clinic-price-card__detail-heading';heading.textContent='Оплачивается отдельно';el.appendChild(heading);}const exclusions=document.createElement('ul');for(const line of row.excludes){const li=document.createElement('li');li.textContent=line;exclusions.appendChild(li);}el.appendChild(exclusions);}
+      if(row.excludes?.length){const el=detail('excludes','Оплачивается отдельно','info');const exclusions=document.createElement('ul');for(const line of row.excludes){const li=document.createElement('li');li.textContent=line;exclusions.appendChild(li);}el.appendChild(exclusions);}
       if(row.stages?.length){
         const el=detail('payment','Порядок оплаты','clock');
         for(const line of row.stages){

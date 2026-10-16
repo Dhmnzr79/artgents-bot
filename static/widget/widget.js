@@ -51,7 +51,7 @@ const PLAIN_ATTRIBUTION_ROUTES = new Set([
 const SECRET_SESSION_RESET_RE = /^::reset\s+(\S+)\s*$/i;
 const SECRET_SESSION_RESET_TOKEN = "x7k9m2p4";
 
-const SEND_BTN_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const SEND_BTN_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M12 19V5M6 11l6-6 6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 const LINK_ARROW_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M4 12h16M14 6l6 6-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
@@ -846,7 +846,10 @@ export function mountWidget(root, config, { pagePath } = {}) {
         <main class="clinic-shell__main" aria-label="Содержимое помощника">
           <div class="clinic-shell__feed" role="tabpanel" aria-label="Помощник" data-clinic-feed></div>
           <section class="clinic-shell__tab-panel" role="tabpanel" aria-label="Услуги и цены" data-clinic-catalog-panel hidden><div data-clinic-catalog></div></section>
-          <section class="clinic-shell__tab-panel" role="tabpanel" aria-label="Запись" data-clinic-booking-panel hidden><div data-clinic-booking></div></section>
+          <section class="clinic-shell__tab-panel" role="tabpanel" aria-label="Запись" data-clinic-booking-panel hidden>
+            <div class="clinic-catalog__heading clinic-booking__heading"><span class="clinic-catalog__eyebrow">Давайте познакомимся</span><h2 class="clinic-catalog__title">Начнём с обращения</h2><p>Оставьте контакты. Администратор свяжется с вами и поможет согласовать время приёма.</p></div>
+            <div data-clinic-booking></div><p class="clinic-booking__note">Можно пока не выбирать услугу — поможем разобраться.</p>
+          </section>
         </main>
         <form class="clinic-shell__composer" data-clinic-composer-form>
           <div class="clinic-shell__composer-inner">

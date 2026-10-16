@@ -19,6 +19,77 @@ read-only граница НикаДент ниже относится к уже 
 tenant/privacy/consent и прежние роли Target Contract §3 сохраняются.
 Вопросы владельцу — только обычным текстом с примерами, без quiz/popup.
 
+## Этап 4: перенос дизайна сохранённого прототипа — owner GO 2026-10-16
+
+Owner: «Сделай все как в прототипе», после скриншотов вкладок, списка услуг
+и направлений. Продолжение той же ветки codex/three-tabs-catalog в repo/top
+C:/Cursor Projects/artgents-bot-active. Baseline 2611529e5127d29fb06c96c3e6e547e35dcf8fc7;
+origin/main и merge base f7629491f2bb93ed80e2f58aea53770841bbd6a3.
+Tracked/index чистые; foreign otzyv-1/2/3.jpg сохраняются.
+
+Тип: исправление интерфейса и authored presentation data, не архитектурное
+упрощение. Визуальный источник static/experiments/three-tabs/{index.html,
+styles.css,app.js}. Переносим шрифты/отступы/heading/search/direction tiles,
+service rows, price details и форму; реальное наполнение, точные offers,
+options-first и общая форма сохраняют owners этапов 1–3. Не возвращаем
+отклонённую «Спросить об этой услуге», «Новая заявка» и демо-дисклеймеры.
+Данные прототипа не становятся прайсом. Краткие подписи направлений и label
+каталога — authored UI text, не новый semantic/control field модели.
+
+Exact allowlist до редактирования:
+- contracts/widget_catalog.py
+- core/widget_catalog.py
+- static/widget/catalog.js
+- static/widget/price_card.js
+- static/widget/booking_form.js
+- static/widget/widget.js
+- static/widget/widget.css
+- static/experiments/three-tabs/app.js
+- docs/artifacts/three-tabs-prototype/app.js
+- clients/demo/target_response/widget_catalog.json
+- clients/demo_medical/target_response/widget_catalog.json
+- clients/nikadent/target_response/widget_catalog.json
+- clients/_template/target_response/widget_catalog.json
+- tests/test_widget_catalog.py
+- tests/test_widget_three_tabs_browser.py
+- docs/CLIENT_PACK_AUTHORING.md
+- docs/tasks/THREE_TABS_CATALOG_TASK.md
+
+Owner уточнил: не переносить «Выберите направление или найдите услугу.» и
+«Демо-клиника · основные услуги», удалить эти строки и из standalone prototype.
+Каталог без демонстрационных пояснений; подсказки внутри направлений сохраняются.
+
+Проверки блока: schema/API existing catalog tests, JS syntax, targeted browser
+workflow трёх tenants и screenshots 390/desktop сравнение с prototype.
+Так как расширяется публичный presentation contract, один independent Checker
+завершённого блока; без полного повторения аудита D2. Provider/SMTP/VPS — 0.
+
+Результат блока: удалено прежнее оформление направлений (белые рамки/counts),
+несогласованные font sizes/desktop overrides, прежняя компоновка формы/composer.
+Перенесены prototype heading/search/soft tiles/list rows, размеры/типографика
+всех трёх вкладок, price-card/формы, отдельный accordion исключений. Цены и
+includes/excludes берутся из тех же frozen rows, public renderers общие.
+Направления получили authored subtitle; label/subtitle обязательны в четырёх
+packs, API только проецирует их. Стрелки направлений/услуг — тот же SVG path,
+stroke 1.4 и 17px из прототипа; CTA тоже имеет декоративную стрелку.
+Копия прототипа в docs/artifacts и ignored static/experiments очищены от
+отклонённых подписей. Последняя намеренно остаётся вне Git по handoff.
+
+Проверки: catalog API/schema **12 passed**, Chrome workflow **3 passed** у
+трёх tenants (selection/form/consent/retry/restore, 320/390/1280). Screenshots
+сняты для root каталога 390/1280, detail и формы; выполнена визуальная сверка
+со standalone prototype. JS syntax/diff check проходят. Заключительный browser
+run **3 passed** (24.30s); после финальной подгонки базового line-height отдельно
+проверена настоящая локальная test panel всех трёх клиентов, со screenshots
+390/1280: каталог, услуги, варианты, detail, форма. Harness блокировал /ask и
+/lead, запрещённых POST не было. DEV overlay скрыт штатной test panel.
+Independent Checker **PASS**, собственные **12 passed**, P0/P1/P2 нет.
+Это UI bug fix, архитектурное упрощение не заявляется. Semantic/lead/price
+owners, shared draft и options-first не меняются; live/provider/SMTP calls 0.
+Изменены только 16 tracked путей allowlist и ignored локальная копия прототипа.
+Foreign JPG сохранены, `.env`/SQLite/logs не входят в checkpoint. Checkpoint
+остаётся в codex/three-tabs-catalog и draft PR34, без merge/deploy/full CI.
+
 ## Этап 3: рабочий каталог и три вкладки — owner GO 2026-10-16
 
 Владелец: «Давай» после описания каталога, трёх вкладок, общей формы,

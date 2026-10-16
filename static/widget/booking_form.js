@@ -34,11 +34,12 @@ export function createBookingForm({apiBase,clientId,getSid,getCatalog}){
     }
     mount.replaceChildren();
     const form=el('form','clinic-booking');form.noValidate=true;
-    const title=el('h3',null,'Оставить заявку');
+    const title=el('h3',null,extended?'Ваши контакты':'Оставить заявку');
+    const intro=el('p','clinic-booking__intro',extended?'Поможем выбрать следующий шаг.':'Администратор свяжется с вами и согласует время.');
     const service=draft.selection?catalog.services.find(s=>s.service_id===draft.selection.service_id):null;
     const row=service?.price?.rows.find(r=>r.offer_id===draft.selection?.offer_id);
     const subject=el('p','clinic-booking__subject',service?[service.name,row?.variant_label].filter(Boolean).join(' · '):'Услугу можно уточнить с администратором');
-    form.append(title,subject);
+    form.append(title,intro,subject);
     const field=(key,labelText,type='text')=>{
       const label=el('label','clinic-booking__field',labelText),input=el(type==='textarea'?'textarea':'input');
       if(type!=='textarea')input.type=type;

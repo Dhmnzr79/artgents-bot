@@ -84,8 +84,11 @@ URL/UTM в модель не отправляются. Сервер приним
 
 ### Каталог и форма в трёх вкладках
 
-`widget_catalog.json` содержит `version: 1`, `client_id`, `unpriced_text` и
-`sections`: `section_id`, `title`, `service_ids`. Каждая активная услуга входит
+`widget_catalog.json` содержит `version: 1`, `client_id`, `label` (например,
+«Стоматология»), `unpriced_text` и `sections`: `section_id`, `title`, `subtitle`,
+`service_ids`. `subtitle` — короткая подпись серой плитки направления, без числа
+услуг или цены. `label` и `subtitle` — оформление каталога, не контекст модели.
+Каждая активная услуга входит
 ровно в один раздел; неизвестные, чужие, неактивные и пропущенные IDs — ошибка.
 Названия, суммы, варианты и условия повторно здесь не записываются. Каталог и
 чат используют один сборщик offers, commercial selector и renderer карточки.

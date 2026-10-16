@@ -56,6 +56,7 @@ def test_three_tabs_private_shared_form_and_page_remount(http_env,monkeypatch,tm
         {headers:{'Content-Type':'text/event-stream'}});
     };
     mountWidget(document.querySelector('#root'),{...fixtures.config,apiBase:location.origin});
+    document.querySelector('[data-clinic-dev-reset]')?.remove(); // Same as the real test panel: no overlapping debug control.
     document.querySelector('[data-clinic-launcher-open],[data-clinic-launcher]').click();
   },fixtures);
   await setup();
@@ -65,6 +66,11 @@ def test_three_tabs_private_shared_form_and_page_remount(http_env,monkeypatch,tm
   const userCount=await page.locator('.clinic-msg--user').count();
   await page.getByRole('tab',{name:'Услуги и цены',exact:true}).click();
   const catalogPanel=page.locator('[data-clinic-catalog-panel]');
+  await catalogPanel.locator('.clinic-catalog__row').first().waitFor();
+  if((await catalogPanel.innerText()).includes('Услуг:')||(await catalogPanel.innerText()).includes('Демо-клиника'))throw new Error('Prototype presentation replaced by count/disclaimer');
+  if(process.env.THREE_TABS_SCREENSHOT_DIR){fs.mkdirSync(process.env.THREE_TABS_SCREENSHOT_DIR,{recursive:true});
+    for(const width of [390,1280]){await page.setViewportSize({width,height:900});await page.locator('[data-clinic-panel]').screenshot({path:path.join(process.env.THREE_TABS_SCREENSHOT_DIR,`${fixtures.config.clientId}-${width}-directions.png`)});}
+    await page.setViewportSize({width:390,height:900});}
   await catalogPanel.locator('.clinic-catalog__row').first().click();
   // Search still covers the full clinic after choosing a section.
   await catalogPanel.getByRole('searchbox').fill(fixtures.service.name);
@@ -75,6 +81,7 @@ def test_three_tabs_private_shared_form_and_page_remount(http_env,monkeypatch,tm
   const index=fixtures.service.price.rows.findIndex(row=>row.offer_id===fixtures.chosen);
   await options.nth(index).click();
   if(await catalogPanel.locator('.clinic-price-card__overview-row').count())throw new Error('Detail did not open');
+  if(process.env.THREE_TABS_SCREENSHOT_DIR)await page.locator('[data-clinic-panel]').screenshot({path:path.join(process.env.THREE_TABS_SCREENSHOT_DIR,`${fixtures.config.clientId}-390-detail.png`)});
   await catalogPanel.getByRole('button',{name:'Оставить заявку',exact:true}).click();
   await catalogPanel.getByLabel('Как к вам обращаться').fill('Анна Проверка');
   await catalogPanel.getByLabel('Телефон',{exact:true}).fill('+79991234567');

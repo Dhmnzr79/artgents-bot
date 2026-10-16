@@ -103,7 +103,7 @@ $('#composer').onsubmit=e=>{e.preventDefault();const input=$('#question'),q=inpu
 function renderCatalog(){
  const root=$('#catalog');
  if(activeService){renderDetail();return;}
- root.innerHTML=`${activeCategory?'<button class="back" id="back-directions">← Все направления</button>':''}<div class="page-heading"><span class="eyebrow">${esc(packs[packKey].label)}</span><h2>${esc(activeCategory||'Услуги и цены')}</h2><p>${activeCategory?'Основные услуги и ориентиры стоимости.':'Выберите направление или найдите услугу.'}</p></div><label class="sr-only" for="service-search">Поиск по всему каталогу</label><input class="search" id="service-search" placeholder="Найти услугу или направление…"><p class="catalog-note">${packKey==='medical'?'Демонстрационные услуги и цены':'Демо-клиника · основные услуги'}</p><div id="service-list"></div>`;
+ root.innerHTML=`${activeCategory?'<button class="back" id="back-directions">← Все направления</button>':''}<div class="page-heading"><span class="eyebrow">${esc(packs[packKey].label)}</span><h2>${esc(activeCategory||'Услуги и цены')}</h2><p>${activeCategory?'Основные услуги и ориентиры стоимости.':''}</p></div><label class="sr-only" for="service-search">Поиск по всему каталогу</label><input class="search" id="service-search" placeholder="Найти услугу или направление…"><div id="service-list"></div>`;
  const input=$('#service-search');input.value=search;input.oninput=()=>{search=input.value;renderList();};
  if(activeCategory)$('#back-directions').onclick=()=>{activeCategory=null;search='';renderCatalog();$('#panel-catalog').scrollTop=categoryScroll;};
  renderList();
@@ -111,7 +111,8 @@ function renderCatalog(){
 function renderList(){
  const list=$('#service-list'),query=search.trim().toLowerCase();list.innerHTML='';
  $('#catalog .page-heading h2').textContent=query?'Результаты поиска':activeCategory||'Услуги и цены';
- $('#catalog .page-heading p').textContent=query?'По всем направлениям клиники.':activeCategory?'Основные услуги и ориентиры стоимости.':'Выберите направление или найдите услугу.';
+ $('#catalog .page-heading p').hidden=!query&&!activeCategory;
+ $('#catalog .page-heading p').textContent=query?'По всем направлениям клиники.':activeCategory?'Основные услуги и ориентиры стоимости.':'';
  if(!query&&!activeCategory){
  list.className='direction-list';packs[packKey].categories.forEach(([name,hint])=>{const b=document.createElement('button');b.className='direction-row';b.innerHTML=`<span><strong>${esc(name)}</strong><small>${esc(hint)}</small></span>${arrow}`;b.onclick=()=>{categoryScroll=$('#panel-catalog').scrollTop;activeCategory=name;renderCatalog();$('#panel-catalog').scrollTop=0;};list.append(b);});return;
  }

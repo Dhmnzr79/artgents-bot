@@ -63,5 +63,5 @@ def build_widget_catalog(snapshot, *, as_of: date):
                 aliases=service.aliases,description=description,
                 price=price_block(rows,'detail' if len(rows)==1 else 'options') if rows else None,
                 details=details))
-    return dict(client_id=client_id,catalog_version=snapshot.fingerprint,unpriced_text=nav.unpriced_text,
+    return dict(client_id=client_id,label=nav.label,catalog_version=snapshot.fingerprint,unpriced_text=nav.unpriced_text,
         sections=[s.model_dump(mode='json') for s in nav.sections],services=services)

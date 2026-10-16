@@ -10,21 +10,24 @@
         "ent_consultation",
         "ent_endoscopy",
         "nasal_lavage"
-      ]
+      ],
+      "subtitle": "Уши, горло и нос · взрослым и детям"
     },
     {
       "section_id": "general_medicine",
       "title": "Терапия",
       "service_ids": [
         "therapist_consultation"
-      ]
+      ],
+      "subtitle": "Общие вопросы о здоровье"
     },
     {
       "section_id": "pediatrics",
       "title": "Педиатрия",
       "service_ids": [
         "pediatric_consultation"
-      ]
+      ],
+      "subtitle": "Приём детей"
     },
     {
       "section_id": "gynecology",
@@ -32,14 +35,16 @@
       "service_ids": [
         "gynecology_consultation",
         "cervical_screening"
-      ]
+      ],
+      "subtitle": "Женское здоровье"
     },
     {
       "section_id": "urology",
       "title": "Урология",
       "service_ids": [
         "urology_consultation"
-      ]
+      ],
+      "subtitle": "Консультации и обследования"
     },
     {
       "section_id": "cardiology",
@@ -47,14 +52,16 @@
       "service_ids": [
         "cardiology_consultation",
         "ecg"
-      ]
+      ],
+      "subtitle": "Сердце и сосуды"
     },
     {
       "section_id": "neurology",
       "title": "Неврология",
       "service_ids": [
         "neurology_consultation"
-      ]
+      ],
+      "subtitle": "Консультации невролога"
     },
     {
       "section_id": "ultrasound",
@@ -62,7 +69,8 @@
       "service_ids": [
         "abdominal_ultrasound",
         "thyroid_ultrasound"
-      ]
+      ],
+      "subtitle": "Ультразвуковые исследования"
     },
     {
       "section_id": "dermatology",
@@ -70,7 +78,8 @@
       "service_ids": [
         "dermatology_consultation",
         "digital_dermatoscopy"
-      ]
+      ],
+      "subtitle": "Здоровье кожи"
     },
     {
       "section_id": "cosmetology",
@@ -82,7 +91,9 @@
         "laser_hair_removal",
         "ultrasound_lifting",
         "botulinum_therapy"
-      ]
+      ],
+      "subtitle": "Уход и эстетические процедуры"
     }
-  ]
+  ],
+  "label": "Медицинский центр"
 }

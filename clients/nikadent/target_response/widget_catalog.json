@@ -13,7 +13,8 @@
         "all_on_6",
         "sinus_lift",
         "bone_graft"
-      ]
+      ],
+      "subtitle": "Один зуб или вся челюсть"
     },
     {
       "section_id": "prosthetics",
@@ -30,7 +31,8 @@
         "fixed_bridge",
         "temporary_denture",
         "denture_reline"
-      ]
+      ],
+      "subtitle": "Коронки и восстановление зубов"
     },
     {
       "section_id": "treatment",
@@ -41,7 +43,8 @@
         "pulpitis",
         "periodontitis",
         "tooth_extraction"
-      ]
+      ],
+      "subtitle": "Сохранение собственных зубов"
     },
     {
       "section_id": "restoration",
@@ -51,14 +54,17 @@
         "ceramic_inlays",
         "tooth_restoration",
         "emax_crowns"
-      ]
+      ],
+      "subtitle": "Форма и эстетика улыбки"
     },
     {
       "section_id": "hygiene",
       "title": "Гигиена",
       "service_ids": [
         "teeth_cleaning"
-      ]
+      ],
+      "subtitle": "Профессиональный уход"
     }
-  ]
+  ],
+  "label": "Стоматология"
 }

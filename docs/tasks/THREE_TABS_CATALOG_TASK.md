@@ -19,6 +19,59 @@ read-only граница НикаДент ниже относится к уже 
 tenant/privacy/consent и прежние роли Target Contract §3 сохраняются.
 Вопросы владельцу — только обычным текстом с примерами, без quiz/popup.
 
+## Отдельная песочница шрифтов и отступов — owner GO 2026-10-17
+
+Owner попросил автономный HTML/CSS/JS виджет с основными UI состояниями,
+Inter/Roboto и переключателем для телефона. Это отдельный статический макет
+оформления в рамках текущей задачи; рабочий runtime/архитектура не меняются.
+Preflight repo/top C:/Cursor Projects/artgents-bot-active, branch
+codex/three-tabs-catalog, HEAD/baseline b3f14dd2e83048ddb6cd14781b7f443bc06445a0;
+origin/main/mergebase f7629491f2bb93ed80e2f58aea53770841bbd6a3.
+Tracked/index чистые, foreign otzyv-1/2/3.jpg сохраняются. Exact allowlist:
+- static/experiments/widget-playground/index.html
+- static/experiments/widget-playground/styles.css
+- static/experiments/widget-playground/app.js
+- static/experiments/widget-playground/fonts.css
+- static/experiments/widget-playground/build.py
+- static/experiments/widget-playground/README.md
+- static/experiments/widget-playground/assets/avatar.png
+- static/experiments/widget-playground/assets/inter-cyrillic-wght-normal.woff2
+- static/experiments/widget-playground/assets/inter-latin-wght-normal.woff2
+- static/experiments/widget-playground/assets/roboto-cyrillic-wght-normal.woff2
+- static/experiments/widget-playground/assets/roboto-latin-wght-normal.woff2
+- static/experiments/widget-playground/assets/OFL.txt
+- static/experiments/widget-playground/assets/Roboto-LICENSE.txt
+- docs/tasks/THREE_TABS_CATALOG_TASK.md
+
+В макете подготовленные диалог/ценовые варианты/продолжения, каталог,
+fixed/from/range/no-public/unit, группы/поиск, состав/доплаты/условия/оплата/акция,
+общая форма и success. Никаких API/model/lead/SMTP вызовов; данные контактов
+только в памяти страницы, localStorage только предпочтения оформления.
+Форма имитирует UI, не доставку. Все примеры не являются новой базой клиентов.
+Шрифты/аватар скопированы из имеющихся локальных assets с лицензиями.
+Настройки font/size/line-height/spacing/weight/desktop-width, экспорт CSS.
+build.py создаёт portable inline HTML и source ZIP в ignored drafts/widget-playground.
+Отдельный static server192.168.0.2:9100 раздаёт только папку песочницы;
+бот9001 и VPS не меняются. static/experiments/ локально ignored в .git/info/exclude;
+при checkpoint разрешён force-add только перечисленных точных путей.
+Проверки: JS syntax, Chromium mobile geometry/сценарии/InterRoboto/формы/
+preferences/portable file, один пропорциональный Checker изолированного макета.
+
+Результат: 12 экранов ×2 шрифта ×4 ширины (320/390/430/1280) —96 сочетаний PASS;
+крупные настройки дополнительно320/390/430 PASS, поиск зон/выбранная позиция/
+общий черновик/consent gate/success/escaping/history/settings persistence/CSS
+export/portable file PASS. CDP подтвердил реальный custom Roboto, шрифты локальные.
+Макет не делает network writes. Independent Checker PASS: JS syntax, portable
+HTML без external resources с4 встроенными fonts, ZIP integrity,13 исходников
+и card проверены; P0/P1/P2 нет. Прежние production suites не запускались.
+Локальная страница http://127.0.0.1:9100/ отвечает200. Сервер макета теперь
+bind0.0.0.0:9100, launcherPID23040; раздаёт только папку песочницы. LAN192.168.0.2
+не подтвердился (timeout даже с компьютера), firewall/VPN не менялись;
+доступ с реального телефона и клавиатура не проверены. Самодостаточный HTML
+и ZIP готовы в drafts/widget-playground/. Provider/model/SMTP/VPS0.
+14 точных путей, foreign3JPG сохранены. Checkpoint `Add standalone widget typography playground`,
+push в текущую ветку; draft PR34, без merge/deploy. Владелец продолжает ручную проверку.
+
 ## Этап 7: структура каталога и устранение повторов — owner GO 2026-10-17
 
 Owner GO после фиксации CATALOG_INTERFACE_SPEC.md: «Можешь делать правки».

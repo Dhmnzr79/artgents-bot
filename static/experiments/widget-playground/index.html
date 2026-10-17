@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <title>Artgents — шрифты и отступы виджета</title>
+  <link rel="stylesheet" href="fonts.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="lab-bar">
+    <strong>Artgents <span>· макет</span></strong>
+    <div class="font-switch" role="group" aria-label="Шрифт"><button data-font="Inter" aria-pressed="true">Inter</button><button data-font="Roboto" aria-pressed="false">Roboto</button></div>
+    <button class="lab-button" id="open-settings" aria-controls="settings" aria-expanded="false">Настройки</button>
+  </header>
+  <main class="preview">
+    <section class="widget" aria-label="Консультант клиники">
+      <header class="widget-header"><img src="assets/avatar.png" width="40" height="40" alt=""><div><strong>Надежда</strong><p>ИИ-консультант Artgents</p></div><button class="icon-button" id="collapse-widget" aria-label="Свернуть виджет">×</button></header>
+      <nav class="tabs" role="tablist" aria-label="Разделы виджета">
+        <button id="tab-chat" role="tab" data-tab="chat" aria-controls="panel-chat" aria-selected="true">Помощник</button>
+        <button id="tab-catalog" role="tab" data-tab="catalog" aria-controls="panel-catalog" aria-selected="false" tabindex="-1">Услуги и цены</button>
+        <button id="tab-booking" role="tab" data-tab="booking" aria-controls="panel-booking" aria-selected="false" tabindex="-1">Запись</button>
+      </nav>
+      <section id="panel-chat" class="tab-panel chat-panel" role="tabpanel" aria-labelledby="tab-chat">
+        <div id="feed" class="feed" aria-label="Переписка" tabindex="0"></div>
+        <form id="composer" class="composer"><label class="sr-only" for="question">Ваш вопрос</label><textarea id="question" rows="1" placeholder="Напишите сообщение…"></textarea><button class="send" aria-label="Отправить сообщение">↑</button></form>
+      </section>
+      <section id="panel-catalog" class="tab-panel scroll-panel" role="tabpanel" aria-labelledby="tab-catalog" hidden><div id="catalog"></div></section>
+      <section id="panel-booking" class="tab-panel scroll-panel" role="tabpanel" aria-labelledby="tab-booking" hidden><h2>Запись</h2><p class="subtitle">Оставьте контакты — администратор свяжется с вами и согласует время.</p><div id="booking-form" class="form-mount"></div></section>
+    </section>
+    <button id="reopen-widget" class="primary reopen" hidden>Открыть помощника</button>
+  </main>
+  <div class="settings-backdrop" id="settings-backdrop" hidden></div>
+  <aside id="settings" class="settings" aria-label="Настройки макета" hidden>
+    <header><h2>Шрифты и отступы</h2><button id="close-settings" class="icon-button" aria-label="Закрыть настройки">×</button></header>
+    <p class="lab-note">Автономный макет. Ответы подготовлены, контакты никуда не отправляются. В браузере сохраняются только настройки оформления.</p>
+    <div class="font-switch" role="group" aria-label="Шрифт в настройках"><button data-font="Inter" aria-pressed="true">Inter</button><button data-font="Roboto" aria-pressed="false">Roboto</button></div>
+    <div id="sliders"></div>
+    <label class="setting">Начертание заголовков<select id="heading-weight"><option value="400">400 · обычное</option><option value="500">500 · среднее</option><option value="600" selected>600 · полужирное</option></select></label>
+    <label class="setting">Открыть пример<select id="scene"><option value="chat">Диалог</option><option value="catalog">Каталог направлений</option><option value="implant">Варианты с ценами</option><option value="full">Полная карточка с оплатой и акцией</option><option value="fixed">Одна точная цена</option><option value="from">Цена «от»</option><option value="range">Диапазон цены</option><option value="unpriced">Без публичной цены</option><option value="zones">Группы и поиск по зонам</option><option value="unit">Цена за единицу</option><option value="booking">Заявка</option><option value="success">Успешная заявка</option></select></label>
+    <div class="settings-actions"><button id="reset-settings" class="lab-button">Сбросить оформление</button><button id="export-settings" class="lab-button">Скачать настройки CSS</button></div>
+    <output id="settings-status" role="status"></output>
+  </aside>
+</body>
+</html>

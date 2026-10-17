@@ -7,7 +7,7 @@ export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect
   let promotionCount = 0;
   const svg = (name) => {
     const paths = {layers:'m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5',
-      check:'m5 12 4 4 10-10',clock:'M12 7v5l4 2',info:'M12 11v6M12 7v1',
+      clock:'M12 7v5l4 2',info:'M12 11v6M12 7v1',
       gift:'M3 9h18v4H3ZM5 13v8h14v-8M12 9v12M12 9C5 9 5 3 8 3c3 0 4 6 4 6s1-6 4-6c3 0 3 6-4 6Z',
       chevron:'m9 5 7 7-7 7',arrow:'M4 12h16M14 6l6 6-6 6',extent:'m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3ZM4 7.5l8 4.5 8-4.5M12 12v9'};
     const el = document.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -38,6 +38,31 @@ export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect
     const body=document.createElement('div');body.className='clinic-price-card__detail-body';
     setBotAnswerBody(body,text);target.appendChild(body);
   };
+  // The first three disclosures share one list renderer in chat and catalog.
+  const addItems = (target, lines, rich = false) => {
+    let list = target.querySelector('ul.clinic-price-card__list');
+    if (!list) { list=document.createElement('ul');list.className='clinic-price-card__list';target.appendChild(list); }
+    for (const line of lines) {
+      const content=document.createElement('div');
+      if (rich) setBotAnswerBody(content,line); else content.textContent=line;
+      const entries=rich ? [...content.children].flatMap(block=>
+        ['UL','OL'].includes(block.tagName) ? [...block.children] : [block]) : [content];
+      for (const entry of entries) {
+        const li=document.createElement('li');li.append(...entry.childNodes);
+        if (!li.textContent.trim()) continue;
+        const walker=document.createTreeWalker(li,NodeFilter.SHOW_TEXT);
+        let first;
+        while ((first=walker.nextNode())) {
+          if (!first.nodeValue.trim()) continue;
+          first.nodeValue=first.nodeValue.replace(/^(\s*)(\p{L})/u,(_,space,letter)=>space+letter.toLocaleUpperCase('ru-RU'));
+          break;
+        }
+        // Ignore exact repeats after presentation casing; do not infer semantic equivalence.
+        if (![...list.children].some(item=>item.textContent===li.textContent))list.appendChild(li);
+      }
+    }
+    if (!list.children.length) { sections.delete(target.dataset.priceSection);target.remove(); }
+  };
   const disabled = isDisabled;
   const select = (choice, revision) => onSelect(choice, revision);
   for (const part of message.bodyParts) {
@@ -49,7 +74,8 @@ export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect
         const content=document.createElement('div');addText(content,part.text);promo.appendChild(content);financialCard.appendChild(promo);
       } else {
         const payment=part.price_section==='consultation';
-        addText(detail(payment?'payment':'conditions',payment?'Порядок оплаты':'Условия и преимущества',payment?'clock':'info'),part.text);
+        const section=detail(payment?'payment':'conditions',payment?'Порядок оплаты':'Условия и преимущества',payment?'clock':'info');
+        if(payment)addText(section,part.text);else addItems(section,[part.text],true);
       }
       continue;
     }
@@ -123,27 +149,15 @@ export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect
       if(!catalog||!options||row.mode!=='no_public_price')item.appendChild(amount);
       if(options&&choice){const arrow=svg('arrow');arrow.classList.add('clinic-price-card__row-arrow');item.appendChild(arrow);}
       if(row.scope_text){const caption=document.createElement('p');caption.className='clinic-price-card__caption';if(!options)caption.appendChild(svg('extent'));const scope=document.createElement('span');scope.textContent=row.scope_text;caption.appendChild(scope);item.appendChild(caption);}
-      // Overview is a compact preview; full authored conditions stay in detail.
-      for(const term of (options||catalog ? [] : [...new Set(row.condition_texts||[])])){
-        if(term===row.scope_text)continue;
-        const note=document.createElement('p');note.className='clinic-price-card__condition';note.appendChild(svg('info'));
-        const text=document.createElement('span');text.textContent=term.charAt(0).toUpperCase()+term.slice(1);note.appendChild(text);item.appendChild(note);
-      }
       card.appendChild(item);
     }
     bubble.appendChild(card);
     if(!options&&rows.length===1){
       const row=rows[0];
-      if(row.includes?.length){
-        const el=detail('includes','Что входит в стоимость','layers');
-        const list=document.createElement('ul');list.className='clinic-price-card__check-list';
-        for(const line of row.includes){const li=document.createElement('li');li.appendChild(svg('check'));const text=document.createElement('span');text.textContent=line;li.appendChild(text);list.appendChild(li);}el.appendChild(list);
-      }
-      if(row.excludes?.length){const el=detail('excludes','Оплачивается отдельно','info');const exclusions=document.createElement('ul');for(const line of row.excludes){const li=document.createElement('li');li.textContent=line;exclusions.appendChild(li);}el.appendChild(exclusions);}
-      if(catalog){
-        const terms=[...new Set(row.condition_texts||[])].filter(term=>term!==row.scope_text&&!(row.excludes||[]).includes(term));
-        for(const term of terms)addText(detail('conditions','Условия и преимущества','info'),term);
-      }
+      if(row.includes?.length)addItems(detail('includes','Что входит в стоимость','layers'),row.includes);
+      if(row.excludes?.length)addItems(detail('excludes','Оплачивается отдельно','info'),row.excludes);
+      const terms=[...new Set(row.condition_texts||[])].filter(term=>term!==row.scope_text&&!(row.excludes||[]).includes(term));
+      if(terms.length)addItems(detail('conditions','Условия и преимущества','info'),terms);
       if(row.stages?.length){
         const el=detail('payment','Порядок оплаты','clock');
         for(const line of row.stages){
@@ -160,7 +174,7 @@ export function renderPriceBody(bubble, message, {clientId, isDisabled, onSelect
   }
   // Commercial parts may arrive after the promotion; keep the open promo last.
   for(const card of bubble.querySelectorAll('.clinic-price-card')){
-    if(catalog)for(const key of ['includes','excludes','conditions','payment']){const section=card.querySelector(`[data-price-section="${key}"]`);if(section)card.appendChild(section);}
+    for(const key of ['includes','excludes','conditions','payment']){const section=card.querySelector(`[data-price-section="${key}"]`);if(section)card.appendChild(section);}
     const promo=card.querySelector('.clinic-price-card__promotion');if(promo)card.appendChild(promo);
   }
   flushText();

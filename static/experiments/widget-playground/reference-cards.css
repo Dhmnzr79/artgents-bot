@@ -63,9 +63,9 @@ button.clinic-price-card__overview-row { cursor:pointer; }
 .clinic-price-card__detail ul { margin:0;padding:0 0 16px 20px;font-size:var(--clinic-font-small);color:var(--clinic-text-soft);line-height:1.5; }
 .clinic-price-card__detail li+li { margin-top:8px; }
 .clinic-price-card__detail-heading { margin:0 0 8px;font-size:var(--clinic-font-small);font-weight:500;color:var(--clinic-text-soft); }
-.clinic-price-card__detail .clinic-price-card__check-list { list-style:none;padding-left:0; }
-.clinic-price-card__check-list li { display:flex;align-items:flex-start;gap:8px; }
-.clinic-price-card__check-list .clinic-price-card__icon { width:13px;height:13px;margin-top:4px;color:var(--clinic-text-muted); }
+.clinic-price-card__detail .clinic-price-card__list { list-style:disc;padding-left:20px; }
+.clinic-price-card__list li>p { margin:0; }
+.clinic-price-card__list li>p+p { margin-top:8px; }
 .clinic-price-card__stage-title { display:block;color:var(--clinic-text);font-weight:500;font-size:var(--clinic-font-small);margin-bottom:4px; }
 .clinic-price-card__promotion { display:flex;align-items:flex-start;gap:12px;margin:8px 0 24px;padding:16px;border:0;border-radius:12px;background:var(--clinic-promo-surface);color:var(--clinic-brand); }
 .clinic-price-card__promotion>.clinic-price-card__icon { width:20px;height:20px;margin-top:0; }

@@ -1,0 +1,144 @@
+/* Real widget price card styles; tracking removed for this playground. */
+.clinic-price-card {
+  margin:0 0 24px;padding:4px 0 0;border:0;border-radius:0;background:#fff;
+  color:var(--clinic-text);font-size:var(--clinic-font-small);line-height:1.5;
+  overflow-wrap:anywhere;
+}
+.clinic-price-card__title,.clinic-catalog__title {
+  margin:0;font-size:var(--clinic-font-heading);line-height:1.22;
+  font-weight:600;overflow-wrap:anywhere;
+}
+.clinic-price-card__tabs {
+  display:flex;flex-wrap:wrap;gap:4px;margin:20px 0 0;padding:4px;
+  border-radius:12px;background:var(--clinic-soft);
+}
+.clinic-price-card__volume-hint {
+  margin:16px 0 0;padding:16px;border-radius:12px;background:var(--clinic-promo-surface);
+  color:var(--clinic-promo-ink);font-size:var(--clinic-font-small);line-height:1.5;
+}
+.clinic-price-card__tab {
+  flex:1 1 72px;min-width:0;min-height:44px;padding:10px 8px;border:0;
+  border-radius:9px;background:transparent;color:var(--clinic-text-soft);
+  font:inherit;font-size:var(--clinic-font-small);line-height:1.3;
+  font-weight:400;overflow-wrap:anywhere;cursor:pointer;
+}
+.clinic-price-card__tab[aria-pressed="true"] { color:var(--clinic-text);background:#fff;box-shadow:0 1px 4px #00000007; }
+.clinic-price-card button:disabled { cursor:default;opacity:.65; }
+.clinic-price-card button:focus-visible,.clinic-price-card summary:focus-visible { outline:2px solid var(--clinic-brand);outline-offset:-3px; }
+.clinic-price-card__price-area { padding:24px 0; }
+.clinic-price-card__amount { font-size:var(--clinic-font-main);line-height:1.375;font-weight:600;white-space:normal;font-variant-numeric:tabular-nums;color:var(--clinic-text);overflow-wrap:anywhere; }
+.clinic-price-card__amount--single { font-size:var(--clinic-font-amount);line-height:1.22; }
+.clinic-price-card__amount--description { font-weight:400;font-size:var(--clinic-font-small);color:var(--clinic-text-soft);line-height:1.43; }
+.clinic-price-card__caption { margin:8px 0 0;font-size:var(--clinic-font-small);color:var(--clinic-text-soft);line-height:1.43; }
+.clinic-price-card__condition { display:flex;align-items:flex-start;gap:8px;margin:12px 0 0;font-size:var(--clinic-font-small);line-height:1.5;color:var(--clinic-text-soft); }
+.clinic-price-card__icon { width:16px;height:16px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.6; }
+.clinic-price-card__condition>.clinic-price-card__icon { margin-top:3px;color:var(--clinic-text-muted); }
+.clinic-price-card__price-area>.clinic-price-card__caption { display:flex;align-items:flex-start;gap:8px; }
+.clinic-price-card__caption>.clinic-price-card__icon { margin-top:2px;color:var(--clinic-text-muted); }
+.clinic-price-card__overview-row {
+  display:grid;grid-template-columns:minmax(0,1fr) fit-content(45%);align-items:start;
+  gap:0 16px;width:100%;padding:20px 0;border:0;
+  text-align:left;background:#fff;color:inherit;
+}
+.clinic-price-card__overview-row+.clinic-price-card__overview-row { border-top:1px solid var(--clinic-border); }
+button.clinic-price-card__overview-row { cursor:pointer; }
+.clinic-price-card__overview-name { grid-column:1;grid-row:1;font-size:var(--clinic-font-main);line-height:1.375;font-weight:500;min-width:0; }
+.clinic-price-card__overview-row>.clinic-price-card__amount { grid-column:2;grid-row:1;justify-self:end;text-align:right;min-width:0; }
+.clinic-price-card__overview-row>.clinic-price-card__caption { grid-column:1;grid-row:2;margin:4px 0 0;min-width:0; }
+.clinic-price-card__overview-row>.clinic-price-card__condition { grid-column:1; }
+.clinic-price-card__row-arrow { grid-column:2;grid-row:2;align-self:start;justify-self:end;margin-top:4px;width:18px;height:18px;color:var(--clinic-text-muted);stroke-width:1.5; }
+.clinic-price-card__overview-row--description { grid-template-columns:minmax(0,1fr) 18px; }
+.clinic-price-card__overview-row--description>.clinic-price-card__amount { grid-column:1;grid-row:3;justify-self:start;text-align:left;margin-top:8px; }
+.clinic-price-card__overview-row--description>.clinic-price-card__row-arrow { grid-column:2;grid-row:3; }
+.clinic-price-card__group-title { margin:24px 0 8px;font-size:var(--clinic-font-small);line-height:1.5;font-weight:600;color:var(--clinic-text-soft); }
+.clinic-price-card__detail { margin:0;padding:0;border-top:1px solid var(--clinic-border);font-size:var(--clinic-font-small); }
+.clinic-price-card__detail summary { display:flex;align-items:center;gap:12px;list-style:none;min-height:56px;padding:16px 0;font-size:var(--clinic-font-small);line-height:1.43;font-weight:400;cursor:pointer;color:inherit;touch-action:manipulation; }
+.clinic-price-card__detail summary::-webkit-details-marker { display:none; }
+.clinic-price-card__detail summary>span { min-width:0;overflow-wrap:anywhere; }
+.clinic-price-card__detail summary>.clinic-price-card__icon { color:var(--clinic-text-muted); }
+.clinic-price-card__detail summary>.clinic-price-card__chevron { width:13px;height:13px;margin-left:auto;transition:transform .15s; }
+.clinic-price-card__detail[open] summary>.clinic-price-card__chevron { transform:rotate(90deg); }
+.clinic-price-card__detail-body { padding:0 0 16px;font-size:var(--clinic-font-small);line-height:1.5;color:var(--clinic-text-soft); }
+.clinic-price-card__detail-body p { margin:0; }
+.clinic-price-card__detail ul { margin:0;padding:0 0 16px 20px;font-size:var(--clinic-font-small);color:var(--clinic-text-soft);line-height:1.5; }
+.clinic-price-card__detail li+li { margin-top:8px; }
+.clinic-price-card__detail-heading { margin:0 0 8px;font-size:var(--clinic-font-small);font-weight:500;color:var(--clinic-text-soft); }
+.clinic-price-card__detail .clinic-price-card__check-list { list-style:none;padding-left:0; }
+.clinic-price-card__check-list li { display:flex;align-items:flex-start;gap:8px; }
+.clinic-price-card__check-list .clinic-price-card__icon { width:13px;height:13px;margin-top:4px;color:var(--clinic-text-muted); }
+.clinic-price-card__stage-title { display:block;color:var(--clinic-text);font-weight:500;font-size:var(--clinic-font-small);margin-bottom:4px; }
+.clinic-price-card__promotion { display:flex;align-items:flex-start;gap:12px;margin:8px 0 24px;padding:16px;border:0;border-radius:12px;background:var(--clinic-promo-surface);color:var(--clinic-brand); }
+.clinic-price-card__promotion>.clinic-price-card__icon { width:20px;height:20px;margin-top:0; }
+.clinic-price-card__promotion .clinic-price-card__detail-body { padding:0;font-size:var(--clinic-font-small);line-height:1.43;color:var(--clinic-promo-ink); }
+.clinic-price-card__promotion strong { font-weight:500;color:#39476c; }
+.clinic-price-card__selected-variant { margin:12px 0 0;font-size:var(--clinic-font-small);font-weight:400;color:var(--clinic-text-soft); }
+
+
+.clinic-catalog__heading { margin:8px 0 24px; }
+.clinic-catalog__heading p { font-size:var(--clinic-font-small);color:var(--clinic-text-soft);line-height:1.5;margin:12px 0 0; }
+.clinic-catalog__heading p:empty { display:none; }
+.clinic-catalog__back { display:flex;align-items:center;gap:8px;min-height:44px;border:0;background:transparent;color:var(--clinic-text-soft);padding:8px 0;margin:0 0 12px;font:inherit;font-size:var(--clinic-font-small);line-height:1.4;cursor:pointer;text-align:left; }
+.clinic-catalog__search { width:100%;min-width:0;min-height:48px;border:1px solid #ddd;border-radius:12px;padding:12px 14px;margin:0 0 16px;font:inherit;font-size:var(--clinic-font-main);line-height:1.5;outline-color:var(--clinic-brand);background:#fff;color:var(--clinic-text); }
+.clinic-catalog__search::placeholder { color:var(--clinic-text-muted);opacity:1; }
+.clinic-catalog__list { display:grid;gap:8px; }
+.clinic-catalog__row { display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;border:0;border-radius:12px;background:var(--clinic-soft);padding:16px;text-align:left;font:inherit;color:var(--clinic-text);cursor:pointer; }
+.clinic-catalog__direction-copy { min-width:0; }
+.clinic-catalog__row strong { display:block;font-size:var(--clinic-font-main);font-weight:500;line-height:1.375;overflow-wrap:anywhere; }
+.clinic-catalog__row small { display:block;font-size:var(--clinic-font-small);line-height:1.43;color:var(--clinic-text-soft);margin-top:4px;overflow-wrap:anywhere; }
+.clinic-catalog__arrow { justify-self:end;width:20px;height:20px;flex-shrink:0;color:var(--clinic-text-soft); }
+.clinic-catalog__list--services { display:block;border:0;border-radius:0; }
+.clinic-catalog__service { display:grid;grid-template-columns:minmax(0,1fr) fit-content(45%);align-items:start;gap:0 16px;padding:20px 0;border:0;border-radius:0;background:#fff; }
+.clinic-catalog__service+.clinic-catalog__service { border-top:1px solid var(--clinic-border); }
+.clinic-catalog__service strong { grid-column:1;grid-row:1;min-width:0; }
+.clinic-catalog__row-price { grid-column:2;grid-row:1;justify-self:end;font-size:var(--clinic-font-main);font-weight:600;line-height:1.375;text-align:right;color:var(--clinic-text);overflow-wrap:anywhere; }
+.clinic-catalog__service small { grid-column:1;grid-row:2;margin-top:4px; }
+.clinic-catalog__service .clinic-catalog__arrow { grid-column:2;grid-row:2;align-self:start;justify-self:end;margin-top:4px;width:18px;height:18px;color:var(--clinic-text-muted); }
+.clinic-catalog__eyebrow { display:block;font-size:var(--clinic-font-eyebrow);font-weight:500;line-height:1.4;color:var(--clinic-text-muted);margin:0 0 8px; }
+.clinic-catalog__description { padding-bottom:16px;font-size:var(--clinic-font-small);line-height:1.5;color:var(--clinic-text-soft);overflow-wrap:anywhere; }
+.clinic-catalog__subtitle { margin:12px 0 20px;font-size:var(--clinic-font-small);line-height:1.5;color:var(--clinic-text-soft);overflow-wrap:anywhere; }
+.clinic-catalog__description p { margin:0 0 12px; }
+.clinic-catalog__description p:last-child { margin-bottom:0; }
+.clinic-catalog__unpriced { font-size:var(--clinic-font-small);color:var(--clinic-text-soft); }
+.clinic-catalog__empty { font-size:var(--clinic-font-small);color:var(--clinic-text-soft);margin:0;padding:20px 0; }
+.clinic-catalog__apply,.clinic-booking__submit { position:relative;width:100%;min-height:52px;border:0;border-radius:12px;padding:14px 44px;background:var(--clinic-brand);color:#fff;font:inherit;font-size:var(--clinic-font-main);line-height:1.375;font-weight:500;cursor:pointer;overflow-wrap:anywhere; }
+.clinic-catalog__apply { margin-top:8px; }
+.clinic-booking-mount { margin:16px 0; }
+.clinic-booking { padding:16px;border:0;border-radius:16px;background:var(--clinic-soft);color:var(--clinic-text);overflow-wrap:anywhere; }
+.clinic-booking h3 { margin:0;font-size:var(--clinic-font-subheading);line-height:1.35;font-weight:600; }
+.clinic-booking__intro { font-size:var(--clinic-font-small);color:var(--clinic-text-soft);margin:8px 0 0;line-height:1.5; }
+.clinic-booking__subject { font-size:var(--clinic-font-small);line-height:1.5;color:var(--clinic-text-soft);margin:12px 0 0; }
+.clinic-booking__heading { margin-bottom:24px; }
+.clinic-booking__heading .clinic-catalog__eyebrow { text-transform:uppercase; }
+.clinic-booking__note { color:var(--clinic-text-soft);font-size:var(--clinic-font-eyebrow);line-height:1.5;margin:12px 0 0; }
+.clinic-booking__field { display:block;margin:20px 0;font-size:var(--clinic-font-small);line-height:1.43;color:var(--clinic-text-soft); }
+.clinic-booking__field input,.clinic-booking__field select,.clinic-booking__field textarea { display:block;width:100%;min-width:0;min-height:48px;margin-top:8px;padding:12px;border:1px solid #d9d9d9;border-radius:10px;background:#fff;color:var(--clinic-text);font:inherit;font-size:var(--clinic-font-main);line-height:1.5;outline-offset:3px; }
+.clinic-booking__field textarea { min-height:96px;resize:vertical; }
+.clinic-booking__field input:focus,.clinic-booking__field select:focus,.clinic-booking__field textarea:focus { outline:2px solid var(--clinic-brand); }
+.clinic-booking__consent { display:flex;gap:12px;align-items:flex-start;font-size:var(--clinic-font-small);line-height:1.5;color:var(--clinic-text-soft);padding:8px 0;margin:12px 0 16px;cursor:pointer; }
+.clinic-booking__consent input { margin:2px 0;width:20px;height:20px;flex-shrink:0;accent-color:var(--clinic-brand); }
+.clinic-booking__links { display:flex;gap:0 12px;flex-wrap:wrap;font-size:var(--clinic-font-small);line-height:1.5;margin:0 0 16px; }
+.clinic-booking__links a { display:inline-flex;align-items:center;min-height:44px;color:var(--clinic-text);text-underline-offset:3px;overflow-wrap:anywhere; }
+.clinic-booking__error { font-size:var(--clinic-font-small);color:#a13e3e;line-height:1.5; }
+.clinic-booking__error:empty { display:none; }
+.clinic-booking__success { padding:20px;border:0;border-radius:16px;background:var(--clinic-soft);color:var(--clinic-text);font-size:var(--clinic-font-small);line-height:1.5; }
+.clinic-booking button:disabled { opacity:.6;cursor:default; }
+.clinic-turn__btn--cta-primary::after,
+.clinic-catalog__apply::after,
+.clinic-booking__submit::after,
+.clinic-shell__launcher.clinic-shell__launcher--demo::after,
+.clinic-dev-reset::after {
+  content: "";
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  background-color: #fff;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12h16M14 6l6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12h16M14 6l6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+  pointer-events: none;
+}
+.clinic-price-card__detail summary>.clinic-price-card__chevron{height:13px;transform:rotate(90deg)}
+.clinic-price-card__detail[open] summary>.clinic-price-card__chevron{transform:rotate(-90deg)}
+@media(max-width:380px){.clinic-booking{padding:12px}}

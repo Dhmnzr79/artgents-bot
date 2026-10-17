@@ -1020,3 +1020,14 @@ offline данные. VPS, серверы и deployed dialogue не провер
 Полный CI/build/deploy не запускались; merge/deploy не разрешены. Перед commit
 будут проверены staged names/stat/diff/check; commit/push/PR и фактический hash
 сообщаются в итоговом ответе. Foreign otzyv-1/2/3.jpg сохранены вне индекса.
+
+
+## 2026-10-17 — полноценный автономный образец (owner GO)
+
+Bug fix образца, не изменение архитектуры бота. Baseline 3c2b446, ветка codex/three-tabs-catalog; origin/main и merge base f762949. В allowlist только static/experiments/widget-playground/{index.html,app.js,styles.css,build.py,README.md,sync-reference.py,reference-data.js,reference-renderer.js,reference-cards.css} и этот документ. Существующие незавершённые правки index/build и generated reference-файлы продолжаем. Foreign otzyv-1/2/3.jpg сохраняем.
+
+Owner: несколько полноценных услуг из реальных демо без сокращения состава, исключений, условий, этапов оплаты и акций; диалог, каталог и форма как в виджете. Убрать ползунки, оставить Inter/Roboto. Под ценой один scope, стрелка раскрытия аккордеона; самолётик внутри поля. Восстановить прежнюю высоту образца: из 7c7ca52 — 720 px, при высоте экрана до 800 px — 680 px; ограничить доступным местом. Только статический образец, без API/отправки заявок/VPS. Проверки: точность всех экспортированных offers, мобильная вёрстка, раскрытие разделов, форма и согласие, автономный HTML. Затем один focused Checker.
+
+Результат: удалены сокращённые придуманные услуги/самодельный price renderer и панель ползунков. Добавлены полный снимок 8 услуг/16 offers, копии настоящего price renderer/formatter и формы с локальными load/submit. Перенесены стили карточек/формы; Inter/Roboto, компактные 720/680 px, самолётик внутри поля, шеврон вниз/вверх. Production-код и контент клиентов не менялись. HTML/ZIP: drafts/widget-playground/artgents-widget-playground-v2.{html,zip}.
+
+Offline evidence: check-v2.mjs — PASS: полные includes/excludes/stages/commercial parts всех 16 offers, 4 размера × 2 шрифта, общий черновик и согласие, отправка сообщения, кнопка внутри поля, автономный HTML, отсутствие ошибок JS. Независимый Checker — PASS; отдельно сравнил все offers с build_widget_catalog и копии renderer/formatter с исходниками. diff --check PASS. Это browser emulation, не физический телефон; живую модель не проверяли. Historical production test failures вне этого этапа, полный CI не запускался. Provider/model/SMTP calls 0. Git: точный allowlist будет сохранён в topic commit/push, PR34 остаётся draft; merge/deploy не выполняются. Foreign otzyv-1/2/3.jpg сохранены.

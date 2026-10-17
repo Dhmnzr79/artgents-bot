@@ -1,7 +1,9 @@
 import { renderPriceBody } from './price_card.js';
 
 const element=(tag,cls,text)=>{const el=document.createElement(tag);if(cls)el.className=cls;if(text!=null)el.textContent=text;return el;};
-const button=(text,action,cls='clinic-catalog__back')=>{const el=element('button',cls,text);el.type='button';el.addEventListener('click',action);return el;};
+const button=(text,action,cls='clinic-catalog__back')=>{const el=element('button',cls,text);el.type='button';
+  if(cls==='clinic-catalog__back'&&text.startsWith('← ')){el.setAttribute('aria-label',text);el.textContent=text.slice(2);el.classList.add('clinic-catalog__back--chevron');}
+  el.addEventListener('click',action);return el;};
 const arrow=()=>{const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
   svg.setAttribute('class','clinic-catalog__arrow');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('fill','none');
   svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','1.4');svg.setAttribute('aria-hidden','true');

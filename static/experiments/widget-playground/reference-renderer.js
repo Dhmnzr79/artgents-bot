@@ -374,8 +374,10 @@ function createBookingForm({apiBase,clientId,getSid,getCatalog}){
     }
     mount.replaceChildren();
     const form=el('form','clinic-booking');form.noValidate=true;
-    if(!extended)form.append(el('h3',null,'Оставить заявку'),
-      el('p','clinic-booking__intro','Администратор свяжется с вами и согласует время приёма.'));
+    form.append(el(extended?'h2':'h3',null,extended?'Запись на приём':'Оставить заявку'),
+      el('p','clinic-booking__intro',extended?
+        'Оставьте имя и телефон — администратор свяжется с вами и согласует время приёма.':
+        'Администратор свяжется с вами и согласует время приёма.'));
     const service=draft.selection?catalog.services.find(s=>s.service_id===draft.selection.service_id):null;
     const row=service?.price?.rows.find(r=>r.offer_id===draft.selection?.offer_id);
     if(service)form.append(el('p','clinic-booking__subject',[service.name,row?.variant_label].filter(Boolean).join(' · ')));

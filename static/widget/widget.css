@@ -1298,6 +1298,7 @@ button.clinic-price-card__overview-row { cursor:pointer; }
 .clinic-catalog__apply { margin-top:8px; }
 .clinic-booking-mount { margin:16px 0; }
 .clinic-booking { padding:16px;border:0;border-radius:16px;background:var(--clinic-soft);color:var(--clinic-text);overflow-wrap:anywhere; }
+.clinic-booking h2 { margin:0;font-size:var(--clinic-font-heading);line-height:1.22;font-weight:600; }
 .clinic-booking h3 { margin:0;font-size:var(--clinic-font-subheading);line-height:1.35;font-weight:600; }
 .clinic-booking__intro { font-size:var(--clinic-font-small);color:var(--clinic-text-soft);margin:8px 0 0;line-height:1.5; }
 .clinic-booking__subject { font-size:var(--clinic-font-small);line-height:1.5;color:var(--clinic-text-soft);margin:12px 0 0; }

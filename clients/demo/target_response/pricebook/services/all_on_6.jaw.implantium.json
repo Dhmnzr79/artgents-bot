@@ -9,7 +9,7 @@
     "billing_unit": "jaw"
   },
   "package": {
-    "label": "за одну челюсть; КТ и костная пластика по показаниям — отдельно",
+    "label": "за одну челюсть",
     "includes": [
       "6 имплантов с документами",
       "хирургия и местная анестезия",
@@ -63,11 +63,6 @@
   ],
   "required_conditions_metadata": {
     "completeness": "complete",
-    "conditions": [
-      {
-        "condition_id": "mandatory_exclusion",
-        "display_text": "КТ и костная пластика по показаниям — отдельно"
-      }
-    ]
+    "conditions": []
   }
 }

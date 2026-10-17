@@ -9,7 +9,7 @@
     "billing_unit": "procedure"
   },
   "package": {
-    "label": "за одну область; стоимость зависит от объёма костного материала и способа доступа; имплант, коронка и КТ — отдельно",
+    "label": "за одну область; стоимость зависит от объёма костного материала и способа доступа",
     "includes": [
       "анестезия",
       "костный материал",
@@ -40,12 +40,7 @@
   "option_id": "closed",
   "required_conditions_metadata": {
     "completeness": "complete",
-    "conditions": [
-      {
-        "condition_id": "mandatory_exclusion",
-        "display_text": "Имплант, коронка и КТ — отдельно"
-      }
-    ]
+    "conditions": []
   },
   "applies_to_extents": [
     "one_tooth",

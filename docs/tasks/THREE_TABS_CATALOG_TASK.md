@@ -1044,3 +1044,49 @@ Owner GO: один scope под ценой в каталоге и диалоге
 Аудит данных: demo 22 services/33 offers; demo_medical 21/45; nikadent 27/26; _template 1/1 — всего 105 offers. Прочитаны все scope_text; непустые короткие объёмы в одном поле без переносов/списка примечаний. No-public-price остаётся со своим approved_text и без выдуманного scope. Введён UI-инвариант, а не семантическая проверка качества новых авторских формулировок. В данных остаются возможные смысловые повторы разными фразами (например, общий текст про доплаты и отдельные исключения); их автоматическое угадывание/удаление не добавляли. Content rewrite отложен владельцем.
 
 Evidence: 101 существующий тест PASS (3 catalog structure browser + 98 catalog generalization). Новый browser test PASS — 105 offers × catalog/chat = 210 displays, все исходные includes/excludes/условия/stages/commercial parts, exact price/scope, единые списки/регистр/порядок, generic future-service rich-text и пустые блоки. Первое падение нового теста было ошибкой чтения textContent между heading и p этапа (конкатенация без пробела); test reader исправлен на объединение текстовых узлов, focused повтор PASS. Sample check-v2 PASS: 16 полных offers, 4 размера × 2 шрифта, форма/согласие/shared draft/composer/portable. Независимый Checker PASS после чтения двух call paths и повторного запуска нового теста. diff --check PASS. Только существующие datetime.utcnow warnings; полный CI не запускался. Provider/model/SMTP calls 0, VPS не менялся. Физический телефон и живые ответы модели не проверяли. Индекс будет содержать только allowlist, topic commit/push без merge/deploy; фактический hash в ответе. Foreign JPG сохранены.
+
+
+## 2026-10-17 — весь активный путь цены, owner GO
+
+Bug fix источника доплат и текстовой проекции, не полное архитектурное упрощение. Baseline e32b76d; branch codex/three-tabs-catalog, origin/main и merge base f762949. Foreign otzyv-1/2/3.jpg read-only. Owner требует один scope под ценой в коде всего бота; доплаты только в собственном раскрытии, без runtime semantic filters. Astra consulted read-only: подтверждены общий price builder, API answer, JSON/SSE, модельная история и восстановление; D2 §3 остаётся нормативной таблицей.
+
+Exact allowlist:
+- core/response_text_renderer.py
+- tests/test_d2_catalog_exclusions.py
+- docs/tasks/CATALOG_INTERFACE_SPEC.md
+- docs/tasks/THREE_TABS_CATALOG_TASK.md
+- static/experiments/widget-playground/reference-data.js
+- clients/demo/target_response/pricebook/services/classic.one_tooth.implantium.json
+- clients/demo/target_response/pricebook/services/classic.one_tooth.impro.json
+- clients/demo/target_response/pricebook/services/classic.one_tooth.nobel.json
+- clients/demo/target_response/pricebook/services/one_stage.one_tooth.implantium.json
+- clients/demo/target_response/pricebook/services/one_stage.one_tooth.impro.json
+- clients/demo/target_response/pricebook/services/one_stage.one_tooth.nobel.json
+- clients/demo/target_response/pricebook/services/all_on_4.jaw.implantium.json
+- clients/demo/target_response/pricebook/services/all_on_4.jaw.impro.json
+- clients/demo/target_response/pricebook/services/all_on_4.jaw.nobel.json
+- clients/demo/target_response/pricebook/services/all_on_6.jaw.implantium.json
+- clients/demo/target_response/pricebook/services/all_on_6.jaw.impro.json
+- clients/demo/target_response/pricebook/services/all_on_6.jaw.nobel.json
+- clients/demo/target_response/pricebook/services/implant_supported_prosthetics.default.json
+- clients/demo/target_response/pricebook/services/sinus_lift.one_site.closed.json
+- clients/demo/target_response/pricebook/services/sinus_lift.one_site.open.json
+- clients/demo/target_response/pricebook/services/zygomatic_implants.default.json
+- clients/demo/target_response/pricebook/services/removable_dentures.jaw.partial.json
+- clients/demo/target_response/pricebook/services/removable_dentures.jaw.full.json
+- clients/demo/target_response/pricebook/services/pterygoid_implants.default.json
+- clients/demo/target_response/pricebook/services/temporary_teeth.default.json
+- clients/demo/target_response/pricebook/services/zirconia_crowns.default.json
+- clients/demo/target_response/pricebook/services/pulpitis.default.json
+
+До: в demo одно исключение записано в package.excludes, хвосте package.label и required_conditions_metadata; backend compact renderer дописывает condition_texts в ценовой абзац, а потом печатает excludes. После: авторская доплата только в excludes; price paragraph formatter печатает только цену и scope, отдельно именованные разделы. Важные прочие условия и few_teeth сохраняются, полная published-terms проекция не обнуляется. Убираем inline-конкатенацию условий и повторные авторские копии исключений; без классификатора, новых полей/enum, поисковых словарей или вызовов модели. Смешанные подписи с независимыми неценовыми условиями не перепроектируем: для их полного разнесения понадобился бы новый общий тип condition_id, это отдельный scope и здесь не делается. Никаких новых проверяющих слоёв.
+
+Проверки: все105 canonical offers → текст/карточка; реальные локальные HTTP routes JSON/SSE с подставным provider, выбор и replay, публичная история/remount; targeted current native/catalog tests. Live provider/VPS calls не разрешались, 0. Затем один Checker.
+
+Результат этапа: из _render_compact_price_group удалены include_conditions, сбор common/local notes и их конкатенация в ценовой абзац/строку. Он форматирует только service/variant, price_display_text и scope_text. render_response_text печатает condition_texts отдельным разделом после исключений; тот же renderer используется API, completion, модельной историей и widget-session. Старые текстовые строки без card metadata сохраняют свой display_text, а их отдельные условия теперь имеют явный заголовок вместо bare paragraphs; новую миграцию receipt/данных не вводили. UI использует ранее проверенный единственный scope.
+
+В 22 demo offers убраны авторские копии исключений из label/metadata. У пяти списки excludes явно заполнены ранее указанными доплатами: removable partial/full, pterygoid, temporary_teeth, zirconia. Git-сравнение всех22JSON подтверждает неизменные суммы/режимы/объёмы/includes/stages/facts/refs и сохранность всех прежних excludes. Условия sinus lift о зависимости цены от материала/доступа сохранены. НикаДент/медцентр/шаблон данные не менялись. Общая схема/поля и few_teeth пояснение не менялись. Это исправление источника дублей и отображения; нормализация всех смешанных authoring labels и общая чистка исторических tests не заявляются.
+
+Evidence: 60 PASS — tests/test_d2_catalog_exclusions.py, test_widget_price_details_browser.py, test_widget_session.py, test_d2_native_price_runtime.py. В том числе16 проверок exclusions: реальные Flask /ask и /ask/stream c подставным provider, click, replay без нового вызова, история и POST /api/widget-session; pure text всех105offers, unknown-condition formatter. DOM proof105×2contexts. Ещё4PASS validator всех pack. Lint pricebook0warnings/PASS. Sample check-v2 PASS: 16 полных предложений,4размера×2шрифта,форма/черновик/согласие/composer/portable HTML. Независимый Checker PASS после чтения actual API/completion/history/remount paths и повторных16тестов. diff --check PASS. Наблюдались только прежние datetime.utcnow deprecation warnings; новых падений в этом наборе нет, полный CI/исторические внеочередные suites не запускались.
+
+Live/provider/model/SMTP/VPS calls0. Это локальная проверка текущего кода с подставной моделью, не проверка реальных ответов модели или развёрнутого VPS. Образец и HTML/ZIP v2 обновлены. Git: commit/push только topic branch;PR34 draft, без merge/deploy; hash в ответе. Exactallowlist27paths, индекс очищается commit, foreign3JPG сохранены.

@@ -2,7 +2,7 @@
 window.WidgetPlaygroundData = {
   "as_of": "2026-10-17",
   "source_versions": {
-    "demo": "8b913b39e597e871b0d63fe93de611daa6be7191b8c8c4fe13b0b0693eee18bf",
+    "demo": "195dda098b07882d4e8cd4bc95264918b1ed2169dc47101fe9e1f03af12a578d",
     "demo_medical": "e436929a86acb74da694118d0b9764084c402d205f895e43311490dd08a7a266",
     "nikadent": "be7109228b19bd747db436ff48cde89ac03b2fc98fdc92e48ddf22d7859ba963"
   },
@@ -71,9 +71,7 @@ window.WidgetPlaygroundData = {
                   "currency": "RUB",
                   "billing_unit": "tooth_package",
                   "approved_text": null,
-                  "condition_texts": [
-                    "КТ при необходимости и временная коронка — отдельно"
-                  ],
+                  "condition_texts": [],
                   "includes": [
                     "имплант с документами",
                     "хирургия и местная анестезия",
@@ -148,9 +146,7 @@ window.WidgetPlaygroundData = {
                   "currency": "RUB",
                   "billing_unit": "tooth_package",
                   "approved_text": null,
-                  "condition_texts": [
-                    "КТ при необходимости и временная коронка — отдельно"
-                  ],
+                  "condition_texts": [],
                   "includes": [
                     "имплант с документами",
                     "хирургия и местная анестезия",
@@ -225,9 +221,7 @@ window.WidgetPlaygroundData = {
                   "currency": "RUB",
                   "billing_unit": "tooth_package",
                   "approved_text": null,
-                  "condition_texts": [
-                    "КТ при необходимости и временная коронка — отдельно"
-                  ],
+                  "condition_texts": [],
                   "includes": [
                     "имплант с документами",
                     "хирургия и местная анестезия",

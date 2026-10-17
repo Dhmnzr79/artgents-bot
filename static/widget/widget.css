@@ -1237,7 +1237,7 @@ button.clinic-price-card__overview-row { cursor:pointer; }
 .clinic-price-card__overview-row--description { grid-template-columns:minmax(0,1fr) 18px; }
 .clinic-price-card__overview-row--description>.clinic-price-card__amount { grid-column:1;grid-row:3;justify-self:start;text-align:left;margin-top:8px; }
 .clinic-price-card__overview-row--description>.clinic-price-card__row-arrow { grid-column:2;grid-row:3; }
-.clinic-price-card__group-title { margin:24px 0 8px;font-size:var(--clinic-font-small);line-height:1.5;font-weight:600;color:var(--clinic-text-soft); }
+.clinic-price-card__group-title { margin:20px 0 4px;font-size:var(--clinic-font-main);line-height:1.375;font-weight:600;color:var(--clinic-text); }
 .clinic-price-card__detail { margin:0;padding:0;border-top:1px solid var(--clinic-border);font-size:var(--clinic-font-small); }
 .clinic-price-card__detail summary { display:flex;align-items:center;gap:12px;list-style:none;min-height:56px;padding:16px 0;font-size:var(--clinic-font-small);line-height:1.43;font-weight:400;cursor:pointer;color:inherit;touch-action:manipulation; }
 .clinic-price-card__detail summary::-webkit-details-marker { display:none; }
@@ -1288,7 +1288,8 @@ button.clinic-price-card__overview-row { cursor:pointer; }
 .clinic-catalog__service .clinic-catalog__arrow { grid-column:2;grid-row:2;align-self:start;justify-self:end;margin-top:4px;width:18px;height:18px;color:var(--clinic-text-muted); }
 .clinic-catalog__eyebrow { display:block;font-size:var(--clinic-font-eyebrow);font-weight:500;line-height:1.4;letter-spacing:.075em;color:var(--clinic-text-muted);margin:0 0 8px; }
 .clinic-catalog__description { padding-bottom:16px;font-size:var(--clinic-font-small);line-height:1.5;color:var(--clinic-text-soft);overflow-wrap:anywhere; }
-.clinic-catalog__subtitle { margin:12px 0 20px;font-size:var(--clinic-font-small);line-height:1.5;color:var(--clinic-text-soft);overflow-wrap:anywhere; }
+.clinic-catalog__back+.clinic-catalog__title { font-size:calc(var(--clinic-font-main) * 1.375); }
+.clinic-catalog__subtitle { margin:6px 0 16px;font-size:var(--clinic-font-small);line-height:1.5;color:var(--clinic-text-soft);overflow-wrap:anywhere; }
 .clinic-catalog__description p { margin:0 0 12px; }
 .clinic-catalog__description p:last-child { margin-bottom:0; }
 .clinic-catalog__unpriced { font-size:var(--clinic-font-small);color:var(--clinic-text-soft); }

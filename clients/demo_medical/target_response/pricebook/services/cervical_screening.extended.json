@@ -1,0 +1,61 @@
+{
+  "offer_id": "cervical_screening.extended",
+  "service_id": "cervical_screening",
+  "option_id": "extended",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "package",
+    "amount": 4700
+  },
+  "package": {
+    "label": "за готовый комплект исследований из одного согласованного забора",
+    "includes": [
+      "Согласованный забор материала и расходники",
+      "Жидкостная цитология",
+      "Тест на заявленные лабораторией типы ВПЧ высокого риска",
+      "Электронные результаты"
+    ],
+    "excludes": [
+      "Полноценная консультация гинеколога",
+      "Кольпоскопия и биопсия",
+      "Исследования на другие инфекции"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope",
+    "demo_screening_companion"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    },
+    {
+      "id": "stages",
+      "label": "Оплата по этапам",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  },
+  "payment_stages": [
+    {
+      "label": "Забор и передача материала",
+      "amount": 1900,
+      "currency": "RUB",
+      "timing_text": "При выполнении забора."
+    },
+    {
+      "label": "Лабораторные исследования",
+      "amount": 2800,
+      "currency": "RUB",
+      "timing_text": "При передаче материала в лабораторию; результаты без дополнительной платы."
+    }
+  ]
+}

@@ -10,12 +10,16 @@
 В `clients/nikadent/widget_config.json` уже настроены общее меню, All-on-4,
 съёмные протезы и коронки. Это настройки внешнего вида; MD-база ответов прежняя.
 
-- Верхние `welcomeText` и `starterPrompts` — общее приветствие и три вопроса
+- Верхние `welcomeText` и `starterPrompts` — общее приветствие и стартовые кнопки
   на главной и всех страницах без отдельной настройки (включая врачей и цены).
 - `pageMenus` — список исключений. `paths` содержит адреса страниц **после домена**,
   например `/all-on-4/`. Одному меню можно назначить несколько адресов.
 - В каждом меню `welcomeText` — приветствие, `starterPrompts` — ровно три кнопки.
   `label` — короткая надпись, `q` — полный вопрос, который отправляется при клике.
+- `topicId` — необязательный canonical ID из `target_response/service_topics.json`.
+  Он сообщает модели тему исходной страницы только при первом вопросе новой
+  беседы. Это не утверждение пациента о нужной ему услуге. Общие кнопки могут
+  сохранять прежнее видео; правило трёх вопросов относится к отдельным меню.
 - `welcomePromotion` в верхней части файла — одна акция на весь сайт. Внутри
   `pageMenus` акции не задаются. Её тексты должны соответствовать действующей базе;
   изменение карточки само по себе не меняет условия в фактах/MD.
@@ -25,6 +29,7 @@
 ```json
 {
   "paths": ["/all-on-4/"],
+  "topicId": "implantation",
   "welcomeText": "Здравствуйте! Помогу разобраться в имплантации All-on-4.",
   "starterPrompts": [
     {"label": "Стоимость All-on-4", "q": "Сколько стоит All-on-4 в НикаДент?"},
@@ -40,8 +45,10 @@
 При переходах с перезагрузкой страницы меню определяется заново; для сайта с
 SPA-переходами без перезагрузки отдельная интеграция пока не реализована.
 В новой беседе/reset адрес читается заново; активный разговор не сбрасывается.
-URL/UTM в модель не отправляются. Отдельное меню влияет только на стартовый экран;
-пациент по-прежнему может написать вопрос на любую тему клиники.
+URL/UTM в модель не отправляются. Сервер принимает только pathname, сам проверяет
+его по captured настройкам клиента и определяет тему. Переход на другую страницу
+в активной беседе не меняет начальную тему. Переписка восстанавливается из
+сохранённых ответов сервера; пациент может написать вопрос на любую тему клиники.
 
 Проверка: локальная панель `/static/widget-test.html?client=nikadent`, поле
 «Страница сайта», затем «Открыть чат». Обновить страницу после правки JSON.
@@ -59,9 +66,10 @@ URL/UTM в модель не отправляются. Отдельное мен
 | Цена, billing unit, пакет, payment stages | `clients/{id}/target_response/pricebook/services/{offer_id}.json` |
 | Commercial facts (акции, рассрочка, гарантия) | `clients/{id}/target_response/pricebook/facts.json` |
 | Broad family price (опционально) | `clients/{id}/target_response/pricebook/family_prices.json` |
-| Бренды имплантов и aliases | `clients/{id}/target_response/brand_catalog.json` |
-| Marketing policy (facts/scenarios/CTA contexts) | `clients/{id}/target_response/marketing.yaml` |
-| Приоритеты услуг/offers | `clients/{id}/target_response/clinic_strategy.yaml` |
+| Бренды и aliases | `clients/{id}/target_response/brand_catalog.json` |
+| Коммерческие профили, усилители, «Также», несовместимость | `clients/{id}/target_response/d2_commercial.json` |
+| Явный порядок готовых offers в ценовом обзоре направления | `clients/{id}/target_response/d2_direction_prices.json` |
+| Разделы вкладки каталога и распределение услуг | `clients/{id}/target_response/widget_catalog.json` |
 | Текст услуги / FAQ (FullContext) | `clients/{id}/md/{content_ref}` |
 | Врачи и привязка к услугам | `clients/{id}/doctor_catalog.json` |
 | Контакты, часы, парковка, «не оказываем» | `clients/{id}/clinic_policies.yaml` → `contact:` (structured: phone, whatsapp, address, hours, parking) |
@@ -72,10 +80,69 @@ URL/UTM в модель не отправляются. Отдельное мен
 | Приветствие, стартовые вопросы, меню по страницам, общая акция виджета | `clients/{id}/widget_config.json` |
 | Разрешённые домены установки виджета | `clients/{id}/widget_integration.json` |
 | Runtime capabilities | `clients/{id}/features.yaml` |
-| Доставка заявок и согласие до сбора контактов | `clients/{id}/lead_config.yaml` |
+| Доставка заявок и согласие перед отправкой формы | `clients/{id}/lead_config.yaml` |
+
+### Каталог и форма в трёх вкладках
+
+`widget_catalog.json` содержит `version: 1`, `client_id`, `label` (например,
+«Стоматология»), `unpriced_text` и `sections`: `section_id`, `title`, `subtitle`,
+`service_ids`. `subtitle` — короткая подпись серой плитки направления, без числа
+услуг или цены. `label` и `subtitle` — оформление каталога, не контекст модели.
+Обязательная карта `service_subtitles` задаёт короткую подпись каждой услуги:
+ключ — `service_id`, значение — непустое пояснение для посетителя, например
+`"denture_repair": "Восстановление повреждённого съёмного протеза"`.
+Ключи карты должны точно совпадать с объединением `service_ids` разделов.
+Эта подпись выводится в списке и поиске вместо названия первого варианта
+и счётчика; полный текст услуги остаётся в MD. Автоматических подстановок нет.
+`show_sections` по умолчанию `true`; `false` сразу показывает список услуг.
+Внутренние разделы и полное распределение `service_ids` сохраняются для порядка
+и проверки ссылок. В списке услуг показывается число опубликованных позиций;
+при отсутствии предложений остаётся `unpriced_text`.
+
+Необязательная карта `offer_groups` задаётся по `service_id`. Значение — список
+групп `{ "title": "Отдельные зоны", "offer_ids": ["laser_hair_removal.underarms"] }`.
+Если услуга сгруппирована, **все** её публикуемые активные offers должны входить
+в группы ровно один раз. Неполный список, чужие/неизвестные/неактивные IDs и
+offers неактивных вариантов отклоняются при загрузке. Если групп нет, видны все
+позиции без группировки. Названия, суммы и условия группами не переопределяются.
+Поиск по длинному прайсу фильтрует опубликованные строки, не выбирает предложение.
+
+Полный перечень исключений хранится в `package.excludes` и показывается в
+«Оплачивается отдельно», а также в текстовом ответе/истории выбранного предложения.
+Не копируйте весь этот список второй строкой в `mandatory_exclusion` metadata.
+Самостоятельные обязательные оговорки и условия области цены сохраняются.
+Каждая активная услуга входит
+ровно в один раздел; неизвестные, чужие, неактивные и пропущенные IDs — ошибка.
+Названия, суммы, варианты и условия повторно здесь не записываются. Каталог и
+чат используют один сборщик offers, commercial selector и renderer карточки.
+Без offer услуга остаётся видимой с `unpriced_text`, без выдуманной цены.
+
+Просмотр каталога не меняет заявку. Явная кнопка переносит service/offer в один
+черновик формы; поля синхронны в чате, каталоге и вкладке «Запись».
+Контакты вводятся до галочки, отправляются только кнопкой после согласия.
+Форма не проходит через модель или историю беседы; повтор запроса использует
+тот же request_id. После подтверждения показывается благодарность.
+Локально запускать `scripts/start_local_widget.ps1`; панель поддерживает
+`demo`, `demo_medical`, `nikadent`. Launcher разрешает их только своему процессу,
+не меняя production registry или `.env`. После обновления runtime запускать
+новую беседу: миграция старых сохранённых receipts не входит в эту задачу.
 
 `brand.yaml` ≠ `target_response/brand_catalog.json`  
-`clinic_policies.yaml` ≠ `target_response/clinic_strategy.yaml`
+`clinic_policies.yaml` задаёт контакты и ограничения; коммерческие профили — отдельный домен.
+
+`family` и `price.billing_unit` — непустые идентификаторы из данных клиники.
+Новые направления не требуют расширять встроенный список специальностей.
+Человеческая подпись единицы и объёма уже задаётся обязательным `package.label`:
+например, «за один первичный приём», «за зону подмышек» или «за одну челюсть».
+Код форматирует fixed/from/range суммы; no_public_price сохраняет approved_text.
+Цена не умножается по единице. Service/option/offer/brand/fact IDs по-прежнему
+проверяются на связь и принадлежность каталогу.
+
+Operational validator, startup и readiness используют тот же D2 snapshot/model
+view, что диалог. Старые `target_response/marketing.yaml` и
+`target_response/clinic_strategy.yaml` не читаются этим путём, не влияют на
+результат проверки и новым клиникам не нужны. В существующих packs они могут
+сохраняться для исторических инструментов; это не действующая настройка D2.
 
 **FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE:** canonical contact facts live **only** in
 `clinic_policies.yaml` `contact:` block. **Не дублировать** телефон, адрес, часы, WhatsApp,
@@ -104,7 +171,8 @@ price-only offer).
 1. Скопировать `clients/_template/` → `clients/{new_id}/`.
 2. Заменить placeholder IDs (`sample_service`, `template_brand`, …) на уникальные.
 3. Добавить MD-файлы под каждый `content_ref` в `service_catalog.json`.
-4. Заполнить `doctor_catalog.json` и `service_ids` врачей.
+4. Описать врачей и их услуги в MD. При необходимости заполнить текущие
+   `d2_commercial.json` профили; цены и условия оставить в offers/facts.
 5. Прогнать offline validator:
 
 ```powershell
@@ -139,16 +207,16 @@ booking, consult, callback, plan, price, doctor. Тексты/ключи сущ�
 
 - `target_response/service_catalog.json`
 - `target_response/brand_catalog.json`
-- `target_response/marketing.yaml`
-- `target_response/clinic_strategy.yaml`
 - `target_response/pricebook/facts.json`
 - `target_response/pricebook/services/*.json` (≥1 offer)
-- `doctor_catalog.json`
 - `md/*.md` (≥1)
 - `brand.yaml`, `clinic_policies.yaml`, `features.yaml`, `lead_config.yaml`, `tone.yaml`, `ui.yaml`, `widget_config.json`
 
 ## Optional
 
+- `target_response/d2_commercial.json` (пустой текущий пример есть в шаблоне)
+- `target_response/d2_direction_prices.json` (только явный обзор направления;
+  существующие dental controls пока требуют отдельного этапа обобщения)
 - `target_response/pricebook/family_prices.json`
 - `video_catalog.yaml`
 - `target_response/context_groups.json` (future, not yet implemented — see
@@ -282,6 +350,15 @@ lead session хранит только ссылку на это подтверж
 виджет, сохрани demo_stub без согласия. Без live-вызовов и выкладки».
 
 ## ID consistency
+
+Автоматическая акция ограничивается `allowed_service_ids` / `allowed_topics` и
+`excluded_service_ids` самого факта. Если она относится к конкретным вариантам,
+добавьте `allowed_offer_ids`: это дополнительное сужение, а не замена услуги.
+Каждый offer должен существовать и принадлежать явно разрешённой, не исключённой
+услуге. Отсутствующее поле или `[]` сохраняет область всей услуги. Узкая акция
+показывается автоматически только в подробной карточке соответствующего offer;
+список вариантов ещё ничего не выбирает. `fact_refs` предложения остаётся ссылкой
+на факт и не расширяет область акции. Цены и условия берутся из данных клиента.
 
 - `service_catalog` keys = `service_id` в offers.
 - `offer_id` уникален; файл `{offer_id}.json`.

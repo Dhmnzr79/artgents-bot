@@ -1,0 +1,40 @@
+{
+  "offer_id": "thyroid_ultrasound.with_cervical_nodes",
+  "service_id": "thyroid_ultrasound",
+  "option_id": "with_cervical_nodes",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "package",
+    "amount": 2900
+  },
+  "package": {
+    "label": "за готовый комплекс из двух названных областей",
+    "includes": [
+      "Исследование щитовидной железы",
+      "Исследование лимфоузлов шеи",
+      "Протокол и выбранные изображения"
+    ],
+    "excludes": [
+      "Гормональные и другие анализы",
+      "Пункция",
+      "Консультация эндокринолога"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
+}

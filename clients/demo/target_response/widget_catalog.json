@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "client_id": "demo",
+  "unpriced_text": "Стоимость уточнит администратор",
+  "sections": [
+    {
+      "section_id": "implantation",
+      "title": "Имплантация",
+      "service_ids": [
+        "classic",
+        "one_stage",
+        "all_on_4",
+        "all_on_6",
+        "temporary_teeth",
+        "bone_graft",
+        "sinus_lift",
+        "zygomatic_implants",
+        "pterygoid_implants"
+      ],
+      "subtitle": "Один зуб или вся челюсть"
+    },
+    {
+      "section_id": "prosthetics",
+      "title": "Протезирование",
+      "service_ids": [
+        "implant_supported_prosthetics",
+        "zirconia_crowns",
+        "clasp_dentures",
+        "removable_dentures"
+      ],
+      "subtitle": "Коронки и восстановление зубов"
+    },
+    {
+      "section_id": "treatment",
+      "title": "Лечение зубов и дёсен",
+      "service_ids": [
+        "caries",
+        "pulpitis",
+        "teeth_treatment",
+        "tooth_extraction",
+        "periodontitis"
+      ],
+      "subtitle": "Сохранение собственных зубов"
+    },
+    {
+      "section_id": "aesthetics",
+      "title": "Эстетика улыбки",
+      "service_ids": [
+        "professional_whitening",
+        "veneers",
+        "aligners"
+      ],
+      "subtitle": "Более светлая улыбка"
+    },
+    {
+      "section_id": "diagnostics",
+      "title": "Диагностика",
+      "service_ids": [
+        "tomography"
+      ],
+      "subtitle": "Обследования перед лечением"
+    }
+  ],
+  "label": "Стоматология",
+  "service_subtitles": {
+    "classic": "Восстановление зуба с опорой на имплант",
+    "one_stage": "Удаление зуба и установка импланта за один приём",
+    "all_on_4": "Несъёмные зубы всей челюсти на четырёх имплантах",
+    "all_on_6": "Несъёмные зубы всей челюсти на шести имплантах",
+    "temporary_teeth": "Временное протезирование на период лечения",
+    "bone_graft": "Подготовка костной ткани к установке импланта",
+    "sinus_lift": "Увеличение объёма кости на верхней челюсти",
+    "zygomatic_implants": "Восстановление верхней челюсти при нехватке кости",
+    "pterygoid_implants": "Опора для протеза в боковых отделах верхней челюсти",
+    "implant_supported_prosthetics": "Коронки и протезы с опорой на импланты",
+    "zirconia_crowns": "Прочные безметалловые коронки",
+    "clasp_dentures": "Съёмный протез на тонком металлическом каркасе",
+    "removable_dentures": "Восстановление нескольких зубов или всей челюсти",
+    "caries": "Лечение повреждённых тканей и восстановление пломбой",
+    "pulpitis": "Лечение корневых каналов для сохранения зуба",
+    "teeth_treatment": "Диагностика и восстановление повреждённых зубов",
+    "tooth_extraction": "Удаление зуба под местной анестезией",
+    "periodontitis": "Лечение воспаления дёсен и тканей вокруг зубов",
+    "professional_whitening": "Осветление эмали для более светлой улыбки",
+    "veneers": "Коррекция цвета и формы передних зубов",
+    "aligners": "Выравнивание зубов прозрачными капами",
+    "tomography": "Трёхмерный снимок зубов и челюстей"
+  },
+  "show_sections": true,
+  "offer_groups": {
+    "classic": [
+      {
+        "title": "Системы имплантов",
+        "offer_ids": [
+          "classic.one_tooth.implantium",
+          "classic.one_tooth.impro",
+          "classic.one_tooth.nobel"
+        ]
+      }
+    ]
+  }
+}

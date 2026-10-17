@@ -105,17 +105,17 @@ def test_demo_doctors_use_md_without_parallel_catalog():
     assert validate_client_pack(_DEMO) == []
 
 
-@pytest.mark.parametrize("reference", ["doctor:doctors__doctor__ghost", "kb:doctors__doctor__missing.md#korotko"])
-def test_validator_still_rejects_unavailable_sources_without_doctor_index(tmp_path, reference):
+@pytest.mark.parametrize("reference", ["doctors__doctor__missing.md#korotko", "clinic__info__consultation.md#missing"])
+def test_validator_rejects_unavailable_current_fact_sources(tmp_path, reference):
     import shutil
-    import yaml
+    import json
     pack = tmp_path / "demo"
     shutil.copytree(_DEMO, pack)
     baseline = validate_client_pack(pack)
-    path = pack / "target_response" / "marketing.yaml"
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    data["scenario_rules"]["doctor_trust"]["ordered_amplifier_refs"].append(reference)
-    path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+    path = pack / "target_response" / "pricebook" / "facts.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    next(iter(data.values()))["detail_ref"] = reference
+    path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     errors = validate_client_pack(pack)
     assert len(errors) == len(baseline) + 1
     assert any("external_ref_invalid" in error for error in errors)

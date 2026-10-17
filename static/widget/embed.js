@@ -61,15 +61,15 @@
     window[GLOBAL_GUARD] = true;
   }
 
-  /** @param {ShadowRoot} shadow @param {string} href */
-  function loadStylesheet(shadow, href) {
+  /** @param {ShadowRoot | HTMLHeadElement} root @param {string} href */
+  function loadStylesheet(root, href) {
     return new Promise((resolve, reject) => {
       const link = document.createElement("link");
       link.rel = "stylesheet";
       link.href = href;
       link.onload = () => resolve();
       link.onerror = () => reject(new Error("widget_css_load_failed"));
-      shadow.appendChild(link);
+      root.appendChild(link);
     });
   }
 
@@ -83,6 +83,9 @@
 
     const shadow = host.attachShadow({ mode: "open" });
     const cssUrl = `${apiBase}/static/widget/widget.css`;
+    // Chrome registers @font-face in the document, not in a shadow stylesheet.
+    // This sheet contains font declarations only; host-page selectors are untouched.
+    await loadStylesheet(document.head, `${apiBase}/static/widget/fonts.css`);
     await loadStylesheet(shadow, cssUrl);
 
     const configUrl = `${apiBase}/api/widget-config?client_id=${encodeURIComponent(clientId)}`;

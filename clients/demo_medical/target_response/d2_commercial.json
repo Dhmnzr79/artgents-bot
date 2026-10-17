@@ -1,0 +1,193 @@
+{
+  "version": 1,
+  "client_id": "demo_medical",
+  "price_booster_packages": [
+    {
+      "package_id": "demo_payment_clarity",
+      "name": "Понятная оплата",
+      "body_text": "До начала согласуем состав и полную стоимость. Для предложений с поэтапной оплатой заранее назовём суммы и порядок платежей; кредит и рассрочка оформляются отдельно."
+    }
+  ],
+  "also_list_packages": [
+    {
+      "package_id": "demo_visit_support",
+      "name": "После визита",
+      "body_text": "После визита поможем получить заключение и спланировать следующее обращение. Если понадобятся другой специалист или дополнительные исследования, заранее объясним их стоимость."
+    }
+  ],
+  "service_profiles": [
+    {
+      "service_id": "ent_consultation",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "ent_endoscopy",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "nasal_lavage",
+      "price_detail_ids": [
+        "includes",
+        "stages"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "therapist_consultation",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "pediatric_consultation",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "gynecology_consultation",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "cervical_screening",
+      "price_detail_ids": [
+        "includes",
+        "stages"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "urology_consultation",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "cardiology_consultation",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "ecg",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "neurology_consultation",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "abdominal_ultrasound",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "thyroid_ultrasound",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "dermatology_consultation",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "digital_dermatoscopy",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "biorevitalization",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "plasma_therapy",
+      "price_detail_ids": [
+        "includes",
+        "stages"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "photorejuvenation",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "laser_hair_removal",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "ultrasound_lifting",
+      "price_detail_ids": [
+        "includes",
+        "stages"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    },
+    {
+      "service_id": "botulinum_therapy",
+      "price_detail_ids": [
+        "includes"
+      ],
+      "price_booster_id": "demo_payment_clarity",
+      "also_list_id": "demo_visit_support"
+    }
+  ],
+  "incompatibility_groups": []
+}

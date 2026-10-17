@@ -1,0 +1,41 @@
+{
+  "offer_id": "dermatology_consultation.primary",
+  "service_id": "dermatology_consultation",
+  "option_id": "primary",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "visit",
+    "amount": 3000
+  },
+  "package": {
+    "label": "за один первичный приём",
+    "includes": [
+      "Обсуждение жалоб и истории обращения",
+      "Осмотр беспокоящих участков кожи, волос или ногтей",
+      "Разбор предоставленных результатов",
+      "Письменное заключение и дальнейший план"
+    ],
+    "excludes": [
+      "Дерматоскопия",
+      "Лабораторные исследования и соскобы",
+      "Удаление образований и другие процедуры"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
+}

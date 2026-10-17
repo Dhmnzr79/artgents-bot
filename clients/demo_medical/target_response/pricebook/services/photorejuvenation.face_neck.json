@@ -1,0 +1,42 @@
+{
+  "offer_id": "photorejuvenation.face_neck",
+  "service_id": "photorejuvenation",
+  "option_id": "face_neck",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "package",
+    "amount": 12500
+  },
+  "package": {
+    "label": "за одну IPL-процедуру двух названных зон",
+    "includes": [
+      "Осмотр и подбор параметров врачом",
+      "Подготовка лица и шеи",
+      "Световая обработка двух зон",
+      "Завершающий уход"
+    ],
+    "excludes": [
+      "Декольте, кисти и веки",
+      "Удаление образований",
+      "Следующие посещения"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope",
+    "demo_cosmetic_control"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
+}

@@ -44,7 +44,15 @@ Write-Host "Stop this bot with Ctrl+C."
 Write-Host "Auto-restart is ON for Python changes. Keep this terminal open."
 
 Push-Location -LiteralPath $repoRoot
+$previousAllowedClients = $env:ALLOWED_CLIENTS
 try {
+    # Local test admission only. Keep production registry and .env untouched.
+    $configuredClients = $previousAllowedClients
+    if ([string]::IsNullOrWhiteSpace($configuredClients)) {
+        $registryLine = Select-String -LiteralPath $envFile -Pattern '^\s*ALLOWED_CLIENTS\s*=' | Select-Object -Last 1
+        if ($registryLine) { $configuredClients = ($registryLine.Line -split '=', 2)[1].Trim().Trim('"').Trim("'") }
+    }
+    $env:ALLOWED_CLIENTS = ((@('demo', 'demo_medical', 'nikadent') + @($configuredClients -split ',')) | Where-Object { $_.Trim() } | ForEach-Object { $_.Trim() } | Sort-Object -Unique) -join ','
     $logCheck = @'
 from flask.cli import load_dotenv
 load_dotenv()
@@ -70,5 +78,6 @@ if enabled:
     }
     & $python -m flask --app app run --host 127.0.0.1 --port 9001 --reload --no-debugger
 } finally {
+    $env:ALLOWED_CLIENTS = $previousAllowedClients
     Pop-Location
 }

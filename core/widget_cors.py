@@ -9,11 +9,16 @@ from core.origin_guard import matching_widget_origin
 
 _WIDGET_CORS_PREFIXES = (
     "/api/widget-config",
+    "/api/widget-catalog",
+    "/api/booking-form",
+    "/api/widget-session",
     "/api/video-catalog",
     "/api/media/",
     "/ask",
     "/lead",
     "/static/widget/",
+    "/static/fonts/inter-cyrillic-wght-normal.woff2",
+    "/static/fonts/inter-latin-wght-normal.woff2",
 )
 
 _CORS_ALLOW_METHODS = "GET, POST, OPTIONS"

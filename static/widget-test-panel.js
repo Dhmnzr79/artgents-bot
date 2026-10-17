@@ -53,7 +53,7 @@ void checkConnection();
 
 const clientSelect = document.getElementById("client-select");
 const requestedClient = new URL(location.href).searchParams.get("client") || "demo";
-const clientId = ["demo", "nikadent"].includes(requestedClient) ? requestedClient : "demo";
+const clientId = ["demo", "demo_medical", "nikadent"].includes(requestedClient) ? requestedClient : "demo";
 clientSelect.value = clientId;
 const clientUrl = id => {
   const url = new URL(location.href);
@@ -63,7 +63,7 @@ const clientUrl = id => {
 };
 document.getElementById("client-new-tab").href = clientUrl(clientId).href;
 clientSelect.addEventListener("change", () => location.assign(clientUrl(clientSelect.value).href));
-document.querySelector(".footer span").textContent = `${clientId === "demo" ? "Демо" : "НикаДент"} · ${location.host}`;
+document.querySelector(".footer span").textContent = `${({demo:'Стоматология',demo_medical:'АртМед',nikadent:'НикаДент'})[clientId]} · ${location.host}`;
 let config;
 try {
   const response = await fetch(`/api/widget-config?client_id=${encodeURIComponent(clientId)}`, {cache:"no-store"});

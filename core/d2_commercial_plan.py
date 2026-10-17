@@ -25,6 +25,7 @@ def resolve_d2_commercial_plan(
     bundle: ResponseDataCatalog,
     as_of: date,
     service_id: str | None,
+    offer_id: str | None = None,
     topic_id: str | None = None,
     include_packages: bool,
     shown_promo_fact_ids: tuple[str, ...] = (),
@@ -35,6 +36,11 @@ def resolve_d2_commercial_plan(
 ) -> D2ResolvedCommercialPlan:
     if authority is None:
         return D2ResolvedCommercialPlan()
+    if offer_id is not None and not any(
+        offer.offer_id == offer_id and offer.service_id == service_id and offer.active
+        for offer in bundle.offers
+    ):
+        raise ValueError("commercial_offer_scope_invalid")
     client_id = authority.source_client_id
     profiles = {item.service_id: item for item in authority.service_profiles}
     profile = profiles.get(service_id) if service_id else None
@@ -44,6 +50,8 @@ def resolve_d2_commercial_plan(
         if fact.kind != "promo" or not fact_active_as_of(fact, as_of) or fact_id in shown:
             continue
         if promotion_scope == "shown" and fact_id not in shown_promo_fact_ids:
+            continue
+        if fact.allowed_offer_ids and offer_id not in fact.allowed_offer_ids:
             continue
         if promotion_scope != "general":
             if service_id is not None:

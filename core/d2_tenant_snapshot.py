@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from dataclasses import asdict
 from pathlib import Path
@@ -32,6 +33,11 @@ from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 
 class D2TenantSnapshotError(ValueError):
     pass
+
+
+def d2_clients_root() -> Path:
+    """One configured pack root for dialogue, startup and readiness."""
+    return Path(os.getenv("D2_CLIENTS_ROOT") or Path(__file__).resolve().parents[1] / "clients")
 
 
 _FRONTMATTER = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
@@ -68,7 +74,7 @@ def _read_set(client_root: Path) -> tuple[tuple[str, bytes], ...]:
             continue
         files.extend(item for item in base.rglob(pattern)
                      if item.is_file() and item not in (target / "marketing.yaml", target / "clinic_strategy.yaml"))
-    for name in ("tone.yaml", "ui.yaml", "video_catalog.yaml", "clinic_policies.yaml"):
+    for name in ("tone.yaml", "ui.yaml", "video_catalog.yaml", "clinic_policies.yaml", "widget_config.json"):
         path = client_root / name
         if path.is_file():
             files.append(path)
@@ -179,7 +185,38 @@ def load_d2_tenant_snapshot(client_id: str, *, clients_root: Path) -> D2TenantSn
             allowed_service_ids=direct or topical,
             sections=sections,
         ))
-    return D2TenantSnapshot(client_id=client_id, fingerprint=_fingerprint(client_id, first), bundle=bundle, files=first, content=tuple(content), service_topics=MappingProxyType(service_topics), diagnostics=tuple(diagnostics))
+    snapshot = D2TenantSnapshot(client_id=client_id, fingerprint=_fingerprint(client_id, first), bundle=bundle, files=first, content=tuple(content), service_topics=MappingProxyType(service_topics), diagnostics=tuple(diagnostics))
+    _validated_page_menus(snapshot)
+    nav_raw=dict(snapshot.files).get('target_response/widget_catalog.json')
+    if nav_raw is not None:
+        from contracts.widget_catalog import WidgetCatalogNavigation
+        try:
+            WidgetCatalogNavigation.model_validate_json(nav_raw).bind(client_id,bundle)
+        except ValueError as exc:
+            raise D2TenantSnapshotError('widget_catalog_invalid') from exc
+    return snapshot
+
+
+def _validated_page_menus(snapshot):
+    from contracts.widget_config import WidgetPresentationV1
+    raw = dict(snapshot.files).get('widget_config.json')
+    if raw is None:return ()
+    try:
+        menus = WidgetPresentationV1.model_validate_json(raw).pageMenus or ()
+    except ValueError as exc:
+        raise D2TenantSnapshotError('widget_page_config_invalid') from exc
+    if any(menu.topicId is not None and menu.topicId not in set(snapshot.service_topics.values()) for menu in menus):
+        raise D2TenantSnapshotError('widget_page_topic_invalid')
+    return menus
+
+
+def resolve_entry_page_context(snapshot, path):
+    from contracts.d2_dialogue import D2EntryPageContext
+    if path is None:return None
+    from contracts.widget_config import WidgetPageMenuV1
+    normalized = WidgetPageMenuV1._exact_paths([path])[0]
+    menu = next((menu for menu in _validated_page_menus(snapshot) if normalized in menu.paths),None)
+    return D2EntryPageContext(path=normalized,topic_id=menu.topicId) if menu and menu.topicId else None
 
 
 def build_d2_bundle(snapshot: D2TenantSnapshot) -> ResponseDataCatalog:
@@ -211,6 +248,29 @@ def build_d2_model_view(snapshot: D2TenantSnapshot) -> D2ModelView:
         direction_prices=_direction_prices(snapshot.files, bundle),
         commercial=_commercial_contract(snapshot.files, bundle, snapshot.client_id),
     )
+
+
+def validate_d2_authored_content_refs(snapshot: D2TenantSnapshot) -> tuple[str, ...]:
+    """Operational pack integrity from captured data, without per-turn policy changes.
+
+    A model's unsupported source claim still follows the existing recoverable
+    dialogue path. Startup/readiness and the authoring validator reject broken
+    references in the clinic's own catalog before admitting that pack.
+    """
+    documents = {item.content_ref: item for item in snapshot.content}
+    refs = [service.content_ref for service in snapshot.bundle.services.values()]
+    refs.extend(option.content_ref for service in snapshot.bundle.services.values() for option in service.options)
+    missing = [ref for ref in refs if ref is not None and ref not in documents]
+    for fact in snapshot.bundle.facts.values():
+        if fact.detail_ref is None:
+            continue
+        doc, separator, anchor = fact.detail_ref.partition("#")
+        content = documents.get(doc)
+        if not separator or content is None or not any(
+            section.section_ref == f"a:{anchor}" for section in content.sections
+        ):
+            missing.append(fact.detail_ref)
+    return tuple(dict.fromkeys(missing))
 
 
 def _approved_md_corpus(snapshot: D2TenantSnapshot) -> str:

@@ -1,0 +1,40 @@
+{
+  "offer_id": "thyroid_ultrasound.standard",
+  "service_id": "thyroid_ultrasound",
+  "option_id": "standard",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "procedure",
+    "amount": 2100
+  },
+  "package": {
+    "label": "за одно исследование щитовидной железы",
+    "includes": [
+      "Размеры и структура щитовидной железы",
+      "Описание обнаруженных изменений",
+      "Протокол и выбранные изображения"
+    ],
+    "excludes": [
+      "Отдельное исследование лимфоузлов шеи",
+      "Анализы на гормоны и пункция",
+      "Консультация эндокринолога"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
+}

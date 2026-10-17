@@ -9,7 +9,7 @@
     "billing_unit": "tooth_package"
   },
   "package": {
-    "label": "за восстановление одного зуба (имплант + постоянная коронка); КТ при необходимости и временная коронка — отдельно",
+    "label": "за восстановление одного зуба (имплант + постоянная коронка)",
     "includes": [
       "имплант с документами",
       "хирургия и местная анестезия",
@@ -64,11 +64,6 @@
   ],
   "required_conditions_metadata": {
     "completeness": "complete",
-    "conditions": [
-      {
-        "condition_id": "mandatory_exclusion",
-        "display_text": "КТ при необходимости и временная коронка — отдельно"
-      }
-    ]
+    "conditions": []
   }
 }

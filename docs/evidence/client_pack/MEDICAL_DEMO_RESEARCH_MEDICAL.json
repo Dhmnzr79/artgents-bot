@@ -1,0 +1,444 @@
+{
+  "researched_at": "2026-10-16",
+  "method": "На каждую услугу открыты и прочитаны минимум две тематические страницы реальных клиник или медицинских организаций через web search/open; наблюдения ниже пересказаны самостоятельно, без цитирования текстов. observed_facts описывают медицинскую основу, а не факты об «АртМед Демо».",
+  "invented_content_distinction": "«АртМед Демо» — вымышленная демо-клиника. Все особенности организации посещения, демонстрационного кабинета, выдачи документов и сервиса являются авторскими вымышленными фактами. Цены, варианты оплаты и акции не выводятся из источников и хранятся отдельно. Реальные имена, контакты, рейтинги, лицензии и награды источников в контент клиники не переносились.",
+  "editorial_limits": "Не переносились гарантии выздоровления, абсолютной безопасности или безболезненности, универсальные курсы и спорные рекламные медицинские утверждения. Интервалы цервикального скрининга и состав обследований не назначаются всем одинаково. Принципы согласования манипуляций и ясного разделения консультации и дополнительных услуг — авторская организация демо-сервиса.",
+  "services": [
+    {
+      "service_id": "ent_consultation",
+      "sources": [
+        {
+          "url": "https://www.smclinic.ru/doctors/otolaringolog-lor.html",
+          "title": "СМ-Клиника: отоларинголог",
+          "observed_facts": [
+            "Специалист занимается заболеваниями уха, носа и горла.",
+            "Диагностические исследования и лечебные манипуляции представлены отдельно от консультации."
+          ]
+        },
+        {
+          "url": "https://spb.medsi.ru/services/otorinolaringologiya-lor/",
+          "title": "МЕДСИ: приём оториноларинголога",
+          "observed_facts": [
+            "Приём включает обсуждение жалоб и осмотр ЛОР-органов.",
+            "Эндоскопия, исследования слуха и промывания имеют самостоятельные задачи."
+          ]
+        }
+      ]
+    },
+    {
+      "service_id": "ent_endoscopy",
+      "sources": [
+        {
+          "url": "https://www.smclinic.ru/professional-services/diagnostika-v-otolaringologii/issledovanie-endoskopicheskoe-lor-organov/",
+          "title": "СМ-Клиника: эндоскопическое исследование ЛОР-органов",
+          "observed_facts": [
+            "Эндоскоп позволяет рассматривать доступные структуры с увеличением.",
+            "Перед исследованием важно сообщить об аллергии на лекарства, кровотечениях и влияющих на свёртывание препаратах.",
+            "Возможны неприятные ощущения и небольшие кровянистые выделения."
+          ]
+        },
+        {
+          "url": "https://medsi.ru/services/endoskopicheskie-issledovaniya-lor-organov/",
+          "title": "МЕДСИ: эндоскопические исследования ЛОР-органов",
+          "observed_facts": [
+            "Исследование проводится по медицинским показаниям.",
+            "Диагностическое эндоскопическое исследование и консультация перечислены отдельными услугами."
+          ]
+        }
+      ]
+    },
+    {
+      "service_id": "nasal_lavage",
+      "sources": [
+        {
+          "url": "https://www.smclinic.ru/professional-services/promyvanie-nosa-metodom-peremescheniya/",
+          "title": "СМ-Клиника: промывание носа методом перемещения",
+          "observed_facts": [
+            "При процедуре подача раствора сочетается с удалением жидкости и отделяемого.",
+            "Очищение от вязкого отделяемого и уменьшение отёка могут облегчать носовое дыхание; гарантированный срок облегчения не переносился.",
+            "Для выполнения требуется соблюдать положение тела и инструкции специалиста.",
+            "К ограничениям относятся кровотечения, нарушения свёртывания и ситуации, мешающие спокойно выполнять инструкции."
+          ]
+        },
+        {
+          "url": "https://www.gosmed.ru/treatment-methods/promyvanie-nosa-metodom-peremeshcheniya-lor-protsedura-kukushka/",
+          "title": "Клиника СПбГУ: промывание носа методом перемещения",
+          "observed_facts": [
+            "Метод перемещения по Проетцу применяется при определённых заболеваниях носа и пазух.",
+            "Метод имеет конкретные показания, а не предназначен автоматически для любого насморка."
+          ]
+        }
+      ]
+    },
+    {
+      "service_id": "therapist_consultation",
+      "sources": [
+        {
+          "url": "https://www.smclinic.ru/doctors/terapevt.html",
+          "title": "СМ-Клиника: терапевт",
+          "observed_facts": [
+            "Терапевт оценивает жалобы и общее состояние пациента.",
+            "Дополнительные исследования и участие других специалистов могут быть частью дальнейшего обследования."
+          ]
+        },
+        {
+          "url": "https://medsi.ru/services/priem-terapevta/",
+          "title": "МЕДСИ: приём терапевта",
+          "observed_facts": [
+            "Первичная консультация включает анамнез, жалобы и изучение медицинских документов.",
+            "По результатам оценки врач планирует обследование или направляет к специалисту нужного профиля."
+          ]
+        }
+      ]
+    },
+    {
+      "service_id": "pediatric_consultation",
+      "sources": [
+        {
+          "url": "https://www.smdoctor.ru/doctors/pediatr/",
+          "title": "СМ-Доктор: педиатр",
+          "observed_facts": [
+            "Педиатр обсуждает жалобы с родителями и осматривает ребёнка.",
+            "В раннем возрасте могут оцениваться физические показатели и развитие.",
+            "Вакцинация, оформление документов и другие направления имеют отдельные задачи."
+          ]
+        },
+        {
+          "url": "https://spb.medsi.ru/services/pediatriya/",
+          "title": "МЕДСИ: педиатрия",
+          "observed_facts": [
+            "Педиатрия охватывает диагностику, лечение и профилактические вопросы детского здоровья.",
+            "Консультации для медицинской документации представлены отдельными услугами."
+          ]
+        }
+      ]
+    },
+    {
+      "service_id": "gynecology_consultation",
+      "sources": [
+        {
+          "url": "https://www.smclinic.ru/doctors/ginekolog.html",
+          "title": "СМ-Клиника: гинеколог",
+          "observed_facts": [
+            "На приёме обсуждают жалобы, изучают документы и проводят осмотр.",
+            "Мазки, УЗИ и другие исследования дополняют консультацию при необходимости."
+          ]
+        },
+        {
+          "url": "https://volgograd.medsi.ru/services/section-ginekologiya/",
+          "title": "МЕДСИ: акушерство и гинекология",
+          "observed_facts": [
+            "Работа гинеколога включает консультацию и осмотр.",
+            "Имеющиеся анализы и заключения используются при оценке ситуации."
+          ]
+        }
+      ]
+    },
+    {
+      "service_id": "cervical_screening",
+      "sources": [
+        {
+          "url": "https://www.smclinic.ru/analizy/zhidkostnaya-tsitologiya-sheyki-matki-i-vpch-test/",
+          "title": "СМ-Клиника: жидкостная цитология и ВПЧ-тест",
+          "observed_facts": [
+            "Для исследования получают клетки шейки матки и цервикального канала.",
+            "Цитология и ВПЧ-тест являются различными компонентами обследования.",
+            "Периодичность выбирают с учётом индивидуального риска и клинических данных."
+          ]
+        },
+        {
+          "url": "https://www.emcmos.ru/programs_and_services/services/gistologicheskaya-laboratoriya_citologiya/",
+          "title": "EMC: цитология и скрининг рака шейки матки",
+          "observed_facts": [
+            "Цитология основана на исследовании клеточного материала.",
+            "Лабораторное исследование имеет диагностические задачи, отличные от обычного осмотра."
+          ]
+        },
+        {
+          "url": "https://www.nhs.uk/tests-and-treatments/cervical-screening/what-is-cervical-screening/",
+          "title": "NHS: What is cervical screening?",
+          "observed_facts": [
+            "Скрининг проверяет материал шейки матки на ВПЧ высокого риска и клеточные изменения в рамках принятой программы.",
+            "При исследовании получают небольшой образец клеток шейки матки."
+          ]
+        },
+        {
+          "url": "https://www.nhs.uk/tests-and-treatments/cervical-screening/your-results/",
+          "title": "NHS: Your cervical screening results",
+          "observed_facts": [
+            "Положительный ВПЧ-тест может сочетаться как с клеточными изменениями, так и с их отсутствием.",
+            "Последующие действия зависят от сочетания результатов."
+          ]
+        }
+      ]
+    },
+    {
+      "service_id": "urology_consultation",
+      "sources": [
+        {
+          "url": "https://www.smclinic.ru/doctors/urolog.html",
+          "title": "СМ-Клиника: уролог",
+          "observed_facts": [
+            "Урология охватывает мочевую систему женщин и мужчин и мужскую репродуктивную систему.",
+            "Изменения мочеиспускания и другие жалобы служат поводом для оценки специалистом."
+          ]
+        },
+        {
+          "url": "https://medsi.ru/clinics/kdts-medsi-v-marino/urologiya/",
+          "title": "МЕДСИ: приём уролога в Марьино",
+          "observed_facts": [
+            "Консультация и дальнейшие исследования представлены как разные услуги.",
+            "Лабораторные, ультразвуковые и эндоскопические методы применяются для уточнения урологических заболеваний."
+          ]
+        }
+      ]
+    },
+    {
+      "service_id": "cardiology_consultation",
+      "sources": [
+        {
+          "url": "https://www.smclinic.ru/doctors/kardiolog.html",
+          "title": "СМ-Клиника: кардиолог",
+          "observed_facts": [
+            "Кардиолог занимается заболеваниями сердечно-сосудистой системы.",
+            "Консультация и различные кардиологические исследования имеют отдельный состав."
+          ]
+        },
+        {
+          "url": "https://perm.medsi.ru/services/priem-kardiologa/",
+          "title": "МЕДСИ: приём кардиолога",
+          "observed_facts": [
+            "Необходимый объём диагностики зависит от клинической ситуации.",
+            "Эпизодические нарушения могут потребовать длительного мониторирования, а не только короткой ЭКГ."
+          ]
+        },
+        {
+          "url": "https://www.nhs.uk/conditions/heart-attack/",
+          "title": "NHS: Heart attack",
+          "observed_facts": [
+            "Сильная давящая боль в груди и выраженное затруднение дыхания требуют срочной медицинской помощи."
+          ]
+        }
+      ]
+    },
+    {
+      "service_id": "ecg",
+      "sources": [
+        {
+          "url": "https://www.smclinic.ru/diagnosis/funktsionalnaya-diagnostika/ekg-elektrokardiografiya/",
+          "title": "СМ-Клиника: электрокардиография",
+          "observed_facts": [
+            "ЭКГ регистрирует электрические импульсы, возникающие при работе сердца.",
+            "Электроды устанавливают на грудь и конечности, пациент лежит на кушетке.",
+            "Специальная подготовка к обычной записи обычно не требуется; перед ней можно спокойно отдохнуть."
+          ]
+        },
+        {
+          "url": "https://spb.medsi.ru/services/elektrokardiografiya-ekg/",
+          "title": "МЕДСИ: электрокардиография",
+          "observed_facts": [
+            "ЭКГ фиксирует электрическую активность сердца и используется для оценки ритма и проведения.",
+            "Запись в покое и нагрузочные варианты различаются составом.",
+            "После исследования могут потребоваться дополнительные обследования."
+          ]
+        },
+        {
+          "url": "https://www.nhs.uk/tests-and-treatments/electrocardiogram/",
+          "title": "NHS: Electrocardiogram (ECG)",
+          "observed_facts": [
+            "При ЭКГ в покое электроды на груди и конечностях регистрируют электрические сигналы сердца.",
+            "Для записи требуется спокойно лежать; удобна одежда, легко открывающая нужные участки."
+          ]
+        },
+        {
+          "url": "https://www.uhs.nhs.uk/Media/UHS-website-2019/Patientinformation/Heartandlungs/Electrocardiogram-ECG-2810-PIL.pdf",
+          "title": "University Hospital Southampton: ECG patient information, reviewed February 2026",
+          "observed_facts": [
+            "Типичная длительность обычной ЭКГ составляет пять–десять минут.",
+            "При ЭКГ в тело не подают электрический ток.",
+            "Для подтверждения диагноза иногда требуются дополнительные исследования."
+          ]
+        }
+      ]
+    },
+    {
+      "service_id": "neurology_consultation",
+      "sources": [
+        {
+          "url": "https://www.smclinic.ru/doctors/nevrolog.html",
+          "title": "СМ-Клиника: невролог",
+          "observed_facts": [
+            "Приём начинается с жалоб, анамнеза, сведений о лекарствах и динамике симптомов.",
+            "После беседы проводится общий и специализированный осмотр."
+          ]
+        },
+        {
+          "url": "https://spb.medsi.ru/services/priyem-nevrologa/",
+          "title": "МЕДСИ: приём невролога",
+          "observed_facts": [
+            "Осмотр включает оценку рефлексов, походки, координации и чувствительности по ситуации.",
+            "Результаты прежних обследований полезно взять с собой.",
+            "МРТ, КТ и другие методы применяются для уточнения диагностических вопросов."
+          ]
+        }
+      ]
+    }
+  ],
+  "editorial_rewrite_provenance": {
+    "date": "2026-10-16",
+    "baseline": "758f0665968cc98961e88022ec741135d7fc85ad",
+    "public_name": "АртМед",
+    "scope": "Полный авторский рерайт 11 medical service MD: польза посещения, ход процедуры, получение результата, сервис и оснащение. Четыре H3, korotko и два followup-anchor; цены и условия offers не менялись.",
+    "fictional_clinic_boundary": "Публичная подача АртМед согласована владельцем. Клиника и её организационные стандарты вымышлены; источник не подтверждает существование АртМед, реальный штат, доступность записи, работу лаборатории или соблюдение сроков. Медицинские свойства проверяются по отдельным источникам, сервисные числа придуманы для этого pack.",
+    "successfully_reopened_urls": [
+      "https://www.smclinic.ru/professional-services/diagnostika-v-otolaringologii/issledovanie-endoskopicheskoe-lor-organov/",
+      "https://www.smclinic.ru/professional-services/promyvanie-nosa-metodom-peremescheniya/",
+      "https://www.smclinic.ru/diagnosis/funktsionalnaya-diagnostika/ekg-elektrokardiografiya/",
+      "https://www.smclinic.ru/analizy/zhidkostnaya-tsitologiya-sheyki-matki-i-vpch-test/",
+      "https://www.smclinic.ru/doctors/otolaringolog-lor.html",
+      "https://medsi.ru/services/priem-terapevta/",
+      "https://www.smdoctor.ru/doctors/pediatr/",
+      "https://volgograd.medsi.ru/services/section-ginekologiya/",
+      "https://www.smclinic.ru/doctors/urolog.html",
+      "https://perm.medsi.ru/services/priem-kardiologa/",
+      "https://spb.medsi.ru/services/priyem-nevrologa/"
+    ],
+    "additional_successfully_opened_urls": [
+      "https://www.nhs.uk/tests-and-treatments/electrocardiogram/",
+      "https://www.uhs.nhs.uk/Media/UHS-website-2019/Patientinformation/Heartandlungs/Electrocardiogram-ECG-2810-PIL.pdf",
+      "https://www.nhs.uk/tests-and-treatments/cervical-screening/what-is-cervical-screening/",
+      "https://www.nhs.uk/tests-and-treatments/cervical-screening/your-results/",
+      "https://www.nhs.uk/conditions/heart-attack/"
+    ],
+    "clinical_timing": [
+      {
+        "service_id": "ent_endoscopy",
+        "claim": "Обычно 10–15 минут на эндоскопическое исследование.",
+        "source_url": "https://www.smclinic.ru/professional-services/diagnostika-v-otolaringologii/issledovanie-endoskopicheskoe-lor-organov/",
+        "observed_basis": "В разделе техники проведения указана типичная длительность 10–15 минут; это время процедуры, а не срок установления окончательного диагноза."
+      },
+      {
+        "service_id": "nasal_lavage",
+        "claim": "Около 10 минут на промывание методом перемещения.",
+        "source_url": "https://www.smclinic.ru/professional-services/promyvanie-nosa-metodom-peremescheniya/",
+        "observed_basis": "На странице метода указана длительность 10 минут; численность курса из источника не переносилась."
+      },
+      {
+        "service_id": "ecg",
+        "claim": "Около 10 минут на обычную ЭКГ.",
+        "source_urls": [
+          "https://www.smclinic.ru/diagnosis/funktsionalnaya-diagnostika/ekg-elektrokardiografiya/",
+          "https://www.uhs.nhs.uk/Media/UHS-website-2019/Patientinformation/Heartandlungs/Electrocardiogram-ECG-2810-PIL.pdf"
+        ],
+        "observed_basis": "Оба материала указывают типичную длительность пять–десять минут."
+      }
+    ],
+    "invented_service_standards": [
+      {
+        "service_ids": [
+          "ent_consultation",
+          "therapist_consultation",
+          "urology_consultation"
+        ],
+        "facts": [
+          "Первичная консультация: 40 минут.",
+          "Письменное заключение и план выдаются после приёма."
+        ]
+      },
+      {
+        "service_ids": [
+          "pediatric_consultation",
+          "gynecology_consultation",
+          "cardiology_consultation",
+          "neurology_consultation"
+        ],
+        "facts": [
+          "Первичная консультация: 45 минут.",
+          "Письменное заключение и план выдаются после приёма."
+        ]
+      },
+      {
+        "service_ids": [
+          "ent_consultation"
+        ],
+        "facts": [
+          "ЛОР-комбайн с направленным освещением, обычный осмотр в одном кабинете."
+        ]
+      },
+      {
+        "service_ids": [
+          "ent_endoscopy"
+        ],
+        "facts": [
+          "Выбранные изображения сохраняются вместе с описанием.",
+          "Протокол и выбранные снимки выдаются в день посещения."
+        ]
+      },
+      {
+        "service_ids": [
+          "nasal_lavage"
+        ],
+        "facts": [
+          "Контроль переносимости и назначения на каждом посещении.",
+          "Памятка после процедуры и возможность спокойно посидеть."
+        ]
+      },
+      {
+        "service_ids": [
+          "pediatric_consultation"
+        ],
+        "facts": [
+          "Игрушки для знакомства в кабинете.",
+          "Осмотр с участием родителя и объяснения по возрасту."
+        ]
+      },
+      {
+        "service_ids": [
+          "gynecology_consultation",
+          "urology_consultation"
+        ],
+        "facts": [
+          "Отдельное место для переодевания.",
+          "Объяснение и согласование деликатных этапов осмотра."
+        ]
+      },
+      {
+        "service_ids": [
+          "cardiology_consultation"
+        ],
+        "facts": [
+          "При варианте with_ecg запись обсуждается на той же встрече; кардиограмма и заключение выдаются вместе."
+        ]
+      },
+      {
+        "service_ids": [
+          "ecg"
+        ],
+        "facts": [
+          "Врачебная расшифровка и заключение в течение 20 минут после записи.",
+          "Время на спокойный отдых до процедуры."
+        ]
+      },
+      {
+        "service_ids": [
+          "cervical_screening"
+        ],
+        "facts": [
+          "Слот на посещение: 20 минут, включая оформление и объяснения.",
+          "Электронный результат цитологии: до 7 рабочих дней со дня взятия материала.",
+          "Электронный результат расширенного исследования: до 10 рабочих дней со дня взятия материала.",
+          "При дополнительной проверке материала пациенту сообщают новый срок."
+        ]
+      },
+      {
+        "service_ids": [
+          "neurology_consultation"
+        ],
+        "facts": [
+          "Свободная зона для проверки походки и движений в кабинете."
+        ]
+      }
+    ],
+    "medical_editorial_limits": "Не заимствованы гарантии излечения, абсолютной безопасности, неизбежного диагноза за визит, универсальная частота скрининга и число процедур. Английские интервалы и маршрутизация NHS не переносились в российский pack. Клиническая длительность процедуры отделена от вымышленных сроков выдачи документов и результатов АртМед."
+  }
+}

@@ -1,4 +1,4 @@
-"""Production readiness checks (read-only, no tenant data, no provider calls)."""
+"""Production readiness checks (read-only, no provider calls)."""
 from __future__ import annotations
 
 import os
@@ -10,9 +10,11 @@ from core.alibaba_openai_transport_policy import (
     validate_alibaba_chat_api_key,
     validate_alibaba_chat_base_url,
 )
-from core.client_config_loader import ExplicitPackClientIdError, require_existing_explicit_pack_client_id
-from core.client_runtime import client_md_dir
-from core.target_client_data import load_target_client_data
+from core.client_config_loader import ExplicitPackClientIdError, require_explicit_pack_client_id
+from core.d2_tenant_snapshot import (
+    d2_clients_root, load_d2_tenant_snapshot, build_d2_model_view,
+    validate_d2_authored_content_refs,
+)
 
 _FORBIDDEN_RUNTIME_CLIENT_IDS = frozenset({"default", "_template"})
 
@@ -24,10 +26,14 @@ def _invalid_allowed_client_id(client_id: str) -> str | None:
     if cid in _FORBIDDEN_RUNTIME_CLIENT_IDS:
         return "allowed_client_id_forbidden"
     try:
-        require_existing_explicit_pack_client_id(cid)
+        require_explicit_pack_client_id(cid)
     except ExplicitPackClientIdError:
         return "allowed_client_pack_missing"
-    md_dir = client_md_dir(cid)
+    clients_root = d2_clients_root().resolve()
+    pack_root = (clients_root / cid).resolve()
+    if pack_root.parent != clients_root:
+        return "allowed_client_pack_invalid"
+    md_dir = pack_root / "md"
     if not os.path.isdir(md_dir):
         return "allowed_client_pack_missing"
     try:
@@ -42,14 +48,17 @@ def _invalid_allowed_client_id(client_id: str) -> str | None:
         return "allowed_client_pack_invalid"
     try:
         from core.d2_usage_limits import load_usage_limits
-        load_usage_limits(cid)
+        load_usage_limits(cid, clients_root=clients_root)
     except (ValueError, OSError):
         return "allowed_client_usage_limits_invalid"
     try:
-        data = load_target_client_data(cid)
+        snapshot = load_d2_tenant_snapshot(cid, clients_root=clients_root)
+        build_d2_model_view(snapshot)
+        if validate_d2_authored_content_refs(snapshot):
+            return "allowed_client_pack_invalid"
     except Exception:
         return "allowed_client_pack_invalid"
-    if not data.bundle.services or not data.bundle.offers:
+    if not snapshot.bundle.services or not snapshot.bundle.offers:
         return "allowed_client_pack_invalid"
     return None
 

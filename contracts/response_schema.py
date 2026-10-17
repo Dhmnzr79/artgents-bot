@@ -1,8 +1,7 @@
-"""Target response-data authoring contracts (S1, offline and unwired).
+"""Validated client-owned response data for the D2 catalog and legacy tooling.
 
-These models describe future client-owned schema data and validate local references in
-memory. They do not load client packs, select content, read session state, or influence
-the product response path.
+Pure models validate data and local references in memory. They perform no pack I/O,
+dialogue selection, model calls or session-state access.
 """
 
 from __future__ import annotations
@@ -67,17 +66,8 @@ FactSourceRef = Annotated[SourceRef, AfterValidator(_require_fact_ref)]
 MoneyAmount = Annotated[StrictInt, Field(ge=0)]
 Priority = StrictInt
 
-ServiceFamily = Literal[
-    "diagnostics",
-    "therapy",
-    "endodontics",
-    "surgery",
-    "periodontology",
-    "implantology",
-    "prosthodontics",
-    "orthodontics",
-    "aesthetics",
-]
+# Clinic-owned taxonomy identifiers, not a built-in list of specialties.
+ServiceFamily = NonBlankStr
 ServiceRole = Literal["protocol", "advanced_protocol", "supporting"]
 SelectionMode = Literal["scope", "context", "direct"]
 PatientExtent = Literal["one_tooth", "few_teeth", "full_arch"]
@@ -88,16 +78,8 @@ PatientStage = Literal[
 ]
 PatientJaw = Literal["upper", "lower"]
 ReportedContext = Literal["reported_bone_deficit"]
-BillingUnit = Literal[
-    "tooth",
-    "implant",
-    "tooth_package",
-    "jaw",
-    "both_jaws",
-    "procedure",
-    "unit",
-    "course",
-]
+# The human-readable scope is authored in package.label.
+BillingUnit = NonBlankStr
 MarketingScenario = Literal[
     "pain_fear",
     "cost",
@@ -422,6 +404,7 @@ class TargetCommercialFact(TargetSchemaModel):
     active_until: IsoDate | None = None
     allowed_service_ids: list[NonBlankStr] = Field(default_factory=list)
     allowed_topics: list[NonBlankStr] = Field(default_factory=list)
+    allowed_offer_ids: list[NonBlankStr] = Field(default_factory=list)
     detail_ref: NonBlankStr | None = None
     incompatible_with: list[NonBlankStr] = Field(default_factory=list)
     requested_display_policy: RequestedDisplayPolicy | None = None
@@ -432,6 +415,8 @@ class TargetCommercialFact(TargetSchemaModel):
     def _fact_invariants(self) -> "TargetCommercialFact":
         if _duplicates(self.allowed_service_ids):
             raise ValueError("fact_allowed_service_duplicate")
+        if _duplicates(self.allowed_offer_ids):
+            raise ValueError("fact_allowed_offer_duplicate")
         if _duplicates(self.allowed_topics):
             raise ValueError("fact_allowed_topic_duplicate")
         if _duplicates(self.incompatible_with):
@@ -746,6 +731,13 @@ class ResponseDataCatalog(TargetSchemaModel):
         for fact in self.facts.values():
             if any(service_id not in self.services for service_id in fact.allowed_service_ids):
                 raise ValueError("bundle_fact_service_missing")
+            for offer_id in fact.allowed_offer_ids:
+                offer = next((item for item in self.offers if item.offer_id == offer_id), None)
+                if offer is None:
+                    raise ValueError("bundle_fact_offer_missing")
+                if (offer.service_id not in fact.allowed_service_ids
+                        or offer.service_id in fact.excluded_service_ids):
+                    raise ValueError("bundle_fact_offer_service_mismatch")
             if any(fact_id not in self.facts for fact_id in fact.incompatible_with):
                 raise ValueError("bundle_fact_incompatible_missing")
 

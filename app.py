@@ -32,7 +32,6 @@ from core.widget_cors import (
     widget_cors_preflight_response,
 )
 from core.video_catalog_loader import catalog_for_widget, get_external_video_src
-from lead_service import handle_lead
 from logging_setup import LOG_FILE, get_logger, log_json, make_request_context
 from session import (
     bind_client_id,
@@ -155,6 +154,7 @@ def _clear_session_client_binding_teardown(exc):
 
 @app.after_request
 def _after(resp):
+    if request.path=='/api/widget-session':resp.headers['Cache-Control']='no-store'
     if request.path.startswith("/dashboard") or _is_health_probe_path():
         return resp
     latency = int((time.time() - request.ctx["t0"]) * 1000)
@@ -511,6 +511,25 @@ def static_files(path):
     return send_from_directory("static", path)
 
 
+@app.get("/api/widget-catalog")
+def api_widget_catalog():
+    from datetime import datetime, timezone
+    from core.d2_tenant_snapshot import load_d2_tenant_snapshot, d2_clients_root
+    from core.widget_catalog import build_widget_catalog
+    client_id = resolve_request_client_id(request.args.get("client_id"), host=request.host)
+    if client_id is None:
+        return jsonify({"error":"unknown_client"}), 403
+    blocked = _widget_origin_forbidden(client_id)
+    if blocked:
+        return blocked
+    try:
+        snapshot = load_d2_tenant_snapshot(client_id,clients_root=d2_clients_root())
+        result = build_widget_catalog(snapshot,as_of=datetime.now(timezone.utc).date())
+    except ValueError:
+        return jsonify({"error":"widget_catalog_invalid"}), 400
+    return jsonify(result)
+
+
 @app.post("/lead")
 def create_lead():
     data = _bounded_widget_payload()
@@ -523,13 +542,53 @@ def create_lead():
     if blocked:
         body, status = blocked
         return body, status
-    data["client_id"] = client_id
-    sid = sid_from_body(data)
-    data["sid"] = sid
-    data["request_id"] = request.ctx.get("request_id")
-    _bind_chat_ctx(sid, client_id)
-    payload, status = handle_lead(data, client_id=client_id)
-    return jsonify(payload), status
+    # The private body never enters dialogue/full-audit logging or model input.
+    from core.d2_booking_form import submit_booking_form
+    try:
+        payload = submit_booking_form(data,client_id=client_id,peer_ip=request.remote_addr)
+        return jsonify(payload), 200
+    except D2RequestIdConflict:
+        return jsonify({"ok":False,"error_code":"request_conflict"}), 409
+    except D2RequestInProgress:
+        return jsonify({"ok":False,"error_code":"submission_pending"}), 409
+    except ClientUsageLimitReached as exc:
+        return jsonify({"ok":False,"error_code":exc.code}), 429, {"Retry-After":str(exc.retry_after)}
+    except ValueError as exc:
+        safe_codes = {"bad_phone","lead_consent_required","lead_consent_changed","lead_consent_not_configured",
+                      "catalog_changed","form_service_unavailable","form_offer_unavailable"}
+        code = str(exc) if str(exc) in safe_codes else "bad_request"
+        return jsonify({"ok":False,"error_code":code}), 400
+
+
+@app.get("/api/booking-form")
+def api_booking_form():
+    from core.d2_booking_form import booking_form_definition
+    client_id = resolve_request_client_id(request.args.get("client_id"),host=request.host)
+    if client_id is None:
+        return jsonify({"error":"unknown_client"}), 403
+    blocked = _widget_origin_forbidden(client_id)
+    if blocked:return blocked
+    try:
+        return jsonify(booking_form_definition(client_id))
+    except ValueError:
+        return jsonify({"error":"lead_consent_not_configured"}), 400
+
+
+@app.post('/api/widget-session')
+def api_widget_session():
+    from core.widget_session import widget_session
+    data=_bounded_widget_payload()
+    if not isinstance(data,dict):return jsonify({'error':'invalid_request'}),400
+    client_id=resolve_request_client_id(data.get('client_id'),host=request.host)
+    if client_id is None:return jsonify({'error':'unknown_client'}),403
+    blocked=_widget_origin_forbidden(client_id)
+    if blocked:return blocked
+    try:
+        response=jsonify(widget_session(client_id,data))
+    except ValueError:
+        response=jsonify({'error':'widget_session_invalid'});response.status_code=400
+    response.headers['Cache-Control']='no-store'
+    return response
 
 
 if __name__ == "__main__":

@@ -1,0 +1,9 @@
+leads:
+  enabled: false
+  mode: demo_stub
+admin:
+  enabled: false
+postgres_events:
+  enabled: false
+ingress:
+  strict: true

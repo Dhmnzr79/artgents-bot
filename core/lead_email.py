@@ -83,6 +83,7 @@ def _build_body(
     sid: str,
     request_id: str,
     captured_at: str,
+    selection: dict | None = None,
 ) -> str:
     clinic = _clinic_name(client_id)
     lines = [
@@ -101,6 +102,11 @@ def _build_body(
         f"request_id: {request_id or '—'}",
         f"Время (UTC): {captured_at}",
     ]
+    if selection:
+        lines[6:6] = [f"Услуга: {selection.get('service_name') or '—'}",
+                      f"Вариант: {selection.get('variant_name') or 'Уточнить с администратором'}",
+                      f"service_id: {selection.get('service_id')}",
+                      f"offer_id: {selection.get('offer_id') or '—'}"]
     return "\n".join(lines)
 
 
@@ -134,6 +140,7 @@ def send_lead_email(
     sid: str,
     request_id: str,
     captured_at: str,
+    selection: dict | None = None,
 ) -> tuple[bool, str]:
     """Send lead email. Returns (ok, delivery_status for PG/admin)."""
     if not smtp_configured():
@@ -174,6 +181,7 @@ def send_lead_email(
             sid=sid,
             request_id=request_id,
             captured_at=captured_at,
+            selection=selection,
         )
     )
 

@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from contracts.response_plan_materialization import D2PublishedOfferTerms
 from contracts.response_schema import TargetOffer
-from core.response_plan_condition_evidence import materialization_price_scope_label
 
 
 def build_d2_published_offer_terms(*, offer: TargetOffer, source_client_id: str) -> D2PublishedOfferTerms:
     """Keep every explicit published term without inventing any absent condition."""
     terms: list[str] = []
-    scope = materialization_price_scope_label(offer)
+    scope = (offer.package.price_scope_label or "").strip()
     if scope and scope != offer.package.label:
         terms.append(scope)
     terms.extend(item for item in offer.package.includes if item != offer.package.label)

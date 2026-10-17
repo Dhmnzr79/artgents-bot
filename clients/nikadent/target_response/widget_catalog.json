@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "client_id": "nikadent",
+  "unpriced_text": "Стоимость уточнит администратор",
+  "sections": [
+    {
+      "section_id": "implantation",
+      "title": "Имплантация",
+      "service_ids": [
+        "classic",
+        "one_stage",
+        "all_on_4",
+        "all_on_6",
+        "sinus_lift",
+        "bone_graft"
+      ],
+      "subtitle": "Один зуб или вся челюсть"
+    },
+    {
+      "section_id": "prosthetics",
+      "title": "Протезирование",
+      "service_ids": [
+        "prosthetics_consultation",
+        "metal_ceramic_crowns",
+        "zirconia_crowns",
+        "core_inlay",
+        "removable_dentures",
+        "clasp_dentures",
+        "implant_supported_prosthetics",
+        "denture_repair",
+        "fixed_bridge",
+        "temporary_denture",
+        "denture_reline"
+      ],
+      "subtitle": "Коронки и восстановление зубов"
+    },
+    {
+      "section_id": "treatment",
+      "title": "Лечение зубов и дёсен",
+      "service_ids": [
+        "caries",
+        "teeth_treatment",
+        "pulpitis",
+        "periodontitis",
+        "tooth_extraction"
+      ],
+      "subtitle": "Сохранение собственных зубов"
+    },
+    {
+      "section_id": "restoration",
+      "title": "Эстетика и реставрация",
+      "service_ids": [
+        "veneers",
+        "ceramic_inlays",
+        "tooth_restoration",
+        "emax_crowns"
+      ],
+      "subtitle": "Форма и эстетика улыбки"
+    },
+    {
+      "section_id": "hygiene",
+      "title": "Гигиена",
+      "service_ids": [
+        "teeth_cleaning"
+      ],
+      "subtitle": "Профессиональный уход"
+    }
+  ],
+  "label": "Стоматология",
+  "service_subtitles": {
+    "classic": "Восстановление зуба с опорой на имплант",
+    "one_stage": "Удаление зуба и установка импланта за один приём",
+    "all_on_4": "Несъёмные зубы всей челюсти на четырёх имплантах",
+    "all_on_6": "Несъёмные зубы всей челюсти на шести имплантах",
+    "sinus_lift": "Увеличение объёма кости на верхней челюсти",
+    "bone_graft": "Подготовка костной ткани к установке импланта",
+    "prosthetics_consultation": "Выбор способа восстановления зубов и план лечения",
+    "metal_ceramic_crowns": "Коронки с керамическим покрытием на металлическом каркасе",
+    "zirconia_crowns": "Прочные безметалловые коронки",
+    "core_inlay": "Опора под коронку при сильном разрушении зуба",
+    "removable_dentures": "Восстановление нескольких зубов или всей челюсти",
+    "clasp_dentures": "Съёмный протез на тонком металлическом каркасе",
+    "implant_supported_prosthetics": "Коронки и протезы с опорой на импланты",
+    "denture_repair": "Восстановление повреждённого съёмного протеза",
+    "fixed_bridge": "Замена отсутствующих зубов с опорой на соседние",
+    "temporary_denture": "Замена одного–трёх зубов на время лечения",
+    "denture_reline": "Коррекция посадки уже изготовленного протеза",
+    "caries": "Лечение повреждённых тканей и восстановление пломбой",
+    "teeth_treatment": "Диагностика и восстановление повреждённых зубов",
+    "pulpitis": "Лечение корневых каналов для сохранения зуба",
+    "periodontitis": "Лечение воспаления дёсен и тканей вокруг зубов",
+    "tooth_extraction": "Удаление зуба под местной анестезией",
+    "veneers": "Коррекция цвета и формы передних зубов",
+    "ceramic_inlays": "Восстановление жевательной поверхности зуба",
+    "tooth_restoration": "Восстановление формы и цвета зуба",
+    "emax_crowns": "Эстетичные безметалловые коронки из керамики",
+    "teeth_cleaning": "Удаление зубного камня, налёта и полировка"
+  },
+  "show_sections": true,
+  "offer_groups": {
+    "removable_dentures": [
+      {
+        "title": "Пластиночные протезы",
+        "offer_ids": [
+          "removable_dentures.jaw.partial",
+          "removable_dentures.jaw.full"
+        ]
+      },
+      {
+        "title": "Другие материалы",
+        "offer_ids": [
+          "removable_dentures.jaw.nylon",
+          "removable_dentures.jaw.acry_free"
+        ]
+      }
+    ]
+  }
+}

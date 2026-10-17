@@ -1,0 +1,41 @@
+{
+  "offer_id": "pediatric_consultation.primary",
+  "service_id": "pediatric_consultation",
+  "option_id": "primary",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "visit",
+    "amount": 3200
+  },
+  "package": {
+    "label": "за один первичный приём",
+    "includes": [
+      "Обсуждение жалоб и истории обращения",
+      "Осмотр ребёнка с участием законного представителя",
+      "Разбор предоставленных результатов",
+      "Письменное заключение и дальнейший план"
+    ],
+    "excludes": [
+      "Вакцинация",
+      "Анализы и УЗИ",
+      "Специальные комплекты справок и осмотры других специалистов"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
+}

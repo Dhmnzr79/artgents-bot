@@ -1,0 +1,42 @@
+{
+  "offer_id": "photorejuvenation.face",
+  "service_id": "photorejuvenation",
+  "option_id": "face",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "zone",
+    "amount": 8900
+  },
+  "package": {
+    "label": "за одну IPL-процедуру лица",
+    "includes": [
+      "Осмотр и подбор параметров врачом",
+      "Подготовка кожи",
+      "Обработка лица",
+      "Завершающий уход и памятка"
+    ],
+    "excludes": [
+      "Шея, декольте и веки",
+      "Удаление образований кожи",
+      "Другие аппаратные процедуры"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope",
+    "demo_cosmetic_control"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
+}

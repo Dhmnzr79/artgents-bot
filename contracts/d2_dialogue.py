@@ -14,9 +14,16 @@ from contracts.response_plan import ResponsePlanModel
 from contracts.lead_consent import LeadConsentReceipt
 from contracts.response_plan_materialization import D2SelectedDocumentAction, MaterializedResponseOutcome
 from contracts.response_plan_session import D2SelectedUiRef
+from contracts.response_plan_session import D2DialogueReceiptRef
+
+
+class D2EntryPageContext(ResponsePlanModel):
+    path: str
+    topic_id: str
 
 
 class D2DialogueRecord(ResponsePlanModel):
+    entry_page_context: D2EntryPageContext | None = None
     state: D2SessionState
     activity: D2SessionActivity
     tenant_fingerprint: str
@@ -54,6 +61,7 @@ class D2ProviderInput:
     user_message: str
     model_view: D2ModelView
     context: D2SessionContextProjection
+    entry_page_context: D2EntryPageContext | None = None
     selected_ui_ref: D2SelectedUiRef | None = None
     selected_document_action: D2SelectedDocumentAction | None = None
     known_task: D2ExplanationTask | None = None
@@ -97,6 +105,8 @@ class D2CompletedTurn(ResponsePlanModel):
     lead_effect: D2LeadEffect = D2LeadEffect()
     consent_receipt: LeadConsentReceipt | None = None
     lead_consent_request_id: str | None = None
+    dialogue_ref: D2DialogueReceiptRef | None = None
+    catalog_version: str | None = None
 
     @model_validator(mode="after")
     def _validate_identity(self) -> Self:
@@ -104,6 +114,8 @@ class D2CompletedTurn(ResponsePlanModel):
             raise ValueError("d2_request_id_required")
         if not self.request_fingerprint.strip():
             raise ValueError("d2_request_fingerprint_required")
+        if self.dialogue_ref is not None and self.dialogue_ref.request_id != self.request_id:
+            raise ValueError('d2_dialogue_ref_owner_mismatch')
         if self.committed_revision < 1:
             raise ValueError("d2_committed_revision_invalid")
         if self.consent_receipt is not None:
@@ -122,3 +134,4 @@ class D2DialogueTurn:
     request_id: str
     idempotent_replay: bool = False
     lead_effect: D2LeadEffect = D2LeadEffect()
+    catalog_version: str | None = None

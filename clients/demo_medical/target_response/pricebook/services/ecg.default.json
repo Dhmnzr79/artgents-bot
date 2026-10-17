@@ -1,0 +1,41 @@
+{
+  "offer_id": "ecg.default",
+  "service_id": "ecg",
+  "option_id": "default",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "procedure",
+    "amount": 1400
+  },
+  "package": {
+    "label": "за одну запись ЭКГ в покое в 12 отведениях",
+    "includes": [
+      "Подготовка к записи и установка электродов",
+      "Запись ЭКГ",
+      "Врачебная расшифровка",
+      "Копия кардиограммы и заключение"
+    ],
+    "excludes": [
+      "Полноценная консультация кардиолога",
+      "Нагрузочные пробы",
+      "Длительное мониторирование"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
+}

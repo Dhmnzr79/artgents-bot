@@ -16,6 +16,7 @@ from core.d2_dialogue_store import D2DialogueStore, D2RequestIdConflict, D2Reque
 from core.d2_live_provider import D2HttpProvider
 from core.d2_demo_limits import admit_demo_call
 from core.d2_usage_limits import ClientUsageAdmission, load_usage_limits, visitor_bucket
+from core.d2_tenant_snapshot import d2_clients_root
 from session import (
     bind_session_client, capture_lead_session_row, restore_lead_session_row, sid_from_body,
 )
@@ -26,10 +27,6 @@ def _store_path(client_id: str) -> Path:
     if configured:
         return Path(configured)
     return Path(per_client_data_dir(client_id)) / "d2_dialogue.sqlite"
-
-
-def _clients_root() -> Path:
-    return Path(os.getenv("D2_CLIENTS_ROOT") or Path(__file__).resolve().parents[1] / "clients")
 
 
 def _response_payload(turn, *, session_key: SessionKey) -> dict:
@@ -50,6 +47,7 @@ def _response_payload(turn, *, session_key: SessionKey) -> dict:
             "video": ui["video"],
         },
         "revision": turn.committed_revision,
+        "catalog_version": turn.catalog_version,
         "lead_effect": turn.lead_effect.model_dump(mode="json"),
     }
 
@@ -67,12 +65,18 @@ def _audit_lead_after(sid: str, *, phase: str) -> None:
 
 def run_d2_ask_json(data: dict, *, client_id: str, peer_ip: str | None = None) -> dict:
     diagnostics.stage("request")
-    supported = {"client_id", "sid", "request_id", "q", "ref", "ui_revision", "visitor_id"}
+    supported = {"client_id", "sid", "request_id", "q", "ref", "ui_revision", "visitor_id", "entry_page_path"}
     if set(data) - supported:
         raise ValueError("d2_unsupported_request_fields")
     for name in ("sid", "ref"):
         if name in data and data[name] is not None and not isinstance(data[name], str):
             raise ValueError("d2_request_field_invalid")
+    if 'entry_page_path' in data:
+        from contracts.widget_config import WidgetPageMenuV1
+        path_value = data['entry_page_path']
+        if not isinstance(path_value,str) or len(path_value)>512:
+            raise ValueError('entry_page_path_invalid')
+        WidgetPageMenuV1._exact_paths([path_value])
     if data.get("ref") is not None and not data["ref"].strip():
         raise ValueError("d2_stale_or_unsupported_ref")
     if data.get("ref"):
@@ -91,7 +95,7 @@ def run_d2_ask_json(data: dict, *, client_id: str, peer_ip: str | None = None) -
     user_message = data.get("q") or ""
     if not isinstance(user_message, str):
         raise ValueError("d2_question_invalid")
-    limits = load_usage_limits(client_id, clients_root=_clients_root())
+    limits = load_usage_limits(client_id, clients_root=d2_clients_root())
     visitor_bucket(data.get("visitor_id"), peer_ip)
     if limits and len(user_message) > limits.message_max_chars:
         raise ValueError("message_too_long")
@@ -115,9 +119,9 @@ def run_d2_ask_json(data: dict, *, client_id: str, peer_ip: str | None = None) -
                 session_key=key,
                 user_message=user_message,
                 provider=D2HttpProvider(admission=lambda: admit_demo_call(
-                    store._connection, sid=sid, peer_ip=peer_ip,
-                )) if client_id == "demo" else D2HttpProvider(admission=usage.model if usage else None),
-                clients_root=_clients_root(),
+                    store._connection, sid=sid, peer_ip=peer_ip,client_id=client_id,
+                )) if client_id in {"demo","demo_medical"} else D2HttpProvider(admission=usage.model if usage else None),
+                clients_root=d2_clients_root(),
                 store=store,
                 now=datetime.now(timezone.utc),
                 request_id=request_id,
@@ -125,6 +129,7 @@ def run_d2_ask_json(data: dict, *, client_id: str, peer_ip: str | None = None) -
                 ui_revision=data.get("ui_revision"),
                 lead_bridge=True,
                 usage_admission=usage,
+                entry_page_path=data.get('entry_page_path'),
             )
         except (D2RequestIdConflict, D2RequestInProgress) as exc:
             diagnostics.failure(exc)

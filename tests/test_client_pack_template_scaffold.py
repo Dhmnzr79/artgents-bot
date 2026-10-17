@@ -44,8 +44,7 @@ def test_template_has_canonical_structure() -> None:
     required = [
         "target_response/service_catalog.json",
         "target_response/brand_catalog.json",
-        "target_response/marketing.yaml",
-        "target_response/clinic_strategy.yaml",
+        "target_response/d2_commercial.json",
         "target_response/pricebook/facts.json",
         "target_response/pricebook/services/sample_service.default.json",
         "doctor_catalog.json",
@@ -61,3 +60,5 @@ def test_template_has_canonical_structure() -> None:
     ]
     for rel in required:
         assert (_TEMPLATE / rel).is_file(), rel
+    for legacy in ("marketing.yaml", "clinic_strategy.yaml"):
+        assert not (_TEMPLATE / "target_response" / legacy).exists()

@@ -113,6 +113,7 @@ button.clinic-price-card__overview-row { cursor:pointer; }
 .clinic-booking__heading .clinic-catalog__eyebrow { text-transform:uppercase; }
 .clinic-booking__note { color:var(--clinic-text-soft);font-size:var(--clinic-font-eyebrow);line-height:1.5;margin:12px 0 0; }
 .clinic-booking__field { display:block;margin:20px 0;font-size:var(--clinic-font-small);line-height:1.43;color:var(--clinic-text-soft); }
+.clinic-booking__field:first-child { margin-top:0; }
 .clinic-booking__field input,.clinic-booking__field select,.clinic-booking__field textarea { display:block;width:100%;min-width:0;min-height:48px;margin-top:8px;padding:12px;border:1px solid #d9d9d9;border-radius:10px;background:#fff;color:var(--clinic-text);font:inherit;font-size:var(--clinic-font-main);line-height:1.5;outline-offset:3px; }
 .clinic-booking__field textarea { min-height:96px;resize:vertical; }
 .clinic-booking__field input:focus,.clinic-booking__field select:focus,.clinic-booking__field textarea:focus { outline:2px solid var(--clinic-brand); }

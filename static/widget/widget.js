@@ -847,8 +847,8 @@ export function mountWidget(root, config, { pagePath } = {}) {
           <div class="clinic-shell__feed" role="tabpanel" aria-label="Помощник" data-clinic-feed></div>
           <section class="clinic-shell__tab-panel" role="tabpanel" aria-label="Услуги и цены" data-clinic-catalog-panel hidden><div data-clinic-catalog></div></section>
           <section class="clinic-shell__tab-panel" role="tabpanel" aria-label="Запись" data-clinic-booking-panel hidden>
-            <div class="clinic-catalog__heading clinic-booking__heading"><span class="clinic-catalog__eyebrow">Давайте познакомимся</span><h2 class="clinic-catalog__title">Начнём с обращения</h2><p>Оставьте контакты. Администратор свяжется с вами и поможет согласовать время приёма.</p></div>
-            <div data-clinic-booking></div><p class="clinic-booking__note">Можно пока не выбирать услугу — поможем разобраться.</p>
+            <div class="clinic-catalog__heading clinic-booking__heading"><h2 class="clinic-catalog__title">Запись на приём</h2><p>Оставьте имя и телефон — администратор свяжется с вами и согласует время приёма.</p></div>
+            <div data-clinic-booking></div>
           </section>
         </main>
         <form class="clinic-shell__composer" data-clinic-composer-form>

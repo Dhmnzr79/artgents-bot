@@ -30,7 +30,7 @@ _TEMPLATE = _REPO / "clients" / "_template"
 
 _DEMO_VISUAL = {
     "botName": "Надежда",
-    "onlineLabel": "ИИ-консультант клиники. Онлайн 24/7",
+    "onlineLabel": "сейчас онлайн",
     "launcherSubtitle": "Демо ИИ-консультанта клиники",
     "launcherCtaLabel": "Посмотреть демо",
     "launcherTeaser": False,
@@ -75,7 +75,7 @@ def test_nikadent_presentation_valid_v1() -> None:
     out = validate_widget_presentation_document(raw, client_id="nikadent")
     assert out["botName"] == "Ольга"
     assert out["demoLauncher"] is False
-    assert "НикаДент" in out["welcomeText"]
+    assert out["welcomeText"] == "Помогу разобраться в услугах, ценах и врачах."
     assert len(out["starterPrompts"]) == 3
     assert len(out["pageMenus"]) == 3
 

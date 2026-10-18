@@ -8,20 +8,31 @@
     "render_mode": "natural",
     "active": true,
     "allowed_service_ids": [
+      "classic",
+      "one_stage",
+      "all_on_4",
+      "all_on_6",
+      "sinus_lift",
+      "bone_graft",
+      "metal_ceramic_crowns",
+      "zirconia_crowns",
+      "veneers",
+      "core_inlay",
+      "ceramic_inlays",
       "prosthetics_consultation",
       "removable_dentures",
       "clasp_dentures",
       "implant_supported_prosthetics",
-      "zirconia_crowns",
-      "metal_ceramic_crowns",
+      "denture_repair",
       "fixed_bridge",
-      "core_inlay",
-      "all_on_4",
-      "all_on_6"
+      "emax_crowns",
+      "temporary_denture",
+      "denture_reline"
     ],
     "allowed_topics": [
       "prosthetics",
-      "implantation"
+      "implantation",
+      "restoration"
     ],
     "incompatible_with": []
   },
@@ -29,7 +40,7 @@
     "id": "tax_deduction",
     "kind": "benefit",
     "catalog_label": "Налоговый вычет за лечение",
-    "text_fact": "Помощь в получении налогового вычета 13%.",
+    "text_fact": "Подготовим документы об оплате лечения для оформления налогового вычета.",
     "render_mode": "strict",
     "active": true,
     "allowed_service_ids": [

@@ -51,5 +51,7 @@ def test_results_published_cta_starts_existing_lead_without_model(http_env):
     assert buttons and buttons[0]["source_client_id"] == "demo"
     started = call(client, request_id="booking", q="",
                    ref=f"button:{buttons[0]['button_id']}", ui_revision=first["revision"])
-    assert "Как к вам обращаться" in started["answer"]
+    assert started["ui"]["booking_form"] is True
+    assert started["ui"]["lead_consent"] is None
+    assert not started["ui"]["quick_replies"]
     assert len(wire.calls) == 1

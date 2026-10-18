@@ -275,7 +275,7 @@ def test_core_inlay_known_volume_retains_unit_price_and_crown_exclusion(http_env
                 q=f"Сколько стоит культевая вкладка на {count} зуба?")
     row, = rows(body)
     assert (row["offer_id"], row["min_amount"], row["billing_unit"]) == ("core_inlay.default", 7000, "tooth")
-    assert "Стоимость коронки оплачивается отдельно." in row["condition_texts"]
+    assert "Стоимость коронки оплачивается отдельно." in row["excludes"]
     assert "21 000" not in body["answer"].replace("\u00a0", " ")
 
 

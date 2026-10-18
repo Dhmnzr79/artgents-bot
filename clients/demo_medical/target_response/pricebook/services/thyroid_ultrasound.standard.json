@@ -24,7 +24,8 @@
   },
   "fact_refs": [
     "demo_price_before_action",
-    "demo_fixed_package_scope"
+    "demo_fixed_package_scope",
+    "demo_ultrasound_10"
   ],
   "followups": [
     {

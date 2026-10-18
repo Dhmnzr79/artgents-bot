@@ -15,6 +15,7 @@ from tests.d2_ci_http import http_env, click
 from tests.test_d2_http_contract import post, post_sse, sse_events
 from tests.test_d2_native_price_runtime import Transport, message, price
 from tests.test_d2_price_cards import cards
+from tests.test_widget_booking_form import form_payload
 
 VISITOR = "a" * 32
 OTHER = "b" * 32
@@ -114,10 +115,12 @@ def test_quota_contacts_booking_and_free_replay(http_env, monkeypatch, transport
     cta = next(b for b in limited["ui"]["buttons"] if b["action_kind"] == "cta")
     consent = click(client, limited, "button:" + cta["button_id"], client_id="nikadent",
         sid="new-chat", request_id="book", transport=transport, visitor_id=VISITOR)
-    assert consent["ui"]["lead_consent"]
-    named = click(client, consent, "lead:consent_accept", client_id="nikadent", sid="new-chat",
-        request_id="accept", transport=transport, visitor_id=VISITOR)
-    assert named["ui"]["lead_consent"] is None
+    assert consent["ui"]["booking_form"] is True
+    assert consent["ui"]["lead_consent"] is None
+    assert not consent["ui"]["quick_replies"]
+    replay = click(client, limited, "button:" + cta["button_id"], client_id="nikadent",
+        sid="new-chat", request_id="book", transport=transport, visitor_id=VISITOR)
+    assert replay == consent
     assert len(calls.calls) == 1 and count(db, "question") == 1
 
 
@@ -193,7 +196,7 @@ def test_three_leads_hour_and_no_fourth_delivery(http_env, monkeypatch, transpor
     def handle(*args, **kw):
         smtp.append(args)
         return {"delivery":"email"},200
-    monkeypatch.setattr("core.d2_lead_bridge.handle_lead",handle)
+    monkeypatch.setattr("core.d2_booking_form.handle_lead",handle)
     first=send(client,transport,sid="consume",request_id="ai",q="Расскажите о клинике")
     for i in range(4):
         sid=f"booking-{i}"
@@ -201,12 +204,14 @@ def test_three_leads_hour_and_no_fourth_delivery(http_env, monkeypatch, transpor
         cta=next(b for b in body["ui"]["buttons"] if b["action_kind"]=="cta")
         body=click(client,body,"button:"+cta["button_id"],client_id="nikadent",sid=sid,
                    request_id="book",transport=transport,visitor_id=VISITOR)
-        body=click(client,body,"lead:consent_accept",client_id="nikadent",sid=sid,
-                   request_id="accept",transport=transport,visitor_id=VISITOR)
-        send(client,transport,sid=sid,request_id="name",q="Анна")
-        body=send(client,transport,sid=sid,request_id="phone",q="+79001234567")
-        assert body["lead_effect"]["status"] == ("sent" if i<3 else "failed")
-        assert send(client,transport,sid=sid,request_id="phone",q="+79001234567") == body
+        assert body["ui"]["booking_form"] is True and not body["ui"]["quick_replies"]
+        payload = form_payload(client, tenant="nikadent", sid=sid, request_id="submit", visitor_id=VISITOR)
+        result = client.post("/lead", json=payload)
+        if i < 3:
+            assert result.status_code == 200 and result.get_json()["status"] == "sent"
+            assert client.post("/lead", json=payload).get_json() == result.get_json()
+        else:
+            assert result.status_code == 429 and result.get_json()["error_code"] == "visitor_lead_limit"
     assert len(smtp)==3 and count(db,"lead")==3 and count(db,"model")==1
 
 

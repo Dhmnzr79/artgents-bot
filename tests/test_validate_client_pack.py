@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.d2_ci_http import bind_copied_tenant
+
 import subprocess
 import sys
 from pathlib import Path
@@ -62,6 +64,7 @@ def test_validator_rejects_enabled_real_leads_without_valid_consent(tmp_path, br
     import yaml
     pack = tmp_path / "clinic"
     shutil.copytree(_TEMPLATE, pack)
+    bind_copied_tenant(pack, 'clinic')
     features = yaml.safe_load((pack / "features.yaml").read_text(encoding="utf-8"))
     features["leads"]["enabled"] = True
     (pack / "features.yaml").write_text(yaml.safe_dump(features), encoding="utf-8")
@@ -76,6 +79,7 @@ def test_validator_accepts_enabled_real_leads_with_consent(tmp_path):
     import yaml
     pack = tmp_path / "clinic"
     shutil.copytree(_TEMPLATE, pack)
+    bind_copied_tenant(pack, 'clinic')
     (pack / "features.yaml").write_text("leads:\n  enabled: true\n  mode: email\n", encoding="utf-8")
     config = yaml.safe_load((pack / "lead_config.yaml").read_text(encoding="utf-8"))
     config["consent"] = {"version": "v1", "checkbox_text": "Agree",
@@ -89,6 +93,7 @@ def test_validator_rejects_unbound_document_cta(tmp_path):
     import shutil
     pack = tmp_path / "clinic"
     shutil.copytree(_TEMPLATE, pack)
+    bind_copied_tenant(pack, 'clinic')
     (pack / "md/sample__service__example.md").write_text(
         "---\ntopic: general\ncta_action: lead\ncta_key: unknown\n---\n# Sample\n", encoding="utf-8")
     assert "md/sample__service__example.md: cta_key_missing_in_tone" in validate_client_pack(pack)

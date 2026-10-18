@@ -42,7 +42,7 @@ def test_catalog_actual_endpoint_is_read_only_and_complete(http_env,monkeypatch,
     assert {s['service_id']:s['subtitle'] for s in data['services']}==authored['service_subtitles']
 
 
-def test_catalog_exact_price_and_offer_promo_scope(http_env,monkeypatch):
+def test_catalog_exact_price_and_service_promo_scope(http_env,monkeypatch):
     admit_medical(http_env,monkeypatch)
     data=http_env[0].get('/api/widget-catalog?client_id=demo_medical').get_json()
     service=next(s for s in data['services'] if s['service_id']=='laser_hair_removal')
@@ -50,9 +50,12 @@ def test_catalog_exact_price_and_offer_promo_scope(http_env,monkeypatch):
     rows=service['price']['rows']
     assert [(r['offer_id'],r['amount']) for r in rows]==[
         ('laser_hair_removal.underarms',1900),('laser_hair_removal.legs',4500),('laser_hair_removal.three_zones',7900)]
-    special='Только пакет «Три зоны»'
-    assert special in json.dumps(service['details']['laser_hair_removal.three_zones'],ensure_ascii=False)
-    assert special not in json.dumps(service['details']['laser_hair_removal.underarms'],ensure_ascii=False)
+    facts=json.loads((ROOT/'clients/demo_medical/target_response/pricebook/facts.json').read_text(encoding='utf-8'))
+    special=facts['demo_beauty_15']['microfact_text']
+    for detail in service['details'].values():
+        assert [part['text'] for part in detail['parts'] if part['price_section']=='promotion']==[special]
+    unrelated=next(s for s in data['services'] if s['service_id']=='ent_consultation')
+    assert all(not any(part['price_section']=='promotion' for part in detail['parts']) for detail in unrelated['details'].values())
     assert service['price_summary_text']=='от 1\u00a0900\u00a0₽'
 
 

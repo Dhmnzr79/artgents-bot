@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "client_id": "nikadent",
+  "price_booster_packages": [
+    {
+      "package_id": "agreed_price_in_contract",
+      "name": "Согласованная стоимость",
+      "body_text": "Стоимость согласованного лечения фиксируем в договоре до начала работы."
+    }
+  ],
+  "also_list_packages": [
+    {
+      "package_id": "tax_deduction_documents",
+      "name": "Документы для налогового вычета",
+      "body_text": "Подготовим документы об оплате лечения для оформления налогового вычета."
+    }
+  ],
+  "service_profiles": [
+    {
+      "service_id": "caries",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "teeth_treatment",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "pulpitis",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "tooth_restoration",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "teeth_cleaning",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "periodontitis",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "tooth_extraction",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "classic",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "one_stage",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "all_on_4",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "all_on_6",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "sinus_lift",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "bone_graft",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "metal_ceramic_crowns",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "zirconia_crowns",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "veneers",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "core_inlay",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "ceramic_inlays",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "prosthetics_consultation",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "removable_dentures",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "clasp_dentures",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "implant_supported_prosthetics",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "denture_repair",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "fixed_bridge",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "emax_crowns",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "temporary_denture",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    },
+    {
+      "service_id": "denture_reline",
+      "price_booster_id": "agreed_price_in_contract",
+      "also_list_id": "tax_deduction_documents",
+      "price_detail_ids": []
+    }
+  ],
+  "incompatibility_groups": []
+}

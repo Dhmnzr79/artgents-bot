@@ -2,6 +2,7 @@
 doc_id: clinic__info__payment
 doc_type: info
 topic: clinic
+subtopic: payment
 suggest_h3:
   - gotovoe-predlozhenie
   - etapy-i-otdelnye-raskhody

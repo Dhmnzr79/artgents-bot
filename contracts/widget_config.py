@@ -49,6 +49,7 @@ LEGACY_SNAKE_WIDGET_KEYS = frozenset(
 )
 
 _CAMEL_CASE_RE = re.compile(r"^[a-z][a-zA-Z0-9]*$")
+WidgetIconKey = Literal["question", "services", "prices", "doctors", "video", "results", "booking", "promotion", "info"]
 
 
 class WidgetConfigValidationError(ValueError):
@@ -80,6 +81,7 @@ class WidgetStarterPromptV1(_WidgetStrictModel):
     q: str | None = None
     videoKey: str | None = None
     soon: StrictBool | None = None
+    iconKey: WidgetIconKey | None = None
 
     @field_validator("label", mode="after")
     @classmethod
@@ -104,6 +106,7 @@ class WidgetWelcomePromotionV1(_WidgetStrictModel):
 class WidgetPagePromptV1(_WidgetStrictModel):
     label: str = Field(min_length=1)
     q: str = Field(min_length=1)
+    iconKey: WidgetIconKey | None = None
 
     @field_validator("label", "q", mode="after")
     @classmethod
@@ -144,6 +147,7 @@ class WidgetPageMenuV1(_WidgetStrictModel):
 
 class WidgetPresentationV1(_WidgetStrictModel):
     schemaVersion: Literal[1]
+    design: Literal["aura", "orbit"] = "orbit"
     botName: str
     onlineLabel: str
     welcomeText: str | None

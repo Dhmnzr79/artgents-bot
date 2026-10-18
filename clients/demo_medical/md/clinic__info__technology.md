@@ -2,6 +2,7 @@
 doc_id: clinic__info__technology
 doc_type: info
 topic: clinic
+subtopic: technology
 suggest_h3:
   - videt-i-obyasnyat
   - estetika-bez-kalkulyatora

@@ -1090,3 +1090,199 @@ Exact allowlist:
 Evidence: 60 PASS — tests/test_d2_catalog_exclusions.py, test_widget_price_details_browser.py, test_widget_session.py, test_d2_native_price_runtime.py. В том числе16 проверок exclusions: реальные Flask /ask и /ask/stream c подставным provider, click, replay без нового вызова, история и POST /api/widget-session; pure text всех105offers, unknown-condition formatter. DOM proof105×2contexts. Ещё4PASS validator всех pack. Lint pricebook0warnings/PASS. Sample check-v2 PASS: 16 полных предложений,4размера×2шрифта,форма/черновик/согласие/composer/portable HTML. Независимый Checker PASS после чтения actual API/completion/history/remount paths и повторных16тестов. diff --check PASS. Наблюдались только прежние datetime.utcnow deprecation warnings; новых падений в этом наборе нет, полный CI/исторические внеочередные suites не запускались.
 
 Live/provider/model/SMTP/VPS calls0. Это локальная проверка текущего кода с подставной моделью, не проверка реальных ответов модели или развёрнутого VPS. Образец и HTML/ZIP v2 обновлены. Git: commit/push только topic branch;PR34 draft, без merge/deploy; hash в ответе. Exactallowlist27paths, индекс очищается commit, foreign3JPG сохранены.
+
+## 2026-10-18 — Aura / Orbit в локальном рабочем виджете, owner GO
+
+Классификация: UI bug fix / перенос согласованного дизайна, не D2 архитектурное упрощение. Источник artgents-clean-v6.html и handoff-v5 в Downloads; owner подтвердил Inter-only, текущий межбуквенный интервал, три стартовых пункта и сохранение рабочего выбора объёма в диалоге. Demo Aura (синий), ArtMed Orbit (бирюзовый), НикаДент Orbit (фиолетовый). Только локальная реализация: без merge/VPS/provider/SMTP.
+
+Baseline: C:/Cursor Projects/artgents-bot-active, codex/three-tabs-catalog, HEAD6674f4a, origin/main и mergebasef762949. Предыдущий WIP прототипа сохраняется; чужие otzyv-1/2/3.jpg не трогаем. Allowlist: static/widget/{widget.js,widget.css,fonts.css,icons.js,catalog.js,price_card.js,booking_form.js}; contracts/widget_config.py; clients/{demo,demo_medical,nikadent}/widget_config.json; tests/{test_widget_new_design.py,test_widget_config_contract.py,test_widget_three_tabs_browser.py}; tests/js/widget_new_design_harness.mjs; эта карточка. Вспомогательные локальные результаты проверки в drafts/widget-redesign не входят в коммит.
+
+Сохраняем API/модель/память/SSE/tenant ownership, canonical prices и объём в диалоге, единый приватный черновик и подтверждённую API-отправку. UI: общий набор SVG, компактные темы из финального CSS, групповые меню, карточки списка с ценой снизу, split detail, списки-черточки, минимальная форма без выбора услуги; выбранная услуга и offer остаются контекстом заявки с «Убрать». Никакой fake логики/контента из HTML в runtime.
+
+Baseline offline: 83PASS — config contract, widget catalog, booking form; 872 прежних warnings. Первый запуск не получил доступ к общему pytest tmp; отдельный basetemp внутри drafts устранил проблему без изменения исходников. Проверки после изменения: узкие unit/API/DOM, доступный браузер, ширины320/360/390/412/440 и три цвета, один независимый Checker. Live provider/model/SMTP вызовы не разрешены.
+
+### Итог переноса 2026-10-18
+
+Удалены прежние достижимые стили обновляемых компонентов и последовательные override-слои; сохранены launcher, видео, галерея, rich answers и транспортные состояния. Убраны повторный корневой заголовок каталога, заголовок большой формы и системный select услуг. Старый значок отправки заменён общим SVG-самолётиком. Публичные цены, authored scope, состав/исключения/условия/все этапы оплаты и порядок разделов сохранены.
+
+Добавлены presentation-настройки design (aura/orbit) и iconKey, общий локальный SVG-набор, компактная типографика Inter400/500 и две темы на одной структуре. Цвета из прежних brand.yaml: demo#0C2FE0/Aura, demo_medical#196E76/Orbit, nikadent#762E94/Orbit. Для primary/send вычисляется black/white ink отдельно для обычного/hover brand. В форме «Интересует» можно убрать выбор: selection становится null, контакты/пожелания/consent сохраняются; pending и неопределённый результат защищают неизменяемое тело повторной отправки. Успех показывается только по подтверждению API. Слова «сейчас онлайн» — прежний presentation-статус демо; новая интеграция доступности не вводилась.
+
+Поведение модели, серверная маршрутизация, tenant/price ownership, SSE, память и backend lead не менялись. Существующие volume controls в диалоге остались: одна карточка, три кнопки, опубликованные ref/revision. Это перенос интерфейса и исправление несоответствий макету, не сертификация D2 архитектурного упрощения.
+
+Evidence: 94 уникальных PASS:83 config/catalog/booking API;6 new_design (включая все три цвета,320/360/390/412/440/1280, clear/private draft/immutable retry, current-native volume flows для demo и НикаДент);1 all-price-details (105offers×2contexts);3 three-tabs (каталог, точный offer, чат, форма, remount, root font100/200%);1 no-public-price browser. Последний focused запуск new_design+no_public:7PASS,672 прежних deprecation warnings. Проверены JS syntax и git diff--check. Скриншоты локальных offline fixtures: drafts/widget-redesign/screenshots. Дополнительно CUA: на реальном локальном9001 просмотрены работающий каталог Aura и старт Orbit АртМед, без /ask или отправки формы.
+
+Два старых теста test_d2_price_cards_browser не проходят подготовку API-фикстур до браузера: test_real_card_fonts_selection_and_session_in_browser line216 (HTTP400), test_overview_same_card_navigation_and_unknown_volume_in_browser line270 (нет revision). Оба воспроизведены с тем же результатом на чистом gitarchiveHEAD6674f4a под drafts/widget-redesign/baseline-6674f4a. Это известные baseline failures; их fixtures/backend здесь не изменялись. Действующие volume paths отдельно проверены на текущем native provider contract и канонических HTTP receipts. Изначально новый test предполагал original revision; исправлена именно неверная тестовая гипотеза: существующий renderer использует revision последнего опубликованного overview.
+
+Независимый Checker:PASS; лично35 offline tests, тесты прочитаны первыми, проверены actual presentation/brand/mount, catalog+chat CTA/shared draft/lead и price renderer paths. Замечания о самолётике и контрасте исправлены и перечитаны. Полные browser tests Checker не дублировал. Последний focused review добавленного native-volume evidence фиксируется в ответе.
+
+Live provider/model/SMTP/VPS calls0. Browser/API tests используют подставные provider/delivery/fetch; локальный9001 запущен штатным scripts/start_local_widget.ps1 из этого checkout. Проверка ширин — desktop Chrome, не физические iOS/Android; поведение клавиатуры на реальном телефоне остаётся для owner проверки. Merge/deploy не выполнялись.
+
+Git: codex/three-tabs-catalog, HEAD6674f4a; реализация остаётся в рабочем дереве, индекс пуст, новый commit/push/PR update в этом этапе не выполнялись. Exactallowlist указан выше; предыдущий WIP static/experiments/widget-playground/* сохранён, чужие otzyv-1/2/3.jpg не менялись. Проверочные snapshot/логи/скриншоты находятся в игнорируемом drafts.
+
+Уточнение owner после просмотра: функционал рабочего виджета сохраняем, тестовые сценарии/ответы прототипа не переносим. В обзоре цен диалога убран видимый H3 «Услуги и цены»; названия конкретных услуг/предложений сохранены. Между текстом помощника и следующей ценовой карточкой добавлено16px, чтобы выбор объёма не прижимался к ответу. Это небольшая правка представления: обработчики/ref/revision/суммы не менялись. Прочитан точный diff, JS syntax и diff--check PASS; повторный browser/Checker для косметического уточнения не запускался по verification cadence. Focused Checker добавленного native-volume evidence предыдущего этапа:PASS.
+
+
+## 2026-10-18 — Контент НикаДент и демонстрационные акции АртМед, owner GO
+
+Классификация: исправление контента и привязок существующего commercial contract, не архитектурное упрощение. Baseline: C:/Cursor Projects/artgents-bot-active, codex/three-tabs-catalog, HEAD6674f4a, origin/main и mergebasef762949. Предыдущий UI/prototype WIP сохраняется; otzyv-1/2/3.jpg — foreign WIP. Клиент demo (стоматологический) вне текущего content scope.
+
+НикаДент: проверить всю имплантацию/протезирование, включая эстетические ортопедические конструкции; распространить существующую бесплатную консультацию, убрать бессодержательное «хирургический этап» из двух package labels; использовать подтверждённые payment_terms.md преимущества (согласованный план/стоимость в договоре, документы для вычета). Подключить все27 активных услуг через существующий D2CommercialPack — это tenant authoring, без нового handler/model/enum/слоя. Технические существенные ограничения объёма и цены сохраняем.
+
+АртМед: заменить три прежних pseudo-promo на три явные демоакции:10% два УЗИ до30.11.2026;15% эпиляция/фотоомоложение до31.12.2026; бесплатная консультация косметолога перед биоревитализацией/ультразвуковым лифтингом до31.12.2026. Шесть из21услуг, без случайного назначения при рендере. Остальные без promo. Цена/состав/исключения/этапы оплаты не меняются. Устаревшие MD/presentation подписи тоже синхронизировать.
+
+Exact allowlist:
+
+- clients/nikadent/target_response/pricebook/facts.json
+- clients/nikadent/target_response/d2_commercial.json
+- clients/nikadent/target_response/pricebook/services/classic.default.json
+- clients/nikadent/target_response/pricebook/services/one_stage.default.json
+- clients/demo_medical/target_response/pricebook/facts.json
+- clients/demo_medical/md/clinic__info__promotions.md
+- clients/demo_medical/widget_config.json
+- docs/tasks/THREE_TABS_CATALOG_TASK.md
+- clients/demo_medical/target_response/pricebook/services/abdominal_ultrasound.standard.json
+- clients/demo_medical/target_response/pricebook/services/abdominal_ultrasound.with_kidneys.json
+- clients/demo_medical/target_response/pricebook/services/biorevitalization.face.json
+- clients/demo_medical/target_response/pricebook/services/biorevitalization.face_neck.json
+- clients/demo_medical/target_response/pricebook/services/botulinum_therapy.individual.json
+- clients/demo_medical/target_response/pricebook/services/botulinum_therapy.unit.json
+- clients/demo_medical/target_response/pricebook/services/cervical_screening.basic.json
+- clients/demo_medical/target_response/pricebook/services/cervical_screening.extended.json
+- clients/demo_medical/target_response/pricebook/services/laser_hair_removal.legs.json
+- clients/demo_medical/target_response/pricebook/services/laser_hair_removal.three_zones.json
+- clients/demo_medical/target_response/pricebook/services/laser_hair_removal.underarms.json
+- clients/demo_medical/target_response/pricebook/services/photorejuvenation.face.json
+- clients/demo_medical/target_response/pricebook/services/photorejuvenation.face_neck.json
+- clients/demo_medical/target_response/pricebook/services/photorejuvenation.hands.json
+- clients/demo_medical/target_response/pricebook/services/plasma_therapy.face.json
+- clients/demo_medical/target_response/pricebook/services/plasma_therapy.scalp.json
+- clients/demo_medical/target_response/pricebook/services/plasma_therapy.three_visits.json
+- clients/demo_medical/target_response/pricebook/services/thyroid_ultrasound.standard.json
+- clients/demo_medical/target_response/pricebook/services/thyroid_ultrasound.with_cervical_nodes.json
+- clients/demo_medical/target_response/pricebook/services/ultrasound_lifting.face350.json
+- clients/demo_medical/target_response/pricebook/services/ultrasound_lifting.face_neck500.json
+- clients/demo_medical/target_response/pricebook/services/ultrasound_lifting.lower_face.json
+
+Проверки: tenant loaders/commercial/catalog/offline native price; audit canonical каталога до/после для всех26+45offers, сверка неизменности финансовых полей и scope; даты/границы promo; один Checker для нового Nika tenant pack и связей. Live/model/provider/SMTP/VPS0, без merge/deploy. Baseline snapshots/allowlist/evidence в игнорируемом drafts/tenant-marketing-20261018.
+
+Owner steering: имя АртМед → Виктория во widget_config/page greetings и tone.yaml. Для понятных условий НикаДент дополнительно редактируем хвосты labels, не первые scope clauses; fixed_bridge redundant tail уже объяснён в approved price text. Дополнение exact allowlist:
+
+- clients/demo_medical/tone.yaml
+- clients/nikadent/target_response/pricebook/services/bone_graft.default.json
+- clients/nikadent/target_response/pricebook/services/caries.default.json
+- clients/nikadent/target_response/pricebook/services/clasp_dentures.default.json
+- clients/nikadent/target_response/pricebook/services/core_inlay.default.json
+- clients/nikadent/target_response/pricebook/services/denture_repair.default.json
+- clients/nikadent/target_response/pricebook/services/fixed_bridge.default.json
+- clients/nikadent/target_response/pricebook/services/implant_supported_prosthetics.crown.json
+- clients/nikadent/target_response/pricebook/services/sinus_lift.default.json
+- clients/nikadent/target_response/pricebook/services/tooth_extraction.default.json
+
+Исходный test run:49PASS, baseline failure test_d2_commercial_contract::test_tenants_do_not_share_commercial_packages — переименованная fixture копирует widget_catalog с чужим owner; и исходный test_d2_commercial_plan::test_price_profile_freezes_short_promo_and_packages — старый FakeProvider не даёт текущего price block. Оба наблюдались ДО правок коммерческих данных; старые tests/backend не меняем.
+
+Owner steering cosmetic: price-card title18px/margin-bottom10px; bigprice24px. Добавлено в exact allowlist static/widget/widget.css. По изменённому авторскому предложению scope old three-zones→service discount необходимо обновить tests/test_widget_catalog.py: сохранить точные суммы и заменить прежнее offer-only ожидание проверкой всех variants и отрицательной проверкой другой услуги. Итого42paths в allowlist.json. Это обновление проверки изменённого продукта, не ослабление price/tenant scope.
+
+### Результат контентного этапа
+
+АртМед: удалены три прежние псевдоакции и их ссылки из предложений. Добавлены три демонстрационные акции: скидка 10% на УЗИ брюшной полости и щитовидной железы до 30.11.2026; скидка 15% на эпиляцию и фотоомоложение до 31.12.2026; бесплатная консультация косметолога перед биоревитализацией или ультразвуковым лифтингом до 31.12.2026. Они действуют на 6 из 21 услуги, то есть на 15 из 45 предложений. Остальные услуги без акций. MD и welcomePromotion согласованы. Оплата плазмотерапии по выполненным посещениям сохранена как порядок оплаты. Имя Виктория установлено в widget_config, обоих приветствиях страниц и tone.yaml; старого имени в клиентском пакете нет.
+
+НикаДент: существующая бесплатная консультация распространена на 20 услуг имплантации и ортопедии, включая эстетические конструкции, и тему restoration. Она появляется во всех 23 соответствующих ценовых предложениях. Из подписей classic и one_stage убран «хирургический этап». Остальные обрывочные условия переписаны понятными предложениями. Повтор про расчёт моста после осмотра убран из хвоста label, но сохранён в approved_text. Два преимущества взяты из существующего clinic__info__payment_terms.md: стоимость согласованного лечения фиксируем в договоре; подготовим документы об оплате для оформления налогового вычета. Размер возврата в новом коммерческом блоке не обещаем.
+
+Созданы 27 профилей услуг НикаДент; преимущества видны во всех 26 ценовых предложениях. У пяти услуг — pulpitis, periodontitis, ceramic_inlays, tooth_restoration, teeth_cleaning — нет offers/details. Существующий renderer не показывает у них коммерческие аккордеоны. Этот этап не расширял renderer и не создавал вымышленные ценовые предложения.
+
+Дополнительные косметические правки owner: заголовок ценовой карточки 18 px, margin-bottom 10 px; большая цена 24 px. Шапка и заголовок раздела каталога не менялись. Отдельный browser/Checker для этих микроправок не запускался.
+
+Проверки после изменения контента: 145 уникальных PASS — 113 проверок каталога и текущего native D2 до известного старого падения, затем 32 проверки конфигурации и консультации. Предыдущие 49 baseline PASS частично пересекаются и к 145 не прибавляются. Audit в drafts/tenant-marketing-20261018/audit.py прошёл: во всех 71 предложениях сохранены финансовые поля, scope_text, состав, исключения и этапы оплаты. Проверены положительные и отрицательные границы акций, даты до начала и после окончания, отсутствие нескольких акций на одном предложении, старых ссылок и имени. Результат — audit-result.json. GET к работающему локальному серверу 9001 подтвердил имя Виктория, новые акции и преимущества. Запросы /ask и /lead живому серверу не отправлялись.
+
+Известные baseline failures: два старых commercial-теста падали до изменения данных — fixture с чужим owner и FakeProvider без текущего price block. Дополнительно test_core_inlay_known_volume_retains_unit_price_and_crown_exclusion ожидает условие оплаты коронки в condition_texts, хотя оно уже находится в excludes. Первый параметр воспроизвёл тот же FAIL на чистом git archive HEAD 6674f4a. Четыре параметра этого сценария не объявлены успешными. Исключение коронки сохранено, дубли не возвращались; тест и runtime этого сценария не подменялись. Полный CI не запускался.
+
+Независимый Checker: PASS. Изменённый тест прочитан первым; прослежены snapshot → commercial authority → resolver → каталог/диалог → renderer. Checker лично повторил audit без записи файлов и учёл ограничение пяти услуг без ценовых предложений. Это проверка исправления данных и привязок, а не сертификация архитектурного упрощения или качества живой модели. git diff --check прошёл.
+
+Git: codex/three-tabs-catalog, HEAD 6674f4a, origin/main и merge base f762949. Точный allowlist из 42 файлов указан выше и в drafts/tenant-marketing-20261018/allowlist.json. Индекс пуст; commit, push, обновление PR, merge и развёртывание не выполнялись. Прежние правки интерфейса и прототипа, а также чужие otzyv-1/2/3.jpg сохранены. Живые вызовы provider/model/SMTP/VPS: 0. Реализация остаётся в локальном рабочем дереве.
+
+Последующие согласованные правки интерфейса: короткая форма в ленте и каталоге содержит контекст услуги, имя, телефон, согласие и кнопку; заголовок, вводный текст и поле пожеланий оставлены только в полной форме там, где они предусмотрены. Статусы и подпись источника приведены к 14 px и одному цвету с иконками 16×16. В CTA общий белый SVG справа; подарок в приветственной акции выровнен сверху. При открытии формы кнопка запуска удаляется из каталога, а общий renderTrail не создаёт CTA для уже открытой формы, включая галерею. Существующий флаг bookingForm, общий приватный черновик, валидация и отправка сохранены. Три offline Chrome-проверки клиентов прошли: верхней CTA нет, контекст и согласие сохранены, повторная отправка неизменяема даже после открытия другого предложения. Проверка короткой формы и дубликатов выполнена в существующем tests/test_widget_three_tabs_browser.py; ослабления защиты заявки нет. JS syntax и diff --check прошли. Вызовы живой модели и доставки: 0.
+
+
+## 2026-10-18 — подготовка релиза и VPS, owner GO
+
+Owner явно разрешил commit/push и выгрузку на VPS. Baseline/merge base origin/main f762949, HEAD6674f4a, codex/three-tabs-catalog, Git root C:/Cursor Projects/artgents-bot-active. Классификация: bug fix тестовых fixtures и метаданных; архитектурных изменений D2 нет. Сохраняем принятый приватный booking form; не возвращаем слоты контактов в чат. Тесты переводятся на реальный /lead с согласием, durable receipt, send-once/replay, изоляцией и отказами; негативные проверки ownership/PII/лимитов остаются. Старые release-сценарии читаются и исправляются, не исключаются из selection, CI/protections не меняются. В семь MD АртМед добавляем обязательный subtopic; doc_type FAQ согласуем с существующим именем info.
+
+Exact release allowlist:
+
+- clients/demo/widget_config.json
+- clients/demo_medical/md/clinic__info__about.md
+- clients/demo_medical/md/clinic__info__faq.md
+- clients/demo_medical/md/clinic__info__first_visit.md
+- clients/demo_medical/md/clinic__info__payment.md
+- clients/demo_medical/md/clinic__info__promotions.md
+- clients/demo_medical/md/clinic__info__quality.md
+- clients/demo_medical/md/clinic__info__technology.md
+- clients/demo_medical/target_response/pricebook/facts.json
+- clients/demo_medical/target_response/pricebook/services/abdominal_ultrasound.standard.json
+- clients/demo_medical/target_response/pricebook/services/abdominal_ultrasound.with_kidneys.json
+- clients/demo_medical/target_response/pricebook/services/biorevitalization.face.json
+- clients/demo_medical/target_response/pricebook/services/biorevitalization.face_neck.json
+- clients/demo_medical/target_response/pricebook/services/botulinum_therapy.individual.json
+- clients/demo_medical/target_response/pricebook/services/botulinum_therapy.unit.json
+- clients/demo_medical/target_response/pricebook/services/cervical_screening.basic.json
+- clients/demo_medical/target_response/pricebook/services/cervical_screening.extended.json
+- clients/demo_medical/target_response/pricebook/services/laser_hair_removal.legs.json
+- clients/demo_medical/target_response/pricebook/services/laser_hair_removal.three_zones.json
+- clients/demo_medical/target_response/pricebook/services/laser_hair_removal.underarms.json
+- clients/demo_medical/target_response/pricebook/services/photorejuvenation.face.json
+- clients/demo_medical/target_response/pricebook/services/photorejuvenation.face_neck.json
+- clients/demo_medical/target_response/pricebook/services/photorejuvenation.hands.json
+- clients/demo_medical/target_response/pricebook/services/plasma_therapy.face.json
+- clients/demo_medical/target_response/pricebook/services/plasma_therapy.scalp.json
+- clients/demo_medical/target_response/pricebook/services/plasma_therapy.three_visits.json
+- clients/demo_medical/target_response/pricebook/services/thyroid_ultrasound.standard.json
+- clients/demo_medical/target_response/pricebook/services/thyroid_ultrasound.with_cervical_nodes.json
+- clients/demo_medical/target_response/pricebook/services/ultrasound_lifting.face350.json
+- clients/demo_medical/target_response/pricebook/services/ultrasound_lifting.face_neck500.json
+- clients/demo_medical/target_response/pricebook/services/ultrasound_lifting.lower_face.json
+- clients/demo_medical/tone.yaml
+- clients/demo_medical/widget_config.json
+- clients/nikadent/target_response/d2_commercial.json
+- clients/nikadent/target_response/pricebook/facts.json
+- clients/nikadent/target_response/pricebook/services/bone_graft.default.json
+- clients/nikadent/target_response/pricebook/services/caries.default.json
+- clients/nikadent/target_response/pricebook/services/clasp_dentures.default.json
+- clients/nikadent/target_response/pricebook/services/classic.default.json
+- clients/nikadent/target_response/pricebook/services/core_inlay.default.json
+- clients/nikadent/target_response/pricebook/services/denture_repair.default.json
+- clients/nikadent/target_response/pricebook/services/fixed_bridge.default.json
+- clients/nikadent/target_response/pricebook/services/implant_supported_prosthetics.crown.json
+- clients/nikadent/target_response/pricebook/services/one_stage.default.json
+- clients/nikadent/target_response/pricebook/services/sinus_lift.default.json
+- clients/nikadent/target_response/pricebook/services/tooth_extraction.default.json
+- clients/nikadent/widget_config.json
+- contracts/widget_config.py
+- docs/tasks/THREE_TABS_CATALOG_TASK.md
+- static/widget/booking_form.js
+- static/widget/catalog.js
+- static/widget/fonts.css
+- static/widget/icons.js
+- static/widget/price_card.js
+- static/widget/widget.css
+- static/widget/widget.js
+- tests/d2_ci_http.py
+- tests/js/widget_new_design_harness.mjs
+- tests/test_client_usage_limits.py
+- tests/test_d2_af1b_contacts_http.py
+- tests/test_d2_contact_model_context.py
+- tests/test_d2_demo_limits.py
+- tests/test_d2_demo_release_gate.py
+- tests/test_d2_results_document.py
+- tests/test_d2_situation_disabled.py
+- tests/test_nikadent_price_authority_offline.py
+- tests/test_nikadent_technical_onboarding.py
+- tests/test_tenant_lead_routing_context_offline.py
+- tests/test_validate_client_pack.py
+- tests/test_widget_catalog.py
+- tests/test_widget_config_contract.py
+- tests/test_widget_new_design.py
+- tests/test_widget_three_tabs_browser.py
+
+Прежние WIP static/experiments/widget-playground (8 файлов) и чужие otzyv-1/2/3.jpg сохраняются вне коммита. Релиз только через GitHub CI, immutable image и штатный manual deploy. Проверки локально offline, без живых model/SMTP вызовов; после deploy только read-only health/static/config/catalog GET.
+
+Release checkpoint: независимый Checker PASS по 73 путям. Его37PASS/1FAIL выявили только коллизию тестового имени «Анна» с authored врачом; уникальный маркер сохранён в проверках PII, focused JSON/SSE2PASS. Линтер контента всех pack, pricebook0warnings, validators и синтаксис изменённых Python PASS; staged diff--check чистый. Общий локальный regression run ещё выполняется; исходный pre-fix run остановлен после воспроизведения известных старых failures и не объявляется успешным. Release CI обязан пройти на новом SHA до merge. Live provider/SMTP0. Дальнейшие GitHub/build/deploy evidence фиксируем в PR и ответе, а не объявляем по локальным проверкам.

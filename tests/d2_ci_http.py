@@ -1,8 +1,19 @@
 """Current D2 HTTP migration helpers, with actual published UI actions."""
 import json
+from pathlib import Path
 
 from tests.test_d2_http_contract import FakeProvider, http_env, post, post_sse, sse_events
 from core.d2_live_provider import build_d2_d1r_messages
+
+
+def bind_copied_tenant(pack, tenant):
+    """Author ownership in a synthetic copied pack; runtime still validates it."""
+    for filename in ("widget_catalog.json", "d2_commercial.json"):
+        path = Path(pack) / "target_response" / filename
+        if path.exists():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["client_id"] = tenant
+            path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
 
 def raw(*blocks, **kwargs):

@@ -1,3 +1,4 @@
+import { createWidgetIcon, ARROW_SVG, SEND_SVG, MENU_ICON_KEYS } from "./icons.js";
 import { mountCatalog } from "./catalog.js";
 import { createBookingForm } from "./booking_form.js";
 import { renderPriceBody, mergePriceMessage } from "./price_card.js";
@@ -51,9 +52,9 @@ const PLAIN_ATTRIBUTION_ROUTES = new Set([
 const SECRET_SESSION_RESET_RE = /^::reset\s+(\S+)\s*$/i;
 const SECRET_SESSION_RESET_TOKEN = "x7k9m2p4";
 
-const SEND_BTN_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M12 19V5M6 11l6-6 6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const SEND_BTN_SVG = SEND_SVG;
 
-const LINK_ARROW_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M4 12h16M14 6l6 6-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const LINK_ARROW_SVG = ARROW_SVG;
 
 const CTA_CALENDAR_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M8 3v4M16 3v4M3 10h18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`;
 
@@ -127,6 +128,13 @@ function applyWidgetTheme(shellEl, theme) {
   const brandRgb = _hexToRgb(brand);
   const actionRgb = _hexToRgb(action);
   if (brandRgb) {
+    const inkFor=rgb=>{
+      const linear=rgb.map(value=>{const v=value/255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});
+      const luminance=linear[0]*.2126+linear[1]*.7152+linear[2]*.0722;
+      return luminance>.179?'#000000':'#ffffff';
+    };
+    shellEl.style.setProperty('--clinic-on-brand',inkFor(brandRgb));
+    shellEl.style.setProperty('--clinic-on-brand-hover',inkFor(_hexToRgb(actionHover)));
     const rgb = _rgbCss(brandRgb);
     shellEl.style.setProperty("--clinic-brand-rgb", rgb);
     shellEl.style.setProperty("--clinic-chip-border", brand);
@@ -165,8 +173,8 @@ function resolvePackAssetUrl(apiBase, path) {
  * @param {WidgetConfig} config
  */
 function fillHeaderStatus(el, config) {
-  const clinicName = String(config.clinicName || "").trim() || "клиники";
-  el.textContent = `ИИ-консультант ${clinicName}`;
+  const dot=document.createElement('span');dot.className='clinic-shell__status-dot';dot.setAttribute('aria-hidden','true');
+  el.replaceChildren(dot,document.createTextNode(`${config.botName} ${config.onlineLabel}`));
 }
 
 
@@ -180,6 +188,7 @@ function isActiveLeadFlowPayload(payload) {
  * @typedef {Object} StarterPrompt
  * @property {string} label
  * @property {string} [q]
+ * @property {string} [iconKey] — authored decorative icon
  * @property {string} [videoKey] — открыть каталог клиента без текста запроса
  * @property {boolean} [soon] — кнопка видна, но пока не подключена
  */
@@ -188,6 +197,7 @@ function isActiveLeadFlowPayload(payload) {
  * @typedef {Object} WidgetConfig
  * @property {string} [apiBase]
  * @property {string} clientId
+ * @property {"aura"|"orbit"} [design]
  * @property {string} botName
  * @property {string} [avatarUrl]
  * @property {string} onlineLabel
@@ -593,6 +603,7 @@ function starterPromptsValid(prompts) {
     if (!item || typeof item !== "object") return false;
     const s = /** @type {Record<string, unknown>} */ (item);
     if (typeof s.label !== "string" || !s.label.trim()) return false;
+    if (s.iconKey != null && !MENU_ICON_KEYS.includes(s.iconKey)) return false;
     if (s.q !== undefined && s.q !== null && typeof s.q !== "string") return false;
     if (s.videoKey !== undefined && s.videoKey !== null && typeof s.videoKey !== "string") {
       return false;
@@ -605,6 +616,7 @@ function starterPromptsValid(prompts) {
 function isWidgetPresentationContractValid(config) {
   if (!config || typeof config !== "object") return false;
   if (config.schemaVersion !== 1) return false;
+  if (config.design != null && !["aura", "orbit"].includes(config.design)) return false;
   if (typeof config.clientId !== "string" || !config.clientId.trim()) return false;
   if (typeof config.botName !== "string" || !config.botName.trim()) return false;
   if (typeof config.onlineLabel !== "string" || !config.onlineLabel.trim()) return false;
@@ -821,21 +833,21 @@ export function mountWidget(root, config, { pagePath } = {}) {
     <div class="clinic-shell" data-clinic-root>
       ${launcherHtml}
       <div class="clinic-shell__panel" id="clinic-panel" role="dialog" aria-modal="true" aria-label="Чат" data-clinic-panel>
+        <div class="clinic-shell__top">
           <header class="clinic-shell__header clinic-shell__header--sticky">
             <div class="clinic-shell__header-main">
               <div class="clinic-shell__header-avatar">
                 <span class="clinic-shell__avatar-fallback clinic-shell__avatar-fallback--header" data-clinic-header-fb>
                   <img class="clinic-shell__avatar-fallback-img" alt="" width="48" height="48" data-clinic-header-avatar />
                 </span>
-                <span class="clinic-shell__header-online-dot" aria-hidden="true"></span>
               </div>
               <div class="clinic-shell__header-text">
-                <span class="clinic-shell__header-name" data-clinic-header-name></span>
+                <span class="clinic-shell__header-name" data-clinic-header-name>Помощник клиники <span class="clinic-shell__ai-badge">AI</span></span>
                 <span class="clinic-shell__header-status" data-clinic-header-online></span>
               </div>
             </div>
             <div class="clinic-shell__header-actions">
-              <button type="button" class="clinic-shell__header-close clinic-btn-icon clinic-btn-ghost" data-clinic-close title="Свернуть" aria-label="Свернуть чат">✕</button>
+              <button type="button" class="clinic-shell__header-close clinic-btn-icon clinic-btn-ghost" data-clinic-close title="Свернуть" aria-label="Свернуть чат">−</button>
             </div>
           </header>
           <nav class="clinic-shell__tabs" role="tablist" aria-label="Разделы помощника">
@@ -843,6 +855,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
             <button type="button" role="tab" aria-selected="false" data-clinic-tab="catalog">Услуги и цены</button>
             <button type="button" role="tab" aria-selected="false" data-clinic-tab="booking">Запись</button>
           </nav>
+        </div>
         <main class="clinic-shell__main" aria-label="Содержимое помощника">
           <div class="clinic-shell__feed" role="tabpanel" aria-label="Помощник" data-clinic-feed></div>
           <section class="clinic-shell__tab-panel" role="tabpanel" aria-label="Услуги и цены" data-clinic-catalog-panel hidden><div data-clinic-catalog></div></section>
@@ -856,11 +869,13 @@ export function mountWidget(root, config, { pagePath } = {}) {
             <button type="submit" class="clinic-btn-send" data-clinic-send disabled aria-label="Отправить сообщение">${SEND_BTN_SVG}</button>
           </div>
         </form>
+        <div class="clinic-shell__footer">Работает на artgents</div>
       </div>
     </div>
   `;
 
   const shell = root.querySelector("[data-clinic-root]");
+  shell.dataset.design=config.design || "orbit";
   applyWidgetTheme(shell, config.theme);
   const launcher = root.querySelector("[data-clinic-launcher]");
   const launcherOpenBtn = root.querySelector("[data-clinic-launcher-open]");
@@ -922,7 +937,6 @@ export function mountWidget(root, config, { pagePath } = {}) {
   for (const el of root.querySelectorAll("[data-clinic-launcher-tagline]")) {
     el.textContent = launcherTagline;
   }
-  root.querySelector("[data-clinic-header-name]").textContent = config.botName;
   fillHeaderStatus(root.querySelector("[data-clinic-header-online]"), config);
 
   const alt = (config.botName || "Бот").trim();
@@ -1037,6 +1051,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
     const lab = document.createElement("span");
     lab.className = "clinic-msg__link-text";
     lab.textContent = VIDEO_REVEAL_LABEL;
+    btn.appendChild(createWidgetIcon("video", "clinic-msg__link-icon"));
     const chev = document.createElement("span");
     chev.className = "clinic-msg__link-chevron";
     chev.setAttribute("aria-hidden", "true");
@@ -1788,6 +1803,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
       chev.className = "clinic-msg__link-chevron";
       chev.setAttribute("aria-hidden", "true");
       chev.innerHTML = LINK_ARROW_SVG;
+      if (!isVolume) btn.appendChild(createWidgetIcon("question", "clinic-msg__link-icon"));
       btn.appendChild(lab);
       if (!isVolume) btn.appendChild(chev);
       btn.addEventListener("click", () => {
@@ -1808,12 +1824,12 @@ export function mountWidget(root, config, { pagePath } = {}) {
    * @param {number} msgIndex
    */
   function renderTrail(wrap, m, msgIndex) {
-    if (m.role !== "bot" || m.trailingDismissed) return;
+    if (m.role !== "bot" || m.trailingDismissed || m.bookingForm) return;
 
     const trail = document.createElement("div");
     trail.className = "clinic-turn__trail";
 
-    const publishedCta = !m.bookingForm && m.cta && m.cta.text && m.revision === state.lastPayload?.revision;
+    const publishedCta = m.cta && m.cta.text && m.revision === state.lastPayload?.revision;
     const galleryBooking = m.caseGallery && m.revision === state.lastPayload?.revision
       && !isActiveLeadFlowPayload(state.lastPayload)
       && state.lastPayload?.attribution_kind !== "lead";
@@ -1824,6 +1840,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
       const ctaLabel = m.caseGallery ? "Я хочу так же"
         : (m.cta.text || "Записаться на консультацию").trim();
       c.textContent = ctaLabel;
+      c.appendChild(createWidgetIcon('arrow','clinic-cta-arrow'));
       c.disabled = state.pending || Boolean(state.retryBody);
       c.addEventListener("click", () => {
         if (state.pending || state.retryBody) return;
@@ -1833,6 +1850,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
           if(services.size===1)booking.select({service_id:price.rows[0].service_id,
             offer_id:price.presentation==='detail'?price.rows[0].offer_id:null,catalog_version:m.catalogVersion});
         }
+        m.linksDismissed=true;
         m.bookingForm=true;
         renderFeed({preserveScroll:true});
 
@@ -1886,6 +1904,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
       textP.classList.add("is-done");
       textP.appendChild(textBody);
       lead.appendChild(textP);
+      const orb=document.createElement('span');orb.className='clinic-shell__welcome-orb';orb.setAttribute('aria-hidden','true');lead.appendChild(orb);
 
       card.appendChild(lead);
 
@@ -1902,6 +1921,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
         const lab = document.createElement("span");
         lab.className = "clinic-msg__link-text";
         lab.textContent = s.label;
+        b.appendChild(createWidgetIcon(s.iconKey || (s.videoKey ? "video" : "question"), "clinic-msg__link-icon"));
         const chev = document.createElement("span");
         chev.className = "clinic-msg__link-chevron";
         chev.setAttribute("aria-hidden", "true");
@@ -1942,7 +1962,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
         arrow.className = "clinic-msg__link-chevron";
         arrow.setAttribute("aria-hidden", "true");
         arrow.innerHTML = LINK_ARROW_SVG;
-        button.append(label, arrow);
+        button.append(createWidgetIcon("results", "clinic-msg__link-icon"), label, arrow);
         button.addEventListener("click", () => {
           if (state.pending || state.retryBody) return;
           transitionFromWelcome(() => {
@@ -1954,35 +1974,22 @@ export function mountWidget(root, config, { pagePath } = {}) {
         });
         linksBox.insertBefore(button, firstVideoButton);
       }
-      const menuLabel = document.createElement("p");
-      menuLabel.className = "clinic-shell__menu-label";
-      menuLabel.textContent = "С чего начнём?";
-      actions.append(menuLabel, linksBox);
+      actions.append(linksBox);
       const promotion = config.welcomePromotion;
       if (promotion && typeof promotion.title === "string" &&
           typeof promotion.subtitle === "string" && typeof promotion.q === "string" && promotion.q.trim()) {
         const promo = document.createElement("button");
         promo.type = "button";
         promo.className = "clinic-shell__welcome-promo";
-        const icon = document.createElement("span");
-        icon.className = "clinic-shell__promo-icon";
-        icon.setAttribute("aria-hidden", "true");
-        icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18v4H3ZM5 13v8h14v-8M12 9v12M12 9C5 9 5 3 8 3c3 0 4 6 4 6s1-6 4-6c3 0 3 6-4 6Z"/></svg>';
+        const icon=createWidgetIcon('promotion','clinic-shell__promo-icon');
         const copy = document.createElement("span");
         const title = document.createElement("strong");
         title.textContent = promotion.title;
         const subtitle = document.createElement("small");
         subtitle.textContent = promotion.subtitle;
-        const more = document.createElement("span");
-        more.className = "clinic-shell__promo-more";
-        more.textContent = "Условия акции";
-        const arrow = document.createElement("span");
-        arrow.className = "clinic-msg__link-chevron";
-        arrow.setAttribute("aria-hidden", "true");
-        arrow.innerHTML = LINK_ARROW_SVG;
-        more.appendChild(arrow);
-        copy.append(title, subtitle, more);
-        promo.append(icon, copy);
+        const arrow=createWidgetIcon('arrow','clinic-msg__link-chevron');
+        copy.append(title, subtitle);
+        promo.append(icon, copy, arrow);
         promo.addEventListener("click", () => {
           if (state.pending || state.retryBody) return;
           transitionFromWelcome(() => {
@@ -2091,7 +2098,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
     arrow.className = "clinic-msg__link-chevron";
     arrow.setAttribute("aria-hidden", "true");
     arrow.innerHTML = LINK_ARROW_SVG;
-    button.append(label, arrow);
+    button.append(createWidgetIcon("results", "clinic-msg__link-icon"), label, arrow);
     button.disabled = state.pending || Boolean(state.retryBody);
     button.addEventListener("click", () => {
       if (state.pending || state.retryBody) return;

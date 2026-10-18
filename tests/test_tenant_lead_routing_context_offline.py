@@ -467,11 +467,12 @@ def test_lead_post_zero_provider_calls(
     monkeypatch.setattr("lead_service.leads_mode", lambda _cid: "email")
     resp = app_module.app.test_client().post(
         "/lead",
-        json={"phone": "+79001112233", "sid": "s-provider", "client_id": "nikadent"},
+        json={"name": "Тест", "phone": "+79001112233", "sid": "s-provider",
+              "request_id": "no-consent", "client_id": "nikadent", "consent": {"accepted": False}},
         base_url=_nikadent_base_url(),
         headers=_prod_headers(origin="https://nikadent.bot.artgents.ru"),
     )
-    assert resp.status_code == 403
+    assert resp.status_code == 400
     assert resp.get_json()["error_code"] == "lead_consent_required"
     assert backend.call_count == 0
 

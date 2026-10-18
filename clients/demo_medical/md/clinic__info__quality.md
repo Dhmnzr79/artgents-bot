@@ -2,6 +2,7 @@
 doc_id: clinic__info__quality
 doc_type: info
 topic: clinic
+subtopic: quality
 suggest_h3:
   - ponyatnyi-plan
   - demo-otsenka

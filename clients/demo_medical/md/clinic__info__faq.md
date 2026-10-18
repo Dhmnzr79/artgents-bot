@@ -1,7 +1,8 @@
 ---
 doc_id: clinic__info__faq
-doc_type: faq
+doc_type: info
 topic: clinic
+subtopic: faq
 suggest_h3:
   - nuzhny-li-analizy
   - individualnyi-plan

@@ -64,7 +64,7 @@ def test_three_tabs_private_shared_form_and_page_remount(http_env,monkeypatch,tm
     await page.evaluate(()=>document.fonts.ready);
     for(const textSize of ['100%','200%']){
       await page.evaluate(size=>document.documentElement.style.fontSize=size,textSize);
-      for(const width of [320,360,390,430,1280]){
+      for(const width of [320,360,390,412,440,1280]){
         await page.setViewportSize({width,height:900});
         await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
         const problems=await page.locator('[data-clinic-panel]').evaluate(panel=>{
@@ -122,6 +122,7 @@ def test_three_tabs_private_shared_form_and_page_remount(http_env,monkeypatch,tm
   if(process.env.THREE_TABS_SCREENSHOT_DIR)await page.locator('[data-clinic-panel]').screenshot({path:path.join(process.env.THREE_TABS_SCREENSHOT_DIR,`${fixtures.config.clientId}-390-detail.png`)});
   await catalogPanel.getByRole('button',{name:'Оставить заявку',exact:true}).click();
   await catalogPanel.getByLabel('Как к вам обращаться').fill('Анна Проверка');
+  if(await catalogPanel.locator('.clinic-catalog__apply').count())throw new Error('Catalog CTA remains above open form');
   await catalogPanel.getByLabel('Телефон',{exact:true}).fill('+79991234567');
   await catalogPanel.getByRole('button',{name:'Отправить заявку',exact:true}).click();
   if(await page.evaluate(()=>window.formRequests.length)!==0)throw new Error('Unchecked form submitted');
@@ -131,10 +132,11 @@ def test_three_tabs_private_shared_form_and_page_remount(http_env,monkeypatch,tm
   await booking.getByLabel('Как к вам обращаться').waitFor();
   if(await booking.getByLabel('Как к вам обращаться').inputValue()!=='Анна Проверка')throw new Error('Name draft lost');
   if(await booking.getByLabel('Телефон',{exact:true}).inputValue()!=='+79991234567')throw new Error('Phone draft lost');
-  if(await booking.locator('[data-booking-service]').inputValue()!==fixtures.service.service_id)throw new Error('Exact service lost');
+  if(!(await booking.locator('.clinic-booking__subject').innerText()).includes(fixtures.service.name))throw new Error('Exact service lost');
+  if(await booking.locator('select').count())throw new Error('Removed service selector remains');
   const chosenLabel=fixtures.service.price.rows[index].variant_label;
   if(chosenLabel&&!(await booking.locator('.clinic-booking__subject').innerText()).includes(chosenLabel))throw new Error('Exact offer label lost');
-  await booking.getByLabel('Пожелание · необязательно').fill('Позвонить после 18:00');
+  await booking.getByLabel('Пожелания (необязательно)').fill('Позвонить после 18:00');
   await auditLayout('extended booking form');
   await booking.getByRole('checkbox').check();
   if(await page.evaluate(()=>window.formRequests.length)!==0)throw new Error('Checkbox submitted');
@@ -146,7 +148,11 @@ def test_three_tabs_private_shared_form_and_page_remount(http_env,monkeypatch,tm
   await booking.getByRole('button',{name:'Отправить заявку',exact:true}).click();
   await booking.getByRole('button',{name:'Проверить отправку',exact:true}).waitFor();
   await auditLayout('uncertain submission and retry');
+  if(!await booking.getByRole('button',{name:'Убрать',exact:true}).isDisabled())throw new Error('Uncertain request selection is mutable');
   await page.getByRole('tab',{name:'Услуги и цены',exact:true}).click();
+  // Open a different offer while delivery is uncertain; its CTA must not replace the frozen request.
+  await catalogPanel.getByRole('button',{name:fixtures.service.name,exact:true}).click();
+  await catalogPanel.locator('.clinic-price-card__overview-row').nth((index+1)%fixtures.service.price.rows.length).click();
   await catalogPanel.getByRole('button',{name:'Оставить заявку',exact:true}).click();
   if(!await catalogPanel.getByLabel('Телефон',{exact:true}).isDisabled())throw new Error('Opening another form discarded uncertain request');
   await page.getByRole('tab',{name:'Запись',exact:true}).click();
@@ -175,11 +181,12 @@ def test_three_tabs_private_shared_form_and_page_remount(http_env,monkeypatch,tm
   if(await page.locator('.clinic-msg--user').count()!==userCount)throw new Error('Price choice appended user echo');
   await page.locator('[data-clinic-feed] .clinic-turn__btn--cta-primary').last().click();
   const inline=page.locator('[data-clinic-feed] .clinic-booking');await inline.waitFor();
+  if(await page.locator('[data-clinic-feed] .clinic-turn__btn--cta-primary').count())throw new Error('Chat CTA remains above open form');
   if(!(await inline.locator('.clinic-booking__subject').innerText()).includes(chosenLabel))throw new Error('Chat CTA lost exact offer');
   await inline.getByLabel('Как к вам обращаться').fill('Мария');
   await page.getByRole('tab',{name:'Запись',exact:true}).click();
   if(await booking.getByLabel('Как к вам обращаться').inputValue()!=='Мария')throw new Error('Chat draft not shared');
-  if(await booking.locator('[data-booking-service]').inputValue()!==fixtures.service.service_id)throw new Error('Chat service not shared');
+  if(!(await booking.locator('.clinic-booking__subject').innerText()).includes(fixtures.service.name))throw new Error('Chat service not shared');
   if(await page.evaluate(()=>window.askRequests.length)!==1)throw new Error('Chat CTA called model');
   for(const width of [320,390,1280]){
     await page.setViewportSize({width,height:900});

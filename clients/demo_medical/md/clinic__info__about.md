@@ -2,6 +2,7 @@
 doc_id: clinic__info__about
 doc_type: info
 topic: clinic
+subtopic: about
 suggest_h3:
   - odin-vizit
   - v-tsifrakh

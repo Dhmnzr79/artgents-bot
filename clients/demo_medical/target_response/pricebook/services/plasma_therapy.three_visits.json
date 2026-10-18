@@ -24,7 +24,6 @@
   "fact_refs": [
     "demo_price_before_action",
     "demo_fixed_package_scope",
-    "demo_cosmetic_control",
     "demo_plasma_flexible_payment"
   ],
   "followups": [

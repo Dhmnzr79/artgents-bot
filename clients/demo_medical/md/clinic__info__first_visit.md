@@ -2,6 +2,7 @@
 doc_id: clinic__info__first_visit
 doc_type: info
 topic: clinic
+subtopic: first_visit
 suggest_h3:
   - marshrut
   - posle-vstrechi

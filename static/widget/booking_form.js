@@ -1,4 +1,5 @@
 import { visitorIdForClient } from './api.js';
+import { createWidgetIcon } from './icons.js';
 
 const el=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!=null)node.textContent=text;return node;};
 
@@ -34,13 +35,17 @@ export function createBookingForm({apiBase,clientId,getSid,getCatalog}){
     }
     mount.replaceChildren();
     const form=el('form','clinic-booking');form.noValidate=true;
-    form.append(el(extended?'h2':'h3',null,extended?'Запись на приём':'Оставить заявку'),
-      el('p','clinic-booking__intro',extended?
-        'Оставьте имя и телефон — администратор свяжется с вами и согласует время приёма.':
-        'Администратор свяжется с вами и согласует время приёма.'));
+    if(extended)form.append(el('p','clinic-booking__intro',
+      'Оставьте имя и телефон — администратор свяжется с вами и согласует время приёма.'));
     const service=draft.selection?catalog.services.find(s=>s.service_id===draft.selection.service_id):null;
     const row=service?.price?.rows.find(r=>r.offer_id===draft.selection?.offer_id);
-    if(service)form.append(el('p','clinic-booking__subject',[service.name,row?.variant_label].filter(Boolean).join(' · ')));
+    if(service){
+      const subject=el('div','clinic-booking__subject');
+      const clear=el('button','clinic-booking__clear','Убрать');clear.type='button';clear.dataset.bookingClear='';
+      clear.disabled=pending||Boolean(body)||Boolean(result);
+      clear.onclick=()=>{if(pending||body||result)return;draft.selection=null;renderAll();};
+      subject.append(el('span',null,'Интересует: '+[service.name,row?.variant_label].filter(Boolean).join(' · ')),clear);form.append(subject);
+    }
     const field=(key,labelText,type='text')=>{
       const label=el('label','clinic-booking__field',labelText),input=el(type==='textarea'?'textarea':'input');
       if(type!=='textarea')input.type=type;
@@ -48,20 +53,12 @@ export function createBookingForm({apiBase,clientId,getSid,getCatalog}){
       input.required=key==='name'||key==='phone';input.maxLength=key==='wish'?500:key==='name'?120:40;
       if(key==='name')input.autocomplete='name';
       if(key==='phone'){input.autocomplete='tel';input.inputMode='tel';input.placeholder='+7 (999) 999-99-99';}
-      if(key==='wish')input.placeholder='Например, удобно позвонить после 18:00';
+      if(key==='wish')input.placeholder='Например, услуга или удобное время для звонка';
       input.addEventListener('input',()=>{input.setCustomValidity('');sync(key,input.value);});
       label.append(input);form.append(label);return input;
     };
     const name=field('name','Как к вам обращаться');const phone=field('phone','Телефон','tel');
-    if(extended){
-      const label=el('label','clinic-booking__field','Что вас интересует · необязательно');
-      const select=el('select');select.dataset.bookingService='';
-      const none=el('option',null,'Помогите определиться');none.value='';select.append(none);
-      for(const service of catalog.services){const option=el('option',null,service.name);option.value=service.service_id;select.append(option);}
-      select.value=draft.selection?.service_id||'';
-      select.onchange=()=>{draft.selection=select.value?{service_id:select.value,offer_id:null,catalog_version:catalog.catalog_version}:null;body=null;renderAll();};
-      label.append(select);form.append(label);field('wish','Пожелание · необязательно','textarea');
-    }
+    if(extended)field('wish','Пожелания (необязательно)','textarea');
     const consentLabel=el('label','clinic-booking__consent');const consent=el('input');consent.type='checkbox';
     consent.dataset.bookingField='consent';consent.checked=draft.consent;consent.required=true;
     consent.onchange=()=>{consent.setCustomValidity('');sync('consent',consent.checked);};
@@ -74,7 +71,8 @@ export function createBookingForm({apiBase,clientId,getSid,getCatalog}){
     }
     if(links.children.length)form.append(links);
     const status=el('p','clinic-booking__error',error||(!result?.ok?result?.message||'':''));status.setAttribute('role','status');form.append(status);
-    const submit=el('button','clinic-booking__submit',pending?'Отправляем…':body?'Проверить отправку':'Отправить заявку');submit.type='submit';form.append(submit);
+    const submit=el('button','clinic-booking__submit',pending?'Отправляем…':body?'Проверить отправку':'Отправить заявку');submit.type='submit';
+    submit.append(createWidgetIcon('arrow','clinic-cta-arrow'));form.append(submit);
     const terminalFailure=result&&!result.ok;
     for(const input of form.querySelectorAll('input,select,textarea'))input.disabled=pending||Boolean(body)||Boolean(terminalFailure);
     submit.disabled=pending||Boolean(terminalFailure);

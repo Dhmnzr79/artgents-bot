@@ -1,13 +1,12 @@
 import { renderPriceBody } from './price_card.js';
+import { createWidgetIcon } from './icons.js';
 
 const element=(tag,cls,text)=>{const el=document.createElement(tag);if(cls)el.className=cls;if(text!=null)el.textContent=text;return el;};
 const button=(text,action,cls='clinic-catalog__back')=>{const el=element('button',cls,text);el.type='button';
-  if(cls==='clinic-catalog__back'&&text.startsWith('← ')){el.setAttribute('aria-label',text);el.textContent=text.slice(2);el.classList.add('clinic-catalog__back--chevron');}
+  if(cls==='clinic-catalog__back'&&text.startsWith('← ')){el.setAttribute('aria-label',text.slice(2));el.replaceChildren(createWidgetIcon('arrow','clinic-catalog__back-icon','left'),element('span',null,text.slice(2)));}
   el.addEventListener('click',action);return el;};
-const arrow=()=>{const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-  svg.setAttribute('class','clinic-catalog__arrow');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('fill','none');
-  svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','1.4');svg.setAttribute('aria-hidden','true');
-  const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d','M4 12h16m-6-6 6 6-6 6');svg.append(path);return svg;};
+const arrow=()=>createWidgetIcon('arrow','clinic-catalog__arrow');
+const searchBox=input=>{const box=element('label','clinic-catalog__search-box');box.append(createWidgetIcon('search'),input);return box;};
 
 /** Read-only navigation state belongs to this widget instance, never the dialogue. */
 export function mountCatalog(root,{apiBase,clientId,onApply}){
@@ -25,8 +24,10 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
       state.service=null;state.offer=null;renderList();scroller().scrollTop=state.listScroll;
     }));
     const price=detail?.price||service.price;
-    root.append(element('h2','clinic-catalog__title',position?(price.rows[0].variant_label||service.name):service.name));
-    if(!position)root.append(element('p','clinic-catalog__subtitle',service.subtitle));
+    if(!price||price.presentation==='options'){
+      root.append(element('h2','clinic-catalog__title',service.name));
+      if(service.subtitle)root.append(element('p','clinic-catalog__subtitle',service.subtitle));
+    }
     if(price){
       const cardRoot=element('div');
       const renderPositions=()=>{
@@ -44,7 +45,7 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
       };
       if(price.presentation==='options'&&price.rows.length>6){
         const search=element('input','clinic-catalog__search');search.type='search';search.placeholder='Найти зону или вариант…';search.setAttribute('aria-label','Поиск по прайсу');search.value=state.offerQuery;
-        search.addEventListener('input',()=>{state.offerQuery=search.value;renderPositions();});root.append(search);
+        search.addEventListener('input',()=>{state.offerQuery=search.value;renderPositions();});root.append(searchBox(search));
       }
       renderPositions();root.append(cardRoot);
     }else{
@@ -53,7 +54,9 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
     const apply=button('Оставить заявку',()=>{
       const offer=state.offer||(service.price?.presentation==='detail'?service.price.rows[0].offer_id:null);
       onApply({service_id:service.service_id,offer_id:offer,catalog_version:state.data.catalog_version},formMount);
+      apply.remove();
     },'clinic-catalog__apply');
+    apply.append(createWidgetIcon('arrow','clinic-cta-arrow'));
     const formMount=element('div','clinic-booking-mount');formMount.dataset.catalogForm='';
     root.append(apply,formMount);
   }
@@ -73,6 +76,7 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
       list.replaceChildren();const query=state.query.trim().toLocaleLowerCase('ru');
       list.classList.toggle('clinic-catalog__list--services',Boolean(query||state.section||!state.data.show_sections));
       title.textContent=query?'Результаты поиска':sectionById(state.section)?.title||'Услуги и цены';
+      heading.hidden=!query&&!state.section;
       if(!query&&!state.section&&state.data.show_sections){
         for(const section of state.data.sections){
           const row=button('',()=>{state.directionScroll=scroller().scrollTop;state.section=section.section_id;renderList();scroller().scrollTop=0;},'clinic-catalog__row');
@@ -96,7 +100,7 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
       }
     };
     input.addEventListener('input',()=>{state.query=input.value;renderRows();});
-    root.append(heading,input,list);renderRows();
+    root.append(heading,searchBox(input),list);renderRows();
   }
 
   async function load(){

@@ -85,6 +85,7 @@ def _serialize_fact_row(fact_id: str, fact: TargetCommercialFact) -> dict[str, o
         "render_mode": str(fact.render_mode),
         "active": bool(fact.active),
         "allowed_service_ids": sorted(str(item) for item in fact.allowed_service_ids),
+        "allowed_offer_ids": sorted(str(item) for item in fact.allowed_offer_ids),
         "allowed_topics": sorted(str(item) for item in fact.allowed_topics),
         "incompatible_with": sorted(str(item) for item in fact.incompatible_with),
         "excluded_service_ids": sorted(str(item) for item in fact.excluded_service_ids),

@@ -4,6 +4,7 @@ Historical suites stay unchanged. Fixtures use only prose, D2_META and native
 show_price, never adapt the retired envelope. Secondary tenant is synthetic:
 nikadent is unfinished and is not certified by this demo gate.
 """
+from tests.d2_ci_http import bind_copied_tenant
 import json
 import shutil
 from pathlib import Path
@@ -14,7 +15,7 @@ from core.d2_dialogue_store import D2DialogueStore
 from core.clinic_policies_loader import resolve_policy_text
 from contracts.response_plan import SessionKey
 from session import session_client_scope, mem_get, set_situation_pending
-from lead_interrupt import LEAD_PENDING_ANSWER_REF, LEAD_RESUME_REF
+from tests.test_widget_booking_form import form_payload
 from tests.test_d2_http_contract import http_env, post, post_sse, sse_events
 from tests.test_d2_native_price_runtime import Transport, message, price
 
@@ -46,6 +47,7 @@ def demo_gate_env(http_env,monkeypatch):
     # Valid synthetic secondary tenant, not an edit/fallback for the unfinished real pack.
     root=tmp/"clients"
     shutil.copytree(root/"demo",root/"secondary")
+    bind_copied_tenant(root/'secondary', 'secondary')
     path=root/"secondary/clinic_policies.yaml"
     data=yaml.safe_load(path.read_text(encoding="utf-8"))
     data["contact"]["phone_display"]="+7 (999) 000-00-01"
@@ -103,45 +105,40 @@ def test_tenant_contact_native_price_same_sid_and_replay_are_isolated(demo_gate_
 
 
 @pytest.mark.parametrize("transport",["json","sse"])
-def test_booking_pii_pending_resume_and_situation_disabled(demo_gate_env,transport):
+def test_private_booking_receipt_and_ordinary_dialogue_are_separate(demo_gate_env,transport):
     client,db,use,_=demo_gate_env
     wire=Transport(message(reply(actions=[action("start_booking",age_group="adult")])),message("Ответ по материалам клиники."))
     use(D2HttpProvider(transport=wire))
     first=call(client,transport,request_id="book",q="Хочу записаться")
-    assert "Как к вам обращаться" in first["answer"]
+    assert first["ui"]["booking_form"] is True
+    assert not first["ui"]["quick_replies"]
     with session_client_scope("demo"):
-        assert mem_get("cp6a")["lead_intent"]=="collecting_name"
+        assert mem_get("cp6a")["lead_intent"] == "none"
         set_situation_pending("cp6a",True)
-    phone=call(client,transport,request_id="name",q="Анна")
-    assert phone["ui"]["composer_input_mode"]=="phone" and len(wire.calls)==1
-    with session_client_scope("demo"):
-        assert mem_get("cp6a")["lead_intent"]=="collecting_phone"
-        assert mem_get("cp6a")["profile"]["name"]=="Анна"
-        assert mem_get("cp6a")["situation_pending"] is True
-    question="Меня зовут Анна, телефон +7 999 123-45-67. Как проходит лечение?"
-    pending=call(client,transport,request_id="question",q=question)
-    assert LEAD_PENDING_ANSWER_REF in {x["reply_id"] for x in pending["ui"]["quick_replies"]}
+    with D2DialogueStore(db) as store:
+        key=SessionKey(client_id="demo",sid="cp6a")
+        before=store.read(key)
+        completion=store.read_latest_completion(key)
+    payload=form_payload(client,tenant='demo',sid='cp6a',name='ПриватноеИмяФормыГейт')
+    result=client.post('/lead',json=payload)
+    assert result.status_code==200 and result.get_json()['status']=='demo_stub'
+    assert client.post('/lead',json=payload).get_json()==result.get_json()
     assert len(wire.calls)==1
-    args=dict(request_id="answer",q="",ref=LEAD_PENDING_ANSWER_REF,ui_revision=pending["revision"])
+    with D2DialogueStore(db) as store:
+        assert store.read(key)==before and store.read_latest_completion(key)==completion
+        receipts=store._connection.execute('SELECT payload FROM d2_turn_request').fetchall()
+        encoded=json.dumps(receipts,ensure_ascii=False)
+        assert all(value not in encoded for value in ('ПриватноеИмяФормыГейт','79991234567','Позвонить вечером'))
+    args=dict(request_id="question",q="Как проходит лечение?")
     answer=call(client,transport,**args)
     assert answer["answer"]=="Ответ по материалам клиники."
     assert call(client,transport,**args)==answer and len(wire.calls)==2
-    user=wire.calls[1]["messages"][1]["content"]
-    assert "Анна" not in user and "79991234567" not in user and "123-45-67" not in user
-    assert "Как проходит лечение?" in user
+    prompt=json.dumps(wire.calls[1]["messages"],ensure_ascii=False)
+    assert all(value not in prompt for value in ('ПриватноеИмяФормыГейт','79991234567','Позвонить вечером'))
     with session_client_scope("demo"):
-        assert mem_get("cp6a")["lead_intent"]=="paused"
-        assert mem_get("cp6a")["lead_resume_step"]=="collecting_phone"
-    resumed=call(client,transport,request_id="resume",q="",ref=LEAD_RESUME_REF,ui_revision=answer["revision"])
-    assert resumed["ui"]["composer_input_mode"]=="phone" and len(wire.calls)==2
-    with session_client_scope("demo"):
-        assert mem_get("cp6a")["lead_intent"]=="collecting_phone"
-    submitted=call(client,transport,request_id="phone",q="+79991234567")
-    assert submitted["lead_effect"]["status"]=="demo_stub"
-    assert len(wire.calls)==2
-    with D2DialogueStore(db) as store:
-        state=store.read(SessionKey(client_id="demo",sid="cp6a")).state.model_dump_json()
-        assert "79991234567" not in state and "Анна" not in state
+        state=mem_get('cp6a')
+        assert state['lead_intent']=='none' and state['situation_pending'] is True
+        assert not state['profile'].get('name') and not state['profile'].get('phone')
 
 
 @pytest.mark.parametrize("transport",["json","sse"])

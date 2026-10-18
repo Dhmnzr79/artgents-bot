@@ -1,0 +1,35 @@
+{
+  "offer_id": "digital_dermatoscopy.extended",
+  "service_id": "digital_dermatoscopy",
+  "option_id": "extended",
+  "active": true,
+  "price": {
+    "mode": "no_public_price",
+    "approved_text": "Стоимость уточнит администратор"
+  },
+  "package": {
+    "label": "за индивидуально согласованный объём картирования; состав согласуется заранее, не включает автоматически любое количество образований",
+    "includes": [
+      "Согласование объёма обзорной фотографии и дерматоскопии",
+      "Предложение с полным составом и ценой до процедуры"
+    ],
+    "excludes": [
+      "Удаление и гистология"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
+}

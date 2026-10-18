@@ -15,6 +15,7 @@ const configs = await originalFetch("/configs.json").then(r => r.json());
 const sent = [];
 globalThis.fetch = async (url, options = {}) => {
   if (String(url).includes("/api/video-catalog")) return new Response('{"videos":{}}');
+  if (String(url).endsWith('/api/widget-session')) return new Response(JSON.stringify({client_id:JSON.parse(options.body).client_id,entries:[],current:null,actions_current:false}));
   if (!String(url).endsWith("/ask/stream")) throw new Error("Unexpected widget network: " + url);
   sent.push(JSON.parse(options.body));
   // Terminal mocked transport failure keeps the test independent of model semantics.
@@ -61,6 +62,7 @@ try {
       assert(body.client_id === "nikadent","Tenant changed");
       assert(!body.ref && !body.ui_revision,"Invented governed UI reference");
       assert(!JSON.stringify(body).includes("utm_source") && !body.pagePath && !body.pageUrl,"Page context leaked");
+      assert(body.entry_page_path === (route.split(/[?#]/)[0].replace(/\\/+$/, '') || '/'),"Initial pathname not captured");
       await wait(()=>!el.querySelector(".clinic-shell__typing.is-visible"));
       widget.resetSession();
       await wait(()=>el.querySelector(".clinic-shell__welcome-screen"));
@@ -70,13 +72,17 @@ try {
   }
   const {el,widget} = mount(nika,"/");
   history.replaceState({},"","/all-on-4/");
+  const initialBefore=sent.length;buttons(el)[0].click();await wait(()=>sent.length>initialBefore);
+  assert(sent.at(-1).entry_page_path==='/',"Navigation before first send changed initial page");
+  await wait(()=>!el.querySelector(".clinic-shell__typing.is-visible"));
+  history.replaceState({},"","/all-on-4/");
   widget.resetSession();check(el,nika.pageMenus[0],nika.welcomePromotion);el.remove();
   const preview = mount(nika,"/static/widget-test.html?client=nikadent",{pagePath:"/semnoe-protezirovanie/"});
   check(preview.el,nika.pageMenus[1],nika.welcomePromotion);preview.el.remove();
   // Explicit mode owns all three buttons even for a tenant with a case gallery.
   const explicitDemo = mount({...nika,clientId:"demo"},"/");
   check(explicitDemo.el,nika,nika.welcomePromotion);explicitDemo.el.remove();
-  const demo = mount(configs.demo,"/all-on-4/");
+  const demo = mount(configs.demo,"/");
   assert(buttons(demo.el).length === 3,"Existing demo menu changed");
   assert(buttons(demo.el).some(b=>b.textContent.includes('До и после')),"Demo gallery missing");demo.el.remove();
   const promo = mount(nika,"/all-on-4/");

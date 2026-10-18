@@ -1,0 +1,41 @@
+{
+  "offer_id": "gynecology_consultation.primary",
+  "service_id": "gynecology_consultation",
+  "option_id": "primary",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "visit",
+    "amount": 3300
+  },
+  "package": {
+    "label": "за один первичный приём",
+    "includes": [
+      "Обсуждение жалоб и истории обращения",
+      "Гинекологический осмотр по ситуации и с согласия пациентки",
+      "Разбор предоставленных результатов",
+      "Письменное заключение и дальнейший план"
+    ],
+    "excludes": [
+      "УЗИ",
+      "Лабораторные исследования и забор материала для них",
+      "Кольпоскопия и лечебные процедуры"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
+}

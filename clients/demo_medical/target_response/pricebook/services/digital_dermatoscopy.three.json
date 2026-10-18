@@ -1,0 +1,40 @@
+{
+  "offer_id": "digital_dermatoscopy.three",
+  "service_id": "digital_dermatoscopy",
+  "option_id": "three",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "package",
+    "amount": 3500
+  },
+  "package": {
+    "label": "за готовый пакет исследования до трёх образований",
+    "includes": [
+      "Цифровая дерматоскопия каждого образования в пределах пакета",
+      "Фотофиксация исследованных образований",
+      "Заключение"
+    ],
+    "excludes": [
+      "Карта всей поверхности кожи",
+      "Исследование дополнительных образований",
+      "Удаление и гистология"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
+}

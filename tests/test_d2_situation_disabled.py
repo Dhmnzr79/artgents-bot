@@ -8,6 +8,7 @@ from session import mem_get, session_client_scope, set_situation_pending, set_si
 from tests.test_d2_http_contract import FakeProvider, http_env, post, post_sse, sse_events
 from lead_interrupt import LEAD_PENDING_ANSWER_REF, LEAD_RESUME_REF
 from core.d2_live_provider import build_d2_d1r_messages
+from tests.test_widget_booking_form import form_payload
 
 
 def booking_reply():
@@ -51,10 +52,9 @@ def test_obsolete_command_cannot_change_lead_or_call_model(http_env, transport, 
     fake = use(FakeProvider(booking_reply()))
     send = post if transport == 'json' else post_sse
     if active:
-        _body(send(client, request_id='book', q='Хочу записаться'), transport)
-        assert_lead_step('collecting_name')
-        _body(send(client, request_id='name', q='Анна'), transport)
-        assert_lead_step('collecting_phone')
+        booking = _body(send(client, request_id='book', q='Хочу записаться'), transport)
+        assert booking['ui']['booking_form'] is True
+        assert_lead_step('none')
     with session_client_scope('demo'):
         before = deepcopy(mem_get('cp6a'))
     count = len(fake.inputs)
@@ -67,43 +67,38 @@ def test_obsolete_command_cannot_change_lead_or_call_model(http_env, transport, 
 
 
 @pytest.mark.parametrize('transport', ['json', 'sse'])
-@pytest.mark.parametrize('slot', ['ordinary', 'name', 'phone'])
+@pytest.mark.parametrize('slot', ['ordinary', 'form_open', 'form_submitted'])
 def test_historical_situation_flag_cannot_route_current_turn(http_env, transport, slot):
     client, _, use, _ = http_env
     fake = use(FakeProvider(booking_reply()))
     send = post if transport == 'json' else post_sse
     if slot != 'ordinary':
-        _body(send(client, request_id='book', q='Хочу записаться'), transport)
-        assert_lead_step('collecting_name')
-        if slot == 'phone':
-            _body(send(client, request_id='name', q='Анна'), transport)
-            assert_lead_step('collecting_phone')
+        opened = _body(send(client, request_id='book', q='Хочу записаться'), transport)
+        assert opened['ui']['booking_form'] is True
+        assert_lead_step('none')
+        if slot == 'form_submitted':
+            payload = form_payload(client, tenant='demo', sid='cp6a')
+            submitted = client.post('/lead', json=payload)
+            assert submitted.status_code == 200 and submitted.get_json()['status'] == 'demo_stub'
     with session_client_scope('demo'):
         set_situation_pending('cp6a', True)
         set_situation_note('cp6a', 'Старая заметка')
     fake.raw = 'Пояснение по материалам клиники.'
-    question = 'Как проходит лечение? +79991234567' if slot == 'ordinary' else 'Александр' if slot == 'name' else '+79991234567'
     count = len(fake.inputs)
-    args = dict(request_id='current', q=question)
+    args = dict(request_id='current', q='Как проходит лечение? +79991234567')
     body = _body(send(client, **args), transport)
     assert _body(send(client, **args), transport) == body
+    assert body['answer'] == fake.raw
     with session_client_scope('demo'):
         state = mem_get('cp6a')
         assert state['situation_pending'] is True
-        assert state['situation_note'] == ('' if slot == 'phone' else 'Старая заметка')
-        if slot == 'ordinary':
-            assert state['lead_intent'] not in {'collecting_name', 'collecting_phone'}
-            assert body['answer'] == 'Пояснение по материалам клиники.'
-        elif slot == 'name':
-            assert state['lead_intent'] == 'collecting_phone'
-            assert state['profile']['name'] == 'Александр'
-        else:
-            assert 'заявка никуда не ушла' in body['answer']
-    assert len(fake.inputs) == count + (1 if slot == 'ordinary' else 0)
-    if slot == 'ordinary':
-        prompt = json.dumps(build_d2_d1r_messages(fake.inputs[-1]), ensure_ascii=False)
-        assert '79991234567' not in prompt
-        assert 'Старая заметка' not in prompt
+        assert state['situation_note'] == 'Старая заметка'
+        assert state['lead_intent'] == 'none'
+        assert not state['profile'].get('name') and not state['profile'].get('phone')
+    assert len(fake.inputs) == count + 1
+    prompt = json.dumps(build_d2_d1r_messages(fake.inputs[-1]), ensure_ascii=False)
+    assert '79991234567' not in prompt and 'Старая заметка' not in prompt
+    assert 'Тестовое Имя Формы' not in prompt and 'Позвонить вечером' not in prompt
 
 
 @pytest.mark.parametrize('transport', ['json', 'sse'])
@@ -117,36 +112,34 @@ def test_existing_booking_cta_still_requires_published_ui(http_env, transport):
                   ui_revision=answer['revision']), transport)
     with session_client_scope('demo'):
         assert mem_get('cp6a')['lead_intent'] != 'collecting_name'
-    _body(send(client, request_id='click', q='', ref='button:' + button['button_id'],
+    opened = _body(send(client, request_id='click', q='', ref='button:' + button['button_id'],
                ui_revision=answer['revision']), transport)
     with session_client_scope('demo'):
-        assert mem_get('cp6a')['lead_intent'] == 'collecting_name'
+        assert mem_get('cp6a')['lead_intent'] == 'none'
+    assert opened['ui']['booking_form'] is True
+    assert not opened['ui']['quick_replies']
     assert len(fake.inputs) == 1
 
 
 @pytest.mark.parametrize('transport', ['json', 'sse'])
-def test_historical_situation_flag_does_not_interrupt_lead_pause(http_env, transport):
+def test_historical_situation_flag_does_not_restore_retired_lead_commands(http_env, transport):
     client, _, use, _ = http_env
     fake = use(FakeProvider(booking_reply()))
     send = post if transport == 'json' else post_sse
-    _body(send(client, request_id='book', q='Хочу записаться'), transport)
-    assert_lead_step('collecting_name')
-    _body(send(client, request_id='name', q='Анна'), transport)
-    assert_lead_step('collecting_phone')
-    pending = _body(send(client, request_id='question', q='Как проходит лечение?'), transport)
-    fake.raw = 'Пояснение по материалам клиники.'
-    paused = _body(send(client, request_id='answer', q='', ref=LEAD_PENDING_ANSWER_REF,
-                        ui_revision=pending['revision']), transport)
+    opened = _body(send(client, request_id='book', q='Хочу записаться'), transport)
+    assert opened['ui']['booking_form'] is True
+    assert_lead_step('none')
     with session_client_scope('demo'):
         set_situation_pending('cp6a', True)
         before = deepcopy(mem_get('cp6a'))
-        assert before['lead_intent'] == 'paused'
-    resumed = _body(send(client, request_id='resume', q='', ref=LEAD_RESUME_REF,
-                         ui_revision=paused['revision']), transport)
+    for index, ref in enumerate((LEAD_PENDING_ANSWER_REF, LEAD_RESUME_REF)):
+        rejected(send(client, request_id=f'old-{index}', q='', ref=ref,
+                      ui_revision=opened['revision']), transport)
+        with session_client_scope('demo'):
+            assert mem_get('cp6a') == before
+    fake.raw = 'Пояснение по материалам клиники.'
+    answered = _body(send(client, request_id='question', q='Как проходит лечение?'), transport)
+    assert answered['answer'] == fake.raw and len(fake.inputs) == 2
     with session_client_scope('demo'):
-        state = mem_get('cp6a')
-        assert state['lead_intent'] == 'collecting_phone'
-        assert state['profile']['name'] == 'Анна'
-        assert state['situation_pending'] is True
-    assert {q['reply_id'] for q in resumed['ui']['quick_replies']} == {'lead:cancel'}
-    assert len(fake.inputs) == 2
+        assert mem_get('cp6a')['lead_intent'] == 'none'
+        assert mem_get('cp6a')['situation_pending'] is True

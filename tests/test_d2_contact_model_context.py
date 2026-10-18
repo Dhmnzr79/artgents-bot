@@ -1,4 +1,5 @@
 """Canonical captured YAML contacts ground ordinary model answers."""
+from tests.d2_ci_http import bind_copied_tenant
 import json
 import shutil
 from pathlib import Path
@@ -35,6 +36,7 @@ def test_contacts_use_captured_snapshot_and_do_not_leak_between_tenants(tmp_path
     root = tmp_path / "clients"
     for tenant in ("demo", "other"):
         shutil.copytree(Path("clients/demo"), root / tenant)
+        bind_copied_tenant(root / tenant, tenant)
     first = load_d2_tenant_snapshot("demo", clients_root=root)
     original = json.loads(build_d2_model_view(first).clinic_policy_catalog_json)["contact_facts"]
     for tenant in ("demo", "other"):

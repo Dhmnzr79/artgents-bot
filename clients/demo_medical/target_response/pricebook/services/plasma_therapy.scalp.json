@@ -1,0 +1,41 @@
+{
+  "offer_id": "plasma_therapy.scalp",
+  "service_id": "plasma_therapy",
+  "option_id": "scalp",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "zone",
+    "amount": 7200
+  },
+  "package": {
+    "label": "за одну процедуру согласованной зоны кожи головы",
+    "includes": [
+      "Забор крови",
+      "Один стандартный набор для подготовки плазмы",
+      "Центрифугирование и подготовка плазмы",
+      "Проведение процедуры и расходники"
+    ],
+    "excludes": [
+      "Отдельная первичная консультация",
+      "Трихоскопия и анализы",
+      "Средства для домашнего лечения"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
+}

@@ -9,7 +9,7 @@
     "billing_unit": "tooth"
   },
   "package": {
-    "label": "за одну коронку на импланте; материал и состав уточняются после осмотра",
+    "label": "за одну коронку на импланте; Материал коронки и состав работ согласуем после осмотра.",
     "includes": [],
     "excludes": [
       "Установка импланта не входит в эту сумму."
@@ -24,11 +24,6 @@
   "option_id": "crown",
   "required_conditions_metadata": {
     "completeness": "complete",
-    "conditions": [
-      {
-        "condition_id": "mandatory_exclusion",
-        "display_text": "Установка импланта не входит в эту сумму."
-      }
-    ]
+    "conditions": []
   }
 }

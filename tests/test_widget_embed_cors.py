@@ -35,6 +35,9 @@ def test_is_widget_embed_cors_path():
     assert widget_cors.is_widget_embed_cors_path("/api/media/pain-doctor-explains")
     assert widget_cors.is_widget_embed_cors_path("/static/widget/embed.js")
     assert widget_cors.is_widget_embed_cors_path("/static/widget/widget.js")
+    assert widget_cors.is_widget_embed_cors_path("/static/fonts/inter-cyrillic-wght-normal.woff2")
+    assert widget_cors.is_widget_embed_cors_path("/static/fonts/inter-latin-wght-normal.woff2")
+    assert not widget_cors.is_widget_embed_cors_path("/static/fonts/other.woff2")
     assert widget_cors.is_widget_embed_cors_path("/ask/stream")
     assert not widget_cors.is_widget_embed_cors_path("/dashboard")
     assert not widget_cors.is_widget_embed_cors_path("/static/clients/demo/logo.svg")
@@ -46,6 +49,17 @@ def test_matching_widget_origin_allows_listed(monkeypatch):
 
     monkeypatch.setattr("core.origin_guard.request", _Req())
     assert matching_widget_origin("demo") == "https://artgents.ru"
+
+
+@pytest.mark.parametrize("filename", ["inter-cyrillic-wght-normal.woff2", "inter-latin-wght-normal.woff2"])
+@pytest.mark.parametrize("origin,allowed", [("https://artgents.ru", True), ("https://evil.example", False)])
+def test_bundled_inter_uses_existing_origin_guard(filename, origin, allowed):
+    with app_module.app.test_request_context(
+        "/static/fonts/" + filename, base_url="https://demo.bot.artgents.ru",
+        headers={"Origin": origin},
+    ):
+        response = widget_cors.apply_widget_cors_headers(app_module.app.response_class(b"font"))
+        assert response.headers.get("Access-Control-Allow-Origin") == (origin if allowed else None)
 
 
 def test_matching_widget_origin_rejects_unknown(monkeypatch):

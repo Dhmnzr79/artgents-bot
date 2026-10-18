@@ -1,0 +1,141 @@
+{
+  "demo_plasma_flexible_payment": {
+    "id": "demo_plasma_flexible_payment",
+    "kind": "payment",
+    "catalog_label": "Плазмотерапия без полной предоплаты",
+    "text_fact": "Пакет плазмотерапии лица оплачивается по выполненным посещениям. План и интервалы согласуете с врачом, суммы каждого этапа узнаете до старта. Разовую процедуру можно выбрать отдельно.",
+    "microfact_text": "Пакет плазмотерапии лица: платите по выполненным посещениям, без полной предоплаты.",
+    "render_mode": "strict",
+    "active": true,
+    "allowed_service_ids": [
+      "plasma_therapy"
+    ],
+    "allowed_topics": [],
+    "detail_ref": "clinic__info__promotions.md#korotko",
+    "incompatible_with": []
+  },
+  "demo_price_before_action": {
+    "id": "demo_price_before_action",
+    "kind": "benefit",
+    "catalog_label": "Стоимость согласуем до начала",
+    "text_fact": "В «АртМед» состав и стоимость дополнительных услуг согласуют до выполнения. Если врач предложит исследование или следующий этап, сначала объяснит его задачу; решение об оплате принимаете вы. Полная стоимость лечения рассчитывается по согласованному объёму.",
+    "microfact_text": "До начала дополнительных услуг согласуем их состав и полную стоимость.",
+    "render_mode": "strict",
+    "active": true,
+    "allowed_service_ids": [
+      "ent_consultation",
+      "ent_endoscopy",
+      "nasal_lavage",
+      "therapist_consultation",
+      "pediatric_consultation",
+      "gynecology_consultation",
+      "cervical_screening",
+      "urology_consultation",
+      "cardiology_consultation",
+      "ecg",
+      "neurology_consultation",
+      "abdominal_ultrasound",
+      "thyroid_ultrasound",
+      "dermatology_consultation",
+      "digital_dermatoscopy",
+      "biorevitalization",
+      "plasma_therapy",
+      "photorejuvenation",
+      "laser_hair_removal",
+      "ultrasound_lifting",
+      "botulinum_therapy"
+    ],
+    "allowed_topics": [],
+    "detail_ref": "clinic__info__promotions.md#korotko",
+    "incompatible_with": []
+  },
+  "demo_fixed_package_scope": {
+    "id": "demo_fixed_package_scope",
+    "kind": "benefit",
+    "catalog_label": "Понятный состав до начала",
+    "text_fact": "До начала вы знаете выбранные зоны, исследования, число посещений и включённые услуги. Если понадобится другой объём, врач объяснит изменения, а администратор заранее согласует стоимость.",
+    "microfact_text": "Заранее объясним, что входит в комплекс и какие услуги оплачиваются отдельно.",
+    "render_mode": "strict",
+    "active": true,
+    "allowed_service_ids": [
+      "ent_consultation",
+      "ent_endoscopy",
+      "nasal_lavage",
+      "therapist_consultation",
+      "pediatric_consultation",
+      "gynecology_consultation",
+      "cervical_screening",
+      "urology_consultation",
+      "cardiology_consultation",
+      "ecg",
+      "neurology_consultation",
+      "abdominal_ultrasound",
+      "thyroid_ultrasound",
+      "dermatology_consultation",
+      "digital_dermatoscopy",
+      "biorevitalization",
+      "plasma_therapy",
+      "photorejuvenation",
+      "laser_hair_removal",
+      "ultrasound_lifting",
+      "botulinum_therapy"
+    ],
+    "allowed_topics": [],
+    "detail_ref": "clinic__info__promotions.md#korotko",
+    "incompatible_with": []
+  },
+  "demo_ultrasound_10": {
+    "id": "demo_ultrasound_10",
+    "kind": "promo",
+    "catalog_label": "Скидка 10% на УЗИ",
+    "text_fact": "Скидка 10% на УЗИ брюшной полости и щитовидной железы до 30.11.2026. По предварительной записи.",
+    "microfact_text": "Скидка 10% на выбранное УЗИ до 30.11.2026. По предварительной записи.",
+    "render_mode": "strict",
+    "active": true,
+    "allowed_service_ids": [
+      "abdominal_ultrasound",
+      "thyroid_ultrasound"
+    ],
+    "allowed_topics": [],
+    "detail_ref": "clinic__info__promotions.md#korotko",
+    "incompatible_with": [],
+    "active_from": "2026-10-18",
+    "active_until": "2026-11-30"
+  },
+  "demo_beauty_15": {
+    "id": "demo_beauty_15",
+    "kind": "promo",
+    "catalog_label": "Скидка 15% на эпиляцию и фотоомоложение",
+    "text_fact": "Скидка 15% на лазерную эпиляцию и фотоомоложение до 31.12.2026. По предварительной записи.",
+    "microfact_text": "Скидка 15% на выбранную процедуру до 31.12.2026. По предварительной записи.",
+    "render_mode": "strict",
+    "active": true,
+    "allowed_service_ids": [
+      "laser_hair_removal",
+      "photorejuvenation"
+    ],
+    "allowed_topics": [],
+    "detail_ref": "clinic__info__promotions.md#korotko",
+    "incompatible_with": [],
+    "active_from": "2026-10-18",
+    "active_until": "2026-12-31"
+  },
+  "demo_free_cosmetology_consult": {
+    "id": "demo_free_cosmetology_consult",
+    "kind": "promo",
+    "catalog_label": "Бесплатная консультация косметолога",
+    "text_fact": "Бесплатная консультация косметолога перед биоревитализацией или ультразвуковым лифтингом до 31.12.2026. По предварительной записи.",
+    "microfact_text": "Бесплатная консультация косметолога перед процедурой до 31.12.2026. По предварительной записи.",
+    "render_mode": "strict",
+    "active": true,
+    "allowed_service_ids": [
+      "biorevitalization",
+      "ultrasound_lifting"
+    ],
+    "allowed_topics": [],
+    "detail_ref": "clinic__info__promotions.md#korotko",
+    "incompatible_with": [],
+    "active_from": "2026-10-18",
+    "active_until": "2026-12-31"
+  }
+}

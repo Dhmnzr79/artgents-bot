@@ -1,0 +1,61 @@
+{
+  "offer_id": "ultrasound_lifting.face_neck500",
+  "service_id": "ultrasound_lifting",
+  "option_id": "face_neck500",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "package",
+    "amount": 49000
+  },
+  "package": {
+    "label": "за готовый комплекс лица и шеи до 500 линий",
+    "includes": [
+      "Осмотр и разметка лица и шеи",
+      "Аппаратная процедура в пределах пакета",
+      "Расходные материалы",
+      "Памятка и согласование контроля"
+    ],
+    "excludes": [
+      "Веки, декольте и тело",
+      "Воздействия сверх пакета",
+      "Другие аппаратные методики"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope",
+    "demo_free_cosmetology_consult"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    },
+    {
+      "id": "stages",
+      "label": "Оплата по этапам",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  },
+  "payment_stages": [
+    {
+      "label": "Осмотр, подготовка и начало процедуры",
+      "amount": 19000,
+      "currency": "RUB",
+      "timing_text": "В день процедуры после подтверждения состава."
+    },
+    {
+      "label": "Завершение аппаратной процедуры",
+      "amount": 30000,
+      "currency": "RUB",
+      "timing_text": "В тот же день после выполнения согласованного объёма."
+    }
+  ]
+}

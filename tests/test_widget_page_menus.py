@@ -25,10 +25,8 @@ def presentation(tenant="nikadent"):
     lambda d: d["pageMenus"][0]["starterPrompts"][0].update(videoKey="other-client-video"),
     lambda d: d["pageMenus"][0].update(welcomePromotion={"title": "override"}),
     lambda d: d["pageMenus"][0].update(clientId="demo"),
-    lambda d: d.update(starterPrompts=d["starterPrompts"][:2]),
     lambda d: d.update(welcomeText=" "),
     lambda d: d["starterPrompts"][0].update(q=" "),
-    lambda d: d["starterPrompts"][0].update(videoKey="some-video"),
     lambda d: d["pageMenus"].append(copy.deepcopy(d["pageMenus"][0])),
     lambda d: d["pageMenus"][0].update(paths=["/all-on-4", "/all-on-4/"]),
 ])
@@ -46,6 +44,13 @@ def test_author_paths_are_exact_pathnames(path):
     raw["pageMenus"][0]["paths"] = [path]
     with pytest.raises(WidgetConfigValidationError):
         validate_widget_presentation_document(raw, client_id="nikadent")
+
+
+def test_default_menu_keeps_authored_video_while_page_menu_has_three_questions():
+    raw=presentation('demo')
+    assert len(raw['starterPrompts'])==2 and raw['starterPrompts'][1]['videoKey']
+    assert all(len(menu['starterPrompts'])==3 for menu in raw['pageMenus'])
+    validate_widget_presentation_document(raw,client_id='demo')
 
 
 def test_widget_api_projects_current_tenant_menus_without_security_fields(monkeypatch):
@@ -66,7 +71,7 @@ def test_widget_api_projects_current_tenant_menus_without_security_fields(monkey
             assert body["welcomePromotion"] == presentation()["welcomePromotion"]
             assert "15%" not in json.dumps(body, ensure_ascii=False)
         else:
-            assert body.get("pageMenus") is None
+            assert {m['topicId'] for m in body['pageMenus']}=={'implantation','prosthetics','whitening'}
             assert "НикаДент" not in json.dumps(body, ensure_ascii=False)
     assert client.get("/api/widget-config?client_id=nikadent",
                       headers={"Origin": "https://unrelated.invalid"}).status_code == 403

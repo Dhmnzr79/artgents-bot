@@ -1,0 +1,14 @@
+contact:
+  phone_display: '+7 (000) 000-00-00'
+  address_display: 'ул. Садовая, 10'
+  hours_display: 'Ежедневно 09:00–21:00'
+  parking_display: 'Парковка у входа'
+policies: {}
+service_alternatives: []
+brand_alternatives: []
+service_not_offered_template: 'В каталоге «АртМед» нет услуги «{requested_service}». Уточнить возможность обращения можно у администратора.'
+hard_stop_template: 'Я помогаю по вопросам услуг медцентра, цен и записи на приём.'
+spam_one_chance_template: 'Напишите, пожалуйста, понятный вопрос об услугах медцентра.'
+spam_closed_template: 'Диалог завершён. Можно начать новую беседу.'
+manual_contact_template: 'Такой вопрос нужно обсудить с врачом. Он оценит ситуацию и определит дальнейшие действия.'
+manual_contact_urgent_suffix: 'При срочной ситуации обратитесь за неотложной медицинской помощью, не ожидая ответа помощника.'

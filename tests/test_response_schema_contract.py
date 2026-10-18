@@ -176,8 +176,8 @@ def test_every_s1_model_forbids_extra_fields() -> None:
     [
         (
             TargetService,
-            {"name": "x", "family": "medical", "selection": {"mode": "scope"}},
-            "literal_error",
+            {"name": "x", "family": " ", "selection": {"mode": "scope"}},
+            "string_must_not_be_blank",
         ),
         (
             TargetService,

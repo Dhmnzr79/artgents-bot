@@ -716,6 +716,7 @@ def _resolve_clarify_ui(plan: PreComposerPlan) -> ResolvedUiPlan:
 def _resolve_commerce_ui(plan: PreComposerPlan) -> ResolvedUiPlan:
     return ResolvedUiPlan(
         lead_consent=plan.ui_candidates.lead_consent,
+        booking_form=plan.ui_candidates.booking_form,
         quick_replies=plan.ui_candidates.quick_replies,
         buttons=plan.ui_candidates.buttons,
         widget=plan.ui_candidates.widget,

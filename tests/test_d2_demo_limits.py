@@ -1,4 +1,5 @@
 """Demo admission on actual HTTP provider with offline transport only."""
+from tests.d2_ci_http import bind_copied_tenant
 import sqlite3
 import shutil
 from copy import deepcopy
@@ -12,6 +13,7 @@ from tests.test_d2_http_contract import http_env, post, post_sse, sse_events
 from tests.test_d2_native_price_runtime import Transport, message, price
 from tests.test_d2_text_reply import response, action
 from tests.test_d2_price_cards import cards
+from tests.test_widget_booking_form import form_payload
 
 
 def wire(monkeypatch, *replies, fail=False):
@@ -38,7 +40,7 @@ def _body(response, transport):
 def seed(db, *, sid='other', count=1, peer='seed', stamp=None):
     with sqlite3.connect(db) as conn:
         admit_demo_call(conn, sid=sid, peer_ip=peer, now=time.time() if stamp is None else stamp)
-        conn.executemany('INSERT INTO d2_demo_model_attempt VALUES(?,?,?)', [(sid, 'seed', time.time() if stamp is None else stamp)] * (count-1))
+        conn.executemany('INSERT INTO d2_demo_model_attempt (sid,peer_hash,admitted_at,client_id) VALUES(?,?,?,?)', [(sid, 'seed', time.time() if stamp is None else stamp, 'demo')] * (count-1))
 
 
 def limit(response, transport, code):
@@ -88,6 +90,7 @@ def test_session_limit_replay_free_click_and_explicit_new_sid(http_env, monkeypa
 def test_shared_limit_before_transport_and_other_tenant_unchanged(http_env, monkeypatch, transport, kind):
     client, db, _, tmp = http_env
     shutil.copytree(tmp / 'clients/demo', tmp / 'clients/secondary')
+    bind_copied_tenant(tmp / 'clients/secondary', 'secondary')
     import config
     monkeypatch.setattr(config, 'ALLOWED_CLIENTS', frozenset({'demo', 'secondary'}))
     calls = wire(monkeypatch)
@@ -153,32 +156,30 @@ def test_daily_and_ip_windows_expire_without_resetting_session(tmp_path, monkeyp
 
 
 @pytest.mark.parametrize('transport', ['json', 'sse'])
-def test_quota_denial_preserves_named_lead_and_new_sid_does_not_inherit_it(http_env, monkeypatch, transport):
-    from lead_interrupt import LEAD_PENDING_ANSWER_REF
+def test_quota_denial_preserves_private_form_and_new_sid_is_independent(http_env, monkeypatch, transport):
     from session import mem_get, session_client_scope
     client, db, _, _ = http_env
     calls = wire(monkeypatch, message(response(actions=[action('start_booking', age_group='adult')])),
                  message(response(actions=[action('start_booking', age_group='adult')])))
     send = post if transport == 'json' else post_sse
-    _body(send(client, request_id='book', q='Хочу записаться'), transport)
-    with session_client_scope('demo'):
-        assert mem_get('cp6a')['lead_intent'] == 'collecting_name'
-    _body(send(client, request_id='name', q='Анна'), transport)
-    with session_client_scope('demo'):
-        assert mem_get('cp6a')['lead_intent'] == 'collecting_phone'
-    pending = _body(send(client, request_id='question', q='Сколько стоит имплантация?'), transport)
+    opened = _body(send(client, request_id='book', q='Хочу записаться'), transport)
+    assert opened['ui']['booking_form'] is True
+    payload = form_payload(client, tenant='demo', sid='cp6a', name='Анна')
     seed(db, sid='cp6a', count=29)
     with session_client_scope('demo'):
         before = deepcopy(mem_get('cp6a'))
-        assert before['profile']['name'] == 'Анна'
-    limit(send(client, request_id='blocked', q='', ref=LEAD_PENDING_ANSWER_REF,
-               ui_revision=pending['revision']), transport, 'demo_session_limit')
+        assert before['lead_intent'] == 'none'
+    limit(send(client, request_id='blocked', q='Сколько стоит имплантация?'), transport, 'demo_session_limit')
     with session_client_scope('demo'):
         assert mem_get('cp6a') == before
     assert len(calls) == 1
-    _body(send(client, sid='new', request_id='fresh-book', q='Хочу записаться'), transport)
+    submitted = client.post('/lead', json=payload)
+    assert submitted.status_code == 200 and submitted.get_json()['status'] == 'demo_stub'
+    assert client.post('/lead', json=payload).get_json() == submitted.get_json()
+    fresh = _body(send(client, sid='new', request_id='fresh-book', q='Хочу записаться'), transport)
+    assert fresh['ui']['booking_form'] is True
     with session_client_scope('demo'):
         assert mem_get('cp6a') == before
-        assert mem_get('new')['lead_intent'] == 'collecting_name'
+        assert mem_get('new')['lead_intent'] == 'none'
         assert not mem_get('new')['profile'].get('name')
     assert len(calls) == 2

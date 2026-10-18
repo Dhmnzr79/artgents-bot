@@ -1,0 +1,38 @@
+{
+  "offer_id": "botulinum_therapy.individual",
+  "service_id": "botulinum_therapy",
+  "option_id": "individual",
+  "active": true,
+  "price": {
+    "mode": "no_public_price",
+    "approved_text": "Стоимость уточнит администратор"
+  },
+  "package": {
+    "label": "за согласованную процедуру после очной оценки врача",
+    "includes": [
+      "Согласованные врачом препарат, области и объём",
+      "Подготовка кожи и введение препарата",
+      "Расходные материалы",
+      "Индивидуальная памятка"
+    ],
+    "excludes": [
+      "Отдельная первичная консультация",
+      "Другие косметологические процедуры"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
+}

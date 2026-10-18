@@ -1,0 +1,41 @@
+{
+  "offer_id": "cervical_screening.basic",
+  "service_id": "cervical_screening",
+  "option_id": "basic",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "procedure",
+    "amount": 2900
+  },
+  "package": {
+    "label": "за один забор материала и одно исследование",
+    "includes": [
+      "Забор материала с шейки матки",
+      "Расходные материалы",
+      "Жидкостная цитология",
+      "Электронный лабораторный результат"
+    ],
+    "excludes": [
+      "Полноценная консультация гинеколога",
+      "ВПЧ-тест",
+      "Кольпоскопия и биопсия"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
+}

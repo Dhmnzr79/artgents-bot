@@ -134,6 +134,7 @@ def build_d2_d1r_messages(request: D2ProviderInput) -> tuple[dict[str, str], dic
     ))
     user = "\n\n".join((
         "=== D2_SESSION_CONTEXT ===\n" + request.context.model_dump_json(),
+        *(("=== ENTRY_PAGE_CONTEXT (starting page only; not a stated patient need) ===\n" + request.entry_page_context.model_dump_json(),) if request.entry_page_context is not None else ()) ,
         "=== D2_SELECTED_UI_REF ===\n" + json.dumps(
             request.selected_ui_ref.model_dump(mode="json")
             if request.selected_ui_ref is not None

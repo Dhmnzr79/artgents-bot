@@ -9,7 +9,7 @@
     "billing_unit": "tooth"
   },
   "package": {
-    "label": "за зуб; объём работ уточняется на консультации",
+    "label": "за зуб; Объём работ согласуем на консультации до начала лечения.",
     "includes": [],
     "excludes": [
       "Стоимость коронки оплачивается отдельно."
@@ -23,11 +23,6 @@
   ],
   "required_conditions_metadata": {
     "completeness": "complete",
-    "conditions": [
-      {
-        "condition_id": "mandatory_exclusion",
-        "display_text": "Стоимость коронки оплачивается отдельно."
-      }
-    ]
+    "conditions": []
   }
 }

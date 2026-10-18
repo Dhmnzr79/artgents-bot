@@ -460,11 +460,14 @@ class D2FrozenPriceRow(ResponsePlanModel):
 class D2FrozenPriceBlock(ResponsePlanModel):
     source_client_id: NonBlankStr
     rows: tuple[D2FrozenPriceRow, ...]
+    presentation: Literal["options", "detail"]
 
     @model_validator(mode="after")
     def _validate_rows(self) -> Self:
         if not self.rows:
             raise ValueError("d2_price_rows_out_of_bounds")
+        if self.presentation == "detail" and len(self.rows) != 1:
+            raise ValueError("d2_price_detail_requires_one_offer")
         seen: set[str] = set()
         for row in self.rows:
             if row.source_client_id != self.source_client_id:
@@ -867,6 +870,7 @@ def _validate_price_detail_ui_actions(
 
 
 class UiPlanCandidates(ResponsePlanModel):
+    booking_form: bool = False
     lead_consent: LeadConsentPrompt | None = None
     quick_replies: tuple[UiQuickReplyCandidate, ...] = ()
     buttons: tuple[UiButtonCandidate, ...] = ()
@@ -1341,6 +1345,7 @@ class ResolvedTextualCtaBlock(ResponsePlanModel):
 
 
 class ResolvedUiPlan(ResponsePlanModel):
+    booking_form: bool = False
     lead_consent: LeadConsentPrompt | None = None
     quick_replies: tuple[UiQuickReplyCandidate, ...] = ()
     buttons: tuple[UiButtonCandidate, ...] = ()
@@ -1844,6 +1849,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
 
 
 class ResponseUIProjection(ResponsePlanModel):
+    booking_form: bool = False
     lead_consent: LeadConsentPrompt | None = None
     composer_input_mode: Literal["text", "phone"] = "text"
     quick_replies: tuple[UiQuickReplyCandidate, ...] = ()

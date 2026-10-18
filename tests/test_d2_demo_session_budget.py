@@ -9,6 +9,14 @@ from tests.test_d2_native_price_runtime import Transport, message, price
 from tests.test_d2_http_contract import post, post_sse, sse_events
 
 
+def test_demo_tenants_have_separate_session_budgets_even_in_shared_store(tmp_path):
+    with sqlite3.connect(tmp_path/'limits.sqlite')as conn:
+        for _ in range(30):admit_demo_call(conn,sid='same',peer_ip='local',now=100,client_id='demo')
+        with pytest.raises(D2DemoLimitReached,match='demo_session_limit'):
+            admit_demo_call(conn,sid='same',peer_ip='local',now=100,client_id='demo')
+        admit_demo_call(conn,sid='same',peer_ip='local',now=100,client_id='demo_medical')
+
+
 @pytest.mark.parametrize("transport", ["json", "sse"])
 def test_thirtieth_call_completes_price_replay_is_free_next_denied(http_env, transport):
     client, db, use, _ = http_env

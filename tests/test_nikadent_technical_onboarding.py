@@ -1,4 +1,4 @@
-"""Current HTTP/SSE -> existing SMTP with private slots and durable receipts."""
+"""Current HTTP/SSE opens a private form; /lead sends with durable receipts."""
 import json
 import subprocess
 import os
@@ -15,17 +15,30 @@ from core.d2_tenant_snapshot import build_d2_model_view, load_d2_tenant_snapshot
 from core.d2_live_provider import build_d2_d1r_messages
 from tests.d2_ci_http import FakeProvider, http_env, send, click
 from tests.test_d2_text_reply import response, action
+from tests.test_widget_booking_form import form_payload
 
 
-def begin(client, fake, *, client_id="demo", sid="lead", phone=False, transport="json"):
+def begin(client, fake, *, client_id="demo", sid="lead", transport="json"):
     fake.raw = response(actions=[action("start_booking", age_group="adult")])
     booking = send(client, transport, client_id=client_id, sid=sid, request_id="book", q="Хочу записаться")
-    if client_id == "nikadent":
-        assert booking["ui"]["lead_consent"] is not None
-        click(client, booking, "lead:consent_accept", client_id=client_id, sid=sid,
-              request_id="consent", transport=transport)
-    if phone:
-        send(client, transport, client_id=client_id, sid=sid, request_id="name", q="Анна")
+    assert booking["ui"]["booking_form"] is True
+    assert booking["ui"]["lead_consent"] is None
+    assert not booking["ui"]["quick_replies"]
+    return form_payload(client, tenant=client_id, sid=sid, request_id="submit", name="Анна", phone="8 (900) 123-45-67")
+
+
+def saved_form(db, tenant, sid):
+    with D2DialogueStore(db) as store:
+        status, payload = store._connection.execute(
+            "SELECT status,payload FROM d2_turn_request WHERE client_id=? AND sid=? AND request_id='submit'",
+            (tenant, sid)).fetchone()
+        assert status == "form_complete"
+        # Contact fields never enter a receipt or ordinary dialogue state/completion.
+        assert "Анна" not in payload and "79001234567" not in payload
+        key = SessionKey(client_id=tenant, sid=sid)
+        assert store.read_completion(key, "submit") is None
+        assert "Анна" not in store.read(key).model_dump_json()
+        return json.loads(payload)
 
 
 @pytest.fixture(autouse=True)
@@ -41,19 +54,21 @@ def private_offline_environment(monkeypatch):
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
-def test_nikadent_accepted_slots_send_once_and_replay_without_private_data(http_env, monkeypatch, transport):
+def test_nikadent_private_form_sends_once_and_replay_without_private_data(http_env, monkeypatch, transport):
     client, db, use, _ = http_env
     fake = use(FakeProvider("unused"))
     smtp = MagicMock()
     connect = MagicMock()
     connect.return_value.__enter__.return_value = smtp
     monkeypatch.setattr("core.lead_email._connect_smtp", connect)
-    begin(client, fake, client_id="nikadent", sid="nika-lead", phone=True, transport=transport)
-    args = dict(client_id="nikadent", sid="nika-lead", request_id="phone", q="8 (900) 123-45-67")
-    body = send(client, transport, **args)
-    assert body["lead_effect"]["status"] == "sent"
-    assert "свяжется" in body["answer"]
-    assert send(client, transport, **args) == body
+    payload = begin(client, fake, client_id="nikadent", sid="nika-lead", transport=transport)
+    result = client.post("/lead", json=payload)
+    assert result.status_code == 200
+    body = result.get_json()
+    assert body["status"] == "sent" and body["ok"]
+    assert "свяжется" in body["message"]
+    assert client.post("/lead", json=payload).get_json() == body
+    assert client.post("/lead", json={**payload, "phone": "+79007654321"}).status_code == 409
     smtp.send_message.assert_called_once()
     message = smtp.send_message.call_args.args[0]
     assert message["To"] == "gothica@mail.ru, vikadent2025@mail.ru"
@@ -65,13 +80,9 @@ def test_nikadent_accepted_slots_send_once_and_replay_without_private_data(http_
         private = mem_get("nika-lead")
         assert private["lead_intent"] == "none"
         assert not private["profile"].get("name") and not private["profile"].get("phone")
-    with D2DialogueStore(db) as store:
-        key = SessionKey(client_id="nikadent", sid="nika-lead")
-        saved = store.read_completion(key, "phone")
-        assert saved.response.rendered_text == body["answer"]
-        assert saved.response.ui_projection.model_dump(mode="json") == body["ui"]
-        for text in (saved.model_dump_json(), store.read(key).model_dump_json()):
-            assert "Анна" not in text and "79001234567" not in text
+    receipt = saved_form(db, "nikadent", "nika-lead")
+    assert receipt["status"] == "sent" and receipt["message"] == body["message"]
+    assert receipt["consent_receipt"]["client_id"] == "nikadent"
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
@@ -86,17 +97,17 @@ def test_failed_or_ambiguous_email_is_saved_truthfully_without_resend(http_env, 
     monkeypatch.setattr("core.lead_email._connect_smtp", connect)
     if failure == "missing":
         monkeypatch.delenv("SMTP_PASSWORD")
-    begin(client, fake, client_id="nikadent", sid="failed-lead", phone=True, transport=transport)
-    args = dict(client_id="nikadent", sid="failed-lead", request_id="phone", q="+79001234567")
-    body = send(client, transport, **args)
-    assert body["lead_effect"]["status"] == expected_status
-    assert phrase in body["answer"] and "свяжется" not in body["answer"]
-    assert send(client, transport, **args) == body
+    payload = begin(client, fake, client_id="nikadent", sid="failed-lead", transport=transport)
+    result = client.post("/lead", json=payload)
+    assert result.status_code == 200
+    body = result.get_json()
+    assert body["status"] == expected_status and not body["ok"]
+    assert phrase in body["message"] and "свяжется" not in body["message"]
+    assert client.post("/lead", json=payload).get_json() == body
     assert connect.call_count == (1 if failure == "smtp" else 0)
-    with D2DialogueStore(db) as store:
-        saved = store.read_completion(SessionKey(client_id="nikadent", sid="failed-lead"), "phone")
-        assert saved.response.rendered_text == body["answer"]
-        assert saved.lead_effect.status == expected_status
+    receipt = saved_form(db, "nikadent", "failed-lead")
+    assert receipt["status"] == expected_status and receipt["message"] == body["message"]
+    assert len(fake.inputs) == 1
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
@@ -105,32 +116,39 @@ def test_demo_submission_keeps_stub_and_never_connects_smtp(http_env, monkeypatc
     fake = use(FakeProvider("unused"))
     connect = MagicMock(side_effect=AssertionError("demo cannot send email"))
     monkeypatch.setattr("core.lead_email._connect_smtp", connect)
-    begin(client, fake, sid="shared-id", phone=True, transport=transport)
-    body = send(client, transport, sid="shared-id", request_id="phone", q="+79001234567")
-    assert body["lead_effect"]["status"] == "demo_stub"
+    payload = begin(client, fake, sid="shared-id", transport=transport)
+    body = client.post("/lead", json=payload).get_json()
+    assert body["status"] == "demo_stub" and body["ok"]
     connect.assert_not_called()
-    begin(client, fake, client_id="nikadent", sid="shared-id", phone=True, transport=transport)
+    other_payload = begin(client, fake, client_id="nikadent", sid="shared-id", transport=transport)
+    other_payload["phone"] = "+79007654321"
     monkeypatch.delenv("SMTP_PASSWORD")
-    other = send(client, transport, client_id="nikadent", sid="shared-id", request_id="phone", q="+79007654321")
-    assert other["lead_effect"]["status"] == "failed"
-    assert other["client_id"] == "nikadent" and body["client_id"] == "demo"
+    other = client.post("/lead", json=other_payload).get_json()
+    assert other["status"] == "failed" and not other["ok"]
+    assert client.post("/lead", json=payload).get_json() == body
+    assert client.post("/lead", json=other_payload).get_json() == other
+    assert len(fake.inputs) == 2
+    connect.assert_not_called()
 
 
-def test_commit_failure_does_not_send_and_restores_private_slot(http_env, monkeypatch):
-    client, _, use, _ = http_env
+def test_commit_failure_before_effect_does_not_send_or_save_private_fields(http_env, monkeypatch):
+    client, db, use, _ = http_env
     fake = use(FakeProvider("unused"))
-    begin(client, fake, client_id="nikadent", sid="commit", phone=True)
+    payload = begin(client, fake, client_id="nikadent", sid="commit")
     connect = MagicMock()
     monkeypatch.setattr("core.lead_email._connect_smtp", connect)
-    monkeypatch.setattr(D2DialogueStore, "complete", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("commit failed")))
-    response = client.post("/ask", json={"client_id":"nikadent", "sid":"commit", "request_id":"phone", "q":"+79001234567"})
-    assert response.status_code == 503
+    monkeypatch.setattr(D2DialogueStore, "save_form_pending", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("commit failed")))
+    result = client.post("/lead", json=payload)
+    assert result.status_code == 500
     connect.assert_not_called()
+    with D2DialogueStore(db) as store:
+        assert not store._connection.execute("SELECT 1 FROM d2_turn_request WHERE request_id='submit'").fetchone()
     from session import session_client_scope, mem_get
     with session_client_scope("nikadent"):
         state = mem_get("commit")
-        assert state["lead_intent"] == "collecting_phone"
-        assert state["profile"]["name"] == "Анна" and not state["profile"].get("phone")
+        assert state["lead_intent"] == "none"
+        assert not state["profile"].get("name") and not state["profile"].get("phone")
+    assert len(fake.inputs) == 1
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])

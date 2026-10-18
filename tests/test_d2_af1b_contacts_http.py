@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.d2_ci_http import bind_copied_tenant
+
 import json
 import shutil
 
@@ -27,6 +29,7 @@ def contact_env(http_env, monkeypatch):
     client, db, use, tmp = http_env
     # A valid synthetic pack with branch contact samples, not nikadent certification.
     shutil.copytree(tmp / 'clients/demo', tmp / 'clients/secondary')
+    bind_copied_tenant(tmp / 'clients/secondary', 'secondary')
     path = tmp / 'clients/secondary/clinic_policies.yaml'
     source = yaml.safe_load(path.read_text(encoding='utf-8'))
     samples = yaml.safe_load((tmp / 'clients/nikadent/clinic_policies.yaml').read_text(encoding='utf-8'))

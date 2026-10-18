@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.d2_ci_http import bind_copied_tenant
+
 import subprocess
 import sys
 from pathlib import Path
@@ -62,6 +64,7 @@ def test_validator_rejects_enabled_real_leads_without_valid_consent(tmp_path, br
     import yaml
     pack = tmp_path / "clinic"
     shutil.copytree(_TEMPLATE, pack)
+    bind_copied_tenant(pack, 'clinic')
     features = yaml.safe_load((pack / "features.yaml").read_text(encoding="utf-8"))
     features["leads"]["enabled"] = True
     (pack / "features.yaml").write_text(yaml.safe_dump(features), encoding="utf-8")
@@ -76,6 +79,7 @@ def test_validator_accepts_enabled_real_leads_with_consent(tmp_path):
     import yaml
     pack = tmp_path / "clinic"
     shutil.copytree(_TEMPLATE, pack)
+    bind_copied_tenant(pack, 'clinic')
     (pack / "features.yaml").write_text("leads:\n  enabled: true\n  mode: email\n", encoding="utf-8")
     config = yaml.safe_load((pack / "lead_config.yaml").read_text(encoding="utf-8"))
     config["consent"] = {"version": "v1", "checkbox_text": "Agree",
@@ -89,6 +93,7 @@ def test_validator_rejects_unbound_document_cta(tmp_path):
     import shutil
     pack = tmp_path / "clinic"
     shutil.copytree(_TEMPLATE, pack)
+    bind_copied_tenant(pack, 'clinic')
     (pack / "md/sample__service__example.md").write_text(
         "---\ntopic: general\ncta_action: lead\ncta_key: unknown\n---\n# Sample\n", encoding="utf-8")
     assert "md/sample__service__example.md: cta_key_missing_in_tone" in validate_client_pack(pack)
@@ -105,17 +110,17 @@ def test_demo_doctors_use_md_without_parallel_catalog():
     assert validate_client_pack(_DEMO) == []
 
 
-@pytest.mark.parametrize("reference", ["doctor:doctors__doctor__ghost", "kb:doctors__doctor__missing.md#korotko"])
-def test_validator_still_rejects_unavailable_sources_without_doctor_index(tmp_path, reference):
+@pytest.mark.parametrize("reference", ["doctors__doctor__missing.md#korotko", "clinic__info__consultation.md#missing"])
+def test_validator_rejects_unavailable_current_fact_sources(tmp_path, reference):
     import shutil
-    import yaml
+    import json
     pack = tmp_path / "demo"
     shutil.copytree(_DEMO, pack)
     baseline = validate_client_pack(pack)
-    path = pack / "target_response" / "marketing.yaml"
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    data["scenario_rules"]["doctor_trust"]["ordered_amplifier_refs"].append(reference)
-    path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+    path = pack / "target_response" / "pricebook" / "facts.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    next(iter(data.values()))["detail_ref"] = reference
+    path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     errors = validate_client_pack(pack)
     assert len(errors) == len(baseline) + 1
     assert any("external_ref_invalid" in error for error in errors)

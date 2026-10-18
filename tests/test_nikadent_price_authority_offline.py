@@ -148,7 +148,8 @@ def test_overview_volume_clicks_and_unknown_are_server_owned(http_env, transport
     if topic == "implantation":
         assert ids == ["all_on_4.default", "all_on_6.default"]
         assert all(r["mode"] == "no_public_price" for r in frozen_rows(db))
-        assert not cards(full) and "после диагностики и согласования плана" in full["answer"]
+        assert cards(full)[0]["price"]["presentation"] == "options"
+        assert "после диагностики и согласования плана" in full["answer"]
     else:
         assert ids == ["removable_dentures.jaw.full", "all_on_4.default", "all_on_6.default"]
         assert amount(rows(full)[0]) == 40000 and rows(full)[0]["billing_unit"] == "jaw"
@@ -184,11 +185,13 @@ def test_no_invented_full_package_or_unpublished_prices(http_env, service, exten
     body = send(client, client_id="nikadent", sid="nika-prices")
     assert all(r["mode"] == "no_public_price" for r in frozen_rows(db))
     assert not re.search(r"\d[\d\s]*₽", body["answer"])
-    assert not cards(body)
     if service in {"pulpitis", "teeth_cleaning"}:
+        assert not cards(body)
         assert not saved(db).response.resolved.finalized_commercial_ids.price_offer_ids
     else:
         assert frozen_rows(db) and all(r["approved_text"] for r in frozen_rows(db))
+        assert cards(body)[0]["price"]["presentation"] == "detail"
+        assert cards(body)[0]["price"]["rows"] == frozen_rows(db)
 
 
 @pytest.mark.parametrize("service,option,extent", [
@@ -207,12 +210,14 @@ def test_wrong_volume_or_option_does_not_substitute_cheapest_price(http_env, ser
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
-def test_exact_removable_default_and_authenticated_alternative_keep_scope(http_env, transport):
+def test_removable_options_and_authenticated_alternative_keep_scope(http_env, transport):
     client, db, use, _ = http_env
     wire = native(use, request("removable_dentures"))
     body = send(client, transport, client_id="nikadent", sid="nika-prices", request_id="first")
     assert rows(body)[0]["offer_id"] == "removable_dentures.jaw.partial"
     assert amount(rows(body)[0]) == 35000
+    assert cards(body)[0]["price"]["presentation"] == "options" and len(rows(body)) == 4
+    assert price_scope(db).brand_id is None
     refs = {c["reply_id"] for card in cards(body) for c in card["choices"]}
     assert refs == {"price_select:removable_dentures.jaw."+op for op in ["partial", "full", "acry_free", "nylon"]}
     selected = send(client, transport, client_id="nikadent", sid="nika-prices", request_id="acry", q="",
@@ -249,6 +254,13 @@ def test_surgical_and_prosthetic_exclusions_reach_card_grounding_and_history(htt
     row = rows(body)[0]
     assert any(excluded in x for x in row["excludes"])
     assert excluded in json.dumps(json.loads(wire.calls[1]["messages"][-2]["content"]), ensure_ascii=False)
+    if cards(body)[0]["price"]["presentation"] == "options":
+        # A list shows prices first; package details enter visible history
+        # only after the user opens this exact offer.
+        selected = click(client, body, "price_select:"+row["offer_id"],
+            client_id="nikadent",sid="nika-prices",request_id="detail")
+        assert cards(selected)[0]["price"]["presentation"] == "detail"
+        assert len(wire.calls) == 2
     wire.replies.append(message("Это разные этапы лечения."))
     send(client, client_id="nikadent", sid="nika-prices", request_id="follow", q="Это всё лечение целиком?")
     assert excluded in wire.calls[-1]["messages"][1]["content"]
@@ -263,7 +275,7 @@ def test_core_inlay_known_volume_retains_unit_price_and_crown_exclusion(http_env
                 q=f"Сколько стоит культевая вкладка на {count} зуба?")
     row, = rows(body)
     assert (row["offer_id"], row["min_amount"], row["billing_unit"]) == ("core_inlay.default", 7000, "tooth")
-    assert "Стоимость коронки оплачивается отдельно." in row["condition_texts"]
+    assert "Стоимость коронки оплачивается отдельно." in row["excludes"]
     assert "21 000" not in body["answer"].replace("\u00a0", " ")
 
 
@@ -401,4 +413,4 @@ def test_no_public_price_omits_loose_scope_but_preserves_authored_caveats(http_e
     assert scope not in body["answer"]
     assert data["price"]["approved_text"] in body["answer"]
     assert caveat in body["answer"] and mandatory in body["answer"]
-    assert not cards(body)
+    assert cards(body)[0]["price"]["presentation"] == "detail"

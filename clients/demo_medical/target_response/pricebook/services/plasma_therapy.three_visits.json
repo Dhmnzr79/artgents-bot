@@ -1,0 +1,65 @@
+{
+  "offer_id": "plasma_therapy.three_visits",
+  "service_id": "plasma_therapy",
+  "option_id": "three_visits",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "course",
+    "amount": 17500
+  },
+  "package": {
+    "label": "за готовый пакет из трёх процедур лица при подтверждённом врачом плане; число посещений не является обещанием результата",
+    "includes": [
+      "Три процедуры лица одинакового состава",
+      "Забор крови и стандартный набор на каждом посещении",
+      "Подготовка плазмы и расходники на каждом посещении"
+    ],
+    "excludes": [
+      "Другие зоны",
+      "Анализы и отдельная первичная консультация"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope",
+    "demo_plasma_flexible_payment"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    },
+    {
+      "id": "stages",
+      "label": "Оплата по этапам",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  },
+  "payment_stages": [
+    {
+      "label": "Первое посещение",
+      "amount": 6500,
+      "currency": "RUB",
+      "timing_text": "После первой выполненной процедуры."
+    },
+    {
+      "label": "Второе посещение",
+      "amount": 5500,
+      "currency": "RUB",
+      "timing_text": "После второй выполненной процедуры."
+    },
+    {
+      "label": "Третье посещение",
+      "amount": 5500,
+      "currency": "RUB",
+      "timing_text": "После третьей выполненной процедуры."
+    }
+  ]
+}

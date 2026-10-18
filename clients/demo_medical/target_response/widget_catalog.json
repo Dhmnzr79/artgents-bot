@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "client_id": "demo_medical",
+  "unpriced_text": "Стоимость уточнит администратор",
+  "sections": [
+    {
+      "section_id": "ent",
+      "title": "ЛОР",
+      "service_ids": [
+        "ent_consultation",
+        "ent_endoscopy",
+        "nasal_lavage"
+      ],
+      "subtitle": "Уши, горло и нос · взрослым и детям"
+    },
+    {
+      "section_id": "general_medicine",
+      "title": "Терапия",
+      "service_ids": [
+        "therapist_consultation"
+      ],
+      "subtitle": "Общие вопросы о здоровье"
+    },
+    {
+      "section_id": "pediatrics",
+      "title": "Педиатрия",
+      "service_ids": [
+        "pediatric_consultation"
+      ],
+      "subtitle": "Приём детей"
+    },
+    {
+      "section_id": "gynecology",
+      "title": "Гинекология",
+      "service_ids": [
+        "gynecology_consultation",
+        "cervical_screening"
+      ],
+      "subtitle": "Женское здоровье"
+    },
+    {
+      "section_id": "urology",
+      "title": "Урология",
+      "service_ids": [
+        "urology_consultation"
+      ],
+      "subtitle": "Консультации и обследования"
+    },
+    {
+      "section_id": "cardiology",
+      "title": "Кардиология",
+      "service_ids": [
+        "cardiology_consultation",
+        "ecg"
+      ],
+      "subtitle": "Сердце и сосуды"
+    },
+    {
+      "section_id": "neurology",
+      "title": "Неврология",
+      "service_ids": [
+        "neurology_consultation"
+      ],
+      "subtitle": "Консультации невролога"
+    },
+    {
+      "section_id": "ultrasound",
+      "title": "УЗИ",
+      "service_ids": [
+        "abdominal_ultrasound",
+        "thyroid_ultrasound"
+      ],
+      "subtitle": "Ультразвуковые исследования"
+    },
+    {
+      "section_id": "dermatology",
+      "title": "Дерматология",
+      "service_ids": [
+        "dermatology_consultation",
+        "digital_dermatoscopy"
+      ],
+      "subtitle": "Здоровье кожи"
+    },
+    {
+      "section_id": "cosmetology",
+      "title": "Косметология",
+      "service_ids": [
+        "biorevitalization",
+        "plasma_therapy",
+        "photorejuvenation",
+        "laser_hair_removal",
+        "ultrasound_lifting",
+        "botulinum_therapy"
+      ],
+      "subtitle": "Уход и эстетические процедуры"
+    }
+  ],
+  "label": "Медицинский центр",
+  "service_subtitles": {
+    "ent_consultation": "Уши, горло и нос: осмотр и план лечения",
+    "ent_endoscopy": "Осмотр носа и носоглотки с изображением на экране",
+    "nasal_lavage": "Промывание полости носа в кабинете ЛОРа",
+    "therapist_consultation": "Первый шаг при недомогании и непонятных симптомах",
+    "pediatric_consultation": "Осмотр ребёнка и рекомендации для родителей",
+    "gynecology_consultation": "Женское здоровье, осмотр и подбор обследований",
+    "cervical_screening": "Цитология и исследование на ВПЧ высокого риска",
+    "urology_consultation": "Жалобы на мочеиспускание и мужское здоровье",
+    "cardiology_consultation": "Оценка работы сердца, давления и факторов риска",
+    "ecg": "Запись электрической активности сердца и заключение",
+    "neurology_consultation": "Головные боли, боли в спине и нарушения чувствительности",
+    "abdominal_ultrasound": "Исследование печени, желчного пузыря и других органов",
+    "thyroid_ultrasound": "Оценка структуры, размеров и узлов щитовидной железы",
+    "dermatology_consultation": "Диагностика высыпаний и заболеваний кожи",
+    "digital_dermatoscopy": "Осмотр родинок с увеличением и сохранением снимков",
+    "biorevitalization": "Инъекционное увлажнение для более упругой кожи",
+    "plasma_therapy": "Собственная плазма для кожи лица и кожи головы",
+    "photorejuvenation": "Коррекция пигментации и сосудистых покраснений",
+    "laser_hair_removal": "Удаление нежелательных волос на выбранных зонах",
+    "ultrasound_lifting": "Более чёткий овал лица без разрезов",
+    "botulinum_therapy": "Смягчение мимических морщин с сохранением мимики"
+  },
+  "show_sections": true,
+  "offer_groups": {
+    "laser_hair_removal": [
+      {
+        "title": "Отдельные зоны",
+        "offer_ids": [
+          "laser_hair_removal.underarms",
+          "laser_hair_removal.legs"
+        ]
+      },
+      {
+        "title": "Комплекс",
+        "offer_ids": [
+          "laser_hair_removal.three_zones"
+        ]
+      }
+    ],
+    "plasma_therapy": [
+      {
+        "title": "Один сеанс",
+        "offer_ids": [
+          "plasma_therapy.face",
+          "plasma_therapy.scalp"
+        ]
+      },
+      {
+        "title": "Курс",
+        "offer_ids": [
+          "plasma_therapy.three_visits"
+        ]
+      }
+    ]
+  }
+}

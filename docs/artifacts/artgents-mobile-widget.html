@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Artgents · мобильный виджет</title>
+  <style>
+
+:root{color-scheme:light;--ink:#252525;--muted:#666;--quiet:#737373;--line:#e8e8e8;--soft:#f5f5f5;--blue:#192dee;--preview-width:390px;--visible-height:100dvh;--visible-top:0px;font-family:Arial,Helvetica,sans-serif;font-size:100%;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+*{box-sizing:border-box}body{margin:0;background:#eeefef;color:var(--ink);font-size:1rem;line-height:1.5}button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer;touch-action:manipulation}button,input,select,textarea,a{-webkit-tap-highlight-color:transparent}button{border:0}button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--blue);outline-offset:3px}button:disabled{cursor:default}button:active{filter:brightness(.97)}[hidden],.panel[hidden]{display:none!important}h1,h2,h3,p{margin:0}h2{font-size:1.5rem;line-height:1.22;letter-spacing:-.035em;font-weight:600;overflow-wrap:anywhere}h3{font-size:1.125rem;line-height:1.35;font-weight:600}svg{display:block}.arrow{width:20px;height:20px;flex:none;color:var(--muted)}
+.layout{display:grid;grid-template-columns:340px var(--preview-width);gap:88px;justify-content:center;align-items:start;padding:32px 24px;min-height:100dvh}.notes{padding-top:64px}.eyebrow{font-size:.75rem;line-height:1.4;letter-spacing:.075em;font-weight:500;color:var(--quiet)}.notes>.eyebrow{font-size:.6875rem}.notes h1{font-size:2.75rem;line-height:1.12;letter-spacing:-.055em;font-weight:500;margin:24px 0}.intro{color:var(--muted);line-height:1.7}.preview-label{font-size:.75rem;color:var(--muted);margin:40px 0 8px}.size-switch,.pack-switch{display:flex;gap:4px;padding:4px;background:#e3e5e5;border-radius:12px;max-width:300px}.size-switch button,.pack-switch button{background:transparent;border-radius:8px;min-height:44px;flex:1;font-size:.875rem}.size-switch button[aria-pressed=true],.pack-switch button[aria-pressed=true]{background:#fff;box-shadow:0 2px 4px #00000005}.pack-switch{margin-top:16px}.reset{display:block;min-height:44px;background:none;padding:0;font-size:.875rem;margin-top:20px;color:var(--muted)}.lab-note{font-size:.75rem;line-height:1.6;color:var(--quiet);max-width:285px;margin-top:20px}
+.widget{width:100%;height:calc(100dvh - 64px);max-height:880px;min-height:0;container:widget / inline-size;background:#fff;border-radius:24px;box-shadow:0 16px 60px #00000009,0 0 0 1px #00000005;display:flex;flex-direction:column;overflow:hidden}.header{display:flex;align-items:center;gap:12px;padding:20px 16px 16px;flex:none}.header strong{font-size:1rem;font-weight:600;line-height:1.4}.header p{font-size:.8125rem;color:var(--muted);line-height:1.45}.avatar{width:40px;height:40px;display:grid;place-items:center;border-radius:50%;background:#f0f0f0;color:#555;font-size:1rem;position:relative;flex:none}.avatar span{position:absolute;right:0;bottom:0;width:10px;height:10px;border:2px solid #fff;border-radius:100%;background:#58ad78}.header-mark{margin-left:auto;color:#777;font-size:1.5rem}.tabs{display:grid;grid-template-columns:1fr 1.25fr .8fr;gap:2px;padding:4px;background:var(--soft);border-radius:12px;margin:0 12px 8px;flex:none}.tabs button{min-width:0;min-height:44px;padding:8px 4px;background:none;border-radius:9px;font-size:.875rem;line-height:1.3;color:var(--muted);position:relative;overflow-wrap:anywhere}.tabs button[aria-selected=true]{background:#fff;color:var(--ink);font-weight:500;box-shadow:0 1px 4px #00000006}.draft-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--blue);margin-left:4px;vertical-align:middle}.panel{flex:1;min-height:0;min-width:0}.scroll-panel,.feed{overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#dedede transparent;scroll-padding:16px}.scroll-panel{padding:16px 16px max(24px,env(safe-area-inset-bottom))}.page-heading{margin:8px 0 24px}.page-heading .eyebrow{display:block;margin-bottom:8px}.page-heading p{font-size:.875rem;line-height:1.5;color:var(--muted);margin-top:12px}.page-heading p:empty{display:none}.search{width:100%;min-width:0;min-height:48px;border:1px solid #ddd;border-radius:12px;background:#fff;padding:12px 14px;font-size:1rem;margin:0 0 16px}input::placeholder,textarea::placeholder{color:var(--quiet);opacity:1}.direction-list{display:grid;gap:8px}.direction-row{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;border-radius:12px;background:var(--soft);padding:16px;text-align:left}.direction-row>span{min-width:0}.direction-row strong{display:block;font-size:1rem;line-height:1.375;font-weight:500;overflow-wrap:anywhere}.direction-row small{display:block;font-size:.875rem;line-height:1.43;color:var(--muted);margin-top:4px}.back{display:flex;align-items:center;gap:8px;min-height:44px;background:none;padding:8px 0;margin:0 0 12px;font-size:.875rem;line-height:1.4;color:var(--muted);text-align:left}.back span{font-size:1.125rem}.service-list{border:0}.service-row{background:#fff;width:100%;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 0;text-align:left}.service-row+.service-row{border-top:1px solid var(--line)}.service-copy{display:block;min-width:0}.service-row strong{display:block;font-size:1rem;line-height:1.375;font-weight:500;overflow-wrap:anywhere}.service-row small{display:block;font-size:.875rem;line-height:1.43;color:var(--muted);margin-top:4px}.service-row .price{display:block;font-size:1rem;line-height:1.375;font-weight:600;margin-top:10px;font-variant-numeric:tabular-nums}.service-row .arrow{width:18px;height:18px;color:var(--quiet)}
+.service-card{margin:0}.card-top{padding:4px 0 24px}.card-top>.eyebrow{display:block;margin-bottom:8px}.service-card p{font-size:.875rem;line-height:1.5;color:var(--muted);margin-top:12px}.choices{display:flex;flex-wrap:wrap;gap:4px;border-radius:12px;padding:4px;background:var(--soft);margin:20px 0 0}.choices button{flex:1 1 72px;min-width:0;min-height:44px;background:none;border-radius:9px;padding:10px 8px;font-size:.875rem;line-height:1.3;color:var(--muted);overflow-wrap:anywhere}.choices button[aria-pressed=true]{background:#fff;color:var(--ink);box-shadow:0 1px 4px #00000007}.amount{font-size:1.75rem;line-height:1.22;font-weight:600;letter-spacing:-.035em;font-variant-numeric:tabular-nums;margin-top:24px}.scope{font-size:.875rem;line-height:1.43;margin-top:8px;color:var(--muted)}.service-card details{border-top:1px solid var(--line)}.service-card summary{position:relative;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:56px;padding:16px 0;font-size:.875rem;line-height:1.43;cursor:pointer;touch-action:manipulation}.service-card summary::-webkit-details-marker{display:none}.service-card summary::after{content:'+';font-size:1.25rem;line-height:1;color:var(--quiet);flex:none}.service-card details[open] summary::after{content:'−'}.service-card ul{margin:0;padding:0 0 16px 20px;font-size:.875rem;line-height:1.5;color:var(--muted)}.service-card li+li{margin-top:8px}.service-card details p{margin:0;padding:0 0 16px}.card-promo{display:flex;align-items:flex-start;gap:12px;background:#f0f3ff;border-radius:12px;padding:16px;font-size:.875rem;line-height:1.43;color:#505d80;margin:8px 0 24px}.card-promo svg{width:20px;height:20px;flex:none;color:var(--blue)}.catalog-actions{display:grid;gap:4px;margin-top:8px}.primary{position:relative;display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:52px;padding:14px 16px;border-radius:12px;background:var(--blue);color:#fff;font-size:1rem;line-height:1.375;font-weight:500;text-align:center}.primary .arrow{color:#fff;width:18px;height:18px;margin-left:auto}.primary:has(.arrow){padding-left:34px}.text-button{min-height:44px;padding:12px 0;background:none;color:var(--muted);font-size:.875rem;line-height:1.43;text-align:center}.quiet-note{font-size:.875rem;line-height:1.5;color:var(--muted);margin-top:16px}.empty{padding:20px 0;font-size:.875rem;color:var(--muted)}
+.chat-panel{display:flex;flex-direction:column}.feed{flex:1;min-height:0;padding:20px 16px 24px}.welcome{font-size:1rem;line-height:1.5;margin-bottom:24px}.section-label{font-size:.875rem;color:var(--muted);margin-bottom:12px}.actions{display:grid;gap:8px}.action{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;background:var(--soft);border-radius:12px;min-height:52px;padding:14px 16px;font-size:1rem;line-height:1.375;width:100%;overflow-wrap:anywhere}.promo{display:flex;gap:12px;text-align:left;background:#f0f3ff;border-radius:12px;padding:16px;margin-top:24px;width:100%}.promo>svg{width:20px;height:20px;flex:none;color:var(--blue)}.promo strong{font-size:.875rem;line-height:1.43;font-weight:500;color:#39476c}.promo small,.promo-link{display:block;font-size:.875rem;line-height:1.43;color:#505d80;margin-top:8px}.user{max-width:90%;width:fit-content;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--soft);border-radius:16px 16px 4px 16px;padding:12px 16px;margin:24px 0 24px auto}.reply{margin-bottom:24px}.attribution{font-size:.8125rem;color:var(--muted);margin-bottom:8px}.reply p{font-size:1rem;line-height:1.5;margin-bottom:12px;overflow-wrap:anywhere}.composer{display:flex;align-items:center;gap:8px;padding:12px 16px max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--line);background:#fff;flex:none}.composer input{min-width:0;flex:1;border:0;background:var(--soft);border-radius:12px;padding:12px;font-size:1rem;min-height:48px}.send{width:44px;height:44px;flex:none;border-radius:50%;background:var(--blue);color:#fff;font-size:1.5rem}.form-mount{margin:16px 0}.lead-card{background:var(--soft);padding:16px;border-radius:16px}.lead-intro{font-size:.875rem;line-height:1.5;color:var(--muted);margin-top:8px}.form-service{font-size:.875rem;line-height:1.5;color:var(--muted);margin-top:12px}.form-field{display:block;font-size:.875rem;line-height:1.43;margin:20px 0;color:var(--muted)}.form-field input,.form-field select,.form-field textarea{display:block;width:100%;min-width:0;min-height:48px;border:1px solid #d9d9d9;border-radius:10px;background:#fff;font-size:1rem;line-height:1.5;padding:12px;margin-top:8px;color:var(--ink)}.form-field textarea{resize:vertical;min-height:96px}.consent{display:flex;align-items:flex-start;gap:12px;font-size:.875rem;line-height:1.5;color:var(--muted);padding:8px 0;margin:12px 0 16px;cursor:pointer}.consent input{width:20px;height:20px;flex:none;accent-color:var(--blue);margin:2px 0}.consent button{background:none;padding:0;font-size:inherit;text-decoration:underline;text-underline-offset:3px;color:var(--ink);min-height:44px}.form-footnote{font-size:.75rem;line-height:1.5;color:var(--muted);text-align:center;margin-top:12px}.form-footnote:empty{display:none}.success{padding:20px;background:var(--soft);border-radius:16px}.success-icon{font-size:1.5rem;margin-bottom:8px}.success strong{font-size:1.125rem}.success p{font-size:.875rem;color:var(--muted);margin-top:8px}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@container widget (max-width:340px){.tabs{margin-inline:8px}.tabs button{font-size:.8125rem}.header{padding-top:16px}.direction-row{padding:14px 12px}.choices button{flex-basis:80px}.lead-card{padding:12px}}
+@media(hover:hover){.direction-row:hover,.action:hover{background:#ececec}.service-row:hover{background:#fafafa}.primary:hover,.send:hover{background:#1024d9}.text-button:hover,.back:hover{color:#252525}}
+@media(max-width:800px){html,body{height:100%;overflow:hidden;background:#fff}.layout{display:block;padding:0;min-height:0}.notes{display:none}.widget{position:fixed;top:var(--visible-top);left:0;width:100%;height:var(--visible-height);max-height:none;border-radius:0;box-shadow:none}.header{padding-top:max(16px,env(safe-area-inset-top));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+
+</style>
+
+</head>
+<body>
+  <main class="layout">
+    <aside class="notes">
+      <span class="eyebrow">ARTGENTS / MOBILE FIRST</span>
+      <h1>Всё начинается<br>с понятного.</h1>
+      <p class="intro">Услуги, ответы и запись.<br>В одном спокойном интерфейсе.</p>
+      <div class="preview-label">Ширина виджета</div>
+      <div class="size-switch" role="group" aria-label="Ширина предпросмотра">
+        <button data-width="320" aria-pressed="false">320</button><button data-width="360" aria-pressed="false">360</button><button data-width="390" aria-pressed="true">390</button><button data-width="430" aria-pressed="false">430</button>
+      </div>
+      <div class="pack-switch" role="group" aria-label="Вариант клиники"><button data-pack="dental" aria-pressed="true">Стоматология</button><button data-pack="medical" aria-pressed="false">Медцентр</button></div>
+      <button class="reset" id="reset">Начать заново ↺</button>
+      <p class="lab-note">На телефоне — на весь экран.<br>На компьютере — в выбранной ширине, без масштабирования.</p>
+      <p class="lab-note">Демонстрационные цены и ответы. Заявки никуда не отправляются. Используйте вымышленные контакты.</p>
+    </aside>
+    <section class="widget" aria-label="Консультант клиники">
+      <header class="header"><div class="avatar">Н<span></span></div><div><strong>Надежда</strong><p>ИИ-помощник клиники</p></div><span class="header-mark" aria-hidden="true">✳</span></header>
+      <nav class="tabs" role="tablist" aria-label="Разделы виджета">
+        <button id="tab-chat" role="tab" aria-controls="panel-chat" aria-selected="true" data-tab="chat">Помощник</button>
+        <button id="tab-catalog" role="tab" aria-controls="panel-catalog" aria-selected="false" tabindex="-1" data-tab="catalog">Услуги и цены</button>
+        <button id="tab-booking" role="tab" aria-controls="panel-booking" aria-selected="false" tabindex="-1" data-tab="booking">Запись<span class="draft-dot" hidden></span></button>
+      </nav>
+      <section id="panel-chat" class="panel chat-panel" role="tabpanel" aria-labelledby="tab-chat">
+        <div id="feed" class="feed" tabindex="0" aria-label="Переписка"></div>
+        <form id="composer" class="composer"><label class="sr-only" for="question">Ваш вопрос</label><input id="question" placeholder="Напишите сообщение…" autocomplete="off"><button aria-label="Отправить сообщение" class="send">↑</button></form>
+      </section>
+      <section id="panel-catalog" class="panel scroll-panel" role="tabpanel" aria-labelledby="tab-catalog" hidden>
+        <div id="catalog"></div>
+      </section>
+      <section id="panel-booking" class="panel scroll-panel" role="tabpanel" aria-labelledby="tab-booking" hidden>
+        <div class="page-heading"><span class="eyebrow">ОБРАТНЫЙ ЗВОНОК</span><h2>Запишем на приём</h2><p>Оставьте контакты. Администратор свяжется с вами и поможет согласовать время приёма.</p></div>
+        <div class="form-mount" data-place="booking"></div>
+        <div class="quiet-note">Можно пока не выбирать услугу — поможем разобраться.</div>
+      </section>
+    </section>
+  </main>
+<script>
+'use strict';
+// Standalone UX prototype. No API, model, browser storage or real lead submission.
+const arrow='<svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg>';
+const gift='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 8h18v4H3zM5 12v9h14v-9M12 8v13M12 8H8a3 3 0 1 1 3-3l1 3Zm0 0h4a3 3 0 1 0-3-3l-1 3Z"/></svg>';
+const dentalServices=[
+ {id:'classic',name:'Классическая имплантация',category:'Имплантация',short:'Один зуб · имплант и постоянная коронка',description:'Восстановление отсутствующего зуба с опорой на имплант. Соседние зубы не нужно обтачивать под мост.',variants:[['Implantium','76 200 ₽'],['Impro','85 200 ₽'],['Nobel','101 200 ₽']],scope:'За один зуб · имплант + постоянная коронка',includes:['Имплант с документами','Хирургия и местная анестезия','Постоянная коронка','Контрольные осмотры и куратор'],excludes:'КТ при необходимости и временная коронка оплачиваются отдельно.',stages:['45 200 ₽ — хирургический этап','31 000 ₽ — постоянная коронка, обычно через 3–6 месяцев'],promo:'Бесплатная консультация по имплантации'},
+ {id:'all4',name:'Имплантация All-on-4',category:'Имплантация',short:'Вся челюсть · несъёмный протез',description:'Восстановление зубов всей челюсти на четырёх имплантах. Временный протез помогает вернуться к улыбке и общению на период приживления.',variants:[['Implantium','318 000 ₽'],['Impro','368 000 ₽'],['Nobel','428 000 ₽']],scope:'За одну челюсть',includes:['4 импланта, хирургия и местная анестезия','Временный несъёмный протез по показаниям','Постоянный протез после приживления','Сопровождение куратора'],excludes:'КТ и костная пластика по показаниям оплачиваются отдельно.',stages:['190 800 ₽ — хирургия и временный протез','127 200 ₽ — постоянный протез после приживления'],promo:'Бесплатная консультация по имплантации'},
+ {id:'crowns',name:'Циркониевые коронки',category:'Протезирование',short:'Восстановление собственного зуба',description:'Коронка восстанавливает форму и внешний вид сильно разрушенного зуба. Изготавливаем её в собственной лаборатории.',variants:[['На собственный зуб','от 25 000 ₽']],scope:'За одну коронку на собственном зубе',includes:['Изготовление циркониевой коронки','Примерка и фиксация'],excludes:'Подготовительное лечение зуба оплачивается отдельно.'},
+ {id:'white',name:'Отбеливание зубов',category:'Эстетика',short:'Более светлая улыбка за один визит',description:'Профессиональное отбеливание Philips Zoom WhiteSpeed. До процедуры врач оценивает состояние зубов и обсуждает желаемый оттенок.',variants:[['Одна процедура','от 18 000 ₽']],scope:'За одну процедуру · стоимость зависит от протокола',includes:['Осмотр перед отбеливанием','Защита дёсен и кабинетное отбеливание','Рекомендации по уходу'],excludes:'Профессиональная гигиена и лечение зубов перед отбеливанием оплачиваются отдельно.'}
+];
+
+function basic(id,name,category,price,scope,description){return {id,name,category,short:scope,description,variants:[['Основной вариант',price]],scope,includes:['Приём или процедура в указанном объёме','Рекомендации специалиста'],excludes:'Дополнительные исследования и процедуры — по отдельной стоимости.'};}
+dentalServices.push(
+ basic('caries','Лечение кариеса','Лечение зубов','от 6 500 ₽','За один зуб','Восстановление зуба пломбой. Объём лечения врач определит после осмотра.'),
+ basic('hygiene','Профессиональная гигиена','Гигиена','от 5 500 ₽','За одну процедуру','Удаление налёта и зубного камня с рекомендациями по домашнему уходу.')
+);
+const medicalServices=[
+ basic('ent-first','Первичный приём ЛОРа','ЛОР','3 100 ₽','За один приём · взрослым и детям','Врач выслушает жалобы, проведёт осмотр ушей, носа и горла и обсудит дальнейшие действия.'),
+ basic('ent-repeat','Повторный приём ЛОРа','ЛОР','2 300 ₽','За один повторный приём','Обсуждение результатов обследования и дальнейшего плана с врачом.'),
+ basic('ent-wax','Удаление серной пробки','ЛОР','700 ₽','За одно ухо','Удаление серной пробки после осмотра врачом.'),
+ basic('therapy','Приём терапевта','Терапия','2 800 ₽','За один первичный приём','Если непонятно, к кому обратиться, терапевт поможет определить следующий шаг.'),
+ basic('therapy-repeat','Повторный приём терапевта','Терапия','2 000 ₽','За один повторный приём','Врач обсудит результаты назначенных обследований и ответит на вопросы.'),
+ basic('pediatric','Приём педиатра','Педиатрия','3 000 ₽','За один первичный приём','Врач осмотрит ребёнка, обсудит самочувствие и вопросы родителей.'),
+ basic('pediatric-repeat','Повторный приём педиатра','Педиатрия','2 200 ₽','За один повторный приём','Повторный осмотр и обсуждение изменений в самочувствии ребёнка.'),
+ basic('gyn','Приём гинеколога','Гинекология','3 200 ₽','За один первичный приём','Консультация и осмотр с обсуждением беспокоящих вопросов.'),
+ basic('gyn-repeat','Повторный приём гинеколога','Гинекология','2 400 ₽','За один повторный приём','Обсуждение результатов обследования и дальнейших рекомендаций.'),
+ basic('uro','Приём уролога','Урология','3 000 ₽','За один первичный приём','Консультация специалиста и план дальнейших действий по результатам осмотра.'),
+ basic('uro-repeat','Повторный приём уролога','Урология','2 200 ₽','За один повторный приём','Обсуждение результатов обследования с врачом.'),
+ basic('cardio','Приём кардиолога','Кардиология','3 500 ₽','За один первичный приём','Врач обсудит жалобы и имеющиеся обследования, проведёт осмотр.'),
+ basic('ecg','ЭКГ с расшифровкой','Кардиология','1 200 ₽','За одно исследование','Запись электрокардиограммы и заключение специалиста.'),
+ basic('neuro','Приём невролога','Неврология','3 200 ₽','За один первичный приём','Консультация и неврологический осмотр с объяснением дальнейших действий.'),
+ basic('neuro-repeat','Повторный приём невролога','Неврология','2 400 ₽','За один повторный приём','Оценка изменений и обсуждение результатов обследования.'),
+ basic('us-abdomen','УЗИ брюшной полости','УЗИ','2 600 ₽','За одно исследование','Ультразвуковое исследование органов брюшной полости с заключением. Подготовку уточнят при записи.'),
+ basic('us-thyroid','УЗИ щитовидной железы','УЗИ','1 800 ₽','За одно исследование','Ультразвуковое исследование щитовидной железы с заключением.'),
+ basic('derma','Приём дерматолога','Дерматология','2 900 ₽','За один первичный приём','Консультация по состоянию кожи и осмотр специалистом.'),
+ basic('dermoscopy','Дерматоскопия','Дерматология','1 000 ₽','За одно образование','Осмотр образования кожи с увеличением. Консультация оплачивается отдельно.'),
+ basic('cosmo','Консультация косметолога','Косметология','2 500 ₽','За один приём','Обсудите задачи по уходу за кожей и возможные процедуры со специалистом.'),
+ {...basic('plasma','Плазмотерапия','Косметология','6 000 ₽','За одну процедуру · выбранная зона','Процедура с использованием плазмы собственной крови. Возможность проведения определяет врач на консультации.'),variants:[['Лицо','6 000 ₽'],['Лицо и шея','9 000 ₽']],scope:'За одну процедуру · зона указана в выбранном варианте',includes:['Проведение процедуры в выбранной зоне','Рекомендации по уходу после процедуры'],excludes:'Предварительная консультация и анализы, если потребуются, оплачиваются отдельно.'}
+];
+const packs={
+ dental:{label:'Стоматология',services:dentalServices,categories:[['Имплантация','Один зуб или вся челюсть'],['Протезирование','Коронки и восстановление зубов'],['Лечение зубов','Сохранение собственных зубов'],['Гигиена','Профессиональный уход'],['Эстетика','Более светлая улыбка']]},
+ medical:{label:'Медицинский центр',services:medicalServices,categories:[['ЛОР','Уши, горло и нос · взрослым и детям'],['Терапия','Общие вопросы о здоровье'],['Педиатрия','Приём детей'],['Гинекология','Женское здоровье'],['Урология','Консультации и обследования'],['Кардиология','Сердце и сосуды'],['Неврология','Консультации невролога'],['УЗИ','Ультразвуковые исследования'],['Дерматология','Здоровье кожи'],['Косметология','Уход и эстетические процедуры']]}
+};
+let packKey='dental',services=packs.dental.services,activeCategory=null,categoryScroll=0;
+const byId=id=>services.find(s=>s.id===id);
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let draft,submitted,activeService=null,search='',catalogScroll=0;
+const selectedVariants={};
+function initialDraft(){return {name:'',phone:'',consent:false,service:'',variant:'',wish:''};}
+function switchTab(name,focus=false){
+ document.querySelectorAll('[data-tab]').forEach(b=>{const on=b.dataset.tab===name;b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;if(on&&focus)b.focus();});
+ document.querySelectorAll('[role=tabpanel]').forEach(p=>p.hidden=p.id!==`panel-${name}`);
+}
+document.querySelectorAll('[data-tab]').forEach(b=>{
+ b.onclick=()=>switchTab(b.dataset.tab);
+ b.onkeydown=e=>{const buttons=[...document.querySelectorAll('[data-tab]')],i=buttons.indexOf(b);let n;if(e.key==='ArrowRight')n=(i+1)%3;if(e.key==='ArrowLeft')n=(i+2)%3;if(e.key==='Home')n=0;if(e.key==='End')n=2;if(n!==undefined){e.preventDefault();switchTab(buttons[n].dataset.tab,true);}};
+});
+function primary(label,attrs=''){return `<button class="primary" ${attrs}>${label}${arrow}</button>`;}
+function scrollToEl(el){requestAnimationFrame(()=>{const scroller=el.closest('.feed,.scroll-panel');if(scroller)scroller.scrollTo({top:Math.max(0,el.getBoundingClientRect().top-scroller.getBoundingClientRect().top+scroller.scrollTop-16),behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});});}
+function updateDot(){$('.draft-dot').hidden=submitted||!Object.values(draft).some(Boolean);}
+function newDraft(){draft=initialDraft();submitted=false;renderForms();updateDot();}
+function renderForms(){document.querySelectorAll('.form-mount').forEach(m=>renderForm(m));}
+function syncDraft(key,value){draft[key]=value;document.querySelectorAll(`[data-field="${key}"]`).forEach(el=>{if(key==='consent')el.checked=value;else if(el!==document.activeElement)el.value=value;});document.querySelectorAll('.form-service').forEach(el=>el.textContent=draft.service?`Вы обращаетесь: ${(byId(draft.service)?.name||'')+(draft.variant?' · '+draft.variant:'')}`:'Общая заявка · услугу можно выбрать позже');updateDot();}
+function renderForm(mount){
+ const place=mount.dataset.place,extended=place==='booking';
+ if(submitted){mount.innerHTML='<div class="success" role="status"><div class="success-icon">✓</div><strong>Всё получилось</strong><p>В рабочем виджете здесь будет подтверждение заявки. В прототипе данные никуда не отправлены.</p><button class="text-button" data-new>Новая заявка</button></div>';mount.querySelector('[data-new]').onclick=newDraft;return;}
+ mount.innerHTML=`<form class="lead-card"><h3>${extended?'Ваши контакты':'Оставить заявку'}</h3><p class="lead-intro">${extended?'Поможем выбрать следующий шаг.':'Администратор свяжется с вами и согласует время.'}</p>${extended?'':'<div class="form-service"></div>'}
+ <label class="form-field" for="${place}-name">Как к вам обращаться<input id="${place}-name" data-field="name" name="name" autocomplete="name" required maxlength="80" value="${esc(draft.name)}"></label>
+ <label class="form-field" for="${place}-phone">Телефон<input id="${place}-phone" data-field="phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+7 ___ ___-__-__" required maxlength="24" value="${esc(draft.phone)}"></label>
+ ${extended?`<label class="form-field" for="${place}-service">Что вас интересует · необязательно<select id="${place}-service" data-field="service" name="service"><option value="">Помогите определиться</option>${services.map(s=>`<option value="${s.id}" ${draft.service===s.id?'selected':''}>${s.name}</option>`).join('')}</select></label><label class="form-field" for="${place}-wish">Пожелание · необязательно<textarea id="${place}-wish" data-field="wish" name="wish" maxlength="500" placeholder="Например, удобнее позвонить после 18:00">${esc(draft.wish)}</textarea></label>`:''}
+ <label class="consent"><input type="checkbox" data-field="consent" required ${draft.consent?'checked':''}><span>Согласен на обработку персональных данных. <button type="button" data-consent-info>Подробнее</button></span></label>
+ ${primary('Отправить заявку','type="submit"')}<p class="form-footnote">${extended?'':'Можно вернуться к разговору — поля сохранятся.'}</p></form>`;
+ const serviceLine=mount.querySelector('.form-service');if(serviceLine)serviceLine.textContent=draft.service?`Вы обращаетесь: ${(byId(draft.service)?.name||'')+(draft.variant?' · '+draft.variant:'')}`:'Общая заявка · услугу можно выбрать позже';
+ mount.querySelectorAll('[data-field]').forEach(el=>el.addEventListener('input',()=>{el.setCustomValidity('');if(el.dataset.field==='service')syncDraft('variant','');syncDraft(el.dataset.field,el.type==='checkbox'?el.checked:el.value);}));
+ mount.querySelector('[data-consent-info]').onclick=()=>{let p=mount.querySelector('.consent-info');if(!p){p=document.createElement('p');p.className='quiet-note consent-info';p.textContent='В рабочем виджете здесь будут условия обработки данных конкретной клиники. Этот прототип не передаёт и не сохраняет ваши контакты.';mount.querySelector('.consent').after(p);}else p.hidden=!p.hidden;};
+ mount.querySelector('form').onsubmit=e=>{e.preventDefault();const phone=mount.querySelector('[data-field=phone]'),name=mount.querySelector('[data-field=name]');if(!draft.name.trim()){name.setCustomValidity('Укажите имя');name.reportValidity();return;}if(!/^[+\d\s()−-]+$/.test(draft.phone)||draft.phone.replace(/\D/g,'').length<10||draft.phone.replace(/\D/g,'').length>15){phone.setCustomValidity('Проверьте номер: укажите от 10 до 15 цифр');phone.reportValidity();return;}submitted=true;draft=initialDraft();renderForms();updateDot();};
+}
+function showForm(place,service){
+ if(service&&!submitted){syncDraft('variant',byId(service)?.variants[selectedVariants[service]||0]?.[0]||'');syncDraft('service',service);}
+ let mount=document.querySelector(`.form-mount[data-place="${place}"]`);
+ if(!mount){mount=document.createElement('div');mount.className='form-mount';mount.dataset.place=place;$('#feed').append(mount);}
+ if(place==='chat')$('#feed').append(mount);renderForm(mount);if(place!=='booking')scrollToEl(mount);
+}
+function reply(text,service,links=[]){
+ const el=document.createElement('section');el.className='reply';el.innerHTML=`<div class="attribution">Надежда</div>${text.split('\n\n').map(p=>`<p>${esc(p)}</p>`).join('')}`;
+ const actions=document.createElement('div');actions.className='actions';links.forEach(([label,answer])=>{const b=document.createElement('button');b.className='action';b.innerHTML=`<span>${esc(label)}</span>${arrow}`;b.onclick=()=>{b.remove();ask(label,answer,service);};actions.append(b);});if(links.length)el.append(actions);
+ const cta=document.createElement('div');cta.style.marginTop='15px';cta.innerHTML=primary('Оставить заявку','type="button"');cta.firstElementChild.onclick=()=>showForm('chat',service);el.append(cta);$('#feed').append(el);return el;
+}
+function ask(q,answer,service){
+ const user=document.createElement('div');user.className='user';user.textContent=q;$('#feed').append(user);
+ const el=reply(answer||'Могу помочь разобраться в услугах или оставить заявку. Откройте «Услуги и цены», чтобы выбрать направление. В этом прототипе ответы заранее подготовлены.',service,service?[['Что входит в стоимость?',byId(service).includes.join('. ')+'.'],['Что оплачивается отдельно?',byId(service).excludes]]:[]);
+ scrollToEl(el);
+}
+function welcome(){
+ $('#feed').innerHTML='<p class="welcome">Здравствуйте! Я Надежда, помощник клиники. Помогу разобраться в услугах, ценах и условиях лечения.</p><p class="section-label">С чего начнём?</p><div class="actions" id="starters"></div>';
+ const starters=packKey==='medical'?[['С чего начать?','Можно начать с приёма терапевта, если вы не знаете, какой специалист нужен. Администратор поможет уточнить направление.'],['Сколько стоит приём ЛОРа?',byId('ent-first').description+' Первичный приём — 3 100 ₽.','ent-first'],['Какие есть направления?','В каталоге представлены десять направлений: от терапии и ЛОРа до УЗИ и косметологии. Выберите нужное во вкладке «Услуги и цены».'],['Хочу записаться',null]]:[['Давно не был у стоматолога','Начните с обычного осмотра. Врач выслушает, что вас беспокоит, оценит состояние зубов и дёсен и объяснит, нужен ли уход или лечение. Решение можно принять спокойно, без спешки.'],['Сколько стоит имплантация?','Классическая имплантация с постоянной коронкой — 76 200 ₽ на системе Implantium. КТ при необходимости и временная коронка оплачиваются отдельно.\n\nВ каталоге можно посмотреть состав и другие готовые варианты.','classic'],['Расскажите про коронки',byId('crowns').description+' Стоимость — от 25 000 ₽ за коронку на собственном зубе.','crowns'],['Хочу записаться',null]];
+ starters.forEach(([label,a,s])=>{const b=document.createElement('button');b.className='action';b.innerHTML=`<span>${label}</span>${arrow}`;b.onclick=()=>{if(!a){const u=document.createElement('div');u.className='user';u.textContent=label;$('#feed').append(u);showForm('chat');}else ask(label,a,s);};$('#starters').append(b);});
+ if(packKey==='medical')return;
+ const p=document.createElement('button');p.className='promo';p.innerHTML=gift+'<span><strong>Бесплатная консультация по имплантации</strong><small>Три варианта лечения в разных бюджетах</small><span class="promo-link">Что входит →</span></span>';p.onclick=()=>ask('Что входит в консультацию?','Ведущий врач обсудит вашу задачу и предложит три варианта лечения с объяснением отличий, этапов и стоимости. КТ по показаниям оплачивается отдельно.','classic');$('#feed').append(p);
+}
+$('#composer').onsubmit=e=>{e.preventDefault();const input=$('#question'),q=input.value.trim();if(!q)return;input.value='';if(/запис|заявк|хочу.*при[её]м/i.test(q)){const u=document.createElement('div');u.className='user';u.textContent=q;$('#feed').append(u);showForm('chat');return;}const s=services.find(x=>q.toLowerCase().includes(x.name.toLowerCase()))||(packKey==='medical'?(/лор/i.test(q)?byId('ent-first'):null):/корон/i.test(q)?byId('crowns'):/отбел/i.test(q)?byId('white'):/all|вся челюсть/i.test(q)?byId('all4'):/имплант/i.test(q)?byId('classic'):null);ask(q,s?`${s.description}\n\n${s.variants[0][1]}. ${s.scope}. ${s.excludes}`:null,s?.id);};
+function renderCatalog(){
+ const root=$('#catalog');
+ if(activeService){renderDetail();return;}
+ root.innerHTML=`${activeCategory?'<button class="back" id="back-directions">← Все направления</button>':''}<div class="page-heading"><span class="eyebrow">${esc(packs[packKey].label)}</span><h2>${esc(activeCategory||'Услуги и цены')}</h2><p>${activeCategory?'Основные услуги и ориентиры стоимости.':''}</p></div><label class="sr-only" for="service-search">Поиск по всему каталогу</label><input class="search" id="service-search" placeholder="Найти услугу или направление…"><div id="service-list"></div>`;
+ const input=$('#service-search');input.value=search;input.oninput=()=>{search=input.value;renderList();};
+ if(activeCategory)$('#back-directions').onclick=()=>{activeCategory=null;search='';renderCatalog();$('#panel-catalog').scrollTop=categoryScroll;};
+ renderList();
+}
+function renderList(){
+ const list=$('#service-list'),query=search.trim().toLowerCase();list.innerHTML='';
+ $('#catalog .page-heading h2').textContent=query?'Результаты поиска':activeCategory||'Услуги и цены';
+ $('#catalog .page-heading p').hidden=!query&&!activeCategory;
+ $('#catalog .page-heading p').textContent=query?'По всем направлениям клиники.':activeCategory?'Основные услуги и ориентиры стоимости.':'';
+ if(!query&&!activeCategory){
+ list.className='direction-list';packs[packKey].categories.forEach(([name,hint])=>{const b=document.createElement('button');b.className='direction-row';b.innerHTML=`<span><strong>${esc(name)}</strong><small>${esc(hint)}</small></span>${arrow}`;b.onclick=()=>{categoryScroll=$('#panel-catalog').scrollTop;activeCategory=name;renderCatalog();$('#panel-catalog').scrollTop=0;};list.append(b);});return;
+ }
+ list.className='service-list';
+ const found=services.filter(s=>(query||s.category===activeCategory)&&`${s.name} ${s.short} ${s.category}`.toLowerCase().includes(query));
+ if(!found.length){list.innerHTML='<p class="empty">Ничего не найдено. Попробуйте другое название.</p>';return;}
+ found.forEach(s=>{const b=document.createElement('button');b.className='service-row';b.innerHTML=`<span class="service-copy"><strong>${esc(s.name)}</strong><small>${query?esc(s.category)+' · ':''}${esc(s.short)}</small><span class="price">${esc(s.variants[0][1])}</span></span>${arrow}`;b.onclick=()=>{catalogScroll=$('#panel-catalog').scrollTop;activeService=s.id;renderDetail();$('#panel-catalog').scrollTop=0;};list.append(b);});
+}
+function renderDetail(){
+ const s=byId(activeService),index=selectedVariants[s.id]||0,variant=s.variants[index],root=$('#catalog');
+ root.innerHTML=`<button class="back"><span>←</span> ${search.trim()?'Результаты поиска':esc(activeCategory||'Все направления')}</button><div class="service-card"><div class="card-top"><span class="eyebrow">${s.category}</span><h2>${s.name}</h2><p>${s.description}</p>${s.variants.length>1?`<div class="choices" role="group" aria-label="Вариант услуги">${s.variants.map((v,i)=>`<button aria-pressed="${i===index}" data-variant="${i}">${v[0]}</button>`).join('')}</div>`:''}<div class="amount">${variant[1]}</div><div class="scope">${s.scope}</div></div><details><summary>Что входит в стоимость</summary><ul>${s.includes.map(x=>`<li>${x}</li>`).join('')}</ul></details><details><summary>Оплачивается отдельно</summary><p>${s.excludes}</p></details>${s.stages&&index===0?`<details><summary>Оплата по этапам</summary><ul>${s.stages.map(x=>`<li>${x}</li>`).join('')}</ul></details>`:''}${s.promo?`<div class="card-promo">${gift}<span>${s.promo}</span></div>`:''}</div><div class="catalog-actions">${primary('Оставить заявку','type="button" id="catalog-apply"')}<button class="text-button" id="ask-service">Спросить об этой услуге →</button></div><div class="form-mount" data-place="catalog" hidden></div>`;
+ root.querySelector('.back').onclick=()=>{activeService=null;renderCatalog();$('#panel-catalog').scrollTop=catalogScroll;};
+ root.querySelectorAll('[data-variant]').forEach(b=>b.onclick=()=>{const mount=root.querySelector('.form-mount'),wasOpen=!mount.hidden,scroll=$('#panel-catalog').scrollTop;selectedVariants[s.id]=+b.dataset.variant;if(draft.service===s.id)syncDraft('variant',s.variants[selectedVariants[s.id]][0]);renderDetail();const next=root.querySelector('.form-mount');if(wasOpen){next.hidden=false;renderForm(next);}$('#panel-catalog').scrollTop=scroll;});
+ $('#catalog-apply').onclick=()=>{const m=root.querySelector('.form-mount');m.hidden=false;showForm('catalog',s.id);};
+ $('#ask-service').onclick=()=>{switchTab('chat');ask(`Расскажите про услугу «${s.name}»`,`${s.description}\n\n${variant[1]}. ${s.scope}. ${s.excludes}`,s.id);};
+}
+function reset(){draft=initialDraft();submitted=false;activeService=null;activeCategory=null;categoryScroll=0;search='';catalogScroll=0;Object.keys(selectedVariants).forEach(k=>delete selectedVariants[k]);welcome();renderCatalog();renderForms();updateDot();switchTab('chat');$('#question').value='';$('#feed').scrollTop=0;$('#panel-booking').scrollTop=0;$('#panel-catalog').scrollTop=0;}
+document.querySelectorAll('[data-pack]').forEach(b=>b.onclick=()=>{
+ if(b.dataset.pack===packKey)return;
+ packKey=b.dataset.pack;services=packs[packKey].services;
+ document.querySelectorAll('[data-pack]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+ $('.header p').textContent=packs[packKey].label;reset();
+});
+$('#reset').onclick=reset;reset();
+
+// Preview controls alter the container width, never scale the interface.
+document.querySelectorAll('[data-width]').forEach(b=>b.onclick=()=>{document.documentElement.style.setProperty('--preview-width',b.dataset.width+'px');document.querySelectorAll('[data-width]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));});
+// The top-level visual viewport accounts for the keyboard on mobile browsers.
+function fitViewport(){if(window.visualViewport){document.documentElement.style.setProperty('--visible-height',window.visualViewport.height+'px');document.documentElement.style.setProperty('--visible-top',window.visualViewport.offsetTop+'px');}}
+window.visualViewport?.addEventListener('resize',fitViewport);window.visualViewport?.addEventListener('scroll',fitViewport);window.addEventListener('resize',fitViewport);fitViewport();
+// Open on the catalog so its new layout can be inspected immediately.
+switchTab('catalog');
+
+</script>
+</body>
+</html>

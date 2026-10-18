@@ -16,15 +16,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from core.clinic_policies_loader import validate_policy_text_refs  # noqa: E402
-from contracts.response_schema_refs import (  # noqa: E402
-    ResponseSchemaExternalIndex,
-    validate_response_schema_external_refs,
-)
-from core.response_schema_kb_index import build_response_schema_kb_refs  # noqa: E402
-from core.response_schema_loader import (  # noqa: E402
-    DuplicateKeyError,
-    ResponseSchemaLoadError,
-    load_response_schema_bundle,
+from core.d2_tenant_snapshot import (  # noqa: E402
+    D2TenantSnapshotError, load_d2_tenant_snapshot, build_d2_model_view,
+    validate_d2_authored_content_refs,
 )
 from contracts.widget_config import (  # noqa: E402
     WidgetConfigValidationError,
@@ -101,8 +95,6 @@ def validate_client_pack(
     required_target = (
         "service_catalog.json",
         "brand_catalog.json",
-        "marketing.yaml",
-        "clinic_strategy.yaml",
         "pricebook/facts.json",
     )
     for piece in required_target:
@@ -178,8 +170,10 @@ def validate_client_pack(
         return errors
 
     try:
-        bundle = load_response_schema_bundle(target_root)
-    except (ResponseSchemaLoadError, DuplicateKeyError, ValueError) as exc:
+        snapshot = load_d2_tenant_snapshot(pack_root.name, clients_root=pack_root.parent)
+        build_d2_model_view(snapshot)
+        bundle = snapshot.bundle
+    except (D2TenantSnapshotError, ValueError) as exc:
         errors.append(f"target_response/: schema_load_failed:{exc}")
         return errors
 
@@ -193,19 +187,8 @@ def validate_client_pack(
     if not bundle.offers and not scaffold:
         errors.append("target_response/pricebook/services/: empty_offers")
 
-    kb_refs = build_response_schema_kb_refs(md_root) if md_root.is_dir() else frozenset()
-    external_index = ResponseSchemaExternalIndex(kb_refs=kb_refs)
-    try:
-        validate_response_schema_external_refs(bundle, external_index)
-    except Exception as exc:
-        errors.append(f"target_response/: external_ref_invalid:{exc}")
-
-    for scenario_name, rule in bundle.marketing.scenario_rules.items():
-        if rule.allowed_topics and not rule.allowed_semantic_contexts:
-            errors.append(
-                f"target_response/marketing.yaml:{scenario_name}:"
-                "allowed_topics_without_semantic_contexts"
-            )
+    for ref in validate_d2_authored_content_refs(snapshot):
+        errors.append(f"target_response/: external_ref_invalid:{ref}")
 
     policies_path = rel("clinic_policies.yaml")
     if policies_path.is_file():

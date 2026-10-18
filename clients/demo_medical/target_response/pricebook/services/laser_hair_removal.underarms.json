@@ -1,0 +1,41 @@
+{
+  "offer_id": "laser_hair_removal.underarms",
+  "service_id": "laser_hair_removal",
+  "option_id": "underarms",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "zone",
+    "amount": 1900
+  },
+  "package": {
+    "label": "за одну процедуру обеих подмышечных областей",
+    "includes": [
+      "Осмотр зоны и подбор параметров",
+      "Обработка обеих подмышечных областей",
+      "Завершающий уход"
+    ],
+    "excludes": [
+      "Плечи и грудь",
+      "Другие зоны",
+      "Следующие сеансы"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope",
+    "demo_beauty_15"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
+}

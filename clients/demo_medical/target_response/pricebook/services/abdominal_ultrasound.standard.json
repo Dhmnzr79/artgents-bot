@@ -1,0 +1,41 @@
+{
+  "offer_id": "abdominal_ultrasound.standard",
+  "service_id": "abdominal_ultrasound",
+  "option_id": "standard",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "currency": "RUB",
+    "billing_unit": "procedure",
+    "amount": 3000
+  },
+  "package": {
+    "label": "за одно исследование перечисленных органов",
+    "includes": [
+      "Печень, желчный пузырь и желчные протоки",
+      "Поджелудочная железа и селезёнка",
+      "Протокол и выбранные изображения"
+    ],
+    "excludes": [
+      "Почки и мочевой пузырь",
+      "Специальные функциональные пробы",
+      "Консультация лечащего врача"
+    ]
+  },
+  "fact_refs": [
+    "demo_price_before_action",
+    "demo_fixed_package_scope",
+    "demo_ultrasound_10"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
+}

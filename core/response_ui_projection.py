@@ -43,7 +43,8 @@ def project_response_ui(plan: ResolvedResponsePlan) -> ResponseUIProjection:
             service_choices.append(reply.model_copy(update={"label":action.service_name or reply.label}))
         return part.model_copy(update={"choices": tuple(
         reply for reply in ui.quick_replies if reply.reply_id in actions
-        and actions[reply.reply_id].service_id == part.price.rows[0].service_id
+        and (part.price.presentation == "options"
+             or actions[reply.reply_id].service_id == part.price.rows[0].service_id)
         ), "service_choices": tuple(service_choices) if len(service_choices) > 1 else (),
             "overview": plan.d2_price_scope_decision})
     body_parts = tuple(card_metadata(part) if isinstance(part, ResponsePriceCardPart) else part
@@ -52,6 +53,7 @@ def project_response_ui(plan: ResolvedResponsePlan) -> ResponseUIProjection:
         body_parts = ()
     return ResponseUIProjection(
         lead_consent=ui.lead_consent,
+        booking_form=ui.booking_form,
         quick_replies=ui.quick_replies,
         buttons=ui.buttons,
         widget=ui.widget,

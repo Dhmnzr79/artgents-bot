@@ -26,6 +26,8 @@ window.setTimeout=(fn,delay,...args)=>{
 };
 window.clearTimeout=id=>{pending.delete(id);realClear(id);};
 const assert=(ok,why)=>{if(!ok)throw new Error(why);};
+const cssColor=value=>{const probe=document.createElement('span');probe.style.color=value;document.body.appendChild(probe);const result=getComputedStyle(probe).color;probe.remove();return result;};
+const brandTint=(brand,percent)=>cssColor('color-mix(in srgb,'+brand+' '+percent+'%,white)');
 const wait=async fn=>{for(let i=0;i<120;i++){if(fn())return;await new Promise(r=>realTimeout(r,20));}throw new Error('Wait timeout');};
 const sleep=ms=>new Promise(r=>realTimeout(r,ms));
 function fire(){assert(pending.size===1,'Exactly one invitation timer expected');const [id,fn]=pending.entries().next().value;pending.delete(id);realClear(id);fn();}
@@ -44,7 +46,7 @@ try{
   const avatar=el.querySelector('[data-clinic-avatar]');await wait(()=>avatar.complete&&avatar.naturalWidth>0);
   assert(avatar.src.includes('/static/clients/nikadent/avatar.png'),'Actual tenant avatar not used');
   const dot=getComputedStyle(el.querySelector('.clinic-shell__header-online-dot--launcher')).backgroundColor;
-  assert(dot==='rgb(40, 193, 58)','Online dot is not green');
+  assert(dot==='rgb(88, 173, 120)','Online dot is not green');
   assert(launch.textContent.includes('Задать вопрос'),'Wrong launcher label');
   const before=rect(card);assert(dismiss.hidden&&pending.size===1&&delays[0]===30000,'Initial30s state invalid');
   fire();await sleep(450);
@@ -54,15 +56,15 @@ try{
   dismiss.click();await sleep(400);assert(sameCorner(before,rect(card))&&Math.abs(rect(card).height-before.height)<1,'Dismiss did not collapse in place');
   launch.click();assert(getComputedStyle(card).display==='none'&&launch.getAttribute('aria-expanded')==='true','Actual chat did not open');
   const promotion=el.querySelector('.clinic-shell__welcome-promo');
-  assert(getComputedStyle(promotion).backgroundColor==='rgb(245, 239, 248)','Promotion background ignores tenant setting');
+  assert(getComputedStyle(promotion).backgroundColor===brandTint('#762E94',9),'Promotion background ignores tenant setting');
   assert(getComputedStyle(el.querySelector('.clinic-shell__promo-icon')).color==='rgb(118, 46, 148)','Promotion accent ignores tenant setting');
-  assert(getComputedStyle(el.querySelector('.clinic-shell__promo-more')).color==='rgb(118, 46, 148)','Promotion link ignores tenant setting');
-  assert(getComputedStyle(el.querySelector('.clinic-shell__promo-more .clinic-msg__link-chevron')).color==='rgb(118, 46, 148)','Promotion arrow ignores tenant setting');
+  assert(!el.querySelector('.clinic-shell__promo-more'),'Removed promotion sublink remains');
+  assert(getComputedStyle(promotion.querySelector('.clinic-msg__link-chevron')).color==='rgb(146, 158, 177)','Promotion arrow must use subdued reference color');
   const input=el.querySelector('[data-clinic-input]');input.value='Черновик';
   assert(getComputedStyle(el.querySelector('[data-clinic-send]')).backgroundColor==='rgb(118, 46, 148)','Send button must use tenant brand');
-  const composer=el.querySelector('.clinic-shell__composer-inner');
-  assert(getComputedStyle(composer).borderTopColor==='rgb(118, 46, 148)','Composer border must use tenant brand');
-  input.focus();assert(getComputedStyle(composer).borderTopColor==='rgb(118, 46, 148)','Focused composer must keep tenant brand');
+  const composer=el.querySelector('.clinic-shell__composer-inner');input.blur();
+  assert(getComputedStyle(composer).borderTopColor==='rgba(0, 0, 0, 0)','Idle composer border must be transparent');
+  input.focus();assert(getComputedStyle(composer).borderTopColor===brandTint('#762E94',35),'Focused composer must use tenant brand tint');
   el.querySelector('[data-clinic-close]').click();assert(!pending.size&&dismiss.hidden,'Chat close should return compact capsule without replay');
   assert(document.activeElement===launch,'Closing an open chat must restore launcher focus');
   widget.restartLauncherTeaser();assert(input.value==='Черновик'&&pending.size===1,'Panel replay reset conversation');
@@ -71,14 +73,14 @@ try{
   const savedTheme=configs.nikadent.theme;
   configs.nikadent.theme={promoBackground:'#E0F8EE',promoAccent:'#136943'};
   const second=mount('nikadent');assert(!pending.size,'Seen marker ignored');
-  assert(getComputedStyle(second.el.querySelector('.clinic-shell__welcome-promo')).backgroundColor==='rgb(224, 248, 238)','Promotion-only theme needs brand or leaks other tenant');
-  assert(getComputedStyle(second.el.querySelector('.clinic-shell__promo-icon')).color==='rgb(19, 105, 67)','Promotion-only accent needs brand');
+  assert(getComputedStyle(second.el.querySelector('.clinic-shell__welcome-promo')).backgroundColor===brandTint('#0C2FE0',9),'Promotion without primary brand must use default blue, not leak tenant purple');
+  assert(getComputedStyle(second.el.querySelector('.clinic-shell__promo-icon')).color==='rgb(12, 47, 224)','Promotion gift follows primary brand');
   assert(getComputedStyle(second.el.querySelector('[data-clinic-send]')).backgroundColor==='rgb(12, 47, 224)','Promotion override changed primary color');
   second.el.remove();configs.nikadent.theme=savedTheme;
   el.remove();const demo=mount('demo');
   assert(!demo.el.querySelector('[data-clinic-launcher-card]')&&demo.el.querySelector('[data-clinic-launcher-open]').textContent.includes('Посмотреть демо'),'Demo launcher changed');
   assert(getComputedStyle(demo.el.querySelector('[data-clinic-send]')).backgroundColor==='rgb(12, 47, 224)','Tenant color leaked into demo');
-  assert(getComputedStyle(demo.el.querySelector('.clinic-shell__welcome-promo')).backgroundColor==='rgb(240, 244, 255)','Promotion background leaked into demo');
+  assert(getComputedStyle(demo.el.querySelector('.clinic-shell__welcome-promo')).backgroundColor===brandTint('#0C2FE0',9),'Promotion background leaked into demo');
   assert(!pending.size,'Demo scheduled client invitation');demo.el.remove();
   document.body.appendChild(el);input.value='';
   window.__CLIENT_MOBILE_SCROLL__=async()=>{

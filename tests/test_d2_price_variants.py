@@ -135,16 +135,33 @@ def test_single_representative_topic_is_still_options(http_env):
     assert len(wire.calls) == 2
 
 
-@pytest.mark.parametrize('option,has_promo', [('three_zones',True), ('underarms',False)])
-def test_scoped_laser_promo_only_on_its_exact_offer(http_env, monkeypatch, option, has_promo):
+@pytest.mark.parametrize('option', ['three_zones', 'underarms', 'legs'])
+def test_service_wide_beauty_promo_covers_all_laser_options(http_env, monkeypatch, option):
     medical(http_env, monkeypatch)
     client, db, use, _ = http_env
     wire = native(use, 'laser_hair_removal', option_id=option)
     send(client, client_id='demo_medical', sid='variants')
     plan = saved(db, 'demo_medical')
     assert plan.d2_price_block.presentation == 'detail'
-    assert ('demo_laser_three_zones' in {p.fact_id for p in plan.promo_blocks}) == has_promo
-    assert 'demo_cosmetic_control' in {p.fact_id for p in plan.promo_blocks}
+    assert {p.fact_id for p in plan.promo_blocks} == {'demo_beauty_15'}
+    assert len(wire.calls) == 2
+
+
+@pytest.mark.parametrize('option,has_promo', [('three_zones', True), ('underarms', False)])
+def test_scoped_laser_promo_only_on_its_exact_offer(http_env, monkeypatch, option, has_promo):
+    medical(http_env, monkeypatch)
+    client, db, use, tmp = http_env
+    # The real demo promo is now service-wide. Narrow a test-owned copy to keep
+    # proving exact-offer authorization independently of marketing content.
+    path = tmp/'clients/demo_medical/target_response/pricebook/facts.json'
+    facts = json.loads(path.read_text(encoding='utf-8'))
+    facts['demo_beauty_15']['allowed_offer_ids'] = ['laser_hair_removal.three_zones']
+    path.write_text(json.dumps(facts, ensure_ascii=False), encoding='utf-8')
+    wire = native(use, 'laser_hair_removal', option_id=option)
+    send(client, client_id='demo_medical', sid='variants')
+    plan = saved(db, 'demo_medical')
+    assert plan.d2_price_block.presentation == 'detail'
+    assert {p.fact_id for p in plan.promo_blocks} == ({'demo_beauty_15'} if has_promo else set())
     assert len(wire.calls) == 2
 
 
@@ -171,7 +188,8 @@ def test_no_public_price_keeps_card_and_excludes_without_includes(http_env, monk
 def test_scoped_fact_refs_are_validated(fault):
     snapshot = load_d2_tenant_snapshot('demo_medical', clients_root=ROOT/'clients')
     data = snapshot.bundle.model_dump(mode='json')
-    fact = data['facts']['demo_laser_three_zones']
+    fact = data['facts']['demo_beauty_15']
+    fact['allowed_offer_ids'] = ['laser_hair_removal.three_zones']
     if fault == 'missing':
         fact['allowed_offer_ids'] = ['foreign.offer']
     elif fault == 'foreign_service':
@@ -203,15 +221,21 @@ def test_existing_service_wide_nikadent_promo_not_limited_by_offer_fact_refs():
 
 def test_scope_dates_and_inactive_fact_still_apply():
     snap = load_d2_tenant_snapshot('demo_medical', clients_root=ROOT/'clients')
+    # Keep the exact-offer guard even though this demo promotion is now broader.
+    snap.bundle.facts['demo_beauty_15'].allowed_offer_ids = ['laser_hair_removal.three_zones']
     authority = _commercial_authority(snap.client_id,build_d2_model_view(snap),snap.bundle)
     def promos(**kwargs):
         return {p.fact_id for p in resolve_d2_commercial_plan(authority=authority,
             bundle=snap.bundle, service_id='laser_hair_removal', include_packages=True,
             **kwargs).promo_blocks}
-    assert 'demo_laser_three_zones' not in promos(as_of=date(2026,10,16))
-    assert 'demo_laser_three_zones' not in promos(as_of=date(2027,1,1),offer_id='laser_hair_removal.three_zones')
-    snap.bundle.facts['demo_laser_three_zones'].active = False
-    assert 'demo_laser_three_zones' not in promos(as_of=date(2026,10,16),offer_id='laser_hair_removal.three_zones')
+    offer = dict(offer_id='laser_hair_removal.three_zones')
+    assert 'demo_beauty_15' not in promos(as_of=date(2026,10,17), **offer)
+    assert 'demo_beauty_15' in promos(as_of=date(2026,10,18), **offer)
+    assert 'demo_beauty_15' not in promos(as_of=date(2026,10,18))
+    assert 'demo_beauty_15' in promos(as_of=date(2026,12,31), **offer)
+    assert 'demo_beauty_15' not in promos(as_of=date(2027,1,1), **offer)
+    snap.bundle.facts['demo_beauty_15'].active = False
+    assert 'demo_beauty_15' not in promos(as_of=date(2026,10,18), **offer)
 
 
 def test_unpublished_revision_and_other_tenant_cannot_select(http_env):

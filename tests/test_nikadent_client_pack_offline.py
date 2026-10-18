@@ -231,10 +231,14 @@ def test_nikadent_marketing_free_consult_scope_and_priority() -> None:
 
     facts = json.loads((_TARGET / "pricebook" / "facts.json").read_text(encoding="utf-8"))
     allowed = facts["free_orthopedic_consult"]["allowed_service_ids"]
-    assert "classic" not in allowed
-    assert "one_stage" not in allowed
-    assert "fixed_bridge" in allowed
-    assert "core_inlay" in allowed
+    assert set(allowed) == {
+        'classic', 'one_stage', 'all_on_4', 'all_on_6', 'sinus_lift', 'bone_graft',
+        'metal_ceramic_crowns', 'zirconia_crowns', 'veneers', 'core_inlay',
+        'ceramic_inlays', 'prosthetics_consultation', 'removable_dentures',
+        'clasp_dentures', 'implant_supported_prosthetics', 'denture_repair',
+        'fixed_bridge', 'emax_crowns', 'temporary_denture', 'denture_reline',
+    }
+    assert 'caries' not in allowed and 'tooth_extraction' not in allowed
 
 
 def test_nikadent_owner_content_facts_in_md() -> None:

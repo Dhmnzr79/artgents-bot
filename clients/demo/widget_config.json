@@ -6,7 +6,7 @@
   "launcherCtaLabel": "Посмотреть демо",
   "launcherTeaser": false,
   "demoLauncher": true,
-  "welcomeText": "Помогу разобраться в услугах, ценах и врачах.",
+  "welcomeText": "Здравствуйте! Я ИИ-консультант клиники. Расскажу о клинике, врачах, услугах и ценах.",
   "videoAspect": "horizontal",
   "welcomePromotion": {
     "title": "До 15% на имплантацию",

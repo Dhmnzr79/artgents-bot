@@ -3,7 +3,7 @@ leads:
   mode: email
 
 admin:
-  enabled: false
+  enabled: true
 
 postgres_events:
   enabled: false

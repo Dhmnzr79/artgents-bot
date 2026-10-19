@@ -5,11 +5,9 @@ from uuid import UUID
 from contracts.response_plan import SessionKey
 from contracts.d2_session_context import D2SessionSnapshot,D2SessionTtlPolicy
 from core.d2_dialogue_store import D2DialogueStore
-from core.d2_http_adapter import _store_path
-from core.d2_completion_context import public_dialogue_plan
+from core.d2_storage import dialogue_store_path
+from core.d2_publication import public_completed_turn_payload
 from core.d2_session_context import project_d2_session_context
-from core.response_text_renderer import render_response_text
-from core.response_ui_projection import project_response_ui
 from core.user_text_privacy import mask_phones_in_text,mask_emails_in_text
 
 
@@ -22,7 +20,7 @@ def widget_session(client_id,raw):
     before=raw.get('before_revision')
     if before is not None and (type(before) is not int or before<1):
         raise ValueError('widget_session_cursor_invalid')
-    path=_store_path(client_id)
+    path=dialogue_store_path(client_id)
     empty=dict(client_id=client_id,entries=[],current=None,next_before_revision=None,actions_current=False)
     if not path.exists():return empty
     key=SessionKey(client_id=client_id,sid=sid)
@@ -32,17 +30,6 @@ def widget_session(client_id,raw):
         context=project_d2_session_context(D2SessionSnapshot(state=record.state,exists_in_store=True),
             expected_session_key=key,activity=record.activity,policy=D2SessionTtlPolicy(),now=datetime.now(timezone.utc))
         turns,has_more=store.read_dialogue_history(key,before_revision=before)
-        def public_payload(turn):
-            plan=public_dialogue_plan(turn.response.resolved)
-            lead_ids={p.request_id for p in plan.d2_request_parts if p.kind=='lead'}
-            ui=plan.ui_plan.model_copy(update={'booking_form':False,'lead_consent':None,
-                'quick_replies':tuple(q for q in plan.ui_plan.quick_replies if not q.reply_id.startswith('lead:'))})
-            plan=plan.model_copy(update={'d2_request_parts':tuple(p for p in plan.d2_request_parts if p.kind!='lead'),
-                'd2_exact_text_blocks':tuple(b for b in plan.d2_exact_text_blocks if b.request_id not in lead_ids),'ui_plan':ui})
-            return dict(answer=render_response_text(plan,include_lead=False),ui=project_response_ui(plan).model_dump(mode='json'),
-                client_id=client_id,sid=sid,request_id=turn.request_id,revision=turn.committed_revision,
-                catalog_version=turn.catalog_version,
-                attribution_kind=plan.attribution_kind)
         entries=[]
         for turn in turns:
             if turn.dialogue_ref is None:
@@ -50,12 +37,12 @@ def widget_session(client_id,raw):
                 if parts and all(p.kind=='lead' for p in parts):continue
                 if turn.response.resolved.route in {'ANSWER','CLARIFY'}:
                     raise ValueError('widget_history_receipt_ref_missing')
-                entries.append(dict(payload=public_payload(turn),patient_text=None,selected_ref=None,source_revision=None))
+                entries.append(dict(payload=public_completed_turn_payload(turn),patient_text=None,selected_ref=None,source_revision=None))
                 continue
             ref=turn.dialogue_ref
-            entries.append(dict(payload=public_payload(turn),patient_text=mask_emails_in_text(mask_phones_in_text(ref.patient_text)) if ref.patient_text else None,
+            entries.append(dict(payload=public_completed_turn_payload(turn),patient_text=mask_emails_in_text(mask_phones_in_text(ref.patient_text)) if ref.patient_text else None,
                 selected_ref=ref.selected_ui_ref.reply_id if ref.selected_ui_ref else None,
                 source_revision=ref.selected_ui_ref.source_revision if ref.selected_ui_ref else None))
         current=store.read_completion_at_revision(key,record.state.revision)
-        return dict(client_id=client_id,entries=entries,current=public_payload(current) if current else None,
+        return dict(client_id=client_id,entries=entries,current=public_completed_turn_payload(current) if current else None,
             next_before_revision=turns[0].committed_revision if has_more and turns else None,actions_current=context.freshness=='fresh')

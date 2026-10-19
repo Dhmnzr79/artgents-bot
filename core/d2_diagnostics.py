@@ -338,6 +338,8 @@ def _provider_metrics(response):
 def call_provider(transport, **kwargs):
     """Count this existing transport invocation, not hidden SDK network retries."""
     observation = _provider_started()
+    from core.d2_admin_metrics import provider_started, provider_finished
+    admin_observation = provider_started(kwargs.get('model'))
     response = None
     try:
         response = transport(**kwargs)
@@ -347,3 +349,4 @@ def call_provider(transport, **kwargs):
         raise
     finally:
         _provider_finished(observation, response)
+        provider_finished(admin_observation, response)

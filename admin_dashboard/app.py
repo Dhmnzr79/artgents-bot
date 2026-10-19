@@ -1,838 +1,171 @@
-"""Internal dashboard service (read-only) for bot analytics."""
-from __future__ import annotations
-
-import os
-import sys
+"""Private, read-only administration of the current D2 bot."""
 from datetime import datetime, timedelta, timezone
-
-_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if _ROOT not in sys.path:
-    sys.path.insert(0, _ROOT)
+import hmac
+import ipaddress
+import os
+from pathlib import Path
+import re
+from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
-
-load_dotenv(os.path.join(_ROOT, ".env"))
-
 from flask import Flask, jsonify, render_template, request
 
-from core.client_config_loader import admin_client_options, list_admin_client_ids
-from core.pg_schema_readiness import check_pg_schema_ready
-from core.pg_tenant_context import InvalidPgTenantError, tenant_transaction, validate_trusted_pg_tenant
-from admin_dashboard.dialog_segments import (
-    TurnRow,
-    build_visit_item,
-    dialog_status,
-    group_turns_into_visits,
-    turn_row_to_dict,
-    visit_has_lead,
-)
+load_dotenv(Path(__file__).resolve().parents[1] / '.env')
 
-try:
-    import psycopg
-except Exception:  # pragma: no cover - runtime guard
-    psycopg = None
+from admin_dashboard import repository
+from core.client_config_loader import admin_client_options
+
+APP_ENV = (os.getenv('APP_ENV') or 'local').strip().lower()
+ADMIN_TOKEN = (os.getenv('ADMIN_DASHBOARD_TOKEN') or '').strip()
+PORT = int(os.getenv('ADMIN_DASHBOARD_PORT', '9100'))
+app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 1024
 
 
-APP_ENV = (os.getenv("APP_ENV") or "local").strip().lower()
-BOT_PG_DSN = (os.getenv("BOT_PG_DSN") or "").strip()
-PORT = int(os.getenv("ADMIN_DASHBOARD_PORT", "9100"))
-ADMIN_TOKEN = (os.getenv("ADMIN_DASHBOARD_TOKEN") or "").strip()
-DB_CONNECT_TIMEOUT_SEC = int(os.getenv("ADMIN_DASHBOARD_DB_CONNECT_TIMEOUT_SEC", "3"))
-VISIT_GAP_MINUTES = int(os.getenv("ADMIN_DIALOG_VISIT_GAP_MIN", "30"))
-
-_DASHBOARD_DIR = os.path.dirname(os.path.abspath(__file__))
-app = Flask(
-    __name__,
-    template_folder=os.path.join(_DASHBOARD_DIR, "templates"),
-    static_folder=os.path.join(_DASHBOARD_DIR, "static"),
-)
-if APP_ENV == "local":
-    app.config["TEMPLATES_AUTO_RELOAD"] = True
-
-
-def _utc_day_bounds(days_back: int = 0) -> tuple[datetime, datetime]:
+def _overview_period_bounds(raw=None):
+    key = raw if raw in {'today', 'week', 'month'} else 'today'
+    days = {'today': 1, 'week': 7, 'month': 30}[key]
     now = datetime.now(timezone.utc)
-    d0 = datetime(now.year, now.month, now.day, tzinfo=timezone.utc) - timedelta(days=days_back)
-    d1 = d0 + timedelta(days=1)
-    return d0, d1
+    end = datetime(now.year, now.month, now.day, tzinfo=timezone.utc) + timedelta(days=1)
+    return end - timedelta(days=days), end, key, {'today': 'сегодня', 'week': '7 дней', 'month': '30 дней'}[key]
 
 
-_OVERVIEW_PERIOD_DAYS = {"today": 1, "week": 7, "month": 30}
-_OVERVIEW_PERIOD_LABELS = {"today": "сегодня", "week": "7 дней", "month": "30 дней"}
+def _loopback(value):
+    try:
+        return value == 'localhost' or ipaddress.ip_address(value).is_loopback
+    except ValueError:
+        return False
 
 
-def _overview_period_bounds(raw: str | None = None) -> tuple[datetime, datetime, str, str]:
-    """UTC range [d0, d1) for overview/costs: calendar buckets ending tomorrow 00:00 UTC."""
-    key = (raw or "today").strip().lower()
-    if key not in _OVERVIEW_PERIOD_DAYS:
-        key = "today"
-    days = _OVERVIEW_PERIOD_DAYS[key]
-    now = datetime.now(timezone.utc)
-    d1 = datetime(now.year, now.month, now.day, tzinfo=timezone.utc) + timedelta(days=1)
-    d0 = d1 - timedelta(days=days)
-    return d0, d1, key, _OVERVIEW_PERIOD_LABELS[key]
-
-
-def _overview_period() -> tuple[datetime, datetime, str, str]:
-    return _overview_period_bounds(request.args.get("period"))
-
-
+@app.before_request
 def _guard():
-    # Local mode: no token by default.
-    if APP_ENV != "prod":
-        return None
-    expected = ADMIN_TOKEN
-    if not expected:
-        return jsonify({"error": "dashboard_token_not_set"}), 503
-    got = (request.headers.get("X-Admin-Dashboard-Token") or "").strip()
-    if got == expected:
-        return None
-    return jsonify({"error": "not_found"}), 404
+    if APP_ENV == 'local':
+        host = urlsplit('http://' + request.host).hostname or ''
+        if not _loopback(request.remote_addr or '') or not _loopback(host):
+            return jsonify(error='local_access_only'), 403
+        origin = request.headers.get('Origin')
+        if origin and origin != request.host_url.rstrip('/'):
+            return jsonify(error='origin_forbidden'), 403
+    elif APP_ENV in {'prod', 'production'}:
+        if not ADMIN_TOKEN:
+            return jsonify(error='dashboard_token_not_set'), 503
+        token = request.headers.get('X-Admin-Dashboard-Token', '')
+        if not hmac.compare_digest(token.encode(), ADMIN_TOKEN.encode()):
+            return jsonify(error='not_found'), 404
+    else:
+        return jsonify(error='dashboard_environment_invalid'), 503
 
 
-def _require_db():
-    if not BOT_PG_DSN:
-        return None, (jsonify({"error": "BOT_PG_DSN_not_set"}), 503)
-    if psycopg is None:
-        return None, (jsonify({"error": "psycopg_not_installed"}), 503)
-    try:
-        conn = psycopg.connect(BOT_PG_DSN, autocommit=True, connect_timeout=max(1, DB_CONNECT_TIMEOUT_SEC))
-    except Exception as e:
-        return None, (jsonify({"error": "db_connect_failed", "details": str(e)[:200]}), 503)
-    return conn, None
+@app.after_request
+def _private_headers(response):
+    response.headers.update({
+        'Cache-Control': 'no-store, private', 'Pragma': 'no-cache', 'Expires': '0',
+        'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
+        'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+    })
+    return response
 
 
-def _schema_unavailable_response(exc: Exception):
-    msg = str(exc).lower()
-    if "does not exist" in msg or type(exc).__name__ == "UndefinedTable":
-        return jsonify({"error": "db_schema_unavailable"}), 503
-    return None
+def _client():
+    cid = request.args.get('client_id', '')
+    if cid not in {item['client_id'] for item in admin_client_options()}:
+        raise ValueError('unknown_client')
+    return cid
 
 
-def _dashboard_tenant_or_error() -> tuple[str | None, tuple | None]:
-    """Trusted tenant for PG reads; explicit unknown client_id is fail-closed."""
-    if "client_id" in request.args:
-        explicit = (request.args.get("client_id") or "").strip()
-        if explicit:
-            try:
-                return validate_trusted_pg_tenant(explicit), None
-            except InvalidPgTenantError:
-                return None, (jsonify({"error": "unknown_client"}), 400)
-    default = _default_client_id()
-    try:
-        return validate_trusted_pg_tenant(default), None
-    except InvalidPgTenantError:
-        return None, (jsonify({"error": "dashboard_client_unavailable"}), 503)
+def _paging():
+    limit = int(request.args.get('limit', '20'))
+    cursor = request.args.get('cursor')
+    cursor = int(cursor) if cursor is not None else None
+    if not 1 <= limit <= 100 or (cursor is not None and not 1 <= cursor <= 2**63 - 1):
+        raise ValueError('pagination_invalid')
+    return limit, cursor
 
 
-def _default_client_id() -> str:
-    ids = list_admin_client_ids()
-    return ids[0] if ids else "demo"
+@app.errorhandler(ValueError)
+def _bad_request(_exc):
+    return jsonify(error='invalid_request'), 400
 
 
-def _client_id() -> str:
-    cid, err = _dashboard_tenant_or_error()
-    if err:
-        return _default_client_id()
-    return cid or _default_client_id()
+@app.errorhandler(repository.StorageUnavailable)
+def _storage_error(_exc):
+    return jsonify(error='d2_storage_unavailable'), 503
 
 
-def _to_int(value: str | None, default: int, min_v: int, max_v: int) -> int:
-    try:
-        v = int(value or default)
-    except Exception:
-        v = default
-    return min(max(v, min_v), max_v)
-
-
-def _dialog_status(
-    *,
-    has_lead: bool,
-    last_status: str | None,
-    last_route: str | None,
-) -> str:
-    return dialog_status(has_lead=has_lead, last_status=last_status, last_route=last_route)
-
-
-def _fetch_turn_rows(
-    cur,
-    cid: str,
-    *,
-    sid: str | None = None,
-    d0: datetime | None = None,
-    d1: datetime | None = None,
-) -> dict[str, list[TurnRow]]:
-    where = ["client_id=%s", "event_type='turn_complete'", "sid IS NOT NULL"]
-    params: list[object] = [cid]
-    if sid:
-        where.append("sid=%s")
-        params.append(sid)
-    if d0 is not None:
-        where.append("occurred_at >= %s")
-        params.append(d0)
-    if d1 is not None:
-        where.append("occurred_at < %s")
-        params.append(d1)
-    cur.execute(
-        f"""
-        SELECT
-          sid,
-          occurred_at,
-          status,
-          COALESCE((details->>'turn_number')::int, 0) AS turn_number,
-          COALESCE(
-            NULLIF(details->>'user_text_redacted', ''),
-            details->>'user_preview_redacted'
-          ) AS user_text,
-          details->>'bot_text_redacted' AS bot_text,
-          details->>'route' AS route,
-          COALESCE(details->>'doc_id', details->>'chunk_id') AS doc_id,
-          COALESCE((details->>'latency_ms')::numeric, 0)::float AS latency_ms,
-          COALESCE((details->>'pii_withheld')::boolean, false) AS pii_withheld
-        FROM bot_events
-        WHERE {' AND '.join(where)}
-        ORDER BY sid, occurred_at ASC
-        """,
-        tuple(params),
-    )
-    by_sid: dict[str, list[TurnRow]] = {}
-    for sid_val, ts, status, turn_number, user_text, bot_text, route, doc_id, latency_ms, pii_withheld in cur.fetchall():
-        by_sid.setdefault(str(sid_val), []).append(
-            (
-                ts,
-                status,
-                int(turn_number or 0),
-                user_text,
-                bot_text,
-                route,
-                doc_id,
-                float(latency_ms or 0.0),
-                bool(pii_withheld),
-            )
-        )
-    return by_sid
-
-
-def _fetch_lead_times(cur, cid: str, *, d0: datetime | None = None, d1: datetime | None = None) -> dict[str, list[datetime]]:
-    where = ["client_id=%s", "event_type='lead_submitted'", "status='ok'", "sid IS NOT NULL"]
-    params: list[object] = [cid]
-    if d0 is not None:
-        where.append("occurred_at >= %s")
-        params.append(d0)
-    if d1 is not None:
-        where.append("occurred_at < %s")
-        params.append(d1)
-    cur.execute(
-        f"""
-        SELECT sid, occurred_at
-        FROM bot_events
-        WHERE {' AND '.join(where)}
-        ORDER BY sid, occurred_at ASC
-        """,
-        tuple(params),
-    )
-    out: dict[str, list[datetime]] = {}
-    for sid_val, ts in cur.fetchall():
-        out.setdefault(str(sid_val), []).append(ts)
-    return out
-
-
-def _build_visit_list(
-    turns_by_sid: dict[str, list[TurnRow]],
-    leads_by_sid: dict[str, list[datetime]],
-    *,
-    client_id: str,
-    limit: int,
-) -> list[dict]:
-    items: list[dict] = []
-    for sid, turns in turns_by_sid.items():
-        if not turns:
-            continue
-        visits = group_turns_into_visits(
-            turns,
-            leads_by_sid.get(sid, []),
-            gap_minutes=VISIT_GAP_MINUTES,
-        )
-        total = len(visits)
-        for idx, visit_turns in enumerate(visits):
-            items.append(
-                build_visit_item(sid, client_id, idx, total, visit_turns, leads_by_sid.get(sid, []))
-            )
-    items.sort(key=lambda x: x.get("last_ts") or "", reverse=True)
-    return items[:limit]
-
-
-@app.get("/")
+@app.get('/')
 def home():
-    denied = _guard()
-    if denied:
-        return denied
-    default_client_id = _default_client_id()
-    return render_template(
-        "index.html",
-        app_env=APP_ENV,
-        default_client_id=default_client_id,
-    )
+    return render_template('index.html', app_env=APP_ENV)
 
 
-@app.get("/api/health")
+@app.get('/api/health')
 def api_health():
-    denied = _guard()
-    if denied:
-        return denied
-    if not BOT_PG_DSN:
-        return jsonify({"ok": False, "postgres": "BOT_PG_DSN_not_set", "app_env": APP_ENV}), 503
-    if psycopg is None:
-        return jsonify({"ok": False, "postgres": "psycopg_not_installed", "app_env": APP_ENV}), 503
-    conn, err = _require_db()
-    if err:
-        body = err[0].get_json(silent=True) or {}
-        return jsonify({"ok": False, "postgres": body.get("error", "db_connect_failed"), "app_env": APP_ENV}), 503
-    try:
-        ready, reason = check_pg_schema_ready(conn)
-        if not ready:
-            return jsonify(
-                {
-                    "ok": False,
-                    "postgres": "db_schema_unavailable",
-                    "schema_reason": reason,
-                    "app_env": APP_ENV,
-                }
-            ), 503
-    finally:
-        conn.close()
-    return jsonify({"ok": True, "postgres": "connected", "app_env": APP_ENV})
+    clients = admin_client_options()
+    storage = {item['client_id']: repository.health(item['client_id']) for item in clients}
+    return jsonify(ok=True, architecture='D2', read_only=True, storage=storage)
 
 
-@app.get("/api/clients")
+@app.get('/api/clients')
 def api_clients():
-    denied = _guard()
-    if denied:
-        return denied
-    items = admin_client_options()
-    return jsonify({"items": items, "default_client_id": _default_client_id()})
+    return jsonify(items=admin_client_options())
 
 
-@app.get("/api/overview")
+@app.get('/api/overview')
 def api_overview():
-    denied = _guard()
-    if denied:
-        return denied
-    cid, terr = _dashboard_tenant_or_error()
-    if terr:
-        return terr
-    conn, err = _require_db()
-    if err:
-        return err
-    d0, d1, period_key, period_label = _overview_period()
-    try:
-        with tenant_transaction(conn, cid):
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                SELECT
-                  count(*) FILTER (WHERE event_type='user_turn_completed') AS user_turns,
-                  count(DISTINCT sid) FILTER (WHERE sid IS NOT NULL) AS sessions,
-                  count(DISTINCT sid) FILTER (
-                    WHERE sid IS NOT NULL AND event_type='lead_submitted' AND status='ok'
-                  ) AS sessions_with_lead,
-                  count(*) FILTER (WHERE event_type='lead_submitted' AND status='ok') AS leads,
-                  count(*) FILTER (WHERE event_type='llm_error') AS llm_errors,
-                  count(*) FILTER (WHERE status='error' OR event_type IN ('llm_error', 'ask_failed', 'ask_stream_failed')) AS errors,
-                  count(*) FILTER (WHERE event_type='turn_complete' AND details->>'route'='retrieval_no_candidates') AS no_candidates,
-                  count(*) FILTER (WHERE event_type='turn_complete' AND details->>'route'='low_score_fallback') AS low_score_fallback,
-                  COALESCE(avg((details->>'latency_ms')::numeric) FILTER (WHERE event_type='turn_complete' AND details ? 'latency_ms'), 0)::float AS avg_latency_ms
-                FROM bot_events
-                WHERE client_id = %s AND occurred_at >= %s AND occurred_at < %s
-                """,
-                    (cid, d0, d1),
-                )
-                row = cur.fetchone() or (0, 0, 0, 0, 0, 0, 0, 0, 0)
-                turns_today = _fetch_turn_rows(cur, cid, d0=d0, d1=d1)
-                leads_today = _fetch_lead_times(cur, cid, d0=d0, d1=d1)
-                visits_today = _build_visit_list(turns_today, leads_today, client_id=cid, limit=10_000)
-                cur.execute(
-                    """
-                SELECT
-                  COALESCE(sum((details->>'estimated_usd')::numeric), 0)::float
-                FROM bot_events
-                WHERE client_id=%s
-                  AND event_type='llm_usage'
-                  AND occurred_at >= %s AND occurred_at < %s
-                """,
-                    (cid, d0, d1),
-                )
-                usd = float((cur.fetchone() or [0.0])[0] or 0.0)
-    except Exception as e:
-        schema_err = _schema_unavailable_response(e)
-        if schema_err:
-            return schema_err
-        raise
-    finally:
-        conn.close()
-    sessions = int(row[1] or 0)
-    sessions_with_lead = int(row[2] or 0)
-    leads = int(row[3] or 0)
-    visits = len(visits_today)
-    return jsonify(
-        {
-            "client_id": cid,
-            "period": period_key,
-            "period_label": period_label,
-            "range_from": d0.date().isoformat(),
-            "range_to": (d1 - timedelta(days=1)).date().isoformat(),
-            "today_utc": d0.date().isoformat(),
-            "user_turns": int(row[0] or 0),
-            "visits": visits,
-            "conversations": visits,
-            "sessions": sessions,
-            "sessions_with_lead": sessions_with_lead,
-            "leads": leads,
-            "llm_errors": int(row[4] or 0),
-            "errors": int(row[5] or 0),
-            "no_candidates": int(row[6] or 0),
-            "low_score_fallback": int(row[7] or 0),
-            "fallbacks_total": int((row[6] or 0) + (row[7] or 0)),
-            "avg_latency_ms": float(row[8] or 0.0),
-            "estimated_usd": round(usd, 6),
-            "conversion_percent": round(((sessions_with_lead / max(sessions, 1)) * 100.0), 2),
-        }
-    )
+    cid = _client()
+    start, end, period, label = _overview_period_bounds(request.args.get('period'))
+    return jsonify(client_id=cid, period=period, period_label=label,
+                   **repository.overview(cid, start.isoformat(), end.isoformat()))
 
 
-@app.get("/api/dialogs")
+@app.get('/api/dialogs')
 def api_dialogs():
-    denied = _guard()
-    if denied:
-        return denied
-    cid, terr = _dashboard_tenant_or_error()
-    if terr:
-        return terr
-    conn, err = _require_db()
-    if err:
-        return err
-    limit = _to_int(request.args.get("limit"), 30, 1, 200)
-    try:
-        with tenant_transaction(conn, cid):
-            with conn.cursor() as cur:
-                turns_by_sid = _fetch_turn_rows(cur, cid)
-                leads_by_sid = _fetch_lead_times(cur, cid)
-    except Exception as e:
-        schema_err = _schema_unavailable_response(e)
-        if schema_err:
-            return schema_err
-        raise
-    finally:
-        conn.close()
-    out = _build_visit_list(turns_by_sid, leads_by_sid, client_id=cid, limit=limit)
-    return jsonify({"client_id": cid, "items": out})
+    cid = _client()
+    limit, cursor = _paging()
+    return jsonify(client_id=cid, **repository.dialogs(cid, limit, cursor))
 
 
-@app.get("/api/dialogs/<sid>/thread")
-def api_dialog_thread(sid: str):
-    denied = _guard()
-    if denied:
-        return denied
-    cid, terr = _dashboard_tenant_or_error()
-    if terr:
-        return terr
-    conn, err = _require_db()
-    if err:
-        return err
-    sid_clean = (sid or "").strip()
-    if not sid_clean:
-        conn.close()
-        return jsonify({"error": "sid_required"}), 400
-    visit_index = _to_int(request.args.get("visit_index"), 0, 0, 999)
-    try:
-        with tenant_transaction(conn, cid):
-            with conn.cursor() as cur:
-                turns_by_sid = _fetch_turn_rows(cur, cid, sid=sid_clean)
-                leads_by_sid = _fetch_lead_times(cur, cid)
-    except Exception as e:
-        schema_err = _schema_unavailable_response(e)
-        if schema_err:
-            return schema_err
-        raise
-    finally:
-        conn.close()
-    turns = turns_by_sid.get(sid_clean, [])
-    if not turns:
-        return jsonify({"error": "not_found", "sid": sid_clean, "client_id": cid}), 404
-    visits = group_turns_into_visits(
-        turns,
-        leads_by_sid.get(sid_clean, []),
-        gap_minutes=VISIT_GAP_MINUTES,
-    )
-    if visit_index >= len(visits):
-        return jsonify({"error": "visit_not_found", "sid": sid_clean, "visit_index": visit_index}), 404
-    visit_turns = visits[visit_index]
-    last = visit_turns[-1]
-    has_lead = visit_has_lead(visit_turns, leads_by_sid.get(sid_clean, []))
-    return jsonify(
-        {
-            "client_id": cid,
-            "sid": sid_clean,
-            "visit_index": visit_index,
-            "visits_total": len(visits),
-            "turns": [turn_row_to_dict(row) for row in visit_turns],
-            "turns_count": len(visit_turns),
-            "has_lead": has_lead,
-            "status": _dialog_status(has_lead=has_lead, last_status=last[1], last_route=last[5]),
-        }
-    )
+@app.get('/api/dialogs/<session_id>/thread')
+def api_thread(session_id):
+    cid = _client()
+    if not re.fullmatch('[a-f0-9]{64}', session_id):
+        raise ValueError('session_id_invalid')
+    limit, cursor = _paging()
+    result = repository.thread(cid, session_id, limit, cursor)
+    if result is None:
+        return jsonify(error='not_found'), 404
+    return jsonify(client_id=cid, **result)
 
 
-@app.post("/api/dialogs/<sid>/purge")
-@app.delete("/api/dialogs/<sid>")
-def api_dialog_delete(sid: str):
-    """Remove entire browser session from admin stats (keeps llm_usage / token costs)."""
-    denied = _guard()
-    if denied:
-        return denied
-    if not BOT_PG_DSN:
-        return jsonify({"error": "BOT_PG_DSN_not_set"}), 503
-    cid, terr = _dashboard_tenant_or_error()
-    if terr:
-        return terr
-    sid_clean = (sid or "").strip()
-    if not sid_clean:
-        return jsonify({"error": "sid_required"}), 400
-    try:
-        from pg_retention import purge_session_observability
-
-        stats = purge_session_observability(
-            BOT_PG_DSN,
-            sid=sid_clean,
-            client_id=cid,
-            keep_llm_usage=True,
-        )
-    except Exception as e:
-        return jsonify({"error": "purge_failed", "details": str(e)[:200]}), 500
-    if not stats.get("found"):
-        return jsonify({"error": "not_found", "sid": sid_clean, "client_id": cid}), 404
-    return jsonify(
-        {
-            "ok": True,
-            "client_id": cid,
-            "sid": sid_clean,
-            "bot_events_deleted": int(stats.get("bot_events_deleted") or 0),
-            "traces_deleted": int(stats.get("traces_deleted") or 0),
-            "leads_deleted": int(stats.get("leads_deleted") or 0),
-            "sqlite_cleared": bool(stats.get("sqlite_cleared")),
-            "llm_usage_kept": True,
-        }
-    )
-
-
-@app.get("/api/problems")
-def api_problems():
-    denied = _guard()
-    if denied:
-        return denied
-    cid, terr = _dashboard_tenant_or_error()
-    if terr:
-        return terr
-    conn, err = _require_db()
-    if err:
-        return err
-    limit = _to_int(request.args.get("limit"), 50, 1, 300)
-    try:
-        with tenant_transaction(conn, cid):
-            with conn.cursor() as cur:
-                cur.execute(
-                """
-                WITH bad_events AS (
-                  SELECT
-                    occurred_at AS ts,
-                    sid,
-                    event_type,
-                    COALESCE(details->>'user_text_redacted', details->>'user_preview_redacted') AS user_text,
-                    COALESCE(details->>'route', '') AS route,
-                    COALESCE(details->>'error', details->>'fallback_reason', status, event_type) AS reason,
-                    COALESCE(details->>'doc_id', details->>'chunk_id') AS doc_id,
-                    CASE
-                      WHEN event_type IN ('llm_error', 'ask_failed', 'ask_stream_failed') OR status='error' THEN 'high'
-                      WHEN details->>'route'='retrieval_no_candidates' THEN 'high'
-                      WHEN details->>'route'='low_score_fallback' THEN 'medium'
-                      ELSE 'low'
-                    END AS priority
-                  FROM bot_events
-                  WHERE client_id=%s
-                    AND (
-                      status='error'
-                      OR event_type IN ('llm_error', 'ask_failed', 'ask_stream_failed')
-                      OR (event_type='turn_complete' AND details->>'route' IN ('retrieval_no_candidates', 'low_score_fallback'))
-                    )
-                ),
-                bad_leads AS (
-                  SELECT
-                    captured_at AS ts,
-                    sid,
-                    'lead_delivery_issue' AS event_type,
-                    NULL::text AS user_text,
-                    NULL::text AS route,
-                    COALESCE(delivery_status, 'unknown') AS reason,
-                    NULL::text AS doc_id,
-                    'medium'::text AS priority
-                  FROM leads
-                  WHERE client_id=%s
-                    AND COALESCE(delivery_status, '') <> 'email'
-                )
-                SELECT ts, sid, event_type, user_text, route, reason, doc_id, priority
-                FROM (
-                  SELECT * FROM bad_events
-                  UNION ALL
-                  SELECT * FROM bad_leads
-                ) p
-                ORDER BY ts DESC
-                LIMIT %s
-                """,
-                (cid, cid, limit),
-            )
-                rows = cur.fetchall()
-    except Exception as e:
-        schema_err = _schema_unavailable_response(e)
-        if schema_err:
-            return schema_err
-        raise
-    finally:
-        conn.close()
-    items = []
-    for ts, sid, event_type, user_text, route, reason, doc_id, priority in rows:
-        items.append(
-            {
-                "ts": ts.isoformat(),
-                "sid": sid,
-                "event_type": event_type,
-                "user_text": user_text,
-                "route": route,
-                "reason": reason,
-                "doc_id": doc_id,
-                "priority": priority,
-            }
-        )
-    return jsonify({"client_id": cid, "items": items})
-
-
-def _json_bool(details_key: str) -> str:
-    """Safe JSONB → bool in SQL (legacy rows may store '' instead of bool)."""
-    return f"""
-    CASE lower(coalesce(details->>{details_key!r}, ''))
-      WHEN 'true' THEN true
-      WHEN 't' THEN true
-      WHEN '1' THEN true
-      ELSE false
-    END
-    """
-
-
-@app.get("/api/leads")
+@app.get('/api/leads')
 def api_leads():
-    denied = _guard()
-    if denied:
-        return denied
-    cid, terr = _dashboard_tenant_or_error()
-    if terr:
-        return terr
-    conn, err = _require_db()
-    if err:
-        return err
-    limit = min(max(int(request.args.get("limit", 50)), 1), 300)
-    after_hours_sql = _json_bool("after_hours")
-    has_name_sql = _json_bool("has_name")
-    has_situation_sql = _json_bool("has_situation_note")
-    ok_sql = _json_bool("ok")
-    try:
-        with tenant_transaction(conn, cid):
-            with conn.cursor() as cur:
-                cur.execute(
-                f"""
-                SELECT
-                  occurred_at,
-                  request_id,
-                  sid,
-                  COALESCE(details->>'delivery_status', details->>'delivery') AS delivery_status,
-                  details->>'delivery' AS delivery,
-                  details->>'intent' AS intent,
-                  {after_hours_sql} AS after_hours,
-                  {has_name_sql} AS has_name,
-                  {has_situation_sql} AS has_situation_note
-                FROM bot_events
-                WHERE client_id=%s
-                  AND event_type='lead_submitted'
-                  AND status='ok'
-                  AND ({ok_sql} OR details->>'ok' IS NULL)
-                ORDER BY occurred_at DESC
-                LIMIT %s
-                """,
-                (cid, limit),
-            )
-                rows = cur.fetchall()
-    except Exception as e:
-        schema_err = _schema_unavailable_response(e)
-        if schema_err:
-            return schema_err
-        raise
-    finally:
-        conn.close()
-    items = []
-    for (
-        ts,
-        request_id,
-        sid,
-        delivery_status,
-        delivery,
-        intent,
-        after_hours,
-        has_name,
-        has_situation_note,
-    ) in rows:
-        items.append(
-            {
-                "captured_at": ts.isoformat() if ts else None,
-                "request_id": request_id,
-                "sid": sid,
-                "topic": intent,
-                "delivery": delivery,
-                "delivery_status": delivery_status,
-                "after_hours": bool(after_hours),
-                "has_name": bool(has_name),
-                "has_situation_note": bool(has_situation_note),
-                "client_id": cid,
-            }
-        )
-    return jsonify({"client_id": cid, "items": items})
+    cid = _client()
+    limit, cursor = _paging()
+    return jsonify(client_id=cid, **repository.leads(cid, limit, cursor))
 
 
-@app.get("/api/costs")
+@app.get('/api/costs')
 def api_costs():
-    denied = _guard()
-    if denied:
-        return denied
-    cid, terr = _dashboard_tenant_or_error()
-    if terr:
-        return terr
-    conn, err = _require_db()
-    if err:
-        return err
-    d0, d1, period_key, period_label = _overview_period()
-    try:
-        with tenant_transaction(conn, cid):
-            with conn.cursor() as cur:
-                cur.execute(
-                """
-                SELECT
-                  details->>'call_type' AS call_type,
-                  count(*) AS calls,
-                  COALESCE(sum((details->>'prompt_tokens')::numeric),0)::bigint AS prompt_tokens,
-                  COALESCE(sum((details->>'completion_tokens')::numeric),0)::bigint AS completion_tokens,
-                  COALESCE(sum((details->>'estimated_usd')::numeric),0)::float AS usd
-                FROM bot_events
-                WHERE client_id=%s AND event_type='llm_usage'
-                  AND occurred_at >= %s AND occurred_at < %s
-                GROUP BY details->>'call_type'
-                ORDER BY usd DESC, calls DESC
-                """,
-                (cid, d0, d1),
-            )
-                rows = cur.fetchall()
-    except Exception as e:
-        schema_err = _schema_unavailable_response(e)
-        if schema_err:
-            return schema_err
-        raise
-    finally:
-        conn.close()
-    items = []
-    total = 0.0
-    for call_type, calls, pt, ct, usd in rows:
-        val = float(usd or 0.0)
-        total += val
-        items.append(
-            {
-                "call_type": call_type or "unknown",
-                "calls": int(calls or 0),
-                "prompt_tokens": int(pt or 0),
-                "completion_tokens": int(ct or 0),
-                "estimated_usd": round(val, 6),
-            }
-        )
-    return jsonify(
-        {
-            "client_id": cid,
-            "period": period_key,
-            "period_label": period_label,
-            "range_from": d0.date().isoformat(),
-            "range_to": (d1 - timedelta(days=1)).date().isoformat(),
-            "today_utc": d0.date().isoformat(),
-            "estimated_usd_total": round(total, 6),
-            "items": items,
-        }
-    )
+    cid = _client()
+    start, end, *_ = _overview_period_bounds(request.args.get('period'))
+    return jsonify(client_id=cid, **repository.costs(cid, start.isoformat(), end.isoformat()))
 
 
-@app.get("/api/events")
-def api_events():
-    denied = _guard()
-    if denied:
-        return denied
-    cid, terr = _dashboard_tenant_or_error()
-    if terr:
-        return terr
-    conn, err = _require_db()
-    if err:
-        return err
-    limit = _to_int(request.args.get("limit"), 200, 1, 1000)
-    event_type = (request.args.get("event_type") or "").strip()
-    sid = (request.args.get("sid") or "").strip()
-    request_id = (request.args.get("request_id") or "").strip()
-    try:
-        with tenant_transaction(conn, cid):
-            with conn.cursor() as cur:
-                where_parts = ["client_id=%s"]
-                params: list[object] = [cid]
-                if event_type:
-                    where_parts.append("event_type=%s")
-                    params.append(event_type)
-                if sid:
-                    where_parts.append("sid=%s")
-                    params.append(sid)
-                if request_id:
-                    where_parts.append("request_id=%s")
-                    params.append(request_id)
-                params.append(limit)
-                query = f"""
-                SELECT occurred_at, event_type, request_id, sid, status, details
-                FROM bot_events
-                WHERE {' AND '.join(where_parts)}
-                ORDER BY occurred_at DESC
-                LIMIT %s
-            """
-                cur.execute(query, tuple(params))
-                rows = cur.fetchall()
-    except Exception as e:
-        schema_err = _schema_unavailable_response(e)
-        if schema_err:
-            return schema_err
-        raise
-    finally:
-        conn.close()
-    items = []
-    for ts, event_type, request_id, sid, status, details in rows:
-        items.append(
-            {
-                "ts": ts.isoformat(),
-                "event_type": event_type,
-                "request_id": request_id,
-                "sid": sid,
-                "status": status,
-                "details": details or {},
-            }
-        )
-    return jsonify({"client_id": cid, "items": items})
+@app.get('/api/funnel')
+def api_funnel():
+    cid = _client()
+    start, end, *_ = _overview_period_bounds(request.args.get('period'))
+    return jsonify(client_id=cid, **repository.funnel(cid, start.isoformat(), end.isoformat()))
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=PORT, debug=False)
+@app.get('/api/events')
+@app.get('/api/problems')
+def api_observations():
+    cid = _client()
+    limit, cursor = _paging()
+    start, end, *_ = _overview_period_bounds(request.args.get('period'))
+    return jsonify(client_id=cid, **repository.observations(cid, start.isoformat(), end.isoformat(),
+                   limit, cursor, failures_only=request.path == '/api/problems'))
 
+
+if __name__ == '__main__':
+    app.run(host='127.0.0.1', port=PORT, debug=False, use_reloader=False)

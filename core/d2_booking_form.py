@@ -8,7 +8,7 @@ from contracts.lead_consent import LeadConsentReceipt
 from contracts.response_plan import SessionKey
 from core.client_config_loader import tone_to_txt_dict
 from core.d2_dialogue_store import D2DialogueStore
-from core.d2_http_adapter import _store_path
+from core.d2_storage import dialogue_store_path
 from core.d2_tenant_snapshot import d2_clients_root,load_d2_tenant_snapshot
 from core.d2_usage_limits import ClientUsageAdmission,load_usage_limits,visitor_bucket
 from core.lead_consent import lead_consent_definition
@@ -36,7 +36,7 @@ def submit_booking_form(raw, *, client_id, peer_ip=None):
     if not phone:
         raise ValueError('bad_phone')
     key = SessionKey(client_id=client_id,sid=form.sid)
-    path = _store_path(client_id)
+    path = dialogue_store_path(client_id)
     path.parent.mkdir(parents=True,exist_ok=True)
     with D2DialogueStore(path) as store:
         fingerprint = store.private_fingerprint(json.dumps(form.model_dump(mode='json'),ensure_ascii=False,sort_keys=True,separators=(',',':')).encode())

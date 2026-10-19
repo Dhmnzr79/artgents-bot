@@ -109,11 +109,15 @@ def test_caddy_no_db_or_qwen_or_smtp(compose_doc: dict) -> None:
         assert needle not in blob
 
 
-def test_bot_admin_depend_on_successful_migrate(compose_doc: dict) -> None:
-    for svc in ("bot", "admin"):
-        dep = compose_doc["services"][svc].get("depends_on") or {}
-        assert "migrate" in dep
-        assert dep["migrate"].get("condition") == "service_completed_successfully"
+def test_bot_migration_and_admin_read_only_d2_access(compose_doc: dict) -> None:
+    dep = compose_doc["services"]["bot"].get("depends_on") or {}
+    assert dep["migrate"].get("condition") == "service_completed_successfully"
+    admin = compose_doc["services"]["admin"]
+    assert not admin.get("depends_on")
+    assert admin["networks"] == ["edge"]
+    assert "BOT_PG_DSN" not in admin["environment"]
+    assert "ALLOWED_CLIENTS" in admin["environment"]
+    assert admin["volumes"] == ["bot_data:/app/data:ro"]
 
 
 def test_postgres_healthcheck(compose_doc: dict) -> None:

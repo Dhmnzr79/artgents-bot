@@ -33,7 +33,7 @@
 | **postgres** | PostgreSQL только во внутренней сети; данные в named volume. |
 | **migrate** | One-shot: `python -m deploy.postgres.migrate` по `BOT_MIGRATOR_PG_DSN`. |
 | **bot** | Gunicorn → `app:app`, порт **8000 только внутри Docker**. |
-| **admin** | Gunicorn → `admin_dashboard.app:app`, порт **9100 только внутри Docker**. |
+| **admin** | Read-only D2 admin → `admin_dashboard.app:app`, порт **9100 только внутри Docker**, `bot_data` смонтирован только для чтения; без PG DSN. |
 | **caddy** | Единственный сервис с **публичными** портами 80/443 и loopback 9100. |
 
 Redis в пилоте **не** используется.
@@ -52,10 +52,10 @@ Redis в пилоте **не** используется.
 
 ## Сети
 
-- **db_internal** (`internal: true`): `postgres`, `migrate`, `bot`, `admin`.
+- **db_internal** (`internal: true`): `postgres`, `migrate`, `bot`.
 - **edge**: `bot`, `admin`, `caddy`.
 
-`caddy` **не** подключён к `db_internal` — нет доступа к PostgreSQL. `bot` на обеих сетях: БД + исходящий интернет (Qwen/SMTP). Docker socket нигде не монтируется; `network_mode: host` и `privileged` не используются.
+`caddy` и D2 `admin` **не** подключены к `db_internal`. `bot` на обеих сетях: БД + исходящий интернет (Qwen/SMTP). Docker socket нигде не монтируется; `network_mode: host` и `privileged` не используются. Подробнее об источнике данных и приватном доступе: [DASHBOARD.md](../../docs/DASHBOARD.md).
 
 ## Volumes
 
@@ -89,7 +89,7 @@ Client packs и KB поставляются из **Git/image**, не правя�
 | postgres | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` |
 | migrate | `BOT_MIGRATOR_PG_DSN` |
 | bot | `BOT_PG_DSN`, Qwen, SMTP, multiclient/runtime tuning — **без** migrator/bootstrap |
-| admin | `BOT_PG_DSN`, `ADMIN_DASHBOARD_TOKEN`, admin tuning — **без** migrator/Qwen/SMTP |
+| admin | `ALLOWED_CLIENTS`, `DEFAULT_CLIENT_ID`, `ADMIN_DASHBOARD_TOKEN`, admin tuning — **без** PG/migrator/provider/SMTP credentials |
 | caddy | ACME email, Basic Auth user/hash, `ADMIN_DASHBOARD_TOKEN` (для `X-Admin-Dashboard-Token`) — **без** DB/Qwen/SMTP |
 
 SMTP для `bot` опционален и настраивается по принципу **all-or-none**: либо заданы
@@ -147,7 +147,7 @@ SMTP для `bot` опционален и настраивается по при
 
 Caddy в compose ждёт `bot` и `admin` **healthy**; оператор дополнительно обязан пройти шаг 5 до шага 6.
 
-DDL из `bot`/`admin` **не** выполняется.
+PostgreSQL DDL из `bot`/`admin` **не** выполняется. Технические SQLite-таблицы метрик создаёт только bot-writer; admin открывает данные исключительно для чтения.
 
 ## Health
 

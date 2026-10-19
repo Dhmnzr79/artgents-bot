@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Artgents · Команды под рукой</title>
+  <style>
+    :root { color-scheme: light; --ink:#182d38; --muted:#546b76; --line:#dce5e9; --accent:#146353; }
+    * { box-sizing:border-box; }
+    body { margin:0; padding:34px 22px 24px; color:var(--ink); background:#f3f6f5; font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    main { max-width:1080px; margin:auto; }
+    header { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin-bottom:22px; }
+    .eyebrow { color:var(--accent); font-size:12px; font-weight:600; letter-spacing:.11em; text-transform:uppercase; }
+    h1 { margin:5px 0 6px; font-size:30px; font-weight:600; letter-spacing:-.025em; line-height:1.2; }
+    p { margin:7px 0; }
+    .intro,.hint,footer { color:var(--muted); }
+    .stamp { padding-top:4px; color:var(--muted); font-size:12px; white-space:nowrap; }
+    .links { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 22px; }
+    a { color:var(--accent); text-underline-offset:3px; }
+    .links a { padding:8px 13px; background:white; border:1px solid var(--line); border-radius:9px; font-size:14px; text-decoration:none; }
+    .links a:hover { border-color:var(--accent); }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .card { min-width:0; padding:19px 20px; background:white; border:1px solid var(--line); border-radius:14px; }
+    .card-top { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+    .tag { color:var(--accent); font-size:11px; letter-spacing:.07em; font-weight:600; text-transform:uppercase; }
+    h2 { margin:0; font-size:18px; font-weight:600; line-height:1.3; }
+    .hint { font-size:13px; }
+    .command { display:flex; align-items:flex-start; gap:10px; margin:13px 0 10px; padding:12px; background:#f3f6f7; border-radius:9px; }
+    code { display:block; flex:1; min-width:0; white-space:pre-wrap; overflow-wrap:anywhere; font:13px/1.65 ui-monospace,Consolas,monospace; }
+    button { flex-shrink:0; border:1px solid var(--accent); border-radius:7px; background:var(--accent); color:white; padding:8px 11px; font:500 12px/1.2 system-ui,sans-serif; cursor:pointer; }
+    button:hover { background:#104d42; }
+    button:focus-visible,a:focus-visible,select:focus-visible,summary:focus-visible { outline:3px solid #83b9e8; outline-offset:3px; }
+    button.copied { background:#e3f2eb; color:var(--accent); }
+    select { max-width:100%; min-height:34px; padding:5px 28px 5px 9px; color:var(--ink); background:white; border:1px solid var(--line); border-radius:7px; font:inherit; font-size:13px; }
+    .client { display:flex; align-items:center; flex-wrap:wrap; gap:9px; margin-top:11px; font-size:13px; }
+    .note { margin:15px 0; padding:11px 15px; border-left:3px solid #88b4a7; background:#eaf2ee; border-radius:0 8px 8px 0; font-size:13px; }
+    kbd { padding:1px 5px; border:1px solid #cbd6d9; border-bottom-width:2px; border-radius:4px; background:white; color:var(--ink); font:12px ui-monospace,Consolas,monospace; white-space:nowrap; }
+    details { border:1px solid var(--line); border-radius:12px; background:#fff; }
+    summary { padding:14px 18px; cursor:pointer; font-weight:500; }
+    details .grid { padding:0 14px 14px; }
+    details .card { background:#fafcfb; }
+    footer { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; margin-top:18px; font-size:12px; }
+    #status { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); max-width:calc(100% - 32px); padding:11px 18px; border-radius:10px; background:#182d38; color:white; box-shadow:0 5px 24px #182d3820; font-size:14px; }
+    #status:empty { display:none; }
+    @media(max-width:720px) { body{padding:23px 14px;} header{display:block;} .stamp{margin-top:9px;} h1{font-size:26px;} .grid{grid-template-columns:1fr;} .card{padding:17px;} }
+    @media print { body{background:white;padding:0;font-size:12px;} .card{break-inside:avoid;} button,#status{display:none;} details:not([open]){display:none;} .links a{padding:4px 8px;} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <div class="eyebrow">Artgents · рабочая шпаргалка</div>
+      <h1>Команды под рукой</h1>
+      <p class="intro">Нажми «Копировать» и вставь команду туда, где указано на карточке.</p>
+    </div>
+    <div class="stamp">Сверено с кодом · 19 октября 2026</div>
+  </header>
+
+  <nav class="links" aria-label="Открыть рабочие страницы">
+    <a href="http://127.0.0.1:9001/static/widget-test.html?client=demo" target="_blank" rel="noopener">Demo ↗</a>
+    <a href="http://127.0.0.1:9001/static/widget-test.html?client=demo_medical" target="_blank" rel="noopener">АртМед ↗</a>
+    <a href="http://127.0.0.1:9001/static/widget-test.html?client=nikadent" target="_blank" rel="noopener">НикаДент локально ↗</a>
+    <a href="http://127.0.0.1:9100/" target="_blank" rel="noopener">Админка ↗</a>
+    <a href="http://127.0.0.1:19100/" target="_blank" rel="noopener">Админка VPS · через туннель ↗</a>
+    <a href="https://nikadent41.ru/" target="_blank" rel="noopener">Сайт НикаДент ↗</a>
+  </nav>
+
+  <div class="grid">
+    <section class="card" aria-labelledby="bot-title">
+      <div class="card-top"><h2 id="bot-title">1. Запустить бота</h2><span class="tag">PowerShell</span></div>
+      <p class="hint">Открой PowerShell на компьютере и вставь команду. Затем открой Demo, АртМед или НикаДент по ссылкам выше.</p>
+      <div class="command"><code id="bot-command">&amp; "C:\Cursor Projects\artgents-bot-active\scripts\start_local_widget.ps1"</code><button type="button" data-copy="bot-command" aria-label="Копировать команду запуска бота">Копировать</button></div>
+      <p class="hint">Порт 9001. Окно оставь открытым. Изменения Python подхватываются автоматически.</p>
+    </section>
+
+    <section class="card" aria-labelledby="admin-title">
+      <div class="card-top"><h2 id="admin-title">2. Запустить админку</h2><span class="tag">PowerShell</span></div>
+      <p class="hint">Вставь в другое окно PowerShell. Админка читает сохранённые данные и может работать без запущенного бота.</p>
+      <div class="command"><code id="admin-command">&amp; "C:\Cursor Projects\artgents-bot-active\scripts\start_local_admin.ps1"</code><button type="button" data-copy="admin-command" aria-label="Копировать команду запуска админки">Копировать</button></div>
+      <p class="hint">Порт 9100. Окно оставь открытым. После изменения Python админки — остановить и запустить снова.</p>
+    </section>
+
+    <section class="card" aria-labelledby="demo-title">
+      <div class="card-top"><h2 id="demo-title">3. Новая беседа в демо</h2><span class="tag">В чат виджета</span></div>
+      <p class="hint">В Demo или АртМед вставь в поле сообщения виджета и нажми отправку. Дождись завершения текущего ответа.</p>
+      <div class="command"><code id="demo-reset-command">::reset x7k9m2p4</code><button type="button" data-copy="demo-reset-command" aria-label="Копировать команду новой беседы в демо">Копировать</button></div>
+      <p class="hint">Команда обрабатывается виджетом, к модели не отправляется. На локалке проще нажать «Новая беседа» в панели управления.</p>
+    </section>
+
+    <section class="card" aria-labelledby="reset-title">
+      <div class="card-top"><h2 id="reset-title">4. Сброс сессии через F12</h2><span class="tag">Браузер · Console</span></div>
+      <p class="hint">Открой страницу с нужным виджетом → <kbd>F12</kbd> → <b>Console / Консоль</b>. Выбери клиента здесь, скопируй команду туда и нажми <kbd>Enter</kbd>.</p>
+      <label class="client" for="reset-client">Клиент
+        <select id="reset-client">
+          <option value="nikadent">НикаДент</option>
+          <option value="demo">Demo</option>
+          <option value="demo_medical">АртМед</option>
+        </select>
+      </label>
+      <div class="command"><code id="browser-reset-command">localStorage.removeItem("clinic_widget_sid:nikadent"); location.reload();</code><button type="button" data-copy="browser-reset-command" aria-label="Копировать команду сброса сессии выбранного клиента">Копировать</button></div>
+      <p class="hint">Выполняй на сайте с виджетом, а не на этой странице и не в админке. Локалка и сайт НикаДент имеют разные сессии. Страница перезагрузится.</p>
+    </section>
+  </div>
+
+  <aside class="note">
+    <b>Остановить:</b> <kbd>Ctrl+C</kbd> в окне нужного процесса. <b>Перезапустить:</b> остановить и снова выполнить его команду.<br>
+    Ссылки открывают страницы, а процессы запускаются командами. Сброс начинает новую беседу в этом браузере; серверную историю и лимиты он не удаляет. Если ответ ещё идёт — сначала дождись завершения.
+  </aside>
+
+  <details>
+    <summary>VPS · вход и проверка — ещё 4 команды</summary>
+    <div class="grid">
+      <section class="card" aria-labelledby="key-title">
+        <div class="card-top"><h2 id="key-title">5. Добавить SSH-ключ</h2><span class="tag">PowerShell</span></div>
+        <p class="hint">На своём компьютере. Если ключ ещё не добавлен в SSH-agent, введи его парольную фразу по запросу. Символы при вводе скрыты.</p>
+        <div class="command"><code id="ssh-key-command">ssh-add "$env:USERPROFILE\.ssh\artgents_timeweb_ed25519"</code><button type="button" data-copy="ssh-key-command" aria-label="Копировать команду добавления SSH-ключа">Копировать</button></div>
+      </section>
+      <section class="card" aria-labelledby="ssh-title">
+        <div class="card-top"><h2 id="ssh-title">6. Подключиться к VPS</h2><span class="tag">PowerShell</span></div>
+        <p class="hint">На своём компьютере. После входа появится <b>deploy@…</b> — это уже терминал Linux на сервере.</p>
+        <div class="command"><code id="ssh-command">ssh -i "$env:USERPROFILE\.ssh\artgents_timeweb_ed25519" deploy@5.129.195.70</code><button type="button" data-copy="ssh-command" aria-label="Копировать команду подключения к VPS">Копировать</button></div>
+        <p class="hint">Вернуться в PowerShell: набрать <b>exit</b> и нажать Enter. Локальные команды запуска выше выполняются на компьютере.</p>
+      </section>
+      <section class="card" aria-labelledby="vps-admin-title">
+        <div class="card-top"><h2 id="vps-admin-title">7. Открыть серверную админку</h2><span class="tag">PowerShell</span></div>
+        <p class="hint">На компьютере. Создаёт закрытый SSH-туннель; ничего на VPS не запускает и не обновляет. Окно оставь открытым.</p>
+        <div class="command"><code id="vps-admin-command">&amp; "C:\Cursor Projects\artgents-bot-active\scripts\start_vps_admin.ps1"</code><button type="button" data-copy="vps-admin-command" aria-label="Копировать команду открытия серверной админки">Копировать</button></div>
+        <p class="hint">Затем <a href="http://127.0.0.1:19100/" target="_blank" rel="noopener">открой админку VPS</a> и введи свой логин и пароль админки. Это серверные данные. Адрес 9100 остаётся для локальной версии. <kbd>Ctrl+C</kbd> закрывает только туннель.</p>
+      </section>
+      <section class="card" aria-labelledby="vps-audit-title">
+        <div class="card-top"><h2 id="vps-audit-title">8. Проверить готовность VPS</h2><span class="tag">PowerShell</span></div>
+        <p class="hint">На компьютере. После подключения введи Linux sudo-пароль пользователя deploy в терминале. Ввод скрыт; пароль в чат не отправляй.</p>
+        <div class="command"><code id="vps-audit-command">&amp; "C:\Cursor Projects\artgents-bot-active\scripts\audit_vps_admin.ps1"</code><button type="button" data-copy="vps-audit-command" aria-label="Копировать команду read-only проверки VPS">Копировать</button></div>
+        <p class="hint">Только чтение: версии, состояние служб, порты, подключение данных и наличие настроек. Значения паролей, хешей и ключей не выводятся. Вывод проверки можно прислать для разбора. Выкладки, перезапуска, отправки писем и вызовов модели нет.</p>
+      </section>
+    </div>
+  </details>
+
+  <footer>
+    <span>Один автономный HTML-файл · без интернета для просмотра и копирования</span>
+    <span>Можно добавить эту страницу в закладки · <kbd>Ctrl+D</kbd></span>
+  </footer>
+</main>
+<div id="status" role="status" aria-live="polite" aria-atomic="true"></div>
+<script>
+  const clientSelect = document.getElementById('reset-client');
+  const browserReset = document.getElementById('browser-reset-command');
+  const status = document.getElementById('status');
+  let statusTimer;
+  clientSelect.addEventListener('change', () => {
+    browserReset.textContent = `localStorage.removeItem("clinic_widget_sid:${clientSelect.value}"); location.reload();`;
+  });
+
+  function fallbackCopy(text) {
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.readOnly = true;
+    area.style.cssText = 'position:fixed;top:0;left:-9999px;';
+    document.body.appendChild(area);
+    try {
+      area.select();
+      area.setSelectionRange(0, text.length);
+      return document.execCommand('copy');
+    } finally { area.remove(); }
+  }
+
+  document.querySelectorAll('[data-copy]').forEach(button => {
+    let buttonTimer;
+    button.addEventListener('click', async () => {
+      const code = document.getElementById(button.dataset.copy);
+      const text = code.textContent.trim();
+      let copied = false;
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(text);
+          copied = true;
+        }
+      } catch { /* File mode / browser permissions: use the local selection fallback. */ }
+      if (!copied) {
+        try { copied = fallbackCopy(text); } catch { /* Report failure honestly. */ }
+      }
+      clearTimeout(statusTimer);
+      clearTimeout(buttonTimer);
+      button.classList.toggle('copied', copied);
+      button.textContent = copied ? 'Скопировано ✓' : 'Копировать';
+      status.textContent = copied ? 'Команда скопирована — можно вставлять.' : 'Браузер запретил копирование. Открой файл в Chrome или Edge и повтори.';
+      statusTimer = setTimeout(() => { status.textContent = ''; }, 4000);
+      buttonTimer = setTimeout(() => { button.textContent = 'Копировать'; button.classList.remove('copied'); }, 2000);
+    });
+  });
+</script>
+</body>
+</html>

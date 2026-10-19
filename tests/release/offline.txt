@@ -66,3 +66,9 @@ tests/test_response_schema_contract.py
 tests/test_widget_no_public_price_browser.py
 tests/test_client_usage_limits.py
 tests/test_widget_usage_limits.py
+tests/test_d2_admin_dashboard.py
+tests/test_d2_admin_metrics.py
+tests/test_d2_costing.py
+tests/test_vps_admin_helpers_offline.py
+tests/test_widget_analytics.py
+tests/test_widget_catalog_question.py

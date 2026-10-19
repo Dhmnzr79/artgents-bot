@@ -132,4 +132,7 @@ def test_runtime_ddl_removed_from_worker_and_admin() -> None:
     import inspect
 
     assert "_ensure_tables" not in inspect.getsource(pg_sink._worker)
-    assert "ensure_pg_schema" not in inspect.getsource(admin_app._require_db)
+    # Admin no longer has a PG writer/reader; its D2 reader cannot bootstrap tables.
+    assert not hasattr(admin_app, "_require_db")
+    assert "mode=ro" in inspect.getsource(admin_app.repository.reader)
+    assert "query_only=ON" in inspect.getsource(admin_app.repository.reader)

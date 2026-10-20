@@ -4,7 +4,8 @@ import { createWidgetIcon } from './icons.js';
 const el=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!=null)node.textContent=text;return node;};
 
 /** One ephemeral draft, handler and delivery result for every form location. */
-export function createBookingForm({apiBase,clientId,getSid,getCatalog}){
+export function createBookingForm({apiBase,clientId,getSid,getCatalog,onEvent=()=>{}}){
+  const observe=(kind,ids)=>{try{onEvent(kind,ids);}catch{}};
   const draft={name:'',phone:'',consent:false,wish:'',selection:null};
   const mounts=new Map();
   let definition=null,loading=null,pending=false,result=null,body=null,error='';
@@ -89,6 +90,7 @@ export function createBookingForm({apiBase,clientId,getSid,getCatalog}){
           consent:{accepted:draft.consent,definition_fingerprint:definition.definition_fingerprint}};
       }
       pending=true;error='';renderAll();
+      observe('submit',{sid:body.sid,request_id:body.request_id});
       try{
         const response=await fetch(`${base}/lead`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
         const data=await response.json();
@@ -103,6 +105,7 @@ export function createBookingForm({apiBase,clientId,getSid,getCatalog}){
       finally{pending=false;renderAll();}
     };
     mount.append(form);
+    if(mount.isConnected&&!mount.closest('[hidden]'))observe('form');
   }
   return {render,select(selection){if(!result&&!pending&&!body){draft.selection=selection;renderAll();}},open(selection,mount){if(selection!==undefined&&!result&&!pending&&!body){draft.selection=selection;renderAll();}void render(mount);},
     reset(){if(pending)return;Object.assign(draft,{name:'',phone:'',consent:false,wish:'',selection:null});body=null;result=null;error='';renderAll();},

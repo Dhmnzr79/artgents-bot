@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import os
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 
 from contracts.response_plan import SessionKey
 from core import d2_diagnostics as diagnostics
 from core.d2_full_audit import full_audit, full_audit_enabled, full_audit_exception
-from core.client_runtime import per_client_data_dir
+from core.d2_storage import dialogue_store_path
+from core.d2_admin_metrics import observe_request
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore, D2RequestIdConflict, D2RequestInProgress
 from core.d2_live_provider import D2HttpProvider
@@ -20,13 +19,6 @@ from core.d2_tenant_snapshot import d2_clients_root
 from session import (
     bind_session_client, capture_lead_session_row, restore_lead_session_row, sid_from_body,
 )
-
-
-def _store_path(client_id: str) -> Path:
-    configured = os.getenv("D2_DIALOGUE_DB_PATH")
-    if configured:
-        return Path(configured)
-    return Path(per_client_data_dir(client_id)) / "d2_dialogue.sqlite"
 
 
 def _response_payload(turn, *, session_key: SessionKey) -> dict:
@@ -106,10 +98,10 @@ def run_d2_ask_json(data: dict, *, client_id: str, peer_ip: str | None = None) -
         selected_ref=data.get("ref"), ui_revision=data.get("ui_revision"),
     )
     bind_session_client(client_id)
-    path = _store_path(client_id)
+    path = dialogue_store_path(client_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     diagnostics.stage("store_open")
-    with D2DialogueStore(path) as store:
+    with observe_request(client_id, sid, request_id) as observation, D2DialogueStore(path) as store:
         usage = ClientUsageAdmission(store._connection, limits=limits, client_id=client_id,
             sid=sid, request_id=request_id, visitor_id=data.get("visitor_id"), peer_ip=peer_ip) if limits else None
         lead_before = capture_lead_session_row(sid)
@@ -157,6 +149,7 @@ def run_d2_ask_json(data: dict, *, client_id: str, peer_ip: str | None = None) -
                 _audit_lead_after(sid, phase="committed_error")
             raise
         _audit_lead_after(sid, phase="success")
+        observation.complete(turn.idempotent_replay)
         diagnostics.stage("store_close")
     diagnostics.stage("payload")
     payload = _response_payload(turn, session_key=key)

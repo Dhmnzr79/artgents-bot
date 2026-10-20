@@ -1,6 +1,7 @@
 import { createWidgetIcon, ARROW_SVG, SEND_SVG, MENU_ICON_KEYS } from "./icons.js";
 import { mountCatalog } from "./catalog.js";
 import { createBookingForm } from "./booking_form.js";
+import { createWidgetAnalytics } from "./analytics.js";
 import { renderPriceBody, mergePriceMessage } from "./price_card.js";
 ﻿import { streamAsk } from "./api.js";
 import { setBotAnswerBody } from "./answer_format.js";
@@ -697,6 +698,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
   const teaserStorageKey = `${STORAGE_LAUNCHER_TEASER}:${clientId}`;
   const readEntryPagePath = () => String((typeof pagePath === 'function' ? pagePath() : pagePath) || location.pathname)
     .split(/[?#]/, 1)[0].replace(/\/+$/, '') || '/';
+  const trackWidget=createWidgetAnalytics({apiBase,clientId,readPath:readEntryPagePath,paths:['/',...(config.pageMenus||[]).flatMap(menu=>menu.paths)]});
   const resolvedAvatarUrl = resolvePackAssetUrl(
     apiBase,
     (config.avatarUrl || "").trim() || DEFAULT_AVATAR_URL
@@ -851,13 +853,13 @@ export function mountWidget(root, config, { pagePath } = {}) {
             </div>
           </header>
           <nav class="clinic-shell__tabs" role="tablist" aria-label="Разделы помощника">
-            <button type="button" role="tab" aria-selected="true" data-clinic-tab="assistant">Помощник</button>
+            <button type="button" role="tab" aria-selected="true" data-clinic-tab="assistant">ИИ-помощник</button>
             <button type="button" role="tab" aria-selected="false" data-clinic-tab="catalog">Услуги и цены</button>
             <button type="button" role="tab" aria-selected="false" data-clinic-tab="booking">Запись</button>
           </nav>
         </div>
         <main class="clinic-shell__main" aria-label="Содержимое помощника">
-          <div class="clinic-shell__feed" role="tabpanel" aria-label="Помощник" data-clinic-feed></div>
+          <div class="clinic-shell__feed" role="tabpanel" aria-label="ИИ-помощник" data-clinic-feed></div>
           <section class="clinic-shell__tab-panel" role="tabpanel" aria-label="Услуги и цены" data-clinic-catalog-panel hidden><div data-clinic-catalog></div></section>
           <section class="clinic-shell__tab-panel" role="tabpanel" aria-label="Запись" data-clinic-booking-panel hidden>
             <div data-clinic-booking></div>
@@ -896,8 +898,20 @@ export function mountWidget(root, config, { pagePath } = {}) {
   const catalogPanel=root.querySelector('[data-clinic-catalog-panel]');
   const bookingPanel=root.querySelector('[data-clinic-booking-panel]');
   const bookingRoot=root.querySelector('[data-clinic-booking]');
-  const catalog=mountCatalog(root.querySelector('[data-clinic-catalog]'),{apiBase,clientId,onApply:(selection,mount)=>booking.open(selection,mount)});
-  const booking=createBookingForm({apiBase,clientId,getSid:()=>{let sid=getSid();if(!sid){sid=crypto.randomUUID();setSid(sid);}return sid;},getCatalog:()=>catalog.getData()});
+  let preparedCatalogQuestion='';
+  function openCatalogQuestion(serviceName){
+    switchTab('assistant');
+    if(!input.value.trim()||input.value===preparedCatalogQuestion){
+      preparedCatalogQuestion=`По услуге «${serviceName}»: `;
+      input.value=preparedCatalogQuestion;
+    }
+    autoResizeTextarea(input);
+    syncSendState();
+    input.focus({preventScroll:true});
+    input.setSelectionRange(input.value.length,input.value.length);
+  }
+  const catalog=mountCatalog(root.querySelector('[data-clinic-catalog]'),{apiBase,clientId,onApply:(selection,mount)=>booking.open(selection,mount),onAsk:openCatalogQuestion});
+  const booking=createBookingForm({apiBase,clientId,getSid:()=>{let sid=getSid();if(!sid){sid=crypto.randomUUID();setSid(sid);}return sid;},getCatalog:()=>catalog.getData(),onEvent:trackWidget});
   let activeTab='assistant';
   const tabScroll={assistant:0,catalog:0,booking:0};
   const tabPanels={assistant:feed,catalog:catalogPanel,booking:bookingPanel};
@@ -1293,6 +1307,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
 
   function setOpen(open) {
     const wasOpen = state.isOpen;
+    if(open&&!wasOpen)trackWidget('opened');
     state.isOpen = open;
     syncMobileShellClass();
     shell.classList.toggle("is-open", open);
@@ -1374,6 +1389,7 @@ export function mountWidget(root, config, { pagePath } = {}) {
 
   function beginPendingRequest(body) {
     body.entry_page_path=state.entryPagePath;
+    if(typeof body.q==='string'&&body.q.trim())trackWidget('question');
     clearWaitingLabelTimers();
     state.pending = true;
     const leadRequest = isLeadFlowAskBody(body, state.lastPayload)

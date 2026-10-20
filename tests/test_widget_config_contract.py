@@ -75,7 +75,10 @@ def test_nikadent_presentation_valid_v1() -> None:
     out = validate_widget_presentation_document(raw, client_id="nikadent")
     assert out["botName"] == "Ольга"
     assert out["demoLauncher"] is False
-    assert out["welcomeText"] == "Помогу разобраться в услугах, ценах и врачах."
+    assert out["welcomeText"] == (
+        "Здравствуйте! Я ИИ-консультант клиники НикаДент. "
+        "Расскажу о клинике, врачах, услугах и ценах."
+    )
     assert len(out["starterPrompts"]) == 3
     assert len(out["pageMenus"]) == 3
 

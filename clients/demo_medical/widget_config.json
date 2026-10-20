@@ -6,7 +6,7 @@
   "launcherCtaLabel": "Открыть помощника",
   "launcherTeaser": false,
   "demoLauncher": true,
-  "welcomeText": "Помогу разобраться в услугах, ценах и врачах.",
+  "welcomeText": "Здравствуйте! Я ИИ-консультант медцентра Артмед. Расскажу о клинике, врачах, услугах и ценах.",
   "videoAspect": "horizontal",
   "starterPrompts": [
     {

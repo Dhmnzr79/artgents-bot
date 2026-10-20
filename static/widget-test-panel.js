@@ -3,8 +3,9 @@ import { mountWidget } from "./widget/widget.js";
 const notice = document.getElementById("panel-notice");
 const report = text => { notice.textContent = text; };
 
-document.getElementById("copy-launch-command").addEventListener("click", async () => {
-  const command = document.getElementById("launch-command");
+function wireCommandCopy(buttonId, commandId) {
+document.getElementById(buttonId).addEventListener("click", async () => {
+  const command = document.getElementById(commandId);
   try {
     await navigator.clipboard.writeText(command.textContent.trim());
     report("Команда скопирована. Вставьте её в PowerShell.");
@@ -17,6 +18,10 @@ document.getElementById("copy-launch-command").addEventListener("click", async (
     report("Команда выделена. Нажмите Ctrl+C и вставьте в PowerShell.");
   }
 });
+}
+wireCommandCopy("copy-launch-command", "launch-command");
+wireCommandCopy("copy-admin-command", "admin-launch-command");
+document.getElementById("local-admin-controls").hidden = !["127.0.0.1", "localhost", "[::1]"].includes(location.hostname);
 document.getElementById("refresh-page").addEventListener("click", () => location.reload());
 
 const state = document.getElementById("bot-state");
@@ -55,6 +60,7 @@ const clientSelect = document.getElementById("client-select");
 const requestedClient = new URL(location.href).searchParams.get("client") || "demo";
 const clientId = ["demo", "demo_medical", "nikadent"].includes(requestedClient) ? requestedClient : "demo";
 clientSelect.value = clientId;
+document.getElementById("open-local-admin").href = `http://127.0.0.1:9100/?client_id=${encodeURIComponent(clientId)}`;
 const clientUrl = id => {
   const url = new URL(location.href);
   url.searchParams.set("client", id);

@@ -154,7 +154,7 @@ def _clear_session_client_binding_teardown(exc):
 
 @app.after_request
 def _after(resp):
-    if request.path=='/api/widget-session':resp.headers['Cache-Control']='no-store'
+    if request.path in {'/api/widget-session', '/api/widget-events'}:resp.headers['Cache-Control']='no-store'
     if request.path.startswith("/dashboard") or _is_health_probe_path():
         return resp
     latency = int((time.time() - request.ctx["t0"]) * 1000)
@@ -267,6 +267,34 @@ def _bounded_widget_payload():
 @app.errorhandler(413)
 def request_too_large(_exc):
     return safe_jsonify({"error": "request_too_large"}), 413
+
+
+@app.post('/api/widget-events')
+def widget_events():
+    from core.origin_guard import matching_widget_origin
+    from core import widget_analytics
+
+    request.max_content_length = 2048
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get('client_id'), str):
+        return jsonify(error='invalid_event'), 400
+    client_id = resolve_request_client_id(data.get('client_id'), host=request.host)
+    if client_id is None:
+        return jsonify(error='unknown_client'), 403
+    blocked = _widget_origin_forbidden(client_id)
+    if blocked:
+        return blocked
+    origin = matching_widget_origin(client_id)
+    if not origin:
+        return jsonify(error='origin_required'), 403
+    if not widget_analytics.admit(client_id, request.remote_addr):
+        return jsonify(error='event_rate_limit'), 429
+    try:
+        values = widget_analytics.event_values(client_id, data, origin)
+    except (ValueError, WidgetPresentationLoadError):
+        return jsonify(error='invalid_event'), 400
+    widget_analytics.record(client_id, values)
+    return Response(status=204, headers={'Cache-Control': 'no-store'})
 
 
 @app.post("/ask")

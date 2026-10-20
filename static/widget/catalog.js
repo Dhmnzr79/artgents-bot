@@ -9,7 +9,7 @@ const arrow=()=>createWidgetIcon('arrow','clinic-catalog__arrow');
 const searchBox=input=>{const box=element('label','clinic-catalog__search-box');box.append(createWidgetIcon('search'),input);return box;};
 
 /** Read-only navigation state belongs to this widget instance, never the dialogue. */
-export function mountCatalog(root,{apiBase,clientId,onApply}){
+export function mountCatalog(root,{apiBase,clientId,onApply,onAsk}){
   const state={data:null,loading:null,section:null,query:'',service:null,offer:null,offerQuery:'',offerScroll:0,listScroll:0,directionScroll:0};
   const scroller=()=>root.closest('[data-clinic-catalog-panel]')||root;
   const serviceById=id=>state.data.services.find(s=>s.service_id===id);
@@ -55,10 +55,13 @@ export function mountCatalog(root,{apiBase,clientId,onApply}){
       const offer=state.offer||(service.price?.presentation==='detail'?service.price.rows[0].offer_id:null);
       onApply({service_id:service.service_id,offer_id:offer,catalog_version:state.data.catalog_version},formMount);
       apply.remove();
+      ask?.remove();
     },'clinic-catalog__apply');
     apply.append(createWidgetIcon('arrow','clinic-cta-arrow'));
     const formMount=element('div','clinic-booking-mount');formMount.dataset.catalogForm='';
-    root.append(apply,formMount);
+    const ask=onAsk?button('Задать вопрос об услуге',()=>onAsk(service.name),'clinic-catalog__ask'):null;
+    if(ask)ask.prepend(createWidgetIcon('question'));
+    root.append(apply,...(ask?[ask]:[]),formMount);
   }
 
   function renderList(){

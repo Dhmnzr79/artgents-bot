@@ -3,91 +3,64 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Admin Dashboard</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=20260607c">
+  <title>Админка Artgents</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=blue-20261019">
 </head>
 <body>
   <header class="topbar">
     <div class="topbar-title">
-      <img class="topbar-logo" src="{{ url_for('static', filename='logo.svg') }}" width="101" height="26" alt="Artgents">
-      <h1>Admin Dashboard</h1>
-      <span class="env-pill">{{ app_env }}</span>
+      <img class="topbar-logo" src="{{ url_for('static', filename='logo.svg') }}" width="114" height="26" alt="Artgents">
+      <h1>Админка Artgents</h1><span class="env-pill">{{ app_env }} · только просмотр</span>
     </div>
     <div class="controls">
-      <div class="control-field">
-        <span class="control-label" id="clientLabel">Клиника</span>
-        <select id="clientId" aria-labelledby="clientLabel"></select>
-      </div>
+      <label class="control-field">Клиника <select id="clientId"></select></label>
       <button id="refreshBtn" type="button">Обновить</button>
     </div>
   </header>
-
-  <div id="statusBar" class="status-bar" role="status" aria-live="polite"></div>
-
+  <div id="statusBar" class="status-bar" role="status" aria-live="polite">Проверяем доступ…</div>
   <main class="page">
     <section class="card card-overview">
-      <div class="section-head">
-        <h2 id="overviewTitle">Обзор</h2>
-        <label class="control-field period-field">
-          <span class="control-label" id="overviewPeriodLabel">Период</span>
-          <select id="overviewPeriod" aria-labelledby="overviewPeriodLabel">
-            <option value="today">Сегодня</option>
-            <option value="week">7 дней</option>
-            <option value="month">30 дней</option>
-          </select>
-        </label>
-      </div>
-      <div id="overview" class="kpi-grid">
-        <div class="kpi"><span class="kpi-label">Загрузка...</span><span class="kpi-value">...</span></div>
-      </div>
+      <h2>Сохранённые данные</h2>
+      <p class="muted">Всего в текущем хранилище. Заявки демо и подтверждённая отправка считаются отдельно.</p>
+      <div id="overview" class="kpi-grid"></div>
     </section>
-
     <section class="card card-costs">
-      <h2 id="costsTitle">Стоимость LLM</h2>
+      <div class="section-head">
+        <h2>Новые обращения и расходы</h2>
+        <label class="control-field">Период <select id="period"><option value="today">Сегодня · UTC</option><option value="week">7 дней · UTC</option><option value="month">30 дней · UTC</option></select></label>
+      </div>
+      <p class="muted">Токены — по фактическому ответу провайдера: вход из кэша, без кэша и выход. Стоимость — оценка по сохранённым тарифам. Старые неполные оценки учитываются отдельно.</p>
       <div id="costs"></div>
     </section>
-
     <section class="card card-dialogs">
-      <h2>Диалоги (последние)</h2>
-      <p class="section-hint muted">Выберите сессию — полный диалог откроется ниже</p>
-      <div id="dialogs"></div>
+      <h2>Страницы и путь к заявке</h2>
+      <p class="muted">За период, выбранный выше. Каждое действие — число загрузок виджета на странице, где оно произошло; это не уникальные люди. Повторные клики в одной загрузке не увеличивают счётчик. Можно сразу открыть форму, минуя вопрос.</p>
+      <p class="muted">«Вопрос» и «Отправка формы» — действия в браузере. «Принято» и статусы — сохранённый результат сервера. «Отправлено» означает подтверждение почтового транспорта, а не прочтение письма. Демо учитывается отдельно.</p>
+      <div id="funnel"></div>
+    </section>
+    <section class="card card-dialogs">
+      <h2>Диалоги</h2><p class="muted">Сохранённая публикация без приватного ввода заявки. Последние созданные сессии; время последней активности указано отдельно.</p>
+      <div id="dialogs"></div><button id="moreDialogs" type="button" hidden>Ещё сессии</button>
       <div id="dialogThreadViewer" class="dialog-thread-viewer" hidden>
-        <div class="viewer-head">
-          <div id="dialogViewerTitle" class="viewer-title"></div>
-          <button id="dialogViewerClose" type="button" class="dialog-toggle">Свернуть</button>
-        </div>
-        <div id="dialogThreadBody" class="dialog-thread-body"></div>
+        <div class="viewer-head"><h2 id="dialogViewerTitle">История</h2><button id="dialogViewerClose" type="button">Закрыть</button></div>
+        <button id="moreTurns" type="button" hidden>Предыдущие сообщения</button>
+        <div id="dialogThreadBody"></div>
       </div>
     </section>
-
-    <section class="card card-problems">
-      <h2>Проблемы</h2>
-      <div id="problems"></div>
-    </section>
-
     <section class="card card-leads">
-      <h2>Заявки</h2>
-      <div id="leads"></div>
+      <h2>Заявки</h2><p class="muted">Статусы из сохранённых результатов формы. Имена, телефоны, пожелания и тексты согласий здесь не показываются. Повторной отправки нет.</p>
+      <div id="leads"></div><button id="moreLeads" type="button" hidden>Ещё заявки</button>
     </section>
-
+    <section class="card card-problems">
+      <h2>Технические ошибки новых обращений</h2><div id="problems"></div><button id="moreProblems" type="button" hidden>Ещё ошибки</button>
+    </section>
     <section class="card card-dev">
-      <details id="eventExplorer">
-        <summary>Developer Mode: Event Explorer</summary>
-        <div class="event-filters">
-          <label>event_type <input id="eventTypeFilter" type="text" placeholder="turn_complete"></label>
-          <label>sid <input id="sidFilter" type="text" placeholder="insp_..."></label>
-          <label>request_id <input id="requestIdFilter" type="text" placeholder="uuid"></label>
-        </div>
-        <div class="pre-scroll">
-          <pre id="events">hidden</pre>
-        </div>
+      <details id="eventExplorer"><summary>Технические метрики</summary>
+        <p class="muted">Модель, токены, длительность и результат запроса. Без запросов к модели, исходных текстов, ключей и контактов.</p>
+        <div id="events"></div><button id="moreEvents" type="button" hidden>Ещё события</button>
       </details>
     </section>
   </main>
-
-  <script>
-    window.__ADMIN_DEFAULT_CLIENT_ID__ = {{ default_client_id|tojson }};
-  </script>
-  <script src="{{ url_for('static', filename='dashboard.js') }}?v=20260607c"></script>
+  <script src="{{ url_for('static', filename='dashboard.js') }}?v=funnel-20261019" defer></script>
 </body>
 </html>

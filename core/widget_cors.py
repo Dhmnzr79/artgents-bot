@@ -12,6 +12,7 @@ _WIDGET_CORS_PREFIXES = (
     "/api/widget-catalog",
     "/api/booking-form",
     "/api/widget-session",
+    "/api/widget-events",
     "/api/video-catalog",
     "/api/media/",
     "/ask",

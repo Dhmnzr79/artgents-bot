@@ -207,7 +207,7 @@ class D2Cp3LiveProvider:
 
 
 class D2HttpProvider:
-    """Ordinary text, or one native price round followed by grounded final prose."""
+    """Final informational prose with native prices; ground adverse results separately."""
 
     def __init__(self, *, model: str = DEFAULT_LLM_MODEL,
                  transport: Callable[..., object] = chat_completions_create,
@@ -237,16 +237,17 @@ class D2HttpProvider:
         if calls:
             if request.known_task is not None:
                 raise D2LiveProviderError("d2_known_task_tool_forbidden")
-            # Prose before a tool call is planning; existing non-price actions
-            # retain their owner even when requested alongside a native price.
-            siblings = ()
-            _, metadata = split_d2_text_reply(message.content or "")
-            if metadata and metadata.get("actions"):
+            # Informational prose and optional sources share the ordinary parser.
+            # Native prices keep r2...; content keeps r1, and non-price actions
+            # retain their existing owner and exclusive medical handoff.
+            parsed = D2ParsedDialogueResult("dialogue", ())
+            text, metadata = split_d2_text_reply(message.content or "")
+            if text or (metadata and metadata.get("actions")):
                 parsed = parse_d2_text_reply(message.content,
                     active_service_ids=request.model_view.active_service_catalog.active_service_ids)
                 if parsed.outcome == "admin":
                     return message.content  # Existing exclusive medical handoff.
-                siblings = tuple(p for p in parsed.blocks if p.kind != "content")
+            siblings = tuple(p for p in parsed.blocks if p.kind != "content")
             operations, wire_calls = [], []
             for index, call in enumerate(calls, 2):
                 if call.function.name != "show_price":
@@ -268,10 +269,11 @@ class D2HttpProvider:
                 identity = f"r{len(operations)+2}"
                 operations.append(replace(sibling, request_id=identity) if isinstance(sibling, D2RejectedOperation)
                                   else sibling.model_copy(update={"request_id": identity}))
-            # Preserve the API transcript only inside this turn; never publish planning prose.
+            # The transcript is only for a result-grounded adverse completion.
             assistant = {"role": "assistant", "content": message.content, "tool_calls": wire_calls}
             full_audit("price_tool_response", response=assistant, usage=getattr(response, "usage", None))
-            return D2PriceToolReply(D2ParsedDialogueResult("dialogue", tuple(operations)),
+            content = tuple(p for p in parsed.blocks if p.kind == "content")
+            return D2PriceToolReply(D2ParsedDialogueResult("dialogue", (*content, *operations), parsed.source_claims),
                                    (system, user, assistant), tuple(wire_calls))
         reply = _plain_text_reply(message)
         full_audit(

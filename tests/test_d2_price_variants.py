@@ -34,9 +34,11 @@ def saved(db, tenant):
         return store.read_latest_completion(SessionKey(client_id=tenant, sid='variants')).response.resolved
 
 
-def native(use, service, **fields):
-    wire = Transport(message(None, {'target':{'type':'service','id':service}, **fields}),
-                     message('<NO_TEXT>'), message('Подготовку обсудит врач.'))
+def native(use, service, *, needs_completion=False, **fields):
+    replies = [message(None, {'target':{'type':'service','id':service}, **fields})]
+    if needs_completion:
+        replies.append(message('<NO_TEXT>'))
+    wire = Transport(*replies, message('Подготовку обсудит врач.'))
     use(D2HttpProvider(transport=wire))
     return wire
 
@@ -61,9 +63,8 @@ def test_options_click_replay_and_next_scope(http_env, monkeypatch, transport, t
     assert saved(db, tenant).d2_request_parts[0].discussion_scope.brand_id is None
     assert not saved(db, tenant).d2_price_booster_block
     assert not saved(db, tenant).promo_blocks
-    ground = json.loads(wire.calls[1]['messages'][-2]['content'])['price']
-    assert ground == card['price']
-    assert len(wire.calls) == 2
+    assert [r.model_dump(mode='json') for r in saved(db, tenant).d2_price_block.rows] == card['price']['rows']
+    assert len(wire.calls) == 1
     # A fabricated offer ref is never allowed to select a row or call the model.
     rejected = post(client, **args, request_id='forged', q='',
                     ref='price_select:foreign.offer', ui_revision=body['revision'])
@@ -72,7 +73,7 @@ def test_options_click_replay_and_next_scope(http_env, monkeypatch, transport, t
     detail = click(client, body, 'price_select:'+chosen, **args, transport=transport, request_id='click')
     assert cards(detail)[0]['price']['presentation'] == 'detail'
     assert [r['offer_id'] for r in cards(detail)[0]['price']['rows']] == [chosen]
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1
     chosen_scope = next(p.discussion_scope for p in saved(db, tenant).d2_request_parts if p.kind == 'price')
     assert click(client, body, 'price_select:'+chosen, **args, transport=transport, request_id='click') == detail
     send(client, transport, **args, request_id='follow', q='А подготовка?')
@@ -82,7 +83,7 @@ def test_options_click_replay_and_next_scope(http_env, monkeypatch, transport, t
     scope = context['ordinary']['discussion_scope']
     assert scope['target'] == {'type':'service','id':service}
     assert scope['brand_id'] == chosen_scope.brand_id
-    assert len(wire.calls) == 3
+    assert len(wire.calls) == 2
 
 
 @pytest.mark.parametrize('option,expected', [('repeat','ent_consultation.repeat'), ('primary','ent_consultation.primary')])
@@ -93,7 +94,7 @@ def test_precise_medical_option_opens_detail(http_env, monkeypatch, option, expe
     body = send(client, client_id='demo_medical', sid='variants')
     assert cards(body)[0]['price']['presentation'] == 'detail'
     assert [r['offer_id'] for r in cards(body)[0]['price']['rows']] == [expected]
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1
 
 
 def test_one_option_with_several_brands_does_not_choose_first(http_env):
@@ -106,7 +107,7 @@ def test_one_option_with_several_brands_does_not_choose_first(http_env):
     assert cards(body)[0]['price']['presentation'] == 'options'
     assert {r['offer_id'] for r in cards(body)[0]['price']['rows']} == {o.offer_id for o in offers}
     assert saved(db, 'demo').d2_request_parts[0].discussion_scope.brand_id is None
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1
 
 
 def test_single_representative_topic_is_still_options(http_env):
@@ -126,13 +127,13 @@ def test_single_representative_topic_is_still_options(http_env):
                 narrow(child)
     narrow(data)
     path.write_text(json.dumps(data,ensure_ascii=False), encoding='utf-8')
-    wire = Transport(message(None, {'target':{'type':'topic','id':'implantation'}}), message('<NO_TEXT>'))
+    wire = Transport(message(None, {'target':{'type':'topic','id':'implantation'}}))
     use(D2HttpProvider(transport=wire))
     body = send(client)
     block = cards(body)[0]['price']
     assert len(block['rows']) == 1 and block['presentation'] == 'options'
     assert cards(body)[0]['choices']
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1
 
 
 @pytest.mark.parametrize('option', ['three_zones', 'underarms', 'legs'])
@@ -144,7 +145,7 @@ def test_service_wide_beauty_promo_covers_all_laser_options(http_env, monkeypatc
     plan = saved(db, 'demo_medical')
     assert plan.d2_price_block.presentation == 'detail'
     assert {p.fact_id for p in plan.promo_blocks} == {'demo_beauty_15'}
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1
 
 
 @pytest.mark.parametrize('option,has_promo', [('three_zones', True), ('underarms', False)])
@@ -162,7 +163,7 @@ def test_scoped_laser_promo_only_on_its_exact_offer(http_env, monkeypatch, optio
     plan = saved(db, 'demo_medical')
     assert plan.d2_price_block.presentation == 'detail'
     assert {p.fact_id for p in plan.promo_blocks} == ({'demo_beauty_15'} if has_promo else set())
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1
 
 
 def test_no_public_price_keeps_card_and_excludes_without_includes(http_env, monkeypatch):
@@ -173,7 +174,7 @@ def test_no_public_price_keeps_card_and_excludes_without_includes(http_env, monk
     data['package']['includes'] = []
     data['package']['excludes'] = ['Дополнительная зона']
     path.write_text(json.dumps(data,ensure_ascii=False),encoding='utf-8')
-    wire = native(use, 'botulinum_therapy', option_id='individual')
+    wire = native(use, 'botulinum_therapy', needs_completion=True, option_id='individual')
     body = send(client, client_id='demo_medical', sid='variants')
     block = cards(body)[0]['price']
     assert block['presentation'] == 'detail'
@@ -247,4 +248,4 @@ def test_unpublished_revision_and_other_tenant_cannot_select(http_env):
         response = post(client,sid='variants',q='',request_id='reject-'+fields['client_id'],
             ref='price_select:classic.one_tooth.nobel',**fields)
         assert response.status_code in {400,409}
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1

@@ -39,8 +39,7 @@ class Transport:
 def test_card_mixed_followup_tab_and_replay(http_env, transport, monkeypatch):
     client, db, use, _ = http_env
     wire = Transport(message("Используем три системы имплантов."),
-        message("I will answer later", price(volume={"extent": "one_tooth"})),
-        message('Обезболивание обсуждается с врачом.\n<D2_META>\n{"sources":[{"content_ref":"implantation__faq__pain.md"}]}\n</D2_META>'),
+        message('Обезболивание обсуждается с врачом.\n<D2_META>\n{"sources":[{"content_ref":"implantation__faq__pain.md"}]}\n</D2_META>', price(volume={"extent": "one_tooth"})),
         message("Условия гарантии указаны в договоре."), message("Состав выбранной карточки."))
     use(D2HttpProvider(transport=wire))
     send(client, transport, request_id="brand", q="Какие системы используете?")
@@ -61,16 +60,14 @@ def test_card_mixed_followup_tab_and_replay(http_env, transport, monkeypatch):
     assert len(frozen_calls) == 1
     assert "Обезболивание обсуждается" in body["answer"]
     assert "I will" not in body["answer"]
-    tool = json.loads(wire.calls[2]["messages"][-2]["content"])
-    assert tool["price"]["rows"][0]["offer_id"] == row["offer_id"]
-    assert wire.calls[2]["tool_choice"] == "none"
-    assert wire.calls[2]["tools"] == wire.calls[1]["tools"]
+    assert wire.calls[1]["tool_choice"] == "auto"
     assert completed(db).response.resolved.information_blocks[0].content_ref == "implantation__faq__pain.md"
     assert send(client, transport, request_id="price", q="А сколько на один зуб и больно ли?") == body
-    assert len(wire.calls) == 3
+    assert len(wire.calls) == 2
     follow = send(client, transport, request_id="warranty", q="А гарантия?")
     assert not cards(follow)
-    history = wire.calls[3]["messages"][1]["content"]
+    history = wire.calls[2]["messages"][1]["content"]
+    assert "Обезболивание обсуждается" in history
     assert row["offer_id"] in history and "I will" not in history
     for listed in cards(body)[0]["price"]["rows"]:
         assert listed["offer_id"] in history
@@ -79,12 +76,12 @@ def test_card_mixed_followup_tab_and_replay(http_env, transport, monkeypatch):
     tab = click(client, body, "price_select:classic.one_tooth.nobel", request_id="tab", transport=transport)
     assert cards(tab)[0]["price"]["presentation"] == "detail"
     assert [r["offer_id"] for r in cards(tab)[0]["price"]["rows"]] == ["classic.one_tooth.nobel"]
-    assert len(wire.calls) == 4
+    assert len(wire.calls) == 3
     detail = click(client, tab, "price_detail:includes", request_id="detail", transport=transport)
     assert "В стоимость" in detail["answer"]
-    assert len(wire.calls) == 4
+    assert len(wire.calls) == 3
     send(client, transport, request_id="after", q="Это всё включено?")
-    assert "classic.one_tooth.nobel" in wire.calls[4]["messages"][1]["content"]
+    assert "classic.one_tooth.nobel" in wire.calls[3]["messages"][1]["content"]
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
@@ -109,19 +106,16 @@ def test_refusal_has_one_prose_owner_and_preserves_guards(http_env, transport, f
 @pytest.mark.parametrize("transport", ["json", "sse"])
 def test_price_only_without_duplicate_introduction(http_env, transport):
     client, db, use, _ = http_env
-    wire = Transport(message("Not published", {"target": {"type": "topic", "id": "implantation"}}), message("<NO_TEXT>"))
+    wire = Transport(message(None, {"target": {"type": "topic", "id": "implantation"}}))
     use(D2HttpProvider(model="configured-test-model", transport=wire))
     body = send(client, transport, request_id="direction", q="Сколько стоит имплантация?")
     assert cards(body)
     assert not completed(db).response.resolved.information_blocks
-    assert "Not published" not in body["answer"]
     assert "introduction_text" not in wire.calls[0]["messages"][0]["content"]
     from core.one_call_prompt_contract import D2_CLINIC_FACTS_AND_STYLE_INSTRUCTIONS
     first_system = wire.calls[0]["messages"][0]
     assert D2_CLINIC_FACTS_AND_STYLE_INSTRUCTIONS.strip() in first_system["content"]
-    assert wire.calls[1]["messages"][0] == first_system
-
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1
     assert {call["model"] for call in wire.calls} == {"configured-test-model"}
 
 
@@ -130,7 +124,7 @@ def test_price_only_without_duplicate_introduction(http_env, transport):
     message('Новый запрос\n<D2_META>\n{"actions":[{"name":"show_price","arguments":{}}]}\n</D2_META>')])
 def test_completion_failure_never_commits_partial_price(http_env, transport, response):
     client, db, use, _ = http_env
-    wire = Transport(message("Предыдущий ответ."), message(None, price()), response)
+    wire = Transport(message("Предыдущий ответ."), message(None, price(brand_id="osstem")), response)
     use(D2HttpProvider(model="configured-test-model", transport=wire))
     send(client, transport, request_id="before", q="Расскажите")
     previous = completed(db)
@@ -157,7 +151,7 @@ def test_broken_tool_args_not_repaired(http_env, bad):
 
 def test_invalid_optional_sources_preserve_final_prose(http_env):
     client, db, use, _ = http_env
-    wire = Transport(message(None, price()), message('Объяснение.\n<D2_META>\n{"sources":[{"target":"broken"}]}\n</D2_META>'))
+    wire = Transport(message('Объяснение.\n<D2_META>\n{"sources":[{"target":"broken"}]}\n</D2_META>', price()))
     use(D2HttpProvider(transport=wire))
     body = send(client, request_id="sources")
     assert cards(body) and "Объяснение." in body["answer"]
@@ -181,11 +175,11 @@ def test_native_tool_schema_and_no_tail_price_path():
 ])
 def test_native_parameters_select_exact_offer(http_env, args, offer):
     client, db, use, _ = http_env
-    wire = Transport(message(None, args), message("<NO_TEXT>"))
+    wire = Transport(message(None, args))
     use(D2HttpProvider(transport=wire))
     body = send(client, request_id="exact")
     assert cards(body)[0]["price"]["rows"][0]["offer_id"] == offer
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1
 
 
 def test_verified_document_click_keeps_one_text_call(http_env):
@@ -238,7 +232,7 @@ def test_non_price_actions_remain_available(http_env, name, args):
 def test_price_tool_preserves_nonprice_siblings(http_env, transport, name, args):
     client, db, use, _ = http_env
     metadata = '\n<D2_META>\n' + json.dumps({"actions": [{"name": name, "arguments": args}]}) + '\n</D2_META>'
-    wire = Transport(message(metadata, price()), message("<NO_TEXT>"))
+    wire = Transport(message(metadata, price()))
     use(D2HttpProvider(transport=wire))
     body = send(client, transport, request_id="mixed-action")
     plan = completed(db).response.resolved
@@ -246,7 +240,7 @@ def test_price_tool_preserves_nonprice_siblings(http_env, transport, name, args)
         assert not cards(body) and len(wire.calls) == 1
         assert plan.session_delta.terminal_state == "medical_terminal"
     else:
-        assert cards(body) and len(wire.calls) == 2
+        assert cards(body) and len(wire.calls) == 1
         if name == "show_contacts":
             assert plan.d2_contact_blocks
             assert plan.d2_contact_blocks[0].display_text in body["answer"]

@@ -1,5 +1,83 @@
 # Общий каталог и цены — owner GO 2026-10-16
 
+## Один вызов для успешной ценовой карточки — owner GO 2026-10-24
+
+Owner после согласования схемы поручил зафиксировать предыдущий этап и приступить.
+Checkpoint d0e9e68 создан и pushed в origin/codex/three-tabs-catalog; merge/deploy0.
+Продолжаем этап той же задачи в C:/Cursor Projects/artgents-bot-active (Git root),
+ветка codex/three-tabs-catalog, baseline/HEAD d0e9e68, свежий origin/main7ee6323,
+merge base2502be7. Index после checkpoint пуст. Foreign WIP: прежние8playground
+files, docs/ARTGENTS_VPS_PRODUCTION_STATE.md и otzyv-1/2/3.jpg; не изменяем.
+
+Класс: архитектурное упрощение согласованного успешного native-price пути.
+Before: первый text при tool call удаляется, готовая карточка всегда зависит от
+второго writer. After: первый вызов владеет самостоятельной информационной прозой,
+код замораживает карточку; полноценный успешный результат публикуется без completion.
+Removed dependency: обязательный второй model writer после успешной materialization.
+Смысл свободного вопроса/проза — модель, цены/предложения/допустимость — код, по
+Target Contract §3. Не добавляем classifier, control fields, state или prose repair.
+Прежний callback остаётся только для отказов/неполноты; это не удаление всех вторых
+вызовов и не гарантия отсутствия модельных ошибок в произвольной прозе.
+
+Successful здесь: готовая карточка, без failure/deferred/price_reference и без
+no_public_price rows. Уточнение без карточки, missing data, policy refusal и
+несколько цен с прежним deferral сохраняют completion. Его текст/источники заменяют
+первую прозу целиком; contacts/booking/handoff owners не меняются. Модель с пустой
+прозой при mixed не исправляется эвристикой/дополнительным вызовом: риск подлежит
+проверке, HTTP200 сам по себе не доказывает полноту ответа. Astra consulted.
+
+Exact allowlist: core/d2_live_provider.py; core/one_call_prompt_contract.py;
+core/response_plan_materialization.py; tests/test_d2_native_price_runtime.py;
+tests/test_d2_price_variants.py; tests/test_nikadent_price_authority_offline.py;
+tests/test_d2_demo_limits.py; tests/test_d2_price_variants_browser.py
+(уточнение allowlist: прежние assertions двухвызовного транспорта/его fixtures);
+tests/test_d2_price_single_call.py (new); tests/release/offline.txt;
+docs/tasks/THREE_TABS_CATALOG_TASK.md; docs/tasks/DEMO_D2_DELIVERY_ROADMAP.md.
+Приёмка: реальные offline JSON/SSE pure/mixed, контекст/replay/UI clicks, все3tenants,
+ошибочные tools/metadata и отказы/partial/failed completion; один independent Checker.
+Live provider/SMTP hard budget0; новый live benchmark и VPS не разрешены этим GO.
+Прежние logs и experimental scripts сохраняют доказательства двухвызовного baseline;
+автоматический повтор их live запуска после изменения контракта не выполняется.
+
+Результат локального этапа: удалено отбрасывание первой informational prose и
+безусловное исполнение completion для полноценной успешной карточки. В существующем
+D2ParsedDialogueResult сохраняются первая проза/claims, r1; native prices r2...
+и перенумерованные actions не пересекаются. Три runtime paths:
+D2HttpProvider.generate -> dialogue price callback -> resolve_d2_operations.
+Materialization сама определяет полноту по frozen outcome и не вызывает callback
+при успешной цене. Остальные исходы сохраняют прежний callback и заменяют старые
+content/claims/order. Новых полей/состояния/семантических классификаторов нет.
+Prompt contract v50 описывает изменённое авторство текста. Кодовый price/UI/lead
+owner неизменен. Поведение изменилось: successful pure/mixed теперь1modelcall;
+refusal/missing/partial/no-public-price/clarification остаются2, UI clicks — прежние.
+
+Root offline evidence: 227 различных выбранных cases покрыты PASS в нескольких
+целевых запусках. Основной native/variants/Nikadent набор первоначально167PASS/
+8FAIL: pytest уже собрал прежний assert2 для temporary_denture до его обновления.
+С финальным файлом focused12temporary cases+2Nobel-chain cases —14PASS; все8
+падений закрыты, остальные price assertions/guards не ослаблялись. Новый набор
+22PASS +2chainPASS; additional quota/metrics/single-model/provider набор28PASS/
+2FAIL. Эти2неизменённых test_d2_live_provider_offline ожидания старого schema
+и старой фразы промпта воспроизведены на чистом git archive d0e9e68: те же2FAIL.
+Они не исправляются этим этапом и не названы регрессией. Прежние diagnostics
+baseline failures в текущий набор не включались; полный release CI не запускался.
+
+Independent Astra Checker PASS, лично71offlinePASS (22new/native/demo limits),
+реальные callers, ownership, adverse outputs, история/replay и removal dependency
+проверены. Два добавленных chain cases прочитаны, root отдельно2PASS. Checker0
+provider/network/SMTP и без edits. Diff--check PASS. Первый root run имел Windows
+shared app.jsonl rotation warnings; последующие процессы изолировали BOT_LOG_DIR,
+логгер/runtime ради проверки не меняли. Browser fixture assertions актуализированы,
+Chrome geometry не перезапускали: JS/CSS/UI payload не менялись этим этапом.
+
+Ограничение: live prose+tool нового контракта ещё не проверены ни для Qwen, ни
+для DeepSeek. Пустая mixed-проза может оставить только карточку; скрытого repair
+нет, это не считается успешным содержательным ответом. Исходный prose допускает
+прежний явно принятый риск модельных ошибок, суммы/предложения карточки неизменны.
+Live/provider/SMTP0, VPS0. Локальная реализация закончена; до live quality GO и
+бюджета новый платный прогон не запускается. Checkpoint фиксируется отдельно от
+merge/deploy, foreign WIP сохранён, logs/.env/SQLite не входят в Git.
+
 ## Парный Selectel / DeepSeek API — owner GO 2026-10-24
 
 Owner явно просит два идентичных теста: Qwen Selectel VS DeepSeek API,

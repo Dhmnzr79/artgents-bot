@@ -57,16 +57,15 @@ def limit(response, transport, code):
 def test_session_limit_replay_free_click_and_explicit_new_sid(http_env, monkeypatch, transport):
     client, db, _, _ = http_env
     native = price(volume={'extent': 'one_tooth'})
-    calls = wire(monkeypatch, message(None, native), message('<NO_TEXT>'),
-                 message(None, native), message('<NO_TEXT>'))
-    seed(db, sid='cp6a', count=28)
+    calls = wire(monkeypatch, message(None, native), message(None, native))
+    seed(db, sid='cp6a', count=29)
     send = post if transport == 'json' else post_sse
     args = dict(request_id='thirtieth', q='Сколько стоит имплантация?')
     first = _body(send(client, **args), transport)
     row = cards(first)[0]['price']['rows'][0]
     assert row['offer_id'] == 'classic.one_tooth.implantium'
     assert row['amount'] == 76200
-    assert len(calls) == 2  # Selection and completion are separately charged.
+    assert len(calls) == 1  # A successful card consumes only its actual first call.
     assert _body(send(client, **args), transport) == first
     limit(send(client, request_id='thirty-first', q='А сроки?'), transport, 'demo_session_limit')
     with sqlite3.connect(db) as conn:
@@ -78,9 +77,9 @@ def test_session_limit_replay_free_click_and_explicit_new_sid(http_env, monkeypa
     selected = cards(clicked)[0]['price']['rows'][0]
     assert selected['offer_id'] == 'classic.one_tooth.nobel'
     assert selected['amount'] == 101200
-    assert len(calls) == 2
+    assert len(calls) == 1
     fresh = _body(send(client, sid='new-sid', request_id='new', q='Сколько стоит имплантация?'), transport)
-    assert fresh['sid'] == 'new-sid' and len(calls) == 4
+    assert fresh['sid'] == 'new-sid' and len(calls) == 2
     assert cards(fresh)[0]['price']['rows'][0]['offer_id'] == 'classic.one_tooth.implantium'
 
 

@@ -33,7 +33,7 @@ def request(target, *, topic=False, extent=None, count=None, option=None, **extr
 
 
 def native(use, args, *, completion="Состав лечения согласуем после осмотра."):
-    wire = Transport(message("Предварительный текст не публикуется.", args), message(completion))
+    wire = Transport(message(completion, args), message(completion))
     use(D2HttpProvider(model="offline-price-check", transport=wire))
     return wire
 
@@ -115,13 +115,12 @@ def test_precise_prices_modes_units_and_provider_grounding(http_env, transport, 
     row = rows(body)[0]
     assert (row["offer_id"], row["mode"], amount(row), row["billing_unit"]) == (offer, mode, cost, unit)
     assert "Предварительный текст" not in body["answer"]
-    ground = json.loads(wire.calls[1]["messages"][-2]["content"])
-    assert ground["price"]["rows"][0]["offer_id"] == offer
-    assert wire.calls[1]["tool_choice"] == "none" and len(wire.calls) == 2
+    assert frozen_rows(db) == rows(body)
+    assert wire.calls[0]["tool_choice"] == "auto" and len(wire.calls) == 1
     completion = saved(db)
     assert completion.response.resolved.finalized_commercial_ids.price_offer_ids == (offer,)
     assert send(client, transport, client_id="nikadent", sid="nika-prices", request_id="exact", q="Цена выбранной услуги?") == body
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
@@ -159,7 +158,7 @@ def test_overview_volume_clicks_and_unknown_are_server_owned(http_env, transport
     # Existing implementation repeats authored overview, omits its question.
     assert [r["offer_id"] for r in rows(unknown)] == initial
     assert "Какой объём" not in unknown["answer"]
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == (2 if topic == "implantation" else 1)
     assert price_scope(db).volume.extent == "unknown"
 
 
@@ -173,7 +172,7 @@ def test_three_teeth_free_text_keeps_unit_prices_not_multiplied_totals(http_env,
     assert "за один зуб" in " ".join(t for r in rows(body) if r["billing_unit"] == "tooth" for t in r["condition_texts"])
     assert price_scope(db).volume.tooth_count == 3
     assert not any(amount(r) in {66000, 72000, 105000} for r in rows(body))
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1
 
 
 @pytest.mark.parametrize("service,extent", [("all_on_4", "full_arch"), ("all_on_6", "full_arch"),
@@ -223,11 +222,12 @@ def test_removable_options_and_authenticated_alternative_keep_scope(http_env, tr
     selected = send(client, transport, client_id="nikadent", sid="nika-prices", request_id="acry", q="",
                     ref="price_select:removable_dentures.jaw.acry_free", ui_revision=body["revision"])
     assert amount(rows(selected)[0]) == 55000 and rows(selected)[0]["billing_unit"] == "jaw"
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1
     assert send(client, transport, client_id="nikadent", sid="nika-prices", request_id="acry", q="",
                 ref="price_select:removable_dentures.jaw.acry_free", ui_revision=body["revision"]) == selected
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1
     # Following ordinary turn reads the actual published selected variant.
+    wire.replies.clear()
     wire.replies.append(message("Выбран полный протез Acry Free."))
     send(client, transport, client_id="nikadent", sid="nika-prices", request_id="after", q="А какой материал мы выбрали?")
     assert "removable_dentures.jaw.acry_free" in wire.calls[-1]["messages"][1]["content"]
@@ -241,7 +241,7 @@ def test_unpublished_foreign_or_wrong_direction_refs_rejected_before_model(http_
     first = send(client, client_id="nikadent", sid="nika-prices", request_id="first")
     rejected = post(client, client_id="nikadent", sid="nika-prices", request_id="forged", q="", ref=ref, ui_revision=first["revision"])
     assert rejected.status_code == 400
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1
 
 
 @pytest.mark.parametrize("service,excluded", [("classic", "Коронка и протезирование"),
@@ -253,14 +253,15 @@ def test_surgical_and_prosthetic_exclusions_reach_card_grounding_and_history(htt
     body = send(client, client_id="nikadent", sid="nika-prices", request_id="first")
     row = rows(body)[0]
     assert any(excluded in x for x in row["excludes"])
-    assert excluded in json.dumps(json.loads(wire.calls[1]["messages"][-2]["content"]), ensure_ascii=False)
+    assert excluded in json.dumps(rows(body), ensure_ascii=False)
     if cards(body)[0]["price"]["presentation"] == "options":
         # A list shows prices first; package details enter visible history
         # only after the user opens this exact offer.
         selected = click(client, body, "price_select:"+row["offer_id"],
             client_id="nikadent",sid="nika-prices",request_id="detail")
         assert cards(selected)[0]["price"]["presentation"] == "detail"
-        assert len(wire.calls) == 2
+        assert len(wire.calls) == (2 if service == "implant_supported_prosthetics" else 1)
+    wire.replies.clear()
     wire.replies.append(message("Это разные этапы лечения."))
     send(client, client_id="nikadent", sid="nika-prices", request_id="follow", q="Это всё лечение целиком?")
     assert excluded in wire.calls[-1]["messages"][1]["content"]
@@ -287,11 +288,11 @@ def test_consultation_price_preserves_advance_booking_in_grounding_and_receipt(h
     row, = rows(body)
     condition = "Обязательна предварительная запись."
     assert row["amount"] == 0 and condition in row["condition_texts"]
-    assert condition in json.dumps(json.loads(wire.calls[1]["messages"][-2]["content"]), ensure_ascii=False)
+    assert condition in json.dumps(frozen_rows(db), ensure_ascii=False)
     frozen, = frozen_rows(db)
     assert condition in frozen["condition_texts"]
     assert send(client, transport, client_id="nikadent", sid="nika-prices", request_id="consult") == body
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
@@ -310,7 +311,7 @@ def test_temporary_denture_known_count_respects_authored_limit(http_env, transpo
         assert "12 000" not in body["answer"].replace("\u00a0", " ")
         assert not body["ui"]["projected_commercial_ids"]["price_offer_ids"]
     assert send(client, transport, client_id="nikadent", sid="nika-prices", request_id="temporary") == body
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == (1 if count is None or count <= 3 else 2)
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
@@ -336,7 +337,7 @@ def test_count_cap_uses_authored_value_for_other_offers_and_overview_tabs(http_e
         reply["reply_id"] for reply in body["ui"]["quick_replies"]}
     rejected = post(client, client_id="nikadent", sid="nika-prices", request_id="forged-cap", q="",
                     ref="price_select:removable_dentures.jaw.partial", ui_revision=body["revision"])
-    assert rejected.status_code == 400 and len(wire.calls) == 2
+    assert rejected.status_code == 400 and len(wire.calls) == 1
 
 
 @pytest.mark.parametrize("transport", ["json", "sse"])
@@ -355,7 +356,7 @@ def test_saved_price_selection_keeps_allowed_count_and_replays_without_model(htt
     assert price_scope(db).volume.tooth_count == 2
     assert click(client, first, "price_select:removable_dentures.jaw.partial", transport=transport,
                  client_id="nikadent", sid="nika-prices", request_id="selected") == selected
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1
 
 
 @pytest.mark.parametrize("service", ["metal_ceramic_crowns", "fixed_bridge", "core_inlay", "all_on_4"])
@@ -383,7 +384,7 @@ def test_nonexistent_ui_revision_cannot_select_an_otherwise_valid_variant(http_e
     first = send(client, client_id="nikadent", sid="nika-prices", request_id="first")
     response = post(client, client_id="nikadent", sid="nika-prices", request_id="forged-revision", q="",
         ref="price_select:removable_dentures.jaw.full", ui_revision=first["revision"]+1000)
-    assert response.status_code == 400 and len(wire.calls) == 2
+    assert response.status_code == 400 and len(wire.calls) == 1
 
 
 def test_price_ref_from_other_tenant_session_has_no_authority(http_env):
@@ -393,7 +394,7 @@ def test_price_ref_from_other_tenant_session_has_no_authority(http_env):
     # Same textual SID does not make the Demo publication available to Nika.
     response = post(client, client_id="nikadent", sid="same-sid", request_id="foreign", q="",
         ref="price_select:removable_dentures.jaw.full", ui_revision=demo["revision"])
-    assert response.status_code == 400 and len(wire.calls) == 2
+    assert response.status_code == 400 and len(wire.calls) == 1
 
 
 @pytest.mark.parametrize("service", ["all_on_4", "all_on_6"])

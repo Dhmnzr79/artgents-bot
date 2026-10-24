@@ -27,7 +27,7 @@ def test_shared_options_and_detail_in_widget(http_env, monkeypatch, tmp_path, te
     first = send(client, client_id=tenant, sid='browser', q='Стоимость?')
     ref = 'price_select:'+chosen
     selected = click(client, first, ref, client_id=tenant, sid='browser', request_id='click')
-    assert len(wire.calls) == 2
+    assert len(wire.calls) == 1
     payloads = tmp_path/'payloads.json'
     payloads.write_text(json.dumps({'responses': {'Стоимость?':first, ref:selected},
         'expected':cards(first)[0]['price']['rows'], 'selected':cards(selected)[0]['price']['rows'][0],
@@ -101,7 +101,7 @@ def test_unpriced_detail_and_excludes_without_includes_in_widget(http_env, monke
     data['package']['includes'] = []
     data['package']['excludes'] = ['Дополнительная зона']
     path.write_text(json.dumps(data,ensure_ascii=False),encoding='utf-8')
-    wire = native(use, 'botulinum_therapy', option_id='individual')
+    wire = native(use, 'botulinum_therapy', needs_completion=True, option_id='individual')
     first = send(client,client_id='demo_medical',q='Стоимость?')
     assert len(wire.calls) == 2
     payloads = tmp_path/'unpriced.json'

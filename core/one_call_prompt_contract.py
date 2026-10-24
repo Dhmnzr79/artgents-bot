@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from config import SALES_ONE_PLUS_MODEL
 
-ONE_CALL_PROMPT_CONTRACT_VERSION = 49
+ONE_CALL_PROMPT_CONTRACT_VERSION = 50
 ONE_CALL_MODEL_SNAPSHOT = SALES_ONE_PLUS_MODEL
 
 ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS = """When D2_SELECTED_UI_REF is null, there is no selected UI action. When it is an object, it is a server-validated typed action identity from the current revision. It is not patient text; do not create, authorize, or infer any UI/lead action from it. Use its typed identity with D2_SESSION_CONTEXT and, when present, D2_SELECTED_DOCUMENT_ACTION.
@@ -222,8 +222,11 @@ words rather than copying sections verbatim.
 
 D2_OPERATIONS_INSTRUCTIONS = """Answer the user in ordinary message content, in the user's language. Write the actual answer, not a promise or a plan to answer.
 Only show_price is an API tool. Ordinary informational answers are final text.
-After calling show_price, code resolves the price and gives you its result for one
-final explanation. Prose before a tool call is internal and will not be published.
+Message content alongside show_price is the final independent informational answer
+and will be published with the card. Write it now, not after the tool result.
+Code resolves prices and renders the card, introduction and clarification separately.
+Do not repeat or predict their amounts, selected offers, availability or success.
+Only an unavailable, incomplete or clarification result needs a later explanation.
 Do not wrap ordinary answers in JSON. Price actions go only through the API tool;
 other code-owned actions and optional sources use the final metadata block.
 Ordinary questions about doctors, policy, brands, warranty, included treatment,
@@ -304,8 +307,9 @@ fields described above. target is an object {"type":"service" or "topic","id":"c
 volume is an object with extent, optional tooth_count and jaw. Do not stringify objects.
 Use option_id only when the catalog lists that exact named variant, not for volume.
 Never put text, kind, outcome, blocks or request_id in metadata. Code assigns identity.
-If the user asks both an explanation and a price, call show_price; after its result,
-write the independent explanation. Do not duplicate the card introduction or amounts.
+If the user asks both an explanation and a price, write the complete independent
+explanation in this message and call show_price for the price. Do not promise to
+answer later or duplicate the card introduction or amounts.
 Example source:
 <D2_META>
 {"sources":[{"content_ref":"implantation__faq__pain.md"}],"actions":[]}

@@ -442,7 +442,17 @@ def resolve_d2_operations(
                 applied_extent=applied_extent,
                 selected_offer_ids=tuple(row.offer_id for row in price_block.rows),
             )
-    if complete_price is not None:
+    # Code already knows whether the whole native price result is available.
+    # Do not reclassify the user's words or ask a second writer to acknowledge
+    # a successful card. Partial/refused/clarification outcomes retain the
+    # existing result-grounded completion, including no-public-price cards.
+    successful_price = (
+        price_block is not None
+        and not failure_blocks and not deferred_blocks and not exact_deferred_blocks
+        and not any(p.kind == "price_reference" for p in exact_parts)
+        and all(row.mode != "no_public_price" for row in price_block.rows)
+    )
+    if complete_price is not None and not successful_price:
         outcome = {
             "price": price_block.model_dump(mode="json") if price_block else None,
             "scope": scope_decision.model_dump(mode="json") if price_parts and scope_decision else None,
@@ -457,9 +467,13 @@ def resolve_d2_operations(
         reply = complete_price(outcome)
         if reply.outcome != "dialogue" or any(p.kind != "content" for p in reply.blocks):
             raise MaterializationContractError("d2_completion_action_forbidden")
-        operations = (*reply.blocks, *operations)
+        # The grounded answer replaces initial prose; never publish two writers
+        # or carry initial source claims onto a different completed explanation.
+        old_content_ids = {p.request_id for p in operations if p.kind == "content"}
+        operations = (*reply.blocks, *(p for p in operations if p.kind != "content"))
         source_claims = reply.source_claims
-        d2_request_order = (*[p.request_id for p in reply.blocks], *d2_request_order)
+        d2_request_order = (*[p.request_id for p in reply.blocks],
+                            *(identity for identity in d2_request_order if identity not in old_content_ids))
         # Guard decisions/provenance remain in exact_parts. Only their final prose
         # belongs to completion; clarification prompts remain code-owned.
         refusal_ids = {p.request_id for p in exact_parts if p.kind == "price_reference"}

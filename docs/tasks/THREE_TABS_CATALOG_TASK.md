@@ -1,5 +1,65 @@
 # Общий каталог и цены — owner GO 2026-10-16
 
+## Selectel thinking/лимит — owner GO 2026-10-24
+
+Owner «Давай» после предложения проверить управление thinking и лимит по одному
+параметру. Same repository/top C:/Cursor Projects/artgents-bot-active,
+codex/three-tabs-catalog; HEAD/baseline7cfe877, origin/main7ee6323, mergebase2502be7,
+index пуст, foreign8playground+VPSdoc+3jpg сохраняются. Класс: diagnostic experiment,
+runtime не меняется. Exact allowlist: scripts/probe_selectel_thinking.py (new),
+tests/test_selectel_thinking_probe.py (new), эта карточка; evidence ignored logs.
+
+Hard budget8SDKcalls Selectel, retries0, не использовать остатки прошлых бюджетов.
+Cases2/7 из предыдущего frozen benchmark, тот же snapshot SQLite/session, clock,
+модель, текст/история/tools/temp0; фактические исходные SDK payload hashes сверяются
+с предыдущим manifest до сети. Предопределённые4режима: top-level false/1536;
+top-level false/4096; nested chat_template_kwargs false/4096; nested true/4096.
+Соседние сравнения меняют только output limit, формат переключателя, boolean.
+Общий timeout60всем вместо20, чтобы не спутать выходной лимит с клиентским timeout;
+поэтому исходный1536 здесь не буквальная копия прежнего latency опыта. Для второго
+вопроса порядок режимов обратный. Кэш не очищается, один пример на режим.
+
+Один начальный SDK call на case/mode, второй запрещён до сети. Это диагностирует
+first response и successful card, а не adverse completion. All-network failure
+останавливает оставшиеся режимы без retry/repair. Ни .env, ни runtime/prompts,
+ни данные клиентов, ни VPS не меняются; SMTP запрещён. Сохраняются только synthetic
+ответы/tools/usage/параметры и hashes, без ключей и входных provider payloads.
+Public Qwen upstream docs — гипотеза формата; поддержку Selectel проверяет опыт.
+
+Evidence: root11offlinePASS (3new+8budget/hash/state), independent pre-live3PASS
+и harnessPASS; оба actual original SDK hashes совпали с прежним manifest до сети.
+Live завершён8/8SDKcalls, всеreceived, retries0, budget закрыт;HTTP2007/8,
+одинHTTP503, provider/network errors0. Стоимость1.9592363RUB. Evidence в ignored
+logs/selectel-thinking-controls-20261024/live/{manifest,calls,turns,summary}.json
+и report.html. Сохраняется только synthetic content, ключи/входы0.
+
+Case2 «Один зуб» все4режима показали classic+one_stage Nobel, без подмены метода.
+Reasoning:541/564/511/459 для current1536/current4096/nestedFalse4096/nestedTrue4096.
+Следовательно1536в этом повторе справился, хотя тот же frozen input прежде дал
+length: наблюдаемая вариативность, не воспроизводимость каждого прежнего сбоя.
+Case7mixed: current1536 вновь length1536reasoning/1536completion,HTTP503;
+current4096 —2760reasoning/2897completion,14.13s, правильные карточки БЕЗ пояснения;
+nestedFalse4096 —1643/2046,10.49s, правильные карточки БЕЗ пояснения;
+nestedTrue4096 —1751/2144,10.54s, полное пояснение+обе правильные карточки.
+
+Во всех8ответах reasoning ненулевой. Рабочее отключение thinking не доказано;
+это не доказывает полного игнорирования Selectel всех параметров. Нельзя назвать
+этот опыт сравнением фактически off/on. Лимит4096убрал length в3mixedпробах, но
+сам по себе не обеспечил информационную часть. Единственный полный nestedTrue
+sample не доказывает причинный эффект true или общую надёжность. Режимlow/sampling
+не тестировались; делать выводы об их качестве/ускорении по этому опыту нельзя.
+
+Independent Astra post-live: корректный эксперимент, общий PASS качества новой
+схемы не подтверждён. Прочитаны все8публикаций/SDK content/tools; полноценный mixed
+согласуется с Demo facts (протоколы, гарантия, акция, КТ), META JSON валиден,2sources.
+Лишняя вводная перед кодовой остаётся. Reviewer0calls/edits. Вывод: успешные ответы
+уже получались с reasoning; догматически выключать его или объявлять Qwen слабым
+оснований нет. Увеличение лимита и полнота смешанного ответа — разные вопросы.
+
+Runtime/.env/данные не менялись, лимит4096только в опыте. SMTP/VPS/merge/deploy0,
+автоматических дополнительных тестов/repair0. Изменены только3allowlistedpaths,
+foreignWIP сохранён, full CI не запускался; результаты фиксируются checkpoint-ом.
+
 ## Живое сравнение одного вызова — owner GO 2026-10-24
 
 Owner «Делаем» после локального implementation/Checker checkpoint a967d05.

@@ -55,3 +55,16 @@ def test_each_arm_limit_is_sixteen_even_when_first_attempt_fails(tmp_path, monke
         with pytest.raises(ValueError, match='budget_exhausted'):
             budget(model=model)
     assert len(counter) == 32
+
+
+@pytest.mark.parametrize("text", [None, "Обезболивание подбирает врач."])
+def test_single_call_reference_publishes_information_with_tool_in_same_reply(text):
+    blocks = [] if text is None else [{"display_text": text}]
+    record = {"response": {"resolved": {"information_blocks": blocks}}}
+    calls = [{"phase": "initial", "tool_calls": [{"name": "show_price", "arguments": {
+        "target": {"type": "topic", "id": "implantation"}}}]}]
+    replies = pair.reference_replies(record, calls, single_call=True)
+    assert len(replies) == 1
+    message = replies[0].choices[0].message
+    assert message.content == text
+    assert message.tool_calls[0].function.name == "show_price"

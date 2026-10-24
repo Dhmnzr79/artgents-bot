@@ -89,7 +89,7 @@ def synthetic_message(text=None, tools=()):
               model="offline-reference", usage=None)
 
 
-def reference_replies(record, calls):
+def reference_replies(record, calls, *, single_call=False):
     info = record["response"]["resolved"]["information_blocks"]
     text = "\n\n".join(block["display_text"] for block in info) or "<NO_TEXT>"
     sources = [{"content_ref": block["content_ref"],
@@ -101,15 +101,18 @@ def reference_replies(record, calls):
     tools = [NS(id=f"reference-{i}", function=NS(name=tool["name"],
                 arguments=json.dumps(tool["arguments"], ensure_ascii=False)))
              for i, tool in enumerate(initial["tool_calls"])]
+    if single_call:
+        return [synthetic_message(text if info else None, tools)]
     return [synthetic_message(None, tools), synthetic_message(text)] if tools else [synthetic_message(text)]
 
 
-def run(*, live=False):
+def run(*, live=False, single_call=False):
     from time import perf_counter
     from openai import OpenAI
     from dotenv import dotenv_values
 
-    output = BASE_OUTPUT / ("live" if live else "offline")
+    base_output = BASE_OUTPUT.with_name("provider-single-call-20261024") if single_call else BASE_OUTPUT
+    output = base_output / ("live" if live else "offline")
     if output.exists():
         raise ValueError("existing_run_refused")
     output.mkdir(parents=True)
@@ -162,7 +165,7 @@ def run(*, live=False):
                            "clock": Clock.instant, "buckets": buckets}
                 fixtures.append(fixture)
                 queue = reference_replies(reference[number], [r for r in old_calls
-                    if r["turn"] == f"1:{chain}:{index+1}"])
+                    if r["turn"] == f"1:{chain}:{index+1}"], single_call=single_call)
                 def fake_create(**kwargs):
                     if not queue:
                         raise ValueError("reference_extra_call")
@@ -172,6 +175,22 @@ def run(*, live=False):
                     result = client.post("/ask", json=payload)
                 if result.status_code != 200 or queue:
                     raise ValueError(f"reference_replay_failed_{number}_{result.status_code}")
+
+        if single_call:
+            # Independent adverse cases, no invented prior conversation.
+            for tenant, question in (
+                ("demo", "Сколько стоит имплантация Osstem и больно ли её делать?"),
+                ("demo", "Сколько стоит имплантация ребёнку?"),
+                ("nikadent", "Сколько стоит All-on-6 и как проходит лечение?"),
+                ("demo", "Сколько стоят имплантация и отбеливание? И больно ли делать имплантацию?"),
+            ):
+                number = len(fixtures)
+                location = root / "fixtures" / str(number)
+                names = save_state(root, location)
+                fixtures.append({"payload": {"client_id": tenant, "sid": f"adverse-{number}",
+                    "request_id": f"paired-{number}", "q": question}, "location": location, "names": names,
+                    "clock": datetime(2026, 10, 24, 12, tzinfo=timezone.utc) + timedelta(seconds=number),
+                    "buckets": {k: deque(v) for k, v in route_guards._IP_RATE_BUCKETS.items()}})
 
         clients = {arm: OpenAI(api_key=keys[arm] or "offline-key", base_url=base, max_retries=0)
                    for arm, (_, base) in ARMS.items()}
@@ -214,11 +233,13 @@ def run(*, live=False):
         manifest = {"max_per_arm": 16, "max_total": 32, "retries": 0,
             "arms": ARMS, "synthetic_reference": str(REFERENCE.relative_to(ROOT)),
             "initial_inputs_equal": True, "model_snapshot_label": "paired-current-d2",
-            "input_hashes": [expected_hashes[(i, "selectel")] for i in range(8)],
+            "input_hashes": [expected_hashes[(i, "selectel")] for i in range(len(fixtures))],
             "fixed_context_time": "2026-10-24T12:00:00Z + case index seconds",
             "completion_inputs": "own frozen code result; not forced equal",
             "timing": "full Flask /ask and SDK; no browser/TTFT", "cache_flush": False,
-            "usd_rub_conversion_estimate": RUB_PER_USD}
+            "usd_rub_conversion_estimate": RUB_PER_USD,
+            "single_call_contract": single_call,
+            "cases": [{"client_id": f["payload"]["client_id"], "question": f["payload"]["q"]} for f in fixtures]}
         observation.dump(output / "manifest.json", manifest)
         if not live:
             for sdk in clients.values():
@@ -241,6 +262,11 @@ def run(*, live=False):
                         started_at = datetime.now(timezone.utc)
                         response = budget(**kwargs)
                         row = budget.rows[-1]
+                        if single_call:
+                            # Only synthetic test outputs; never keys or provider inputs.
+                            row["message_content"] = observation.field(
+                                observation.field(observation.field(response, "choices")[0], "message"), "content")
+                            observation.dump(budget.path, budget.rows)
                         if arm == "deepseek":
                             from core.d2_costing import cost_snapshot
                             cost = cost_snapshot(ARMS[arm][0], started_at, row["cached_tokens"],
@@ -274,4 +300,6 @@ def run(*, live=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--live", action="store_true")
-    print(json.dumps(run(live=parser.parse_args().live)), flush=True)
+    parser.add_argument("--single-call", action="store_true")
+    args = parser.parse_args()
+    print(json.dumps(run(live=args.live, single_call=args.single_call)), flush=True)

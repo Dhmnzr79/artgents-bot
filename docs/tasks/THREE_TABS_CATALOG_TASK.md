@@ -1,5 +1,72 @@
 # Общий каталог и цены — owner GO 2026-10-16
 
+## Живое сравнение одного вызова — owner GO 2026-10-24
+
+Owner «Делаем» после локального implementation/Checker checkpoint a967d05.
+Та же ветка codex/three-tabs-catalog, repository/top C:/Cursor Projects/artgents-bot-active,
+HEAD/baseline a967d05, origin/main7ee6323, mergebase2502be7; index пуст. Foreign
+8playgroundfiles +VPSdoc+3jpg не трогаем. Класс: диагностический эксперимент,
+не новый runtime fix. Exact allowlist: scripts/compare_selectel_deepseek.py,
+tests/test_compare_selectel_deepseek.py, эта карточка; результаты в ignored logs.
+
+Hard budget16calls/arm,32total, retries0. Один live run, без resume/overwrite или
+добавочных попыток. До сети matched first SDK hashes всех12пар, snapshot каждой
+SQLite/session/IP bucket, fixed clock и одинаковая база/история обоим провайдерам.
+Первые8вопросов сохраняют прежнюю синтетическую историю, офлайн replay переносит
+её исходную информационную прозу в первый ответ по новому контракту. Ещё4
+независимых случая: Osstem+pain, child price, Nikadent All-on-6 no-public-price+info,
+две цены+pain. Никаких изменений промпта/runtime/клиентских данных ради теста.
+Повторно используются reviewed isolation/budget guards; второй вызов получает
+собственный реальный кодовый результат. Сохраняем также synthetic message_content
+ответов для анализа первой прозы/планирования; ключи/входные provider payloads не
+выводим и не сохраняем. Cost/cache/time как в baseline, cache не сбрасываем.
+Отличия с прошлым прогоном ограничивают причинные выводы об ускорении.
+SMTP/VPS0. Предварительно targeted offline tests + независимый pre-live review.
+
+Запуск завершён: root8offlinePASS, independent pre-live8PASS и scoped harnessPASS;
+до первого платного запроса все12пар SDK inputs равны. Actual24turns,25SDKcalls
+(Qwen13, DeepSeek12) из32, retries0, failed transport0; бюджет закрыт, добавочных
+вызовов0. Изоляция и SMTP запрет сохранены. Evidence:
+logs/provider-single-call-20261024/live/{manifest,turns,selectel-calls,deepseek-calls,
+summary}.json и report.html; всё ignored, только synthetic dialogue.
+
+Качество кандидата не прошло live приёмку. Qwen: HTTP2008/12, четыреHTTP503
+(case2/8/10/11) после received API ответа finish_reason:length с1536reasoning и
+пустыми message/toolcalls. Case7 mixed — HTTP200, но length1536 (reasoning1436),
+оборванная проза и нет show_price/карточек. DeepSeek: HTTP20012/12, но mixed
+case7 без tool/cards с ложной ссылкой на карточку; case8 обещает карточку доступных
+брендов без инструмента; case10Nikadent не публикует approved no-public-price
+результат и обещает карточку; case11 игнорирует обе цены, ответив лишь про боль.
+Это потеря до materialization, не ошибка renderer или arithmetic/pricebook.
+У Qwen case9 child действительно отработал tool→policy refusal→completion;
+DeepSeek ответил ordinary refusal без инструмента. Остальные дополнительные
+adverse cases поэтому не доказывают работу conditional completion на live модели.
+
+All12 usage: Qwen prompt448310 = cached316800 + miss131510; completion12569,
+внутри reasoning11669; оценка4.17458RUB, среднее /ask6.318s включая ошибки.
+DeepSeek prompt487148 = cached405248 + miss81900; completion2027, reasoning
+не сообщён во всех12, unknown не0; $0.014716944≈1.18527RUB, среднее2.570s.
+Всего≈5.35985RUB. Для прежних8: Qwen14→8calls,3.48284→2.41980RUB,
+4.197→5.053s; DeepSeek14→8calls,.90015→.67678RUB,3.311→2.414s. Это не
+quality-preserving saving: у обоих потеря цены в mixed, у Qwen ещё error/length.
+Промпт/история формируются одинаково для провайдеров, но разные кэш/токенизация
+и единственный повтор не позволяют приписать все отличия одной причине.
+
+Runtime/данные/лимиты не менялись по ходу теста, автоматического retry/repair нет.
+Кандидат a967d05 остаётся локальным экспериментом; VPS не затронут, merge/deploy0.
+Перед любой приёмкой нужен отдельный согласованный следующий шаг; повышение
+лимита само по себе не устраняет отсутствие tool у DeepSeek. Старый live8case
+baseline сохраняется отдельно и не объявляется проверкой всех12adversecases.
+
+Independent post-live Astra: REJECT качества кандидата, при корректном исполнении
+эксперимента. Прочитаны все24публикации, raw message_content и tools, сверены
+Demo/Nikadent факты и no-public-price authority. Все основные failures подтверждены;
+дополнительно обе модели в case1 добавили вводную/обещание карточки перед кодовой
+вводной. Проверяющий сделал0calls/edits. Этот verdict не отменяет узкий offline
+кодовый PASS a967d05, но блокирует объявление quality-preserving улучшения/релиза.
+Изменены только3объявленных diagnostic paths; staged secrets/.env/raw private
+conversations/SQLite0, foreign WIP сохранён. Полный CI/merge/deploy не запускались.
+
 ## Один вызов для успешной ценовой карточки — owner GO 2026-10-24
 
 Owner после согласования схемы поручил зафиксировать предыдущий этап и приступить.

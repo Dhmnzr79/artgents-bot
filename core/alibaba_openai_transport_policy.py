@@ -13,6 +13,7 @@ _ALLOWED_EXACT_HOSTS: frozenset[str] = frozenset(
         "dashscope-intl.aliyuncs.com",
         "dashscope.aliyuncs.com",
         "api.deepseek.com",
+        "api.tf.selcloud.ru",
     }
 )
 _BLOCKED_HOST_SUFFIXES: tuple[str, ...] = (
@@ -80,6 +81,10 @@ def validate_alibaba_chat_base_url(base_url: str | None) -> str:
     host = _normalized_host(parsed.hostname)
     if not _is_allowed_alibaba_host(host):
         raise AlibabaEndpointConfigurationError("chat_base_url_host_blocked", host)
+    # Token Factory has one explicitly approved OpenAI-compatible base URL.
+    # Keep the same gate for runtime, SDK configuration and readiness.
+    if host == "api.tf.selcloud.ru" and raw.rstrip("/") != "https://api.tf.selcloud.ru/v1":
+        raise AlibabaEndpointConfigurationError("chat_base_url_invalid", raw)
     path = parsed.path or ""
     if path.endswith("/"):
         path = path.rstrip("/")
@@ -96,7 +101,7 @@ def validate_capability_live_model(model: str) -> str:
 
 def validate_alibaba_chat_api_key(api_key: str | None) -> str:
     key = (api_key or "").strip()
-    if not key:
+    if not key or key == "PASTE_SELECTEL_API_KEY_HERE":
         raise AlibabaEndpointConfigurationError("chat_api_key_missing")
     return key
 

@@ -1,5 +1,160 @@
 # Общий каталог и цены — owner GO 2026-10-16
 
+## Парный Selectel / DeepSeek API — owner GO 2026-10-24
+
+Owner явно просит два идентичных теста: Qwen Selectel VS DeepSeek API,
+одинаковые вопросы. Новый отдельный hard budget16SDKcalls/arm,32total,
+retries0, без SMTP/VPS и автоматического расширения. Это диагностический
+frozen-context benchmark, не runtime изменение и не самостоятельные цепочки.
+Ветка/HEAD/mergebase прежние codex/three-tabs-catalog /2502be7,
+origin/main7ee6323. Предыдущие prep/test edits и foreign WIP сохраняются.
+Allowlist: scripts/compare_selectel_deepseek.py,
+tests/test_compare_selectel_deepseek.py, эта карточка. Локальный .env не меняется.
+
+Общая история восстанавливается офлайн через прежние проверенные синтетические
+публикации Qwen, price args и действующий D2. Перед каждым вопросом сохраняются
+все SQLite состояния/session stores и IP buckets; оба плеча стартуют с одного
+снимка и fixed clock. Reference source может влиять на стиль и явно указан.
+Первый фактический SDK input (messages/tools/choice/temp/limit/timeout) обоих
+плеч захватывается без сети и сверяется SHA256 до live; live сверяется с capture.
+Только одинаковая техническая model_snapshot метка нейтрализована для обоих.
+Endpoint/model/provider extras различаются. Второй completion получает собственный
+кодовый результат модели, его равенство не утверждается и ответы не подменяются.
+Порядок AB/BA чередуется по вопросам, кэш не сбрасывается. Provider costs считаются
+по собственному actual usage, DeepSeek по существующему versioned tariff; RUB
+перевод по CBR24.10.2026 80.5381 — оценка без банковских комиссий.
+
+Результат: offline paired harness 3 PASS, вместе с прежними budget tests
+independent Checker 6 PASS; восемь первых фактических SDK inputs равны,
+pre-live scoped PASS. Live выполнено 14 calls/arm = 28/32 всего, retries0,
+16/16 HTTP200; все calls received, транспортных ошибок0. Бюджет закрыт,
+дополнительных provider calls0. Локальный report:
+logs/provider-comparison-20261024/live/report.html, evidence JSON рядом.
+
+Selectel: prompt494979 = cached377600 + miss117379 (76.3% cached),
+completion4018 включает reasoning2665, оценка3.48284 RUB.
+DeepSeek: prompt574908 = cached515584 + miss59324 (89.7% cached),
+completion1219; reasoning usage не сообщён во всех14, это unknown, не ноль.
+Стоимость $0.011176752 ≈0.90015 RUB по субботнему off-peak тарифу.
+Среднее полное Flask /ask время4.197s против3.311s; медиана3.998s/3.287s;
+mixed7.835s/4.157s. У каждого один вызов без cache hit, остальной кэш не
+выравнивался. Это сравнение подключений в данном запуске, не pure model speed
+или cold/warm experiment; токенизаторы/учёт различаются.
+
+Independent Astra post-live semantic review PASS в границах8сценариев:
+прочитаны все16ответов/tools, шесть ценовых случаев дают одинаковые offers и
+суммы. Исторические Nobel loss, classic-only narrowing, invalid target и
+missing mixed не воспроизвелись у обоих. Неблокирующие наблюдения: Selectel
+опустил volume в case1 и показал уточнение, DeepSeek unknown его подавил;
+Selectel case7 сделал неподтверждённое age_group:adult без наблюдаемого влияния
+на цену. «Самая премиальная» Selectel и «одна из самых известных» DeepSeek —
+дополнительные оценки, не буквальные факты базы. Полная фактическая точность,
+длинные самостоятельные диалоги и общий рейтинг моделей не аттестованы.
+
+Изменён только экспериментальный harness/test и эта карточка; рабочие prompts,
+данные/runtime ради результатов не правились. HEAD2502be7, index пуст,
+commit/push/PR/merge/deploy0; прежние prep edits и foreign WIP сохранены.
+Release CI не запускался; прежний diagnostics baseline вне текущего набора.
+SMTP/VPS0. Проверяющий новых живых запросов не выполнял.
+
+## Selectel: исторические Qwen-сценарии, скорость и кэш — owner GO 2026-10-24
+
+Owner просит повторить прежние проблемные Qwen-тесты и измерить время/кэш.
+Объявлен hard budget 32 SDK/provider calls, retries=0, никаких SMTP/VPS.
+Классификация: диагностический эксперимент, не runtime bug fix или упрощение.
+Preflight: та же папка/top и ветка codex/three-tabs-catalog, HEAD/mergebase
+2502be7, origin/main 7ee6323. Существующие Selectel prep edits и foreign WIP
+сохраняются. Allowlist этого этапа: scripts/selectel_d2_regression.py,
+tests/test_selectel_d2_regression.py, эта карточка. Evidence только ignored logs.
+
+Восемь прежних вопросов в четырёх цепочках, два независимых повтора с настоящей
+накопленной историей. Current D2 /ask в Flask test_client через действующий
+Selectel SDK, без замены промпта/схемы или ответов. Это не воспроизведение старого
+транспорта и не сравнение с DeepSeek. Reuse isolation harness: tenant copies,
+SQLite только внутри sandbox, SMTP запрещён. Global experiment guard reserves
+each SDK call before network, failures consume budget, no resume/overwrite.
+Перед ходом требуется запас двух вызовов. SDK retries должны быть 0.
+
+Время: complete local Flask route и каждый provider call; ни browser rendering,
+ни TCP localhost overhead, ни time-to-first-visible-text не измеряются. API
+streaming не включается ради опыта. Кэш не очищается; cold/warm определяется
+по usage, неизвестные счётчики отмечаются. Reasoning входит в completion_tokens
+API и не прибавляется второй раз; supplied RUB output/reasoning rate одинаков.
+Никакого нового состояния/поля в рабочем боте, payload/protection изменений нет.
+
+Evidence 2026-10-24: offline budget/isolation/accounting tests 3 PASS у root и
+independent Checker; pre-live scoped PASS. Live ровно 28/32 SDK calls, retries0,
+16/16 HTTP200, ошибок транспорта0; бюджет запуска закрыт, дополнительных calls0.
+Все counters известны: prompt990409 = cached812800 + uncached177609 (82.1% hit);
+completion8968 включает reasoning6694. Оценка по owner screenshot RUB rates:
+5.95164 RUB; тот же measured volume без cached discount 21.19977 RUB, не счёт.
+Все28calls имели cache hits 28800–32000, cold/warm speed comparison не выполнен.
+Полное Flask route время 2.0543–7.3637s; mixed6.6845/7.3637s. TTFT/browser/VPS
+и параллельная нагрузка не измерялись. Игнорируемый report.html содержит все
+16 синтетических публикаций, суммы, аргументы tools и время двух повторов.
+
+Independent Astra semantic review PASS в границах8сценариев×2: Nobel сохраняется,
+«Один зуб» и mixed дают classic+one_stage, warranty без цены, All-on-6 valid,
+нет markers/английского planning/повтора сумм перед карточкой. Ограничения:
+«самая премиальная из трёх» — интерпретация позиционирования, не буквальный факт;
+volume unknown/omitted меняет уточняющий текст обзора протезирования, не offers.
+Полная фактическая точность/весь бот не аттестованы; это не A/B с DeepSeek и не
+доказательство эффекта только архитектуры или модели. Новая Selectel-модель
+отличается от исторической Qwen. Данные/промпт/runtime не правились по результатам.
+Файлы добавлены только в объявленном allowlist; HEAD2502be7, index пуст,
+commit/push/PR/merge/deploy0; прежние prep edits и foreign WIP сохранены.
+
+## Локальная подготовка Selectel — owner GO 2026-10-24
+
+Owner: «А ты можешь это указать? А я ключ вставлю», затем после разбора
+прежнего WIP: «Делай подготовку». Продолжаем в текущей ветке, без удаления
+или фиксации старых материалов. Классификация: подготовка транспорта/bug fix,
+не архитектурное упрощение. Границы Target Contract §3 неизменны.
+
+Preflight: C:/Cursor Projects/artgents-bot-active (также Git top),
+codex/three-tabs-catalog; HEAD/baseline и merge base 2502be7;
+origin/main 7ee6323, committed trees одинаковы. Foreign WIP: восемь изменённых
+static/experiments/widget-playground файлов; untracked документ состояния VPS
+и otzyv-1/2/3.jpg. Index пуст. Exact allowlist: .env (ignored/local only),
+.env.example, core/alibaba_openai_transport_policy.py,
+tests/test_chat_transport_policy.py, эта карточка.
+
+Подготовка: один точный Selectel base https://api.tf.selcloud.ru/v1 через
+общую проверку runtime/SDK/readiness; placeholder ключа отклоняется до сети.
+Локальный DEFAULT_LLM_MODEL=qwen3.8-flash-next, ключ вводит владелец.
+Существующий enable_thinking=false сохраняется как запрос, не гарантия
+отключения reasoning. В ручных Selectel-пробах reasoning оставался ненулевым.
+Три локальные USD ставки очищаются: рублёвые тарифы не выдаются за USD.
+Содержимое базы, промпт, два ценовых вызова, формы/почта и VPS не меняются.
+Старые секреты не выводятся и не включаются в diff; прежний активный ключ
+сохраняется в существующей provider-specific локальной настройке при необходимости.
+
+Приёмка: targeted offline endpoint/adverse URL/key checks, запись аргументов
+реального D2HttpProvider -> LLM wrapper -> фиктивный SDK create без сети,
+unchanged native-price regression; один независимый Checker. Реальная SDK/HTTP
+совместимость с Selectel и качество модели офлайн не подтверждаются.
+Provider/model/SMTP calls: 0. Запуск, commit/push/merge/deploy не разрешены этим этапом.
+
+Offline evidence: endpoint/arguments suite 22 PASS. Первоначальный общий набор
+дал 84 PASS/4 FAIL: три новых теста предполагали отсутствующий httpx (локальный
+OpenAI SDK использует другой HTTP backend); заменён только тестовый адаптер на
+запись фактических SDK kwargs. После исправления все три проходят. Ещё один
+существующий config-import test повторно загружал локальный .env после delenv;
+readiness suite в изолированной среде PYTHON_DOTENV_DISABLED=1 и fake key —
+26 PASS. Native price и single-model tests прошли в первоначальном наборе.
+Итого все 88 различных выбранных cases покрыты PASS; это offline доказательство,
+не проверка Selectel по сети и не новый full CI. Diff check чистый, index пуст.
+
+Independent Astra Checker: PASS scoped transport preparation; independently
+25 PASS (endpoint/SDK arguments + single model), actual runtime/readiness path
+traced. Temp-directory permission issue resolved with dedicated workspace basetemp.
+No live/provider/SMTP calls; no edits by Checker. Removed: no semantic paths;
+added: exact Selectel endpoint admission and placeholder rejection. Only local
+provider configuration changes after owner inserts key and restarts. No fallback,
+model calls, prompt, tenant/privacy/lead/price ownership changes. HEAD unchanged
+2502be7; four tracked files unstaged, ignored .env local only; no commit/push/PR/
+merge/deploy. Eight playground files and four untracked old materials preserved.
+
 Владелец подтвердил реализацию после согласования последовательности: общая
 схема и ценовой слой → карточки в разговоре → самостоятельный каталог и три
 вкладки → общая форма → два локальных демо. При архитектурных вопросах — Astra.

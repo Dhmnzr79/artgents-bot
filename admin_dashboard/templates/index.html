@@ -1,66 +1,45 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Админка Artgents</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=blue-20261019">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Админка Artgents</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}?v=workspace-visual-3">
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbar-title">
-      <img class="topbar-logo" src="{{ url_for('static', filename='logo.svg') }}" width="114" height="26" alt="Artgents">
-      <h1>Админка Artgents</h1><span class="env-pill">{{ app_env }} · только просмотр</span>
-    </div>
-    <div class="controls">
-      <label class="control-field">Клиника <select id="clientId"></select></label>
-      <button id="refreshBtn" type="button">Обновить</button>
-    </div>
-  </header>
-  <div id="statusBar" class="status-bar" role="status" aria-live="polite">Проверяем доступ…</div>
-  <main class="page">
-    <section class="card card-overview">
-      <h2>Сохранённые данные</h2>
-      <p class="muted">Всего в текущем хранилище. Заявки демо и подтверждённая отправка считаются отдельно.</p>
-      <div id="overview" class="kpi-grid"></div>
-    </section>
-    <section class="card card-costs">
-      <div class="section-head">
-        <h2>Новые обращения и расходы</h2>
-        <label class="control-field">Период <select id="period"><option value="today">Сегодня · UTC</option><option value="week">7 дней · UTC</option><option value="month">30 дней · UTC</option></select></label>
-      </div>
-      <p class="muted">Токены — по фактическому ответу провайдера: вход из кэша, без кэша и выход. Стоимость — оценка по сохранённым тарифам. Старые неполные оценки учитываются отдельно.</p>
-      <div id="costs"></div>
-    </section>
-    <section class="card card-dialogs">
-      <h2>Страницы и путь к заявке</h2>
-      <p class="muted">За период, выбранный выше. Каждое действие — число загрузок виджета на странице, где оно произошло; это не уникальные люди. Повторные клики в одной загрузке не увеличивают счётчик. Можно сразу открыть форму, минуя вопрос.</p>
-      <p class="muted">«Вопрос» и «Отправка формы» — действия в браузере. «Принято» и статусы — сохранённый результат сервера. «Отправлено» означает подтверждение почтового транспорта, а не прочтение письма. Демо учитывается отдельно.</p>
-      <div id="funnel"></div>
-    </section>
-    <section class="card card-dialogs">
-      <h2>Диалоги</h2><p class="muted">Сохранённая публикация без приватного ввода заявки. Последние созданные сессии; время последней активности указано отдельно.</p>
-      <div id="dialogs"></div><button id="moreDialogs" type="button" hidden>Ещё сессии</button>
-      <div id="dialogThreadViewer" class="dialog-thread-viewer" hidden>
-        <div class="viewer-head"><h2 id="dialogViewerTitle">История</h2><button id="dialogViewerClose" type="button">Закрыть</button></div>
-        <button id="moreTurns" type="button" hidden>Предыдущие сообщения</button>
-        <div id="dialogThreadBody"></div>
-      </div>
-    </section>
-    <section class="card card-leads">
-      <h2>Заявки</h2><p class="muted">Статусы из сохранённых результатов формы. Имена, телефоны, пожелания и тексты согласий здесь не показываются. Повторной отправки нет.</p>
-      <div id="leads"></div><button id="moreLeads" type="button" hidden>Ещё заявки</button>
-    </section>
-    <section class="card card-problems">
-      <h2>Технические ошибки новых обращений</h2><div id="problems"></div><button id="moreProblems" type="button" hidden>Ещё ошибки</button>
-    </section>
-    <section class="card card-dev">
-      <details id="eventExplorer"><summary>Технические метрики</summary>
-        <p class="muted">Модель, токены, длительность и результат запроса. Без запросов к модели, исходных текстов, ключей и контактов.</p>
-        <div id="events"></div><button id="moreEvents" type="button" hidden>Ещё события</button>
-      </details>
-    </section>
-  </main>
-  <script src="{{ url_for('static', filename='dashboard.js') }}?v=funnel-20261019" defer></script>
-</body>
-</html>
+<header class="topbar">
+ <div class="brand"><img src="{{ url_for('static', filename='logo.svg') }}" width="114" height="26" alt="Artgents"><span class="env-pill">{{ app_env }} · просмотр</span></div>
+ <div class="controls"><button id="themeToggle" type="button" aria-label="Тёмная тема" aria-pressed="true">Тема: тёмная</button><label>Клиника <select id="clientId"></select></label><button id="refreshBtn" type="button">Обновить</button></div>
+</header>
+<div class="shell">
+ <nav class="sidebar" aria-label="Разделы панели"><p class="nav-caption">УПРАВЛЕНИЕ</p>
+  <button data-page="dialogues" aria-current="page">Диалоги</button><button data-page="errors">Ошибки</button><button data-page="statistics">Статистика</button><button data-page="applications">Заявки</button>
+  <p class="sidebar-note">Данные клиники<br>Только просмотр</p>
+ </nav>
+ <main>
+ <div id="statusBar" class="status-bar" role="status" aria-live="polite">Проверяем доступ…</div>
+ <section id="page-dialogues" class="page-panel">
+  <div class="section-head"><div><h1>Диалоги</h1><p class="muted">Переписка и действия посетителей · по последней активности</p></div></div>
+  <div class="filters"><label class="search">Поиск по вопросам или ID<input id="dialogSearch" type="search" placeholder="Например, консультация" maxlength="200"></label><label>Последняя активность<select id="dialogPeriod"><option value="all">Всё время</option><option value="today">Сегодня · UTC</option><option value="week">7 дней · UTC</option><option value="month">30 дней · UTC</option></select></label><label>Состояние<select id="dialogStatus"><option value="all">Все диалоги</option><option value="problems">С техническими проблемами</option></select></label></div>
+  <div class="dialog-workspace" id="dialogWorkspace">
+   <aside class="dialog-list-pane" aria-label="Список диалогов"><div id="dialogs"></div><button id="moreDialogs" type="button" hidden>Загрузить ещё</button></aside>
+   <div id="threadPlaceholder" class="thread-placeholder"><span class="placeholder-icon">↗</span><h2>Выберите диалог</h2><p>Переписка откроется здесь.<br>Список останется под рукой.</p></div>
+   <section id="dialogThreadViewer" class="dialog-thread-viewer" hidden aria-label="Переписка">
+    <div class="viewer-head"><div><h2 id="dialogViewerTitle" tabindex="-1">Диалог</h2><p id="dialogPosition" class="muted"></p></div><div class="viewer-controls"><button id="prevDialog" aria-label="Предыдущий диалог">←</button><button id="nextDialog" aria-label="Следующий диалог">→</button><button id="dialogViewerClose">К списку</button></div></div>
+    <div id="threadScroll" class="thread-scroll"><button id="moreTurns" hidden>Ранее в диалоге</button><div id="dialogThreadBody" aria-live="polite"></div></div>
+   </section>
+  </div>
+ </section>
+ <section id="page-errors" class="page-panel" hidden><div class="section-head"><div><h1>Ошибки</h1><p class="muted">Техническое выполнение, а не оценка качества ответа</p></div><button id="partialDialogs">Диалоги с проблемами →</button></div>
+ <div class="card"><div class="section-head"><h2>Неудавшиеся обращения</h2><label>Период ошибок<select id="errorPeriod"><option value="today">Сегодня · UTC</option><option value="week">7 дней · UTC</option><option value="month">30 дней · UTC</option></select></label></div><p class="muted">За период статистики. Если причина не записана, восстановить её здесь нельзя. Частично выполненные ответы доступны через «Диалоги с проблемами» за всё время.</p><div id="problems"></div><button id="moreProblems" hidden>Ещё ошибки</button></div></section>
+ <section id="page-statistics" class="page-panel" hidden><div class="section-head"><div><span class="eyebrow">АНАЛИТИКА КЛИНИКИ</span><h1>Работа ассистента</h1><p class="muted">Активность, качество выполнения и расходы — в одном месте</p></div><label>Период статистики и ошибок<select id="period"><option value="today">Сегодня · UTC</option><option value="week">7 дней · UTC</option><option value="month">30 дней · UTC</option></select></label></div>
+ <div class="card stats-primary"><div class="block-heading"><h2>Обращения за период</h2><span class="section-tag">ВЫПОЛНЕНИЕ</span></div><div id="periodOverview" class="kpi-grid"></div><p class="muted">Обращения включают действия виджета. Один вопрос может потребовать несколько вызовов модели. Ошибки — неудавшиеся обращения, без частичных ошибок ответа.</p></div>
+ <div class="card stats-costs"><div class="block-heading"><div><h2>Модели и расходы</h2><p class="muted">Фактический объём токенов · расчётная стоимость</p></div><span class="section-tag">РЕСУРСЫ</span></div><div id="costs"></div></div>
+ <div class="card stats-lifetime"><div class="block-heading"><h2>Накопленные результаты</h2><span class="section-tag">ВСЁ ВРЕМЯ</span></div><div id="overview" class="kpi-grid"></div></div>
+ <div class="card stats-journey"><div class="block-heading"><h2>От открытия до заявки</h2><span class="section-tag">ПУТЬ ПОСЕТИТЕЛЯ</span></div><p class="muted">За выбранный период. Счётчики загрузок виджета с действием, не уникальных людей. «Отправлено» — подтверждение почтового транспорта, не прочтение письма.</p><div id="funnel"></div></div>
+ <div class="card"><details id="eventExplorer"><summary>Технические метрики обращений</summary><div id="events"></div><button id="moreEvents" hidden>Ещё события</button></details></div>
+ </section>
+ <section id="page-applications" class="page-panel" hidden><h1>Заявки</h1><p class="muted">За всё время · без имён, телефонов и пожеланий. Повторная отправка отключена.</p><div class="card"><div id="leads"></div><button id="moreLeads" hidden>Ещё заявки</button><details><summary>Что означают статусы</summary><p>Отправлено — почтовый транспорт подтвердил отправку. Демо — тест без доставки. Не отправлено — зафиксирован сбой. Нет подтверждения — результат доставки неизвестен. Ожидает — окончательный результат ещё не сохранён.</p></details></div></section>
+ </main>
+</div>
+<script src="{{ url_for('static', filename='dashboard.js') }}?v=workspace-visual-3" defer></script>
+</body></html>

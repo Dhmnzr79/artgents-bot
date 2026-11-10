@@ -4,10 +4,7 @@ doc_type: faq
 topic: implantation
 subtopic: safety
 
-aliases:
-  - "безопасна ли имплантация"
-  - "риск заражения при имплантации"
-
+aliases: []
 cta_key: consult
 cta_action: lead
 

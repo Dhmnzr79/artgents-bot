@@ -4,12 +4,7 @@ doc_type: info
 topic: clinic
 subtopic: advantages
 
-aliases:
-  - "преимущества клиники"
-  - "почему наша клиника"
-  - "надёжная клиника"
-  - "рейтинг клиники"
-
+aliases: []
 cta_key: booking
 cta_action: lead
 ---

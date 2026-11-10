@@ -19,6 +19,7 @@ const panel=new Element('section');
 const load=source=>import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 globalThis.document={createElement:tag=>new Element(tag)};
 let source=fs.readFileSync('static/widget/catalog.js','utf8')
+ .replace("import { matchesCatalogSearch } from './catalog_search.js';", fs.readFileSync('static/widget/catalog_search.js','utf8').replace('export function', 'function'))
  .replace("import { createWidgetIcon } from './icons.js';","const createWidgetIcon=()=>document.createElement('svg');")
  .replace("import { renderPriceBody } from './price_card.js';","const renderPriceBody=(root)=>root.append(document.createElement('article'));");
 const {mountCatalog}=await load(source);
@@ -30,7 +31,14 @@ const root=new Element('div'),asked=[],applied=[];
 const catalog=mountCatalog(root,{apiBase:'',clientId:'demo_medical',onAsk:name=>asked.push(name),onApply:(selection,mount)=>applied.push({selection,mount})});
 const walk=n=>[n,...n.children.flatMap(walk)];
 const find=(text)=>{const result=walk(root).find(n=>n.tagName==='button'&&n.textContent===text);assert(result,'missing '+text);return result;};
-await catalog.load();find('ЛОРОписание').click();find(service.name+'1000 ₽Подробности').click();
+await catalog.load();
+const search=walk(root).find(n=>n.tagName==='input');
+search.value='консульатция';search.listeners.input();
+find(service.name+'1000 ₽Подробности');
+search.value='несуществующаяуслуга';search.listeners.input();
+assert(root.textContent.includes('Ничего не найдено'));
+search.value='';search.listeners.input();
+find('ЛОРОписание').click();find(service.name+'1000 ₽Подробности').click();
 panel.scrollTop=146;const nodes=[...root.children];
 find('Задать вопрос об услуге').click();assert.deepEqual(asked,[service.name]);
 assert.deepEqual(root.children,nodes);assert.equal(panel.scrollTop,146);

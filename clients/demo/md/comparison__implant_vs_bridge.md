@@ -4,10 +4,7 @@ doc_type: comparison
 topic: implantation
 subtopic: implant_vs_bridge
 
-aliases:
-  - "мост или имплант"
-  - "чем мост отличается от импланта"
-
+aliases: []
 suggest_h3:
   - esli-net-odnogo-zuba
   - kogda-chashche-vybirayut-implant

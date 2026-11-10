@@ -1,0 +1,651 @@
+{
+  "date": "2026-11-09",
+  "branch": "codex/three-tabs-catalog",
+  "head": "27e78ff615aea60340cca97c54deb9f16127c5f5",
+  "scope": "Only Demo MD aliases; no runtime/source text/catalog changes",
+  "files": [
+    {
+      "path": "clients/demo/md/clinic__info__advantages.md",
+      "before_alias_count": 4,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 908,
+      "after_characters_lf": 812,
+      "before_sha256": "b12261a1e6e82462fe17a67ccfa126a982e9300fae47e871808e785739d1d2ee",
+      "after_sha256": "ec5b5d0254d49a312a353088f4243b6bcade32290cb45fab2a35341442ae25c1"
+    },
+    {
+      "path": "clients/demo/md/clinic__info__consultation.md",
+      "before_alias_count": 7,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1085,
+      "after_characters_lf": 867,
+      "before_sha256": "395d38e0aadb4372f59a06be6ef57f353b950d2ce154ec8218edb5aa335e1322",
+      "after_sha256": "b8c2ea2d9c82a0c7a99a85fb35d4b98979f2d1106cda5082f9688387fd1ea3f1"
+    },
+    {
+      "path": "clients/demo/md/clinic__info__contacts.md",
+      "before_alias_count": 6,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 372,
+      "after_characters_lf": 269,
+      "before_sha256": "aeb007bd7973c636d27313181f71cffc81b97d8f8d43d88f366021e5f8aec941",
+      "after_sha256": "90095bd180ff3f2be3547670ca68cd1f7db50349960931aad879f6809f92082a"
+    },
+    {
+      "path": "clients/demo/md/clinic__info__first_visit.md",
+      "before_alias_count": 1,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1471,
+      "after_characters_lf": 1439,
+      "before_sha256": "9439977efc6921ca3d60292783f1c5d8d0d2c4591046af2fafce6b1a4a493df7",
+      "after_sha256": "80421d9899d08325f8e5d724089a9a19fdbc9da0c8c67f294770315610fcfceb"
+    },
+    {
+      "path": "clients/demo/md/clinic__info__payment_terms.md",
+      "before_alias_count": 9,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1192,
+      "after_characters_lf": 971,
+      "before_sha256": "ad8d8393cf13877d5de65ca303a67d0948a7e1666c4882d0af624babfcd204fc",
+      "after_sha256": "9b4afdc3a46ffa8854462557d3b0e43549eda83268a4c77692ee37f42dc3a373"
+    },
+    {
+      "path": "clients/demo/md/clinic__info__policies.md",
+      "before_alias_count": 4,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 2147,
+      "after_characters_lf": 2058,
+      "before_sha256": "494270028c46dc12f3d1753e26fca684b716b8b6c31666180ed5081bac6fa861",
+      "after_sha256": "aed0ced89a711362399cfbf366c012a63ac7041943f54ad5dbea6bf6a03f050a"
+    },
+    {
+      "path": "clients/demo/md/clinic__info__promo__free_implant_consult.md",
+      "before_alias_count": 2,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 766,
+      "after_characters_lf": 689,
+      "before_sha256": "76256d8bb41d06f88480270532381b5f568b78a5cdcb91e7981041f377da924b",
+      "after_sha256": "aeaa2e7e197ff74212cdc84d7d68521f425c752aa1cce368753edaceadd63e06"
+    },
+    {
+      "path": "clients/demo/md/clinic__info__promo__implant_same_day_discount.md",
+      "before_alias_count": 3,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 704,
+      "after_characters_lf": 608,
+      "before_sha256": "0bf54198cc96889aa23152a4389f827ce14a2f4ccd0035b6cf7b2bc6540e60d1",
+      "after_sha256": "528c71e08d6817792b21f08a506dc4592a8d12fb11fd8cf6e61aade75d85a0a0"
+    },
+    {
+      "path": "clients/demo/md/clinic__info__promo__professional_whitening_discount.md",
+      "before_alias_count": 3,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 702,
+      "after_characters_lf": 605,
+      "before_sha256": "84c22cf9ad3e83ea512e81f4827397984fae7ccc68375ece3288c814f24cd1dc",
+      "after_sha256": "cf56972133db66f4af9c29dc59f8ea14b0c72a1cd5c142a5ed5cbae6d440f005"
+    },
+    {
+      "path": "clients/demo/md/clinic__info__results.md",
+      "before_alias_count": 2,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 605,
+      "after_characters_lf": 550,
+      "before_sha256": "09a53a0933678bcf38c9d85779be3ae065e2f5c246e90e9bb3be626c36ae8f06",
+      "after_sha256": "8e52242b6dc312a28cf4501f6b85f357ab8bc9d9956e419ff7c38947ce05237c"
+    },
+    {
+      "path": "clients/demo/md/clinic__info__technology.md",
+      "before_alias_count": 7,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1670,
+      "after_characters_lf": 1477,
+      "before_sha256": "49273c70ff7ead660d514c1208ed2dd9d16640b447d5aba8c31875ebd5be493b",
+      "after_sha256": "2b43a1f908178f38f7fd58f4e243227d79bfabccb3ceb8e9f30431afb36c5609"
+    },
+    {
+      "path": "clients/demo/md/clinic__info__warranty.md",
+      "before_alias_count": 2,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1686,
+      "after_characters_lf": 1640,
+      "before_sha256": "27f17b5234685a9ba1eaf4534f0ee9960fa9b3b4032cc9e453a6f72eb0ae2a11",
+      "after_sha256": "5b8468556f56e3ac4533f45f5325d3b654913b248fcb7abdaa26ee00434d0bb7"
+    },
+    {
+      "path": "clients/demo/md/comparison__all_on_4_vs_all_on_6.md",
+      "before_alias_count": 6,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 2086,
+      "after_characters_lf": 1868,
+      "before_sha256": "b46dbc17fdc39941f2eca61a5538e760164236f9b3474b3289afd69c686a9429",
+      "after_sha256": "7c57314b1e2e78ec89f357da1e7751ee73ebd9f39b96eee74e16c5099ca7cac2"
+    },
+    {
+      "path": "clients/demo/md/comparison__bone_graft_vs_all_on_4.md",
+      "before_alias_count": 3,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 2241,
+      "after_characters_lf": 2127,
+      "before_sha256": "a71f8ef3d6866bdec68cfd01ce04217d42e6bb8c18012400e9d5e5a81a4eb5eb",
+      "after_sha256": "d1f6d3d7835fc349c68ed1fec0ff6d998114185ff7f987188f219a717651b9c3"
+    },
+    {
+      "path": "clients/demo/md/comparison__bugel_prosthesis_vs_fixed_bridge.md",
+      "before_alias_count": 5,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1951,
+      "after_characters_lf": 1765,
+      "before_sha256": "06b8ac2759d94baee8438426e17961ca91e2639d98cbeb1bf6fac89407f931bb",
+      "after_sha256": "3d73b802747564be7d24478094c807bbce03d2c73e9b19bab9a6b537be060e9b"
+    },
+    {
+      "path": "clients/demo/md/comparison__classic_vs_one_stage.md",
+      "before_alias_count": 4,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 2094,
+      "after_characters_lf": 1923,
+      "before_sha256": "a99326e524fa0c3a1399976916b656fbdf1b736d51e5c9558d2ee2f2c4ef1438",
+      "after_sha256": "cf50f97e503323973348a3ea87c57889fc7a65fadcefbe9f37241aa1f1435ff0"
+    },
+    {
+      "path": "clients/demo/md/comparison__implant_vs_bridge.md",
+      "before_alias_count": 2,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1566,
+      "after_characters_lf": 1507,
+      "before_sha256": "9d1dcce09bb8eab75e1e251db04ee91abe76e7084695fdecb942da3bc2c6ba59",
+      "after_sha256": "52b3b32b5b5bc39bce44e115495a99ebb200adae918837b7ed84a704912c68c4"
+    },
+    {
+      "path": "clients/demo/md/diagnostics__service__tomography.md",
+      "before_alias_count": 3,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 785,
+      "after_characters_lf": 740,
+      "before_sha256": "7aabccfd3fa1d02fe50497ed6d259f53a011e039fec6a3d2c4741f3b79b55dd2",
+      "after_sha256": "5848b5d8b5ea2a0fccb474d79a627df4638d65726787ca13e3806478d386a205"
+    },
+    {
+      "path": "clients/demo/md/doctors__doctor__fedorova.md",
+      "before_alias_count": 4,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 869,
+      "after_characters_lf": 785,
+      "before_sha256": "1d0df596c146d21b1c92ee1744412739395b2036fc75d88584c3610dabd9b1a1",
+      "after_sha256": "46d49c2166526bf6448e139f2158fbf9c3350b27f8b2e8cc375ce37337671cf3"
+    },
+    {
+      "path": "clients/demo/md/doctors__doctor__grigoriev.md",
+      "before_alias_count": 3,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 804,
+      "after_characters_lf": 734,
+      "before_sha256": "c01d12384bf3f2095210b1bde569b7809454a0b893241e462a488e020ec32228",
+      "after_sha256": "7a2eb70b75c9a2d61b04ae7a761c233c26027dbd21bff7e426117c940ae8753c"
+    },
+    {
+      "path": "clients/demo/md/doctors__doctor__kuznetsov.md",
+      "before_alias_count": 3,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1195,
+      "after_characters_lf": 1131,
+      "before_sha256": "d0f651dc73c4aef79ec611098480bec6dfd83268f6c0b6d019faa471923d24ea",
+      "after_sha256": "70fa48e3ca0c228296e4bf57a6183a2560f1a2f1986c8971ea499cae5a3baa0b"
+    },
+    {
+      "path": "clients/demo/md/doctors__doctor__morozova.md",
+      "before_alias_count": 3,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 776,
+      "after_characters_lf": 714,
+      "before_sha256": "68b026ea700cc9bcddcf0a91d5e0b724198c37bfb5da72fcae9b7e5ce71084fe",
+      "after_sha256": "04250d2d4fe191e516b4d97108199629d92892776cf7f1c2d5cc6b26206d6b22"
+    },
+    {
+      "path": "clients/demo/md/doctors__doctor__orlov.md",
+      "before_alias_count": 3,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 970,
+      "after_characters_lf": 912,
+      "before_sha256": "e842ba852f6d467629927cc8752f6c9cf7bc995fec74d0b839c8ec2d7c2ecebe",
+      "after_sha256": "5d8a752c0ea698e76fb48df413188b182a7a37dcfbc6554fefc85ca908b60c07"
+    },
+    {
+      "path": "clients/demo/md/doctors__doctor__overview.md",
+      "before_alias_count": 4,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 842,
+      "after_characters_lf": 746,
+      "before_sha256": "5aaee7ada607515a10b59c79f1da9db58df62a77e34230758f6f25a243476d83",
+      "after_sha256": "e9309350734ad96a1faf81a5d7e5e856957d1a56afc8cbfcb1a299bcf16b8550"
+    },
+    {
+      "path": "clients/demo/md/doctors__doctor__volkov.md",
+      "before_alias_count": 4,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1140,
+      "after_characters_lf": 1055,
+      "before_sha256": "bb3d45b4727ee0aad49925d7bb5899223189df41e38cff193d74458d3b832209",
+      "after_sha256": "71c1df56f4c991454afe2eb5c2511d7d45b3d8e659dc97f77e130aee1d4b83d6"
+    },
+    {
+      "path": "clients/demo/md/extraction__service__tooth_extraction.md",
+      "before_alias_count": 6,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1842,
+      "after_characters_lf": 1717,
+      "before_sha256": "75231bdcfafe4a8ccbb6afe8ecf14b5067e7020ab7565088325fbaa7aa7af586",
+      "after_sha256": "6acfd0a167246ed422bbe35a717d640a2426bf85c506f63659493ac290629710"
+    },
+    {
+      "path": "clients/demo/md/implantation__faq__cost.md",
+      "before_alias_count": 6,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1421,
+      "after_characters_lf": 1198,
+      "before_sha256": "00cc0e567af17f1952431f4ddca0f8601adc6152a238a362f4d7f2c4b13deabd",
+      "after_sha256": "7e693d1ed63c9e72d7b1e91ead74f2944b89f41bc08e71298058153075849404"
+    },
+    {
+      "path": "clients/demo/md/implantation__faq__duration.md",
+      "before_alias_count": 5,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 2158,
+      "after_characters_lf": 1982,
+      "before_sha256": "df499b372d071f0502b1fe95444e1c85eee5b3fc305267a3add312b5692cb32c",
+      "after_sha256": "a0e8fd0ede666219eaadef256c6604e115f954d82963f8e58e94db71e28ddce0"
+    },
+    {
+      "path": "clients/demo/md/implantation__faq__osseointegration.md",
+      "before_alias_count": 4,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1915,
+      "after_characters_lf": 1803,
+      "before_sha256": "07790e41bd58a58be6ad70caaf767f2b2fbcf5bff5f2dfc85ad9cee5147c3c94",
+      "after_sha256": "fbc956684e3773d28aff87db6cec77f3e4f7fc98f6106e8cc030edb3e82d2422"
+    },
+    {
+      "path": "clients/demo/md/implantation__faq__pain.md",
+      "before_alias_count": 3,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 2398,
+      "after_characters_lf": 2300,
+      "before_sha256": "eec001b6d126e7ad3cc7bcd0b174334d19bcb953e5a48fa2c9280f9f94730bfa",
+      "after_sha256": "29f60f8b22ca3533ec401cb57b83ac9c1d00f10b3c333804d951cd463ceb7fae"
+    },
+    {
+      "path": "clients/demo/md/implantation__faq__safety.md",
+      "before_alias_count": 2,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 850,
+      "after_characters_lf": 784,
+      "before_sha256": "d5ffaf62953f68b8d46df227eb47f6c26967a7e51062239cffae6de51611a0f7",
+      "after_sha256": "97b19ae702ab32d6aa9a8d38d022936e01768f3ec921a2d8d75c0e1b9ba57baf"
+    },
+    {
+      "path": "clients/demo/md/implantation__faq__tooth_loss.md",
+      "before_alias_count": 3,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 713,
+      "after_characters_lf": 648,
+      "before_sha256": "be1179fc22a167facf1141c5c01a95b1c92e0d639b782b67f51cc3142930447f",
+      "after_sha256": "5b785b75ca763e58e4e984fdaefbcae10fc5de7c5a195f1b63a42de6c99cb7dc"
+    },
+    {
+      "path": "clients/demo/md/implantation__faq__tooth_one_day.md",
+      "before_alias_count": 4,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 908,
+      "after_characters_lf": 771,
+      "before_sha256": "dd87a10f43e147ec44c244f5de7866f8e27264286dc96a309801995f6b6951dd",
+      "after_sha256": "c6398564d4c5173b66c3176704dfa855e19b10cb731f95374ed46b5a6d056782"
+    },
+    {
+      "path": "clients/demo/md/implantation__faq__what_included.md",
+      "before_alias_count": 2,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1771,
+      "after_characters_lf": 1700,
+      "before_sha256": "5b3ed42f7141cbfbd739f721a3f7b07d1e48d40203b359f8902f569859b4a808",
+      "after_sha256": "b4fd65161cec2a6d2d7bc4b312bfefea77ce208d2bbc9ddd0291e1d373a684eb"
+    },
+    {
+      "path": "clients/demo/md/implantation__info__aftercare.md",
+      "before_alias_count": 3,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1491,
+      "after_characters_lf": 1390,
+      "before_sha256": "f61056efde2096f4520cbf293f06d39631382eea45eaccb33692374ac44e886e",
+      "after_sha256": "8647d4c77ff956cafac2352f47ba3a3247b767fbdeac2d67d773cc3f8745d002"
+    },
+    {
+      "path": "clients/demo/md/implantation__info__contraindications.md",
+      "before_alias_count": 3,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 2240,
+      "after_characters_lf": 2122,
+      "before_sha256": "b941768e85bc51b85b6d4af0202484e267f39315444a9e406732052decd8b527",
+      "after_sha256": "9432362116136de39bed9cd750a8e3e3a9741d0d4f7ac7a962edfa9138f00dc4"
+    },
+    {
+      "path": "clients/demo/md/implantation__info__curator.md",
+      "before_alias_count": 4,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 705,
+      "after_characters_lf": 595,
+      "before_sha256": "57ff8b346295e53d0a064f5105f224b3e9d7d88568a15bf07237601b8adf580b",
+      "after_sha256": "7192949b378093760dc7c9ecdc525ab7d52b0d0db94a0bc188be47568d2a8f29"
+    },
+    {
+      "path": "clients/demo/md/implantation__info__implant_systems.md",
+      "before_alias_count": 4,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1526,
+      "after_characters_lf": 1425,
+      "before_sha256": "3bb4b948dab3321c1c7259d22dee744e1adb918869d5b4d8bef5da95ec9fd594",
+      "after_sha256": "887c5235799adb1e2625b52e53074d625ff79365877df177177fc94536df1e71"
+    },
+    {
+      "path": "clients/demo/md/implantation__info__methods_overview.md",
+      "before_alias_count": 4,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1839,
+      "after_characters_lf": 1697,
+      "before_sha256": "911b065600d08861cc9e20260587c228cff69eb5018d95905a7659d97564c20c",
+      "after_sha256": "0abfcc515ca01797da5f8a51b112d2caf64add32adc8cc714d3333889867dbb4"
+    },
+    {
+      "path": "clients/demo/md/implantation__info__steps.md",
+      "before_alias_count": 5,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1491,
+      "after_characters_lf": 1308,
+      "before_sha256": "6df7597912e77008f1f3e1193ae1528cde370dcd8f52b75b1dd43634685c29ae",
+      "after_sha256": "6bbea167c33b523e957c474b97834c9a216ad565bc8f7d895faee5fccc79a274"
+    },
+    {
+      "path": "clients/demo/md/implantation__service__all_on_4.md",
+      "before_alias_count": 2,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1796,
+      "after_characters_lf": 1732,
+      "before_sha256": "377fa4b1e9a000f48f868cae180c6b0a4730c59e15be586c998d6c239439a04f",
+      "after_sha256": "b8b25b89e203ef0a0800d697034aa2359d12512a0c44b5c49b4fb4fe9e943244"
+    },
+    {
+      "path": "clients/demo/md/implantation__service__all_on_6.md",
+      "before_alias_count": 2,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1806,
+      "after_characters_lf": 1752,
+      "before_sha256": "4015308fb5f6d21248c816af6abe204cd9686f4fa0345ec5b3e1ceb92d91cf2b",
+      "after_sha256": "85f44b57edf64167645355a263db0103a9e12482818bdd114fe626fe424a9f00"
+    },
+    {
+      "path": "clients/demo/md/implantation__service__benefits.md",
+      "before_alias_count": 1,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 849,
+      "after_characters_lf": 826,
+      "before_sha256": "33f8c9d8611b77037ea183cc9be399f547967401cbaf0587422a44f872c6e3b9",
+      "after_sha256": "5cc9982cbddae530ae0686defc7029ce1688745d2639175b966394f36eeae3b3"
+    },
+    {
+      "path": "clients/demo/md/implantation__service__bone_graft.md",
+      "before_alias_count": 5,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1943,
+      "after_characters_lf": 1751,
+      "before_sha256": "b2f25fa227481db9ae6120d9137194eb5f0b1b9a1adc7b5429e20648edd67b13",
+      "after_sha256": "02a374a508d2f8f0a75e9efa4bd40df5f6234b44aecd87d6dfddffe9d94a535c"
+    },
+    {
+      "path": "clients/demo/md/implantation__service__classic.md",
+      "before_alias_count": 2,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1468,
+      "after_characters_lf": 1408,
+      "before_sha256": "e410994a42a5d7d3da104348c01d038c22624ef1fae9690092e09f7aa7c2b97f",
+      "after_sha256": "a924ac776418a7b27601a6cc7d98b8693b6048d24a07ffcc183a2742286cf253"
+    },
+    {
+      "path": "clients/demo/md/implantation__service__one_stage.md",
+      "before_alias_count": 2,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1351,
+      "after_characters_lf": 1277,
+      "before_sha256": "e5c2db25a066452ccca6448048b58f10abf71420cd45f0540c8b951e2e5d21c2",
+      "after_sha256": "34f1d21af88f949a40666ff211a1bdb4e11b16c6ab52b894d00d6a9a13069837"
+    },
+    {
+      "path": "clients/demo/md/implantation__service__pterygoid_implants.md",
+      "before_alias_count": 4,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1595,
+      "after_characters_lf": 1469,
+      "before_sha256": "35657d2fe3c93d56da0f65e351be7571db1c7f160e4f00be7625596250df11fd",
+      "after_sha256": "d484fb2aa90500f6b85e4e1bb6ecec586945edff914d2e57b31374132b185de7"
+    },
+    {
+      "path": "clients/demo/md/implantation__service__sinus_lift.md",
+      "before_alias_count": 2,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1884,
+      "after_characters_lf": 1814,
+      "before_sha256": "b42c98887dd7ea1e3fdee34f24e2fa9d0e5ea523406b87e78d6792d908e04816",
+      "after_sha256": "c08df46859062ca67d21156ad8d1771c352a421c701b3868a332bd6fc4adc80f"
+    },
+    {
+      "path": "clients/demo/md/implantation__service__temporary_teeth.md",
+      "before_alias_count": 6,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1891,
+      "after_characters_lf": 1675,
+      "before_sha256": "7b794706df537c16a1ae024d15187ab9b3b1fba97abe29297362a696b07c1149",
+      "after_sha256": "edfbca577e54615461e1ba9fb797a21ee9aaedd8e7553ac26fb85c4c0991c9d6"
+    },
+    {
+      "path": "clients/demo/md/implantation__service__zygomatic_implants.md",
+      "before_alias_count": 7,
+      "after_alias_count": 2,
+      "retained_aliases": [
+        "зигоматические импланты",
+        "zygomatic implants"
+      ],
+      "before_characters_lf": 1768,
+      "after_characters_lf": 1584,
+      "before_sha256": "a67ccf2ef835dbfc634895c072e4247f060ba7f144c1308d0be062f1ccd78ac2",
+      "after_sha256": "e069bd1f55e2fabef5397ced5fdd93fdf838b4dc9f70856c0f7968c0dc245256"
+    },
+    {
+      "path": "clients/demo/md/orthodontics__service__aligners.md",
+      "before_alias_count": 4,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1522,
+      "after_characters_lf": 1441,
+      "before_sha256": "e94574ea5480a15866e171decfe7f630bfed8f25572c38ba51ee2beddb7ed615",
+      "after_sha256": "57ac7c4bb18dee6e5e26ff2a080675da35600fdd4d7c51329aeb4d4d0776963d"
+    },
+    {
+      "path": "clients/demo/md/periodontology__service__periodontitis.md",
+      "before_alias_count": 7,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 873,
+      "after_characters_lf": 726,
+      "before_sha256": "ab1987579c50c479117b95e40971a5907374d79073934aeaaa16f5119596ddc1",
+      "after_sha256": "54d481986e019a20229ce16bb49ead3cfbb0cde804c19fb475a70cae0d3644ef"
+    },
+    {
+      "path": "clients/demo/md/prosthetics__service__clasp_dentures.md",
+      "before_alias_count": 4,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1321,
+      "after_characters_lf": 1222,
+      "before_sha256": "674ecdff3ea8baba221cd32f7f6328d60529e6336d07247bb061212ca1d16fe4",
+      "after_sha256": "1a6ebe0e106cc134d48143b06216f4151a304127c59d6aaeb857cb5cdf058560"
+    },
+    {
+      "path": "clients/demo/md/prosthetics__service__implant_supported_prosthetics.md",
+      "before_alias_count": 6,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1794,
+      "after_characters_lf": 1614,
+      "before_sha256": "64530fe6e0e114608d307298859c3422b0f1b5bc80e4bbf63c00ea4ec897fece",
+      "after_sha256": "9396387739c59b8357e6be5dc5cdc97ffd8260c9b9f05bab431cbeaa3a2e6f70"
+    },
+    {
+      "path": "clients/demo/md/prosthetics__service__removable_dentures.md",
+      "before_alias_count": 8,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1651,
+      "after_characters_lf": 1459,
+      "before_sha256": "f6ac6d1b74ee0e78cac699944cb4c98326bb812f63f89166bb61b7960d6c9396",
+      "after_sha256": "b0dcf57d67d73e55353cf60c08e107751bd6a8cf37f0ecefb93c593ba25f5036"
+    },
+    {
+      "path": "clients/demo/md/prosthetics__service__veneers.md",
+      "before_alias_count": 2,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1243,
+      "after_characters_lf": 1198,
+      "before_sha256": "485a08899e2fe0aad81d8fa744cdf56b36a0c8a3d1644d4c7aebae476a4fd377",
+      "after_sha256": "0fd8ca359d3fc5565ed0c94c01bc967c3ecd5f074176c3c45915cce7aae837df"
+    },
+    {
+      "path": "clients/demo/md/prosthetics__service__zirconia_crowns.md",
+      "before_alias_count": 6,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1701,
+      "after_characters_lf": 1541,
+      "before_sha256": "a57a4a4201f2f343e811a09cd96711aff3b643a5920fea5223b7b84e35fcd11d",
+      "after_sha256": "65bc05ca3d9b9a8132c18f1820867bedffacc0f930dbf6f2793c5dd4d5e80393"
+    },
+    {
+      "path": "clients/demo/md/treatment__service__caries.md",
+      "before_alias_count": 7,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1039,
+      "after_characters_lf": 869,
+      "before_sha256": "977ce4eee785b0c98a48b9df0b0a48bea5ce4f346d263e5508456df55a1d5c8e",
+      "after_sha256": "d2bfed7d67c3df06d8e09c438c000ebe33704c11cb57001d8e62ad5b2efb9aa8"
+    },
+    {
+      "path": "clients/demo/md/treatment__service__pulpitis.md",
+      "before_alias_count": 6,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 843,
+      "after_characters_lf": 726,
+      "before_sha256": "77ccc6105a70b8d6a9666c9e73091538106bcff5f415a0b5f20ee398496313cf",
+      "after_sha256": "ef18b3372c3c5bdadf9ca3b35835b06c8338d9663e73eeada2b8cef21a7454e2"
+    },
+    {
+      "path": "clients/demo/md/treatment__service__teeth_treatment.md",
+      "before_alias_count": 3,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1311,
+      "after_characters_lf": 1228,
+      "before_sha256": "e7a85d8475426063d43f60267a22fe2584717084dbe919d23b5854669fd49ffd",
+      "after_sha256": "acb99931e8f649a12ec02ff85363e84e383490e578cd2f36606e8d097a805c06"
+    },
+    {
+      "path": "clients/demo/md/whitening__service__teeth_whitening.md",
+      "before_alias_count": 5,
+      "after_alias_count": 0,
+      "retained_aliases": [],
+      "before_characters_lf": 1829,
+      "after_characters_lf": 1720,
+      "before_sha256": "f1bcbd6a6529bf8025280df57127c6298a8f435ccd851c0055d4e0dac63613e1",
+      "after_sha256": "c781d956fc59e88ffda99be3de996c762cc6fef21138f5ec7258949353fbf3a0"
+    }
+  ],
+  "before_aliases": 246,
+  "after_aliases": 2,
+  "corpus_characters_before": 94360,
+  "corpus_characters_after": 87190,
+  "checks": {
+    "all_other_model_view_fields_equal": true,
+    "public_widget_catalog_equal_except_version": true,
+    "authored_refs_valid": true,
+    "non_md_files_equal_baseline": true
+  },
+  "lint_before": [],
+  "lint_after": [],
+  "provider_calls": 0,
+  "token_counts": null,
+  "live_quality": "not_tested",
+  "verification": {
+    "checker": "PASS: structural scope only",
+    "pytest": {
+      "passed": 11,
+      "failed": 6,
+      "baseline_same_failures": true,
+      "suites": [
+        "test_content_linter.py",
+        "test_d2_tenant_snapshot.py",
+        "test_d2_snapshot_sources.py"
+      ]
+    },
+    "live_model_quality": "not tested",
+    "exact_tokens": "not measured"
+  }
+}

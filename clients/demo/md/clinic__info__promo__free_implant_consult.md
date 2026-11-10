@@ -4,10 +4,7 @@ doc_type: info
 topic: clinic
 subtopic: promotions
 
-aliases:
-  - "акция бесплатная консультация"
-  - "бесплатная консультация имплантолога"
-
+aliases: []
 cta_key: booking
 cta_action: lead
 ---

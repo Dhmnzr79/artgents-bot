@@ -4,11 +4,7 @@ doc_type: faq
 topic: implantation
 subtopic: pain
 
-aliases:
-  - "больно ли ставить имплант"
-  - "страшно ли делать имплантацию"
-  - "анестезия при имплантации"
-
+aliases: []
 suggest_h3:
   - kakuyu-anesteziyu-ispolzuyut
   - chto-chuvstvuetsya-posle-ustanovki

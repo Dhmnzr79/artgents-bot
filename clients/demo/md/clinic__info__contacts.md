@@ -4,14 +4,7 @@ doc_type: contacts
 topic: clinic
 subtopic: contacts
 
-aliases:
-  - "адрес клиники"
-  - "часы работы"
-  - "парковка"
-  - "телефон клиники"
-  - "как доехать"
-  - "метро"
-
+aliases: []
 cta_key: callback
 cta_action: lead
 ---

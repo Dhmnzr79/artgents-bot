@@ -4,14 +4,7 @@ doc_type: service
 topic: prosthetics
 subtopic: zirconia_crowns
 
-aliases:
-  - "коронка на зуб"
-  - "зубная коронка"
-  - "поставить коронку"
-  - "циркониевая коронка"
-  - "коронка из диоксида циркония"
-  - "восстановить разрушенный зуб"
-
+aliases: []
 suggest_h3:
   - kogda-stavyat-koronku
   - koronka-na-implant

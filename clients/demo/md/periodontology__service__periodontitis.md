@@ -4,15 +4,7 @@ doc_type: service
 topic: periodontology
 subtopic: periodontitis
 
-aliases:
-  - "парадонтит"
-  - "лечение пародонтоза"
-  - "пародонтоз"
-  - "болят десны"
-  - "кровоточат десны"
-  - "шатаются зубы"
-  - "оголились корни зубов"
-
+aliases: []
 cta_key: plan
 cta_action: lead
 

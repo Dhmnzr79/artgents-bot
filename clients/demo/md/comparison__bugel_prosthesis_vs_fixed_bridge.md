@@ -4,13 +4,7 @@ doc_type: comparison
 topic: prosthetics
 subtopic: bugel_prosthesis_vs_fixed_bridge
 
-aliases:
-  - "бюгельный протез или мост"
-  - "бюгель или мост"
-  - "что лучше бюгельный протез или мост"
-  - "съемный бюгельный или несъемный протез"
-  - "чем бюгельный протез отличается от моста"
-
+aliases: []
 suggest_h3:
   - esli-net-neskolkih-zubov
   - kogda-chashche-vybirayut-byugelnyy-protez

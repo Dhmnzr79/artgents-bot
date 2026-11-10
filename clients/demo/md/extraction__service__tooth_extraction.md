@@ -5,14 +5,7 @@ topic: extraction
 subtopic: tooth_extraction
 aspect: duration
 
-aliases:
-  - "удалить зуб"
-  - "вырвать зуб"
-  - "удаление зуба мудрости"
-  - "сложное удаление"
-  - "зуб не спасти"
-  - "зуб разрушен"
-
+aliases: []
 suggest_h3:
   - bolno-li-udalyat-zub
   - chto-posle-udaleniya

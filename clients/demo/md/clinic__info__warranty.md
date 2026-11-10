@@ -4,10 +4,7 @@ doc_type: info
 topic: clinic
 subtopic: warranty
 
-aliases:
-  - "гарантия на лечение"
-  - "гарантия нобель"
-
+aliases: []
 suggest_h3:
   - chto-delat-esli-voznikla-problema
   - pochemu-garantiya-na-rabotu-vracha-1-god

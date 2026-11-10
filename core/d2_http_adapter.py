@@ -13,7 +13,7 @@ from core.d2_admin_metrics import observe_request
 from core.d2_dialogue import run_d2_dialogue_turn
 from core.d2_dialogue_store import D2DialogueStore, D2RequestIdConflict, D2RequestInProgress
 from core.d2_live_provider import D2HttpProvider
-from core.d2_demo_limits import admit_demo_call
+from core.d2_demo_limits import reserve_demo_call, DEMO_CLIENTS
 from core.d2_usage_limits import ClientUsageAdmission, load_usage_limits, visitor_bucket
 from core.d2_tenant_snapshot import d2_clients_root
 from session import (
@@ -110,9 +110,10 @@ def run_d2_ask_json(data: dict, *, client_id: str, peer_ip: str | None = None) -
             turn = run_d2_dialogue_turn(
                 session_key=key,
                 user_message=user_message,
-                provider=D2HttpProvider(admission=lambda: admit_demo_call(
-                    store._connection, sid=sid, peer_ip=peer_ip,client_id=client_id,
-                )) if client_id in {"demo","demo_medical"} else D2HttpProvider(admission=usage.model if usage else None),
+                provider=D2HttpProvider(admission=lambda: reserve_demo_call(
+                    sid=sid, request_id=request_id, visitor_id=data.get("visitor_id"),
+                    peer_ip=peer_ip, client_id=client_id,
+                )) if client_id in DEMO_CLIENTS else D2HttpProvider(admission=usage.model if usage else None),
                 clients_root=d2_clients_root(),
                 store=store,
                 now=datetime.now(timezone.utc),

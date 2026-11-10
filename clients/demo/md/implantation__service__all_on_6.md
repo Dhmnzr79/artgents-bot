@@ -4,10 +4,7 @@ doc_type: service
 topic: implantation
 subtopic: all_on_6
 
-aliases:
-  - "протокол all-on-6"
-  - "зубной ряд на 6 имплантах"
-
+aliases: []
 suggest_h3:
   - komu-podhodit-all-on-6
   - kak-rabotaet-metod-all-on-6

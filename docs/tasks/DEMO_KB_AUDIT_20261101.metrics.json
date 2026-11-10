@@ -1,0 +1,3094 @@
+{
+  "method": "Offline injected transport, socket connections blocked. Synthetic cases; no provider tokenization. JSON size uses compact ensure_ascii=False encoding, not SDK HTTP byte claim. History fixture: 3 pairs, 20 repeated sentences per answer, not maximum history. Completion outcome is a synthetic fixture, not a validated real runtime result.",
+  "captures": {
+    "first_content": {
+      "serialized_request_characters": 132688,
+      "serialized_request_utf8_bytes": 192459,
+      "message_content_characters": 122842,
+      "messages": [
+        {
+          "role": "system",
+          "content_characters": 122155
+        },
+        {
+          "role": "user",
+          "content_characters": 687
+        }
+      ],
+      "tools_characters": 3023,
+      "tokens": null
+    },
+    "first_price": {
+      "serialized_request_characters": 132714,
+      "serialized_request_utf8_bytes": 192508,
+      "message_content_characters": 122868,
+      "messages": [
+        {
+          "role": "system",
+          "content_characters": 122155
+        },
+        {
+          "role": "user",
+          "content_characters": 713
+        }
+      ],
+      "tools_characters": 3023,
+      "tokens": null
+    },
+    "mixed": {
+      "serialized_request_characters": 132717,
+      "serialized_request_utf8_bytes": 192511,
+      "message_content_characters": 122871,
+      "messages": [
+        {
+          "role": "system",
+          "content_characters": 122155
+        },
+        {
+          "role": "user",
+          "content_characters": 716
+        }
+      ],
+      "tools_characters": 3023,
+      "tokens": null
+    },
+    "entry_page": {
+      "serialized_request_characters": 132826,
+      "serialized_request_utf8_bytes": 192597,
+      "message_content_characters": 122969,
+      "messages": [
+        {
+          "role": "system",
+          "content_characters": 122155
+        },
+        {
+          "role": "user",
+          "content_characters": 814
+        }
+      ],
+      "tools_characters": 3023,
+      "tokens": null
+    },
+    "known_document": {
+      "serialized_request_characters": 113935,
+      "serialized_request_utf8_bytes": 171022,
+      "message_content_characters": 108175,
+      "messages": [
+        {
+          "role": "system",
+          "content_characters": 107227
+        },
+        {
+          "role": "user",
+          "content_characters": 948
+        }
+      ],
+      "tools_characters": 2,
+      "tokens": null
+    },
+    "history_3_pairs": {
+      "serialized_request_characters": 136441,
+      "serialized_request_utf8_bytes": 198873,
+      "message_content_characters": 126523,
+      "messages": [
+        {
+          "role": "system",
+          "content_characters": 122155
+        },
+        {
+          "role": "user",
+          "content_characters": 4368
+        }
+      ],
+      "tools_characters": 3023,
+      "tokens": null
+    },
+    "synthetic_adverse_completion_1_tool_calls": {
+      "serialized_request_characters": 134075,
+      "serialized_request_utf8_bytes": 193869,
+      "message_content_characters": 123985,
+      "messages": [
+        {
+          "role": "system",
+          "content_characters": 122155
+        },
+        {
+          "role": "user",
+          "content_characters": 713
+        },
+        {
+          "role": "assistant",
+          "content_characters": 0
+        },
+        {
+          "role": "tool",
+          "content_characters": 75
+        },
+        {
+          "role": "user",
+          "content_characters": 1042
+        }
+      ],
+      "tools_characters": 3023,
+      "tokens": null
+    },
+    "synthetic_adverse_completion_2_tool_calls": {
+      "serialized_request_characters": 134303,
+      "serialized_request_utf8_bytes": 194097,
+      "message_content_characters": 124060,
+      "messages": [
+        {
+          "role": "system",
+          "content_characters": 122155
+        },
+        {
+          "role": "user",
+          "content_characters": 713
+        },
+        {
+          "role": "assistant",
+          "content_characters": 0
+        },
+        {
+          "role": "tool",
+          "content_characters": 75
+        },
+        {
+          "role": "tool",
+          "content_characters": 75
+        },
+        {
+          "role": "user",
+          "content_characters": 1042
+        }
+      ],
+      "tools_characters": 3023,
+      "tokens": null
+    }
+  },
+  "snapshot_diagnostics": [],
+  "baseline_hashes_match": true,
+  "frontmatter_field_document_counts": {
+    "doc_id": 61,
+    "doc_type": 61,
+    "topic": 61,
+    "subtopic": 61,
+    "aliases": 61,
+    "cta_key": 60,
+    "cta_action": 60,
+    "suggest_h3": 38,
+    "name_full": 6,
+    "name_short": 6,
+    "services": 6,
+    "position": 6,
+    "experience_years": 6,
+    "aspect": 5,
+    "video_key": 2
+  },
+  "frontmatter_field_raw_characters": {
+    "doc_id": 2510,
+    "doc_type": 1079,
+    "topic": 1149,
+    "subtopic": 1541,
+    "aliases": 8009,
+    "cta_key": 990,
+    "cta_action": 1118,
+    "suggest_h3": 3353,
+    "name_full": 234,
+    "name_short": 142,
+    "services": 576,
+    "position": 223,
+    "experience_years": 134,
+    "aspect": 98,
+    "video_key": 62
+  },
+  "md_variant_character_totals": {
+    "raw": 87255,
+    "no_aliases": 79246,
+    "no_ui_fields": 81732,
+    "no_aliases_or_ui": 73723,
+    "body_only_upper_bound": 65360
+  },
+  "md_files": [
+    {
+      "path": "clients/demo/md/clinic__info__advantages.md",
+      "raw_decoded_characters": 933,
+      "variant_characters": {
+        "raw": 933,
+        "no_aliases": 819,
+        "no_ui_fields": 899,
+        "no_aliases_or_ui": 785,
+        "body_only_upper_bound": 684
+      },
+      "aliases": [
+        "преимущества клиники",
+        "почему наша клиника",
+        "надёжная клиника",
+        "рейтинг клиники"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/clinic__info__consultation.md",
+      "raw_decoded_characters": 1113,
+      "variant_characters": {
+        "raw": 1113,
+        "no_aliases": 874,
+        "no_ui_fields": 1079,
+        "no_aliases_or_ui": 840,
+        "body_only_upper_bound": 735
+      },
+      "aliases": [
+        "бесплатная консультация",
+        "консультация стоматолога",
+        "консультация имплантолога",
+        "сколько стоит консультация имплантолога",
+        "план лечения если не буду лечиться",
+        "первый приём",
+        "запись к врачу"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/clinic__info__contacts.md",
+      "raw_decoded_characters": 394,
+      "variant_characters": {
+        "raw": 394,
+        "no_aliases": 271,
+        "no_ui_fields": 359,
+        "no_aliases_or_ui": 236,
+        "body_only_upper_bound": 135
+      },
+      "aliases": [
+        "адрес клиники",
+        "часы работы",
+        "парковка",
+        "телефон клиники",
+        "как доехать",
+        "метро"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/clinic__info__first_visit.md",
+      "raw_decoded_characters": 1504,
+      "variant_characters": {
+        "raw": 1504,
+        "no_aliases": 1457,
+        "no_ui_fields": 1398,
+        "no_aliases_or_ui": 1351,
+        "body_only_upper_bound": 1248
+      },
+      "aliases": [
+        "с чего начать лечение зубов"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "rasskazhite-pro-kliniku",
+        "kak-vybirayut-lechenie"
+      ]
+    },
+    {
+      "path": "clients/demo/md/clinic__info__payment_terms.md",
+      "raw_decoded_characters": 1222,
+      "variant_characters": {
+        "raw": 1222,
+        "no_aliases": 978,
+        "no_ui_fields": 1187,
+        "no_aliases_or_ui": 943,
+        "body_only_upper_bound": 836
+      },
+      "aliases": [
+        "рассрочка",
+        "рассрочка на имплантацию",
+        "оформление рассрочки",
+        "оплата по этапам",
+        "налоговый вычет",
+        "фиксированная стоимость",
+        "скрытые доплаты",
+        "договор на лечение",
+        "как оплатить лечение"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/clinic__info__policies.md",
+      "raw_decoded_characters": 2189,
+      "variant_characters": {
+        "raw": 2189,
+        "no_aliases": 2083,
+        "no_ui_fields": 2154,
+        "no_aliases_or_ui": 2048,
+        "body_only_upper_bound": 1953
+      },
+      "aliases": [
+        "принимаете детей",
+        "лечение по ОМС",
+        "лечение по ДМС",
+        "отсутствующие услуги"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "no_pediatric_dentistry",
+        "no_oms",
+        "no_dms",
+        "braces",
+        "brendy",
+        "otsutstvuyushchie-uslugi",
+        "utochneniya",
+        "osmotr"
+      ]
+    },
+    {
+      "path": "clients/demo/md/clinic__info__promo__free_implant_consult.md",
+      "raw_decoded_characters": 786,
+      "variant_characters": {
+        "raw": 786,
+        "no_aliases": 693,
+        "no_ui_fields": 752,
+        "no_aliases_or_ui": 659,
+        "body_only_upper_bound": 541
+      },
+      "aliases": [
+        "акция бесплатная консультация",
+        "бесплатная консультация имплантолога"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/clinic__info__promo__implant_same_day_discount.md",
+      "raw_decoded_characters": 725,
+      "variant_characters": {
+        "raw": 725,
+        "no_aliases": 612,
+        "no_ui_fields": 691,
+        "no_aliases_or_ui": 578,
+        "body_only_upper_bound": 455
+      },
+      "aliases": [
+        "скидка в день обращения",
+        "скидка 15 процентов на имплантацию",
+        "акция на имплантацию"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/clinic__info__promo__professional_whitening_discount.md",
+      "raw_decoded_characters": 723,
+      "variant_characters": {
+        "raw": 723,
+        "no_aliases": 609,
+        "no_ui_fields": 689,
+        "no_aliases_or_ui": 575,
+        "body_only_upper_bound": 446
+      },
+      "aliases": [
+        "скидка на отбеливание",
+        "акция на отбеливание зубов",
+        "скидка 10 процентов отбеливание"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/clinic__info__results.md",
+      "raw_decoded_characters": 605,
+      "variant_characters": {
+        "raw": 605,
+        "no_aliases": 538,
+        "no_ui_fields": 570,
+        "no_aliases_or_ui": 503,
+        "body_only_upper_bound": 416
+      },
+      "aliases": [
+        "можно посмотреть ваши работы",
+        "фото до и после"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3"
+      ],
+      "anchors": [
+        "korotko",
+        "posmotret-rezultaty"
+      ]
+    },
+    {
+      "path": "clients/demo/md/clinic__info__technology.md",
+      "raw_decoded_characters": 1708,
+      "variant_characters": {
+        "raw": 1708,
+        "no_aliases": 1494,
+        "no_ui_fields": 1592,
+        "no_aliases_or_ui": 1378,
+        "body_only_upper_bound": 1277
+      },
+      "aliases": [
+        "технологии клиники",
+        "цифровая имплантация",
+        "искусственный интеллект",
+        "своя лаборатория",
+        "зачем 3d-планирование",
+        "зачем 3d планирование",
+        "3d-планирование имплантации"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "kak-planiruetsya-implantatsiya",
+        "kak-povyshaetsya-tochnost"
+      ]
+    },
+    {
+      "path": "clients/demo/md/clinic__info__warranty.md",
+      "raw_decoded_characters": 1725,
+      "variant_characters": {
+        "raw": 1725,
+        "no_aliases": 1663,
+        "no_ui_fields": 1591,
+        "no_aliases_or_ui": 1529,
+        "body_only_upper_bound": 1432
+      },
+      "aliases": [
+        "гарантия на лечение",
+        "гарантия нобель"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "chto-delat-esli-voznikla-problema",
+        "pochemu-garantiya-na-rabotu-vracha-1-god"
+      ]
+    },
+    {
+      "path": "clients/demo/md/comparison__all_on_4_vs_all_on_6.md",
+      "raw_decoded_characters": 2129,
+      "variant_characters": {
+        "raw": 2129,
+        "no_aliases": 1891,
+        "no_ui_fields": 1983,
+        "no_aliases_or_ui": 1745,
+        "body_only_upper_bound": 1615
+      },
+      "aliases": [
+        "все на 4 или все на 6",
+        "что лучше all-on-4 или all-on-6",
+        "4 или 6 имплантов на челюсть",
+        "на верхнюю челюсть 4 или 6 имплантов",
+        "чем отличается all-on-6 от all-on-4",
+        "имплантация верхней челюсти"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "kogda-dostatochno-chetyreh",
+        "kogda-vybirayut-shest",
+        "verhnyaya-chelust-i-nagruzka"
+      ]
+    },
+    {
+      "path": "clients/demo/md/comparison__bone_graft_vs_all_on_4.md",
+      "raw_decoded_characters": 2283,
+      "variant_characters": {
+        "raw": 2283,
+        "no_aliases": 2152,
+        "no_ui_fields": 2142,
+        "no_aliases_or_ui": 2011,
+        "body_only_upper_bound": 1877
+      },
+      "aliases": [
+        "наращивание кости или all-on-4",
+        "синус-лифтинг или all-on-4",
+        "можно ли all-on-4 без наращивания кости"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "kogda-nuzhna-kostnaya-plastika",
+        "kogda-mozhno-all-on-4",
+        "kak-vybirayut-na-kt"
+      ]
+    },
+    {
+      "path": "clients/demo/md/comparison__bugel_prosthesis_vs_fixed_bridge.md",
+      "raw_decoded_characters": 1991,
+      "variant_characters": {
+        "raw": 1991,
+        "no_aliases": 1786,
+        "no_ui_fields": 1818,
+        "no_aliases_or_ui": 1613,
+        "body_only_upper_bound": 1460
+      },
+      "aliases": [
+        "бюгельный протез или мост",
+        "бюгель или мост",
+        "что лучше бюгельный протез или мост",
+        "съемный бюгельный или несъемный протез",
+        "чем бюгельный протез отличается от моста"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "esli-net-neskolkih-zubov",
+        "kogda-chashche-vybirayut-byugelnyy-protez",
+        "kogda-mozhno-rassmotret-nesemnyy-most"
+      ]
+    },
+    {
+      "path": "clients/demo/md/comparison__classic_vs_one_stage.md",
+      "raw_decoded_characters": 2143,
+      "variant_characters": {
+        "raw": 2143,
+        "no_aliases": 1954,
+        "no_ui_fields": 2005,
+        "no_aliases_or_ui": 1816,
+        "body_only_upper_bound": 1686
+      },
+      "aliases": [
+        "одномоментная или двухэтапная имплантация",
+        "имплант сразу или в два этапа",
+        "что надёжнее одномоментная или классическая",
+        "сразу с коронкой или в два этапа"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "klassicheskaya-dvuh-etapnaya",
+        "odnomomentnaya-srazu",
+        "chto-vybiraet-vrach"
+      ]
+    },
+    {
+      "path": "clients/demo/md/comparison__implant_vs_bridge.md",
+      "raw_decoded_characters": 1601,
+      "variant_characters": {
+        "raw": 1601,
+        "no_aliases": 1526,
+        "no_ui_fields": 1438,
+        "no_aliases_or_ui": 1363,
+        "body_only_upper_bound": 1239
+      },
+      "aliases": [
+        "мост или имплант",
+        "чем мост отличается от импланта"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "esli-net-odnogo-zuba",
+        "kogda-chashche-vybirayut-implant",
+        "kogda-most-mozhet-byt-razumnym-variantom"
+      ]
+    },
+    {
+      "path": "clients/demo/md/diagnostics__service__tomography.md",
+      "raw_decoded_characters": 809,
+      "variant_characters": {
+        "raw": 809,
+        "no_aliases": 747,
+        "no_ui_fields": 756,
+        "no_aliases_or_ui": 694,
+        "body_only_upper_bound": 578
+      },
+      "aliases": [
+        "своё кт",
+        "свое кт",
+        "повторное кт"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/doctors__doctor__fedorova.md",
+      "raw_decoded_characters": 873,
+      "variant_characters": {
+        "raw": 873,
+        "no_aliases": 777,
+        "no_ui_fields": 841,
+        "no_aliases_or_ui": 745,
+        "body_only_upper_bound": 445
+      },
+      "aliases": [
+        "федорова ирина",
+        "ирина фёдорова",
+        "терапевт фёдорова",
+        "врач фёдорова"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "name_full",
+        "name_short",
+        "aliases",
+        "services",
+        "position",
+        "experience_years",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/doctors__doctor__grigoriev.md",
+      "raw_decoded_characters": 808,
+      "variant_characters": {
+        "raw": 808,
+        "no_aliases": 726,
+        "no_ui_fields": 776,
+        "no_aliases_or_ui": 694,
+        "body_only_upper_bound": 452
+      },
+      "aliases": [
+        "григорьев павел",
+        "пародонтолог григорьев",
+        "врач григорьев"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "name_full",
+        "name_short",
+        "aliases",
+        "services",
+        "position",
+        "experience_years",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/doctors__doctor__kuznetsov.md",
+      "raw_decoded_characters": 1199,
+      "variant_characters": {
+        "raw": 1199,
+        "no_aliases": 1123,
+        "no_ui_fields": 1167,
+        "no_aliases_or_ui": 1091,
+        "body_only_upper_bound": 694
+      },
+      "aliases": [
+        "кузнецов дмитрий",
+        "ортопед кузнецов",
+        "врач кузнецов"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "name_full",
+        "name_short",
+        "aliases",
+        "services",
+        "position",
+        "experience_years",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/doctors__doctor__morozova.md",
+      "raw_decoded_characters": 780,
+      "variant_characters": {
+        "raw": 780,
+        "no_aliases": 706,
+        "no_ui_fields": 748,
+        "no_aliases_or_ui": 674,
+        "body_only_upper_bound": 445
+      },
+      "aliases": [
+        "морозова анна",
+        "ортодонт морозова",
+        "врач морозова"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "name_full",
+        "name_short",
+        "aliases",
+        "services",
+        "position",
+        "experience_years",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/doctors__doctor__orlov.md",
+      "raw_decoded_characters": 974,
+      "variant_characters": {
+        "raw": 974,
+        "no_aliases": 904,
+        "no_ui_fields": 942,
+        "no_aliases_or_ui": 872,
+        "body_only_upper_bound": 578
+      },
+      "aliases": [
+        "никита орлов",
+        "имплантолог орлов",
+        "врач орлов"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "name_full",
+        "name_short",
+        "aliases",
+        "services",
+        "position",
+        "experience_years",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/doctors__doctor__overview.md",
+      "raw_decoded_characters": 865,
+      "variant_characters": {
+        "raw": 865,
+        "no_aliases": 751,
+        "no_ui_fields": 831,
+        "no_aliases_or_ui": 717,
+        "body_only_upper_bound": 614
+      },
+      "aliases": [
+        "врачи клиники",
+        "опыт врачей",
+        "специалисты клиники",
+        "кто занимается имплантацией"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/doctors__doctor__volkov.md",
+      "raw_decoded_characters": 1182,
+      "variant_characters": {
+        "raw": 1182,
+        "no_aliases": 1079,
+        "no_ui_fields": 1149,
+        "no_aliases_or_ui": 1046,
+        "body_only_upper_bound": 627
+      },
+      "aliases": [
+        "волков александр",
+        "главный врач волков",
+        "врач волков",
+        "хирург волков"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "name_full",
+        "name_short",
+        "aliases",
+        "services",
+        "position",
+        "experience_years",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/extraction__service__tooth_extraction.md",
+      "raw_decoded_characters": 1868,
+      "variant_characters": {
+        "raw": 1868,
+        "no_aliases": 1723,
+        "no_ui_fields": 1737,
+        "no_aliases_or_ui": 1592,
+        "body_only_upper_bound": 1448
+      },
+      "aliases": [
+        "удалить зуб",
+        "вырвать зуб",
+        "удаление зуба мудрости",
+        "сложное удаление",
+        "зуб не спасти",
+        "зуб разрушен"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aspect",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "bolno-li-udalyat-zub",
+        "chto-posle-udaleniya",
+        "mozhno-li-srazu-implant"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__faq__cost.md",
+      "raw_decoded_characters": 1454,
+      "variant_characters": {
+        "raw": 1454,
+        "no_aliases": 1211,
+        "no_ui_fields": 1363,
+        "no_aliases_or_ui": 1120,
+        "body_only_upper_bound": 1022
+      },
+      "aliases": [
+        "почему имплант дорого стоит",
+        "дорого ли ставить имплант",
+        "стоит ли платить за дорогой имплант",
+        "как сэкономить на имплантации",
+        "можно ли посчитать цену по снимку",
+        "я боюсь что имплантация это дорого"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "kak-sdelat-implantatsiyu-dostupnee"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__faq__duration.md",
+      "raw_decoded_characters": 2198,
+      "variant_characters": {
+        "raw": 2198,
+        "no_aliases": 2003,
+        "no_ui_fields": 2068,
+        "no_aliases_or_ui": 1873,
+        "body_only_upper_bound": 1749
+      },
+      "aliases": [
+        "сколько длится имплантация",
+        "как долго ставят имплант",
+        "сколько ждать коронку после импланта",
+        "когда будет готов зуб",
+        "срок имплантации после удаления зуба"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aspect",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "ot-chego-zavisit-srok-implantatsii",
+        "mozhno-li-uskorit-implantatsiyu"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__faq__osseointegration.md",
+      "raw_decoded_characters": 1936,
+      "variant_characters": {
+        "raw": 1936,
+        "no_aliases": 1810,
+        "no_ui_fields": 1743,
+        "no_aliases_or_ui": 1617,
+        "body_only_upper_bound": 1494
+      },
+      "aliases": [
+        "приживется ли имплант",
+        "риск отторжения импланта",
+        "процент приживаемости",
+        "надежность имплантов"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action",
+        "video_key"
+      ],
+      "anchors": [
+        "korotko",
+        "a-esli-implant-ne-prizhivetsya",
+        "ot-chego-zavisit-prizhivlenie",
+        "chto-budet-esli-nichego-ne-delat"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__faq__pain.md",
+      "raw_decoded_characters": 2447,
+      "variant_characters": {
+        "raw": 2447,
+        "no_aliases": 2332,
+        "no_ui_fields": 2265,
+        "no_aliases_or_ui": 2150,
+        "body_only_upper_bound": 2051
+      },
+      "aliases": [
+        "больно ли ставить имплант",
+        "страшно ли делать имплантацию",
+        "анестезия при имплантации"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action",
+        "video_key"
+      ],
+      "anchors": [
+        "korotko",
+        "kakuyu-anesteziyu-ispolzuyut",
+        "chto-chuvstvuetsya-posle-ustanovki",
+        "sedatsiya-i-narkoz"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__faq__safety.md",
+      "raw_decoded_characters": 873,
+      "variant_characters": {
+        "raw": 873,
+        "no_aliases": 793,
+        "no_ui_fields": 835,
+        "no_aliases_or_ui": 755,
+        "body_only_upper_bound": 653
+      },
+      "aliases": [
+        "безопасна ли имплантация",
+        "риск заражения при имплантации"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__faq__tooth_loss.md",
+      "raw_decoded_characters": 740,
+      "variant_characters": {
+        "raw": 740,
+        "no_aliases": 658,
+        "no_ui_fields": 702,
+        "no_aliases_or_ui": 620,
+        "body_only_upper_bound": 510
+      },
+      "aliases": [
+        "потерял зуб",
+        "нет зуба что делать",
+        "остался без зуба"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__faq__tooth_one_day.md",
+      "raw_decoded_characters": 935,
+      "variant_characters": {
+        "raw": 935,
+        "no_aliases": 780,
+        "no_ui_fields": 897,
+        "no_aliases_or_ui": 742,
+        "body_only_upper_bound": 626
+      },
+      "aliases": [
+        "зуб в день установки",
+        "временная коронка сразу",
+        "имплант и коронка за один день",
+        "почему нельзя сразу постоянную коронку"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__faq__what_included.md",
+      "raw_decoded_characters": 1811,
+      "variant_characters": {
+        "raw": 1811,
+        "no_aliases": 1724,
+        "no_ui_fields": 1681,
+        "no_aliases_or_ui": 1594,
+        "body_only_upper_bound": 1478
+      },
+      "aliases": [
+        "имплантация под ключ что входит",
+        "коронка отдельно от импланта"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "kogda-koronka-schitaetsya-otdelno",
+        "koronka-na-implant-ili-na-svoy-zub"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__info__aftercare.md",
+      "raw_decoded_characters": 1528,
+      "variant_characters": {
+        "raw": 1528,
+        "no_aliases": 1413,
+        "no_ui_fields": 1397,
+        "no_aliases_or_ui": 1282,
+        "body_only_upper_bound": 1172
+      },
+      "aliases": [
+        "уход после имплантации",
+        "восстановление после импланта",
+        "можно ли есть после имплантации"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "chto-proishodit-v-pervye-dni",
+        "kak-prohodit-vosstanovlenie-do-koronki"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__info__contraindications.md",
+      "raw_decoded_characters": 2296,
+      "variant_characters": {
+        "raw": 2296,
+        "no_aliases": 2161,
+        "no_ui_fields": 2175,
+        "no_aliases_or_ui": 2040,
+        "body_only_upper_bound": 1914
+      },
+      "aliases": [
+        "противопоказания к имплантации",
+        "можно ли ставить имплант при диабете",
+        "можно ли при беременности имплант"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "nuzhna-li-podgotovka-pered-implantatsiey",
+        "vozrast-i-all-on"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__info__curator.md",
+      "raw_decoded_characters": 731,
+      "variant_characters": {
+        "raw": 731,
+        "no_aliases": 603,
+        "no_ui_fields": 693,
+        "no_aliases_or_ui": 565,
+        "body_only_upper_bound": 459
+      },
+      "aliases": [
+        "куратор лечения",
+        "сопровождение пациента",
+        "кто помогает во время лечения",
+        "помощник в клинике"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__info__implant_systems.md",
+      "raw_decoded_characters": 1553,
+      "variant_characters": {
+        "raw": 1553,
+        "no_aliases": 1438,
+        "no_ui_fields": 1410,
+        "no_aliases_or_ui": 1295,
+        "body_only_upper_bound": 1173
+      },
+      "aliases": [
+        "какие импланты лучше",
+        "бренды имплантов",
+        "нобель или импро",
+        "чем отличаются импланты"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "nobel-maksimum-nadezhnosti",
+        "impro-razumnyy-balans",
+        "implantium-dostupnyy-variant"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__info__methods_overview.md",
+      "raw_decoded_characters": 1879,
+      "variant_characters": {
+        "raw": 1879,
+        "no_aliases": 1719,
+        "no_ui_fields": 1844,
+        "no_aliases_or_ui": 1684,
+        "body_only_upper_bound": 1542
+      },
+      "aliases": [
+        "методы имплантации",
+        "классическая или одномоментная имплантация",
+        "как выбрать метод имплантации",
+        "что такое имплантация зубов"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aspect",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "neskolko-zubov-podryad"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__info__steps.md",
+      "raw_decoded_characters": 1537,
+      "variant_characters": {
+        "raw": 1537,
+        "no_aliases": 1335,
+        "no_ui_fields": 1451,
+        "no_aliases_or_ui": 1249,
+        "body_only_upper_bound": 1131
+      },
+      "aliases": [
+        "этапы имплантации",
+        "сколько визитов для имплантации",
+        "сколько визитов полное протезирование челюсти",
+        "что происходит при имплантации",
+        "из чего состоит имплантация"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aspect",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "poryadok-lecheniya-do-implanta"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__service__all_on_4.md",
+      "raw_decoded_characters": 1835,
+      "variant_characters": {
+        "raw": 1835,
+        "no_aliases": 1755,
+        "no_ui_fields": 1698,
+        "no_aliases_or_ui": 1618,
+        "body_only_upper_bound": 1504
+      },
+      "aliases": [
+        "протокол all-on-4",
+        "несъёмный зубной ряд на 4 имплантах"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "komu-podhodit-all-on-4",
+        "kak-rabotaet-metod-all-on-4",
+        "ogranicheniya-i-uhod"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__service__all_on_6.md",
+      "raw_decoded_characters": 1843,
+      "variant_characters": {
+        "raw": 1843,
+        "no_aliases": 1773,
+        "no_ui_fields": 1707,
+        "no_aliases_or_ui": 1637,
+        "body_only_upper_bound": 1523
+      },
+      "aliases": [
+        "протокол all-on-6",
+        "зубной ряд на 6 имплантах"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "komu-podhodit-all-on-6",
+        "kak-rabotaet-metod-all-on-6",
+        "sroki-i-osobennosti"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__service__benefits.md",
+      "raw_decoded_characters": 872,
+      "variant_characters": {
+        "raw": 872,
+        "no_aliases": 834,
+        "no_ui_fields": 837,
+        "no_aliases_or_ui": 799,
+        "body_only_upper_bound": 685
+      },
+      "aliases": [
+        "почему имплантация"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__service__bone_graft.md",
+      "raw_decoded_characters": 1985,
+      "variant_characters": {
+        "raw": 1985,
+        "no_aliases": 1774,
+        "no_ui_fields": 1835,
+        "no_aliases_or_ui": 1624,
+        "body_only_upper_bound": 1506
+      },
+      "aliases": [
+        "не хватает кости для импланта",
+        "нарастить кость для импланта",
+        "наращивание костной ткани",
+        "зуба нет уже много лет можно ли имплант",
+        "давно нет зуба можно поставить имплант"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "kak-prohodit-vosstanovlenie",
+        "sinus-lifting-i-stoimost",
+        "skulovye-implanty-i-alternativy"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__service__classic.md",
+      "raw_decoded_characters": 1499,
+      "variant_characters": {
+        "raw": 1499,
+        "no_aliases": 1423,
+        "no_ui_fields": 1384,
+        "no_aliases_or_ui": 1308,
+        "body_only_upper_bound": 1196
+      },
+      "aliases": [
+        "имплант в два этапа",
+        "сначала имплант потом коронка"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "pochemu-vybirayut-klassicheskuyu",
+        "sroki-i-ogranicheniya"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__service__one_stage.md",
+      "raw_decoded_characters": 1382,
+      "variant_characters": {
+        "raw": 1382,
+        "no_aliases": 1292,
+        "no_ui_fields": 1266,
+        "no_aliases_or_ui": 1176,
+        "body_only_upper_bound": 1058
+      },
+      "aliases": [
+        "одномоментный протокол имплантации",
+        "имплант в день удаления зуба"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "kogda-ne-podhodit-odnomomentnaya",
+        "v-chem-osobennost-metoda"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__service__pterygoid_implants.md",
+      "raw_decoded_characters": 1630,
+      "variant_characters": {
+        "raw": 1630,
+        "no_aliases": 1486,
+        "no_ui_fields": 1477,
+        "no_aliases_or_ui": 1333,
+        "body_only_upper_bound": 1199
+      },
+      "aliases": [
+        "птеригоидная имплантация",
+        "крыловидные импланты",
+        "импланты без костной пластики",
+        "импланты без синус-лифтинга"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "kogda-rassmatrivayut-pterygoid",
+        "chem-otlichaetsya-ot-obychnyh",
+        "pochemu-nuzhna-diagnostika"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__service__sinus_lift.md",
+      "raw_decoded_characters": 1905,
+      "variant_characters": {
+        "raw": 1905,
+        "no_aliases": 1819,
+        "no_ui_fields": 1770,
+        "no_aliases_or_ui": 1684,
+        "body_only_upper_bound": 1566
+      },
+      "aliases": [
+        "больно ли делать синус-лифтинг",
+        "имплант после синус-лифтинга"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "kogda-nuzhen-sinus-lift",
+        "kak-prohodit-sinus-lift",
+        "kogda-stavyat-implant"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__service__temporary_teeth.md",
+      "raw_decoded_characters": 1934,
+      "variant_characters": {
+        "raw": 1934,
+        "no_aliases": 1698,
+        "no_ui_fields": 1808,
+        "no_aliases_or_ui": 1572,
+        "body_only_upper_bound": 1426
+      },
+      "aliases": [
+        "временный зуб на имплант",
+        "зачем нужна временная коронка",
+        "временные или постоянные зубы",
+        "временные пластиковые зубы",
+        "пластиковые или нормальные зубы",
+        "когда поставят коронку после импланта"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aspect",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "kogda-stavyat-vremennye-zuby",
+        "ogranicheniya-do-postoyannoy-koronki"
+      ]
+    },
+    {
+      "path": "clients/demo/md/implantation__service__zygomatic_implants.md",
+      "raw_decoded_characters": 1810,
+      "variant_characters": {
+        "raw": 1810,
+        "no_aliases": 1558,
+        "no_ui_fields": 1669,
+        "no_aliases_or_ui": 1417,
+        "body_only_upper_bound": 1283
+      },
+      "aliases": [
+        "скуловые имплантаты",
+        "импланты в скулу",
+        "зигоматические импланты",
+        "zygomatic implants",
+        "мало кости на верхней челюсти",
+        "сильная атрофия верхней челюсти",
+        "можно ли поставить импланты без костной пластики"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "kogda-rassmatrivayut-skulovye-implanty",
+        "pochemu-nuzhna-kt",
+        "est-li-alternativy"
+      ]
+    },
+    {
+      "path": "clients/demo/md/orthodontics__service__aligners.md",
+      "raw_decoded_characters": 1566,
+      "variant_characters": {
+        "raw": 1566,
+        "no_aliases": 1467,
+        "no_ui_fields": 1454,
+        "no_aliases_or_ui": 1355,
+        "body_only_upper_bound": 1240
+      },
+      "aliases": [
+        "капы для зубов",
+        "выровнять зубы",
+        "исправить прикус",
+        "кривые зубы"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "chto-ispravlyayut-elaynery",
+        "etapy-lecheniya-na-elaynerah"
+      ]
+    },
+    {
+      "path": "clients/demo/md/periodontology__service__periodontitis.md",
+      "raw_decoded_characters": 899,
+      "variant_characters": {
+        "raw": 899,
+        "no_aliases": 731,
+        "no_ui_fields": 864,
+        "no_aliases_or_ui": 696,
+        "body_only_upper_bound": 568
+      },
+      "aliases": [
+        "парадонтит",
+        "лечение пародонтоза",
+        "пародонтоз",
+        "болят десны",
+        "кровоточат десны",
+        "шатаются зубы",
+        "оголились корни зубов"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/prosthetics__service__clasp_dentures.md",
+      "raw_decoded_characters": 1356,
+      "variant_characters": {
+        "raw": 1356,
+        "no_aliases": 1239,
+        "no_ui_fields": 1241,
+        "no_aliases_or_ui": 1124,
+        "body_only_upper_bound": 1000
+      },
+      "aliases": [
+        "протез с дугой",
+        "частичный протез с дугой",
+        "протез на кламмерах",
+        "протез на замках"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "podoydet-li-mne-byugelnyy-protez",
+        "budet-li-udobno-nosit"
+      ]
+    },
+    {
+      "path": "clients/demo/md/prosthetics__service__implant_supported_prosthetics.md",
+      "raw_decoded_characters": 1831,
+      "variant_characters": {
+        "raw": 1831,
+        "no_aliases": 1631,
+        "no_ui_fields": 1724,
+        "no_aliases_or_ui": 1524,
+        "body_only_upper_bound": 1370
+      },
+      "aliases": [
+        "зубы на имплантах",
+        "несъемные зубы на имплантах",
+        "несъёмные зубы на имплантах",
+        "восстановить зубы на имплантах",
+        "протез на имплантах",
+        "импланты с коронками"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "kakoy-variant-podoydet",
+        "budu-li-hodit-bez-zubov"
+      ]
+    },
+    {
+      "path": "clients/demo/md/prosthetics__service__removable_dentures.md",
+      "raw_decoded_characters": 1694,
+      "variant_characters": {
+        "raw": 1694,
+        "no_aliases": 1480,
+        "no_ui_fields": 1529,
+        "no_aliases_or_ui": 1315,
+        "body_only_upper_bound": 1183
+      },
+      "aliases": [
+        "съемные протезы",
+        "съёмные протезы",
+        "зубной протез",
+        "протез если нет зубов",
+        "вставная челюсть",
+        "частичный зубной протез",
+        "полный съёмный протез",
+        "нет всех зубов"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "chastichnyy-ili-polnyy-protez",
+        "mozhno-li-sdelat-udobno-i-estestvenno",
+        "chto-delat-esli-protez-natiraet"
+      ]
+    },
+    {
+      "path": "clients/demo/md/prosthetics__service__veneers.md",
+      "raw_decoded_characters": 1275,
+      "variant_characters": {
+        "raw": 1275,
+        "no_aliases": 1214,
+        "no_ui_fields": 1172,
+        "no_aliases_or_ui": 1111,
+        "body_only_upper_bound": 1000
+      },
+      "aliases": [
+        "виниры на зубы",
+        "голливудская улыбка"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "etapy-ustanovki-vinirov",
+        "bolno-li-stavit-viniry"
+      ]
+    },
+    {
+      "path": "clients/demo/md/prosthetics__service__zirconia_crowns.md",
+      "raw_decoded_characters": 1740,
+      "variant_characters": {
+        "raw": 1740,
+        "no_aliases": 1560,
+        "no_ui_fields": 1639,
+        "no_aliases_or_ui": 1459,
+        "body_only_upper_bound": 1333
+      },
+      "aliases": [
+        "коронка на зуб",
+        "зубная коронка",
+        "поставить коронку",
+        "циркониевая коронка",
+        "коронка из диоксида циркония",
+        "восстановить разрушенный зуб"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "kogda-stavyat-koronku",
+        "koronka-na-implant"
+      ]
+    },
+    {
+      "path": "clients/demo/md/treatment__service__caries.md",
+      "raw_decoded_characters": 1069,
+      "variant_characters": {
+        "raw": 1069,
+        "no_aliases": 878,
+        "no_ui_fields": 1016,
+        "no_aliases_or_ui": 825,
+        "body_only_upper_bound": 721
+      },
+      "aliases": [
+        "дырка в зубе",
+        "поставить пломбу",
+        "вылечить зуб",
+        "зуб с кариесом",
+        "темное пятно на зубе",
+        "зуб реагирует на холодное",
+        "зуб реагирует на сладкое"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/treatment__service__pulpitis.md",
+      "raw_decoded_characters": 868,
+      "variant_characters": {
+        "raw": 868,
+        "no_aliases": 731,
+        "no_ui_fields": 833,
+        "no_aliases_or_ui": 696,
+        "body_only_upper_bound": 588
+      },
+      "aliases": [
+        "пультип",
+        "болит зуб",
+        "сильно болит зуб",
+        "острая зубная боль",
+        "болит зуб ночью",
+        "удалить нерв"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko"
+      ]
+    },
+    {
+      "path": "clients/demo/md/treatment__service__teeth_treatment.md",
+      "raw_decoded_characters": 1338,
+      "variant_characters": {
+        "raw": 1338,
+        "no_aliases": 1241,
+        "no_ui_fields": 1251,
+        "no_aliases_or_ui": 1154,
+        "body_only_upper_bound": 1032
+      },
+      "aliases": [
+        "лечить зубы",
+        "стоматологическое лечение",
+        "терапевтическая стоматология"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "pochemu-lechenie-zubov-bez-boli"
+      ]
+    },
+    {
+      "path": "clients/demo/md/whitening__service__teeth_whitening.md",
+      "raw_decoded_characters": 1874,
+      "variant_characters": {
+        "raw": 1874,
+        "no_aliases": 1746,
+        "no_ui_fields": 1740,
+        "no_aliases_or_ui": 1612,
+        "body_only_upper_bound": 1489
+      },
+      "aliases": [
+        "отбелить зубы",
+        "профессиональное отбеливание",
+        "белые зубы",
+        "осветлить зубы",
+        "желтые зубы"
+      ],
+      "metadata_keys": [
+        "doc_id",
+        "doc_type",
+        "topic",
+        "subtopic",
+        "aliases",
+        "suggest_h3",
+        "cta_key",
+        "cta_action"
+      ],
+      "anchors": [
+        "korotko",
+        "komu-podhodit-otbelivanie",
+        "nuzhna-li-chistka",
+        "bezopasno-li-otbelivanie"
+      ]
+    }
+  ],
+  "literal_authored_md_references": [
+    {
+      "source": "clients/demo/clinic_policies.yaml",
+      "field": ".policies.no_pediatric_dentistry.text_ref",
+      "target": "clinic__info__policies.md",
+      "anchor": "no_pediatric_dentistry",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/clinic_policies.yaml",
+      "field": ".policies.no_oms.text_ref",
+      "target": "clinic__info__policies.md",
+      "anchor": "no_oms",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/clinic_policies.yaml",
+      "field": ".policies.no_dms.text_ref",
+      "target": "clinic__info__policies.md",
+      "anchor": "no_dms",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/clinic_policies.yaml",
+      "field": ".service_alternatives[0].text_ref",
+      "target": "clinic__info__policies.md",
+      "anchor": "braces",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/clinic_policies.yaml",
+      "field": ".brand_alternatives[0].text_ref",
+      "target": "clinic__info__policies.md",
+      "anchor": "brendy",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/clinic__info__first_visit.md",
+      "field": "suggest_h3",
+      "target": "clinic__info__first_visit.md",
+      "anchor": "rasskazhite-pro-kliniku",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/clinic__info__first_visit.md",
+      "field": "suggest_h3",
+      "target": "clinic__info__first_visit.md",
+      "anchor": "kak-vybirayut-lechenie",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/clinic__info__results.md",
+      "field": "suggest_h3",
+      "target": "clinic__info__results.md",
+      "anchor": "posmotret-rezultaty",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/clinic__info__technology.md",
+      "field": "suggest_h3",
+      "target": "clinic__info__technology.md",
+      "anchor": "kak-planiruetsya-implantatsiya",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/clinic__info__technology.md",
+      "field": "suggest_h3",
+      "target": "clinic__info__technology.md",
+      "anchor": "kak-povyshaetsya-tochnost",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/clinic__info__warranty.md",
+      "field": "suggest_h3",
+      "target": "clinic__info__warranty.md",
+      "anchor": "chto-delat-esli-voznikla-problema",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/clinic__info__warranty.md",
+      "field": "suggest_h3",
+      "target": "clinic__info__warranty.md",
+      "anchor": "pochemu-garantiya-na-rabotu-vracha-1-god",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/comparison__all_on_4_vs_all_on_6.md",
+      "field": "suggest_h3",
+      "target": "comparison__all_on_4_vs_all_on_6.md",
+      "anchor": "kogda-dostatochno-chetyreh",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/comparison__all_on_4_vs_all_on_6.md",
+      "field": "suggest_h3",
+      "target": "comparison__all_on_4_vs_all_on_6.md",
+      "anchor": "kogda-vybirayut-shest",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/comparison__all_on_4_vs_all_on_6.md",
+      "field": "suggest_h3",
+      "target": "comparison__all_on_4_vs_all_on_6.md",
+      "anchor": "verhnyaya-chelust-i-nagruzka",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/comparison__bone_graft_vs_all_on_4.md",
+      "field": "suggest_h3",
+      "target": "comparison__bone_graft_vs_all_on_4.md",
+      "anchor": "kogda-nuzhna-kostnaya-plastika",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/comparison__bone_graft_vs_all_on_4.md",
+      "field": "suggest_h3",
+      "target": "comparison__bone_graft_vs_all_on_4.md",
+      "anchor": "kogda-mozhno-all-on-4",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/comparison__bone_graft_vs_all_on_4.md",
+      "field": "suggest_h3",
+      "target": "comparison__bone_graft_vs_all_on_4.md",
+      "anchor": "kak-vybirayut-na-kt",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/comparison__bugel_prosthesis_vs_fixed_bridge.md",
+      "field": "suggest_h3",
+      "target": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+      "anchor": "esli-net-neskolkih-zubov",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/comparison__bugel_prosthesis_vs_fixed_bridge.md",
+      "field": "suggest_h3",
+      "target": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+      "anchor": "kogda-chashche-vybirayut-byugelnyy-protez",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/comparison__bugel_prosthesis_vs_fixed_bridge.md",
+      "field": "suggest_h3",
+      "target": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+      "anchor": "kogda-mozhno-rassmotret-nesemnyy-most",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/comparison__classic_vs_one_stage.md",
+      "field": "suggest_h3",
+      "target": "comparison__classic_vs_one_stage.md",
+      "anchor": "klassicheskaya-dvuh-etapnaya",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/comparison__classic_vs_one_stage.md",
+      "field": "suggest_h3",
+      "target": "comparison__classic_vs_one_stage.md",
+      "anchor": "odnomomentnaya-srazu",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/comparison__classic_vs_one_stage.md",
+      "field": "suggest_h3",
+      "target": "comparison__classic_vs_one_stage.md",
+      "anchor": "chto-vybiraet-vrach",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/comparison__implant_vs_bridge.md",
+      "field": "suggest_h3",
+      "target": "comparison__implant_vs_bridge.md",
+      "anchor": "esli-net-odnogo-zuba",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/comparison__implant_vs_bridge.md",
+      "field": "suggest_h3",
+      "target": "comparison__implant_vs_bridge.md",
+      "anchor": "kogda-chashche-vybirayut-implant",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/comparison__implant_vs_bridge.md",
+      "field": "suggest_h3",
+      "target": "comparison__implant_vs_bridge.md",
+      "anchor": "kogda-most-mozhet-byt-razumnym-variantom",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/extraction__service__tooth_extraction.md",
+      "field": "suggest_h3",
+      "target": "extraction__service__tooth_extraction.md",
+      "anchor": "bolno-li-udalyat-zub",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/extraction__service__tooth_extraction.md",
+      "field": "suggest_h3",
+      "target": "extraction__service__tooth_extraction.md",
+      "anchor": "chto-posle-udaleniya",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/extraction__service__tooth_extraction.md",
+      "field": "suggest_h3",
+      "target": "extraction__service__tooth_extraction.md",
+      "anchor": "mozhno-li-srazu-implant",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__faq__cost.md",
+      "field": "suggest_h3",
+      "target": "implantation__faq__cost.md",
+      "anchor": "kak-sdelat-implantatsiyu-dostupnee",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__faq__duration.md",
+      "field": "suggest_h3",
+      "target": "implantation__faq__duration.md",
+      "anchor": "ot-chego-zavisit-srok-implantatsii",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__faq__duration.md",
+      "field": "suggest_h3",
+      "target": "implantation__faq__duration.md",
+      "anchor": "mozhno-li-uskorit-implantatsiyu",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__faq__osseointegration.md",
+      "field": "suggest_h3",
+      "target": "implantation__faq__osseointegration.md",
+      "anchor": "a-esli-implant-ne-prizhivetsya",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__faq__osseointegration.md",
+      "field": "suggest_h3",
+      "target": "implantation__faq__osseointegration.md",
+      "anchor": "ot-chego-zavisit-prizhivlenie",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__faq__osseointegration.md",
+      "field": "suggest_h3",
+      "target": "implantation__faq__osseointegration.md",
+      "anchor": "chto-budet-esli-nichego-ne-delat",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__faq__pain.md",
+      "field": "suggest_h3",
+      "target": "implantation__faq__pain.md",
+      "anchor": "kakuyu-anesteziyu-ispolzuyut",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__faq__pain.md",
+      "field": "suggest_h3",
+      "target": "implantation__faq__pain.md",
+      "anchor": "chto-chuvstvuetsya-posle-ustanovki",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__faq__pain.md",
+      "field": "suggest_h3",
+      "target": "implantation__faq__pain.md",
+      "anchor": "sedatsiya-i-narkoz",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__faq__what_included.md",
+      "field": "suggest_h3",
+      "target": "implantation__faq__what_included.md",
+      "anchor": "kogda-koronka-schitaetsya-otdelno",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__faq__what_included.md",
+      "field": "suggest_h3",
+      "target": "implantation__faq__what_included.md",
+      "anchor": "koronka-na-implant-ili-na-svoy-zub",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__info__aftercare.md",
+      "field": "suggest_h3",
+      "target": "implantation__info__aftercare.md",
+      "anchor": "chto-proishodit-v-pervye-dni",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__info__aftercare.md",
+      "field": "suggest_h3",
+      "target": "implantation__info__aftercare.md",
+      "anchor": "kak-prohodit-vosstanovlenie-do-koronki",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__info__contraindications.md",
+      "field": "suggest_h3",
+      "target": "implantation__info__contraindications.md",
+      "anchor": "nuzhna-li-podgotovka-pered-implantatsiey",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__info__contraindications.md",
+      "field": "suggest_h3",
+      "target": "implantation__info__contraindications.md",
+      "anchor": "vozrast-i-all-on",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__info__implant_systems.md",
+      "field": "suggest_h3",
+      "target": "implantation__info__implant_systems.md",
+      "anchor": "nobel-maksimum-nadezhnosti",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__info__implant_systems.md",
+      "field": "suggest_h3",
+      "target": "implantation__info__implant_systems.md",
+      "anchor": "impro-razumnyy-balans",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__info__implant_systems.md",
+      "field": "suggest_h3",
+      "target": "implantation__info__implant_systems.md",
+      "anchor": "implantium-dostupnyy-variant",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__info__steps.md",
+      "field": "suggest_h3",
+      "target": "implantation__info__steps.md",
+      "anchor": "poryadok-lecheniya-do-implanta",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__all_on_4.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__all_on_4.md",
+      "anchor": "komu-podhodit-all-on-4",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__all_on_4.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__all_on_4.md",
+      "anchor": "kak-rabotaet-metod-all-on-4",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__all_on_4.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__all_on_4.md",
+      "anchor": "ogranicheniya-i-uhod",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__all_on_6.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__all_on_6.md",
+      "anchor": "komu-podhodit-all-on-6",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__all_on_6.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__all_on_6.md",
+      "anchor": "kak-rabotaet-metod-all-on-6",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__all_on_6.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__all_on_6.md",
+      "anchor": "sroki-i-osobennosti",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__bone_graft.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__bone_graft.md",
+      "anchor": "kak-prohodit-vosstanovlenie",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__bone_graft.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__bone_graft.md",
+      "anchor": "sinus-lifting-i-stoimost",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__bone_graft.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__bone_graft.md",
+      "anchor": "skulovye-implanty-i-alternativy",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__classic.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__classic.md",
+      "anchor": "pochemu-vybirayut-klassicheskuyu",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__classic.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__classic.md",
+      "anchor": "sroki-i-ogranicheniya",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__one_stage.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__one_stage.md",
+      "anchor": "kogda-ne-podhodit-odnomomentnaya",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__one_stage.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__one_stage.md",
+      "anchor": "v-chem-osobennost-metoda",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__pterygoid_implants.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__pterygoid_implants.md",
+      "anchor": "kogda-rassmatrivayut-pterygoid",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__pterygoid_implants.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__pterygoid_implants.md",
+      "anchor": "chem-otlichaetsya-ot-obychnyh",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__pterygoid_implants.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__pterygoid_implants.md",
+      "anchor": "pochemu-nuzhna-diagnostika",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__sinus_lift.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__sinus_lift.md",
+      "anchor": "kogda-nuzhen-sinus-lift",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__sinus_lift.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__sinus_lift.md",
+      "anchor": "kak-prohodit-sinus-lift",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__sinus_lift.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__sinus_lift.md",
+      "anchor": "kogda-stavyat-implant",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__temporary_teeth.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__temporary_teeth.md",
+      "anchor": "kogda-stavyat-vremennye-zuby",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__temporary_teeth.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__temporary_teeth.md",
+      "anchor": "ogranicheniya-do-postoyannoy-koronki",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__zygomatic_implants.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__zygomatic_implants.md",
+      "anchor": "kogda-rassmatrivayut-skulovye-implanty",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__zygomatic_implants.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__zygomatic_implants.md",
+      "anchor": "pochemu-nuzhna-kt",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/implantation__service__zygomatic_implants.md",
+      "field": "suggest_h3",
+      "target": "implantation__service__zygomatic_implants.md",
+      "anchor": "est-li-alternativy",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/orthodontics__service__aligners.md",
+      "field": "suggest_h3",
+      "target": "orthodontics__service__aligners.md",
+      "anchor": "chto-ispravlyayut-elaynery",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/orthodontics__service__aligners.md",
+      "field": "suggest_h3",
+      "target": "orthodontics__service__aligners.md",
+      "anchor": "etapy-lecheniya-na-elaynerah",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/prosthetics__service__clasp_dentures.md",
+      "field": "suggest_h3",
+      "target": "prosthetics__service__clasp_dentures.md",
+      "anchor": "podoydet-li-mne-byugelnyy-protez",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/prosthetics__service__clasp_dentures.md",
+      "field": "suggest_h3",
+      "target": "prosthetics__service__clasp_dentures.md",
+      "anchor": "budet-li-udobno-nosit",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/prosthetics__service__implant_supported_prosthetics.md",
+      "field": "suggest_h3",
+      "target": "prosthetics__service__implant_supported_prosthetics.md",
+      "anchor": "kakoy-variant-podoydet",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/prosthetics__service__implant_supported_prosthetics.md",
+      "field": "suggest_h3",
+      "target": "prosthetics__service__implant_supported_prosthetics.md",
+      "anchor": "budu-li-hodit-bez-zubov",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/prosthetics__service__removable_dentures.md",
+      "field": "suggest_h3",
+      "target": "prosthetics__service__removable_dentures.md",
+      "anchor": "chastichnyy-ili-polnyy-protez",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/prosthetics__service__removable_dentures.md",
+      "field": "suggest_h3",
+      "target": "prosthetics__service__removable_dentures.md",
+      "anchor": "mozhno-li-sdelat-udobno-i-estestvenno",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/prosthetics__service__removable_dentures.md",
+      "field": "suggest_h3",
+      "target": "prosthetics__service__removable_dentures.md",
+      "anchor": "chto-delat-esli-protez-natiraet",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/prosthetics__service__veneers.md",
+      "field": "suggest_h3",
+      "target": "prosthetics__service__veneers.md",
+      "anchor": "etapy-ustanovki-vinirov",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/prosthetics__service__veneers.md",
+      "field": "suggest_h3",
+      "target": "prosthetics__service__veneers.md",
+      "anchor": "bolno-li-stavit-viniry",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/prosthetics__service__zirconia_crowns.md",
+      "field": "suggest_h3",
+      "target": "prosthetics__service__zirconia_crowns.md",
+      "anchor": "kogda-stavyat-koronku",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/prosthetics__service__zirconia_crowns.md",
+      "field": "suggest_h3",
+      "target": "prosthetics__service__zirconia_crowns.md",
+      "anchor": "koronka-na-implant",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/treatment__service__teeth_treatment.md",
+      "field": "suggest_h3",
+      "target": "treatment__service__teeth_treatment.md",
+      "anchor": "pochemu-lechenie-zubov-bez-boli",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/whitening__service__teeth_whitening.md",
+      "field": "suggest_h3",
+      "target": "whitening__service__teeth_whitening.md",
+      "anchor": "komu-podhodit-otbelivanie",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/whitening__service__teeth_whitening.md",
+      "field": "suggest_h3",
+      "target": "whitening__service__teeth_whitening.md",
+      "anchor": "nuzhna-li-chistka",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/md/whitening__service__teeth_whitening.md",
+      "field": "suggest_h3",
+      "target": "whitening__service__teeth_whitening.md",
+      "anchor": "bezopasno-li-otbelivanie",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/marketing.yaml",
+      "field": ".scenario_rules.pain_fear.ordered_amplifier_refs[0]",
+      "target": "implantation__faq__pain.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/marketing.yaml",
+      "field": ".scenario_rules.pain_fear.ordered_amplifier_refs[1]",
+      "target": "implantation__faq__pain.md",
+      "anchor": "kakuyu-anesteziyu-ispolzuyut",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/marketing.yaml",
+      "field": ".scenario_rules.cost.ordered_amplifier_refs[3]",
+      "target": "implantation__faq__cost.md",
+      "anchor": "kak-sdelat-implantatsiyu-dostupnee",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/marketing.yaml",
+      "field": ".scenario_rules.time.ordered_amplifier_refs[0]",
+      "target": "implantation__faq__duration.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/marketing.yaml",
+      "field": ".scenario_rules.time.ordered_amplifier_refs[1]",
+      "target": "implantation__faq__duration.md",
+      "anchor": "mozhno-li-uskorit-implantatsiyu",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/marketing.yaml",
+      "field": ".scenario_rules.time.ordered_amplifier_refs[2]",
+      "target": "implantation__faq__tooth_one_day.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/marketing.yaml",
+      "field": ".scenario_rules.time.ordered_amplifier_refs[3]",
+      "target": "implantation__info__steps.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/marketing.yaml",
+      "field": ".scenario_rules.doctor_trust.ordered_amplifier_refs[0]",
+      "target": "doctors__doctor__overview.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/marketing.yaml",
+      "field": ".scenario_rules.doctor_trust.ordered_amplifier_refs[1]",
+      "target": "clinic__info__technology.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/marketing.yaml",
+      "field": ".scenario_rules.result_reliability.ordered_amplifier_refs[1]",
+      "target": "implantation__faq__osseointegration.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/marketing.yaml",
+      "field": ".scenario_rules.result_reliability.ordered_amplifier_refs[2]",
+      "target": "implantation__faq__osseointegration.md",
+      "anchor": "ot-chego-zavisit-prizhivlenie",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/marketing.yaml",
+      "field": ".scenario_rules.result_reliability.ordered_amplifier_refs[3]",
+      "target": "clinic__info__warranty.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/pricebook/facts.json",
+      "field": ".tax_deduction.detail_ref",
+      "target": "clinic__info__payment_terms.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/pricebook/facts.json",
+      "field": ".installment_12.detail_ref",
+      "target": "clinic__info__payment_terms.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/pricebook/facts.json",
+      "field": ".free_implant_consult.detail_ref",
+      "target": "clinic__info__promo__free_implant_consult.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/pricebook/facts.json",
+      "field": ".implant_warranty.detail_ref",
+      "target": "clinic__info__warranty.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/pricebook/facts.json",
+      "field": ".implant_same_day_discount.detail_ref",
+      "target": "clinic__info__promo__implant_same_day_discount.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/pricebook/facts.json",
+      "field": ".professional_whitening_discount.detail_ref",
+      "target": "clinic__info__promo__professional_whitening_discount.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/pricebook/facts.json",
+      "field": ".payment_stages.detail_ref",
+      "target": "clinic__info__payment_terms.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/pricebook/facts.json",
+      "field": ".fixed_price.detail_ref",
+      "target": "clinic__info__payment_terms.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".tomography.content_ref",
+      "target": "diagnostics__service__tomography.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".professional_whitening.content_ref",
+      "target": "whitening__service__teeth_whitening.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".classic.content_ref",
+      "target": "implantation__service__classic.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".one_stage.content_ref",
+      "target": "implantation__service__one_stage.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".all_on_4.content_ref",
+      "target": "implantation__service__all_on_4.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".all_on_6.content_ref",
+      "target": "implantation__service__all_on_6.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".temporary_teeth.content_ref",
+      "target": "implantation__service__temporary_teeth.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".implant_supported_prosthetics.content_ref",
+      "target": "prosthetics__service__implant_supported_prosthetics.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".caries.content_ref",
+      "target": "treatment__service__caries.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".pulpitis.content_ref",
+      "target": "treatment__service__pulpitis.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".teeth_treatment.content_ref",
+      "target": "treatment__service__teeth_treatment.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".tooth_extraction.content_ref",
+      "target": "extraction__service__tooth_extraction.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".periodontitis.content_ref",
+      "target": "periodontology__service__periodontitis.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".aligners.content_ref",
+      "target": "orthodontics__service__aligners.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".bone_graft.content_ref",
+      "target": "implantation__service__bone_graft.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".veneers.content_ref",
+      "target": "prosthetics__service__veneers.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".zirconia_crowns.content_ref",
+      "target": "prosthetics__service__zirconia_crowns.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".clasp_dentures.content_ref",
+      "target": "prosthetics__service__clasp_dentures.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".sinus_lift.content_ref",
+      "target": "implantation__service__sinus_lift.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".zygomatic_implants.content_ref",
+      "target": "implantation__service__zygomatic_implants.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".pterygoid_implants.content_ref",
+      "target": "implantation__service__pterygoid_implants.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/target_response/service_catalog.json",
+      "field": ".removable_dentures.content_ref",
+      "target": "prosthetics__service__removable_dentures.md",
+      "anchor": null,
+      "exists": true
+    },
+    {
+      "source": "clients/demo/ui.yaml",
+      "field": ".guided_menu.quick_replies[1].ref",
+      "target": "implantation__faq__pain.md",
+      "anchor": "korotko",
+      "exists": true
+    },
+    {
+      "source": "clients/demo/ui.yaml",
+      "field": ".guided_menu.quick_replies[2].ref",
+      "target": "clinic__info__consultation.md",
+      "anchor": "korotko",
+      "exists": true
+    }
+  ],
+  "broken_literal_authored_md_references": [],
+  "variant_method": "In-memory removal of complete YAML field spans only, preserving all other raw decoded bytes/newlines. Sum before corpus wrappers/rstrip. body_only is unsafe upper bound (doctor facts lost), not a recommendation. No source edits. These character deltas are not token/cost savings."
+}

@@ -4,12 +4,7 @@ doc_type: info
 topic: implantation
 subtopic: curator
 
-aliases:
-  - "куратор лечения"
-  - "сопровождение пациента"
-  - "кто помогает во время лечения"
-  - "помощник в клинике"
-
+aliases: []
 cta_key: booking
 cta_action: lead
 

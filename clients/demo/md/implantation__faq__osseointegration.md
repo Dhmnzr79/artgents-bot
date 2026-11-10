@@ -4,12 +4,7 @@ doc_type: faq
 topic: implantation
 subtopic: osseointegration
 
-aliases:
-  - "приживется ли имплант"
-  - "риск отторжения импланта"
-  - "процент приживаемости"
-  - "надежность имплантов"
-
+aliases: []
 suggest_h3:
   - a-esli-implant-ne-prizhivetsya
   - ot-chego-zavisit-prizhivlenie

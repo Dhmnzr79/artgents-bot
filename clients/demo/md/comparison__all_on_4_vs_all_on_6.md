@@ -4,14 +4,7 @@ doc_type: comparison
 topic: implantation
 subtopic: all_on_4_vs_all_on_6
 
-aliases:
-  - "все на 4 или все на 6"
-  - "что лучше all-on-4 или all-on-6"
-  - "4 или 6 имплантов на челюсть"
-  - "на верхнюю челюсть 4 или 6 имплантов"
-  - "чем отличается all-on-6 от all-on-4"
-  - "имплантация верхней челюсти"
-
+aliases: []
 suggest_h3:
   - kogda-dostatochno-chetyreh
   - kogda-vybirayut-shest

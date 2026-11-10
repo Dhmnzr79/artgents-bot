@@ -4,10 +4,7 @@ doc_type: service
 topic: implantation
 subtopic: sinus_lift
 
-aliases:
-  - "больно ли делать синус-лифтинг"
-  - "имплант после синус-лифтинга"
-
+aliases: []
 suggest_h3:
   - kogda-nuzhen-sinus-lift
   - kak-prohodit-sinus-lift

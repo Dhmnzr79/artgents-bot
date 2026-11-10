@@ -5,14 +5,7 @@ topic: implantation
 subtopic: temporary_teeth
 aspect: duration
 
-aliases:
-  - "временный зуб на имплант"
-  - "зачем нужна временная коронка"
-  - "временные или постоянные зубы"
-  - "временные пластиковые зубы"
-  - "пластиковые или нормальные зубы"
-  - "когда поставят коронку после импланта"
-
+aliases: []
 suggest_h3:
   - kogda-stavyat-vremennye-zuby
   - ogranicheniya-do-postoyannoy-koronki

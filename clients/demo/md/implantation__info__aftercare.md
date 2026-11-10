@@ -4,11 +4,7 @@ doc_type: info
 topic: implantation
 subtopic: aftercare
 
-aliases:
-  - "уход после имплантации"
-  - "восстановление после импланта"
-  - "можно ли есть после имплантации"
-
+aliases: []
 suggest_h3:
   - chto-proishodit-v-pervye-dni
   - kak-prohodit-vosstanovlenie-do-koronki

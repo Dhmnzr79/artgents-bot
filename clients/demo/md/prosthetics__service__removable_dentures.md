@@ -4,16 +4,7 @@ doc_type: service
 topic: prosthetics
 subtopic: removable_dentures
 
-aliases:
-  - "съемные протезы"
-  - "съёмные протезы"
-  - "зубной протез"
-  - "протез если нет зубов"
-  - "вставная челюсть"
-  - "частичный зубной протез"
-  - "полный съёмный протез"
-  - "нет всех зубов"
-
+aliases: []
 suggest_h3:
   - chastichnyy-ili-polnyy-protez
   - mozhno-li-sdelat-udobno-i-estestvenno

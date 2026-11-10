@@ -5,13 +5,7 @@ topic: implantation
 subtopic: duration
 aspect: duration
 
-aliases:
-  - "сколько длится имплантация"
-  - "как долго ставят имплант"
-  - "сколько ждать коронку после импланта"
-  - "когда будет готов зуб"
-  - "срок имплантации после удаления зуба"
-
+aliases: []
 suggest_h3:
   - ot-chego-zavisit-srok-implantatsii
   - mozhno-li-uskorit-implantatsiyu

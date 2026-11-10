@@ -4,10 +4,7 @@ doc_type: faq
 topic: implantation
 subtopic: what_included
 
-aliases:
-  - "имплантация под ключ что входит"
-  - "коронка отдельно от импланта"
-
+aliases: []
 suggest_h3:
   - kogda-koronka-schitaetsya-otdelno
   - koronka-na-implant-ili-na-svoy-zub

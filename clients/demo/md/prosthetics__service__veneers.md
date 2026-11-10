@@ -4,10 +4,7 @@ doc_type: service
 topic: prosthetics
 subtopic: veneers
 
-aliases:
-  - "виниры на зубы"
-  - "голливудская улыбка"
-
+aliases: []
 suggest_h3:
   - etapy-ustanovki-vinirov
   - bolno-li-stavit-viniry

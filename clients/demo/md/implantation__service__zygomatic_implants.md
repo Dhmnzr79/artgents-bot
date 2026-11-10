@@ -4,15 +4,7 @@ doc_type: service
 topic: implantation
 subtopic: zygomatic_implants
 
-aliases:
-  - "скуловые имплантаты"
-  - "импланты в скулу"
-  - "зигоматические импланты"
-  - "zygomatic implants"
-  - "мало кости на верхней челюсти"
-  - "сильная атрофия верхней челюсти"
-  - "можно ли поставить импланты без костной пластики"
-
+aliases: ["зигоматические импланты", "zygomatic implants"]
 suggest_h3:
   - kogda-rassmatrivayut-skulovye-implanty
   - pochemu-nuzhna-kt

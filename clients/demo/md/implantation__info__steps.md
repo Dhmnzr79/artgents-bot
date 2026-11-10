@@ -5,13 +5,7 @@ topic: implantation
 subtopic: steps
 aspect: stages
 
-aliases:
-  - "этапы имплантации"
-  - "сколько визитов для имплантации"
-  - "сколько визитов полное протезирование челюсти"
-  - "что происходит при имплантации"
-  - "из чего состоит имплантация"
-
+aliases: []
 suggest_h3:
   - poryadok-lecheniya-do-implanta
 

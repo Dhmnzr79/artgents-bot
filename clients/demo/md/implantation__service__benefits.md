@@ -4,9 +4,7 @@ doc_type: service
 topic: implantation
 subtopic: benefits
 
-aliases:
-  - "почему имплантация"
-
+aliases: []
 cta_key: plan
 cta_action: lead
 

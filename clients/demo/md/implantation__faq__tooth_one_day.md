@@ -4,12 +4,7 @@ doc_type: faq
 topic: implantation
 subtopic: tooth_one_day
 
-aliases:
-  - "зуб в день установки"
-  - "временная коронка сразу"
-  - "имплант и коронка за один день"
-  - "почему нельзя сразу постоянную коронку"
-
+aliases: []
 cta_key: consult
 cta_action: lead
 

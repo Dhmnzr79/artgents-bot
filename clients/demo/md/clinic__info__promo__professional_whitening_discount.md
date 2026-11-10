@@ -4,11 +4,7 @@ doc_type: info
 topic: clinic
 subtopic: promotions
 
-aliases:
-  - "скидка на отбеливание"
-  - "акция на отбеливание зубов"
-  - "скидка 10 процентов отбеливание"
-
+aliases: []
 cta_key: booking
 cta_action: lead
 ---

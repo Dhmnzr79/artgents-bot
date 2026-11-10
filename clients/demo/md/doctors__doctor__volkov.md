@@ -7,12 +7,7 @@ subtopic: volkov
 name_full: "Волков Александр Сергеевич"
 name_short: "Волков"
 
-aliases:
-  - "волков александр"
-  - "главный врач волков"
-  - "врач волков"
-  - "хирург волков"
-
+aliases: []
 services:
   - classic
   - one_stage

@@ -2,7 +2,8 @@ export const TECHNICAL_ERROR_MESSAGE = "Сейчас не получилось �
 
 const visitorMemory = new Map();
 export function visitorIdForClient(clientId) {
-  const key = `clinic_widget_visitor_${clientId}`;
+  const key = ["demo", "demo_medical"].includes(clientId)
+    ? "clinic_widget_visitor_shared_demo" : `clinic_widget_visitor_${clientId}`;
   let id;
   try { id = globalThis.localStorage?.getItem(key); } catch { /* storage denied */ }
   if (!/^[a-f0-9-]{36}$/i.test(id || "")) {
@@ -15,9 +16,8 @@ export function visitorIdForClient(clientId) {
 
 // Presentation only: never publish exception details or claim a lead outcome.
 export function friendlyErrorMessage(error) {
-  if (["demo_session_limit", "demo_daily_limit"].includes(error)) {
-    return "Вы посмотрели возможности демо. Чтобы обсудить бота для вашего проекта, свяжитесь с автором через контакты на сайте.";
-  }
+  if (error === "demo_visitor_limit") return "Вы использовали 30 вопросов демо за последние 24 часа. Попробуйте позже или свяжитесь с автором через контакты на сайте.";
+  if (error === "demo_daily_limit") return "Общий суточный лимит демо исчерпан. Попробуйте позже или свяжитесь с автором через контакты на сайте.";
   if (error === "demo_ip_limit") return "Слишком много вопросов подряд. Подождите минуту и продолжите.";
   if (["visitor_rate_limit", "ip_rate_limit"].includes(error)) return "Слишком много сообщений подряд. Подождите минуту и продолжите.";
   if (error === "message_too_long") return "Сообщение слишком длинное. Пожалуйста, сократите его.";

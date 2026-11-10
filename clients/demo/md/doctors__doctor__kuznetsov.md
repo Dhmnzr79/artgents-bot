@@ -7,11 +7,7 @@ subtopic: kuznetsov
 name_full: "Кузнецов Дмитрий Андреевич"
 name_short: "Кузнецов"
 
-aliases:
-  - "кузнецов дмитрий"
-  - "ортопед кузнецов"
-  - "врач кузнецов"
-
+aliases: []
 services:
   - zirconia_crowns
   - veneers

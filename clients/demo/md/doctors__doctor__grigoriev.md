@@ -7,11 +7,7 @@ subtopic: grigoriev
 name_full: "Григорьев Павел Игоревич"
 name_short: "Григорьев"
 
-aliases:
-  - "григорьев павел"
-  - "пародонтолог григорьев"
-  - "врач григорьев"
-
+aliases: []
 services:
   - periodontitis
 

@@ -4,12 +4,7 @@ doc_type: info
 topic: implantation
 subtopic: implant_systems
 
-aliases:
-  - "какие импланты лучше"
-  - "бренды имплантов"
-  - "нобель или импро"
-  - "чем отличаются импланты"
-
+aliases: []
 suggest_h3:
   - nobel-maksimum-nadezhnosti
   - impro-razumnyy-balans

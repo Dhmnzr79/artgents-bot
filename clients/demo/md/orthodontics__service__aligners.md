@@ -4,12 +4,7 @@ doc_type: service
 topic: orthodontics
 subtopic: aligners
 
-aliases:
-  - "капы для зубов"
-  - "выровнять зубы"
-  - "исправить прикус"
-  - "кривые зубы"
-
+aliases: []
 suggest_h3:
   - chto-ispravlyayut-elaynery
   - etapy-lecheniya-na-elaynerah

@@ -4,14 +4,7 @@ doc_type: service
 topic: prosthetics
 subtopic: implant_supported_prosthetics
 
-aliases:
-  - "зубы на имплантах"
-  - "несъемные зубы на имплантах"
-  - "несъёмные зубы на имплантах"
-  - "восстановить зубы на имплантах"
-  - "протез на имплантах"
-  - "импланты с коронками"
-
+aliases: []
 suggest_h3:
   - kakoy-variant-podoydet
   - budu-li-hodit-bez-zubov

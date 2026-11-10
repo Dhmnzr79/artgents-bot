@@ -76,6 +76,27 @@ def test_block_text_uses_exact_header() -> None:
     assert snapshot.block_text().startswith("=== COMMERCIAL_FACT_CATALOG ===\n")
 
 
+def test_compact_prompt_preserves_all_facts_and_scope_values() -> None:
+    fields = ("allowed_service_ids", "allowed_offer_ids", "allowed_topics",
+              "incompatible_with", "excluded_service_ids")
+    from core.d2_tenant_snapshot import load_d2_tenant_snapshot
+    for client in ("demo", "nikadent", "demo_medical"):
+        bundle = load_d2_tenant_snapshot(client, clients_root=Path("clients")).bundle
+        snapshot = CommercialFactCatalogSnapshot.from_bundle(bundle)
+        original = snapshot.canonical_json
+        header, data, defaults = snapshot.block_text().split("\n", 2)
+        assert header == "=== COMMERCIAL_FACT_CATALOG ==="
+        assert defaults == "Omitted list fields equal []: " + ", ".join(fields) + "."
+        restored = json.loads(data)
+        for row in restored["facts"]:
+            for key in fields:
+                assert row.get(key) != []  # Empty lists are represented by the shared default.
+                row.setdefault(key, [])
+        assert restored == json.loads(original)
+        assert snapshot.canonical_json == original
+        assert len(snapshot.block_text()) < len(header + "\n" + original)
+
+
 def test_full_values_are_preserved_without_offer_or_service_rows() -> None:
     bundle = _demo_bundle()
     payload = json.loads(CommercialFactCatalogSnapshot.from_bundle(bundle).canonical_json)

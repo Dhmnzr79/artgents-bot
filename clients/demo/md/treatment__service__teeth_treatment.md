@@ -4,11 +4,7 @@ doc_type: service
 topic: treatment
 subtopic: teeth_treatment
 
-aliases:
-  - "лечить зубы"
-  - "стоматологическое лечение"
-  - "терапевтическая стоматология"
-
+aliases: []
 suggest_h3:
   - pochemu-lechenie-zubov-bez-boli
 

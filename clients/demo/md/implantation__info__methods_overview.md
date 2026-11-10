@@ -5,12 +5,7 @@ topic: implantation
 subtopic: methods_overview
 aspect: overview
 
-aliases:
-  - "методы имплантации"
-  - "классическая или одномоментная имплантация"
-  - "как выбрать метод имплантации"
-  - "что такое имплантация зубов"
-
+aliases: []
 cta_key: plan
 cta_action: lead
 

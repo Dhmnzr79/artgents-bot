@@ -1,5 +1,6 @@
 import { renderPriceBody } from './price_card.js';
 import { createWidgetIcon } from './icons.js';
+import { matchesCatalogSearch } from './catalog_search.js';
 
 const element=(tag,cls,text)=>{const el=document.createElement(tag);if(cls)el.className=cls;if(text!=null)el.textContent=text;return el;};
 const button=(text,action,cls='clinic-catalog__back')=>{const el=element('button',cls,text);el.type='button';
@@ -90,7 +91,7 @@ export function mountCatalog(root,{apiBase,clientId,onApply,onAsk}){
       }
       const found=state.data.services.filter(service=>{
         const section=sectionById(service.section_id);
-        return query?[service.name,service.subtitle,...service.aliases,section.title,...(service.price?.rows||[]).map(r=>r.variant_label||'')].join(' ').toLocaleLowerCase('ru').includes(query):!state.section||service.section_id===state.section;
+        return query?matchesCatalogSearch([service.name,service.subtitle,...service.aliases,section.title,...(service.price?.rows||[]).map(r=>r.variant_label||'')],query):!state.section||service.section_id===state.section;
       });
       if(!found.length)list.append(element('p','clinic-catalog__empty','Ничего не найдено. Попробуйте другое название.'));
       for(const service of found){

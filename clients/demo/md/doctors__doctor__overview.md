@@ -4,12 +4,7 @@ doc_type: doctor
 topic: doctors
 subtopic: overview
 
-aliases:
-  - "врачи клиники"
-  - "опыт врачей"
-  - "специалисты клиники"
-  - "кто занимается имплантацией"
-
+aliases: []
 cta_key: booking
 cta_action: lead
 ---

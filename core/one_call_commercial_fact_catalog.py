@@ -12,6 +12,10 @@ if TYPE_CHECKING:
     from core.one_call_exact_commercial_catalog import ExactCommercialCatalogSnapshot
 
 _COMMERCIAL_FACT_CATALOG_HEADER = "=== COMMERCIAL_FACT_CATALOG ==="
+_SCOPE_LIST_FIELDS = (
+    "allowed_service_ids", "allowed_offer_ids", "allowed_topics",
+    "incompatible_with", "excluded_service_ids",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,4 +46,12 @@ class CommercialFactCatalogSnapshot:
         return cls.from_exact_catalog(ExactCommercialCatalogSnapshot.from_bundle(bundle))
 
     def block_text(self) -> str:
-        return f"{_COMMERCIAL_FACT_CATALOG_HEADER}\n{self.canonical_json}"
+        # Compact only the model-facing text; retain the full captured authority.
+        payload = json.loads(self.canonical_json)
+        for row in payload["facts"]:
+            for key in _SCOPE_LIST_FIELDS:
+                if row.get(key) == []:
+                    del row[key]
+        defaults = "Omitted list fields equal []: " + ", ".join(_SCOPE_LIST_FIELDS) + "."
+        compact = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        return f"{_COMMERCIAL_FACT_CATALOG_HEADER}\n{compact}\n{defaults}"

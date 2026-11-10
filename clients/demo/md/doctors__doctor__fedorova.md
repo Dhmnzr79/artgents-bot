@@ -7,12 +7,7 @@ subtopic: fedorova
 name_full: "Фёдорова Ирина Михайловна"
 name_short: "Фёдорова"
 
-aliases:
-  - "федорова ирина"
-  - "ирина фёдорова"
-  - "терапевт фёдорова"
-  - "врач фёдорова"
-
+aliases: []
 services:
   - caries
   - pulpitis

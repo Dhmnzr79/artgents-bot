@@ -4,9 +4,7 @@ doc_type: info
 topic: clinic
 subtopic: first_visit
 
-aliases:
-  - "с чего начать лечение зубов"
-
+aliases: []
 suggest_h3:
   - rasskazhite-pro-kliniku
   - kak-vybirayut-lechenie

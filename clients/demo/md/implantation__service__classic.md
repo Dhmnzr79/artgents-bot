@@ -4,10 +4,7 @@ doc_type: service
 topic: implantation
 subtopic: classic
 
-aliases:
-  - "имплант в два этапа"
-  - "сначала имплант потом коронка"
-
+aliases: []
 suggest_h3:
   - pochemu-vybirayut-klassicheskuyu
   - sroki-i-ogranicheniya

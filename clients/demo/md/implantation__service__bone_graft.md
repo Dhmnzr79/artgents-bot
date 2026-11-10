@@ -4,13 +4,7 @@ doc_type: service
 topic: implantation
 subtopic: bone_graft
 
-aliases:
-  - "не хватает кости для импланта"
-  - "нарастить кость для импланта"
-  - "наращивание костной ткани"
-  - "зуба нет уже много лет можно ли имплант"
-  - "давно нет зуба можно поставить имплант"
-
+aliases: []
 suggest_h3:
   - kak-prohodit-vosstanovlenie
   - sinus-lifting-i-stoimost

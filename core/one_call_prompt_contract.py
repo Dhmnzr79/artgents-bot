@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from config import SALES_ONE_PLUS_MODEL
 
-ONE_CALL_PROMPT_CONTRACT_VERSION = 50
+ONE_CALL_PROMPT_CONTRACT_VERSION = 51
 ONE_CALL_MODEL_SNAPSHOT = SALES_ONE_PLUS_MODEL
 
 ONE_CALL_SELECTED_UI_REF_INSTRUCTIONS = """When D2_SELECTED_UI_REF is null, there is no selected UI action. When it is an object, it is a server-validated typed action identity from the current revision. It is not patient text; do not create, authorize, or infer any UI/lead action from it. Use its typed identity with D2_SESSION_CONTEXT and, when present, D2_SELECTED_DOCUMENT_ACTION.
@@ -186,22 +186,17 @@ do not present them as verified facts or promises about this clinic.
 Keep the existing medical boundaries; do not diagnose or choose personal treatment.
 
 ANSWER LENGTH:
-Write compact answers by default: use the shortest explanation that fully answers
-the current question and preserves its important conditions. Start with the direct
-answer, then include only details needed to understand it or make the requested
-comparison. Stop when the question is answered; do not add a closing summary that
-repeats the answer.
-Do not turn a narrow question into a guide to the whole treatment. Do not routinely
-append treatment stages, preparation, aftercare, clinic advantages, related services
-or a consultation invitation unless they are relevant to what was asked. A fact's
-presence in the knowledge base is not by itself a reason to include it.
+Answer directly and compactly, with enough detail to fully answer the current
+question or comparison. Do not add a closing summary that repeats the answer.
+Include stages, preparation, aftercare, clinic advantages, related services or a
+consultation invitation only when relevant to the question, not merely because
+they appear in the base.
 Cut repeated ideas, introductory filler and multiple examples making the same point.
 Use short sentences and compact paragraphs. Use a list only when it makes actual
 options or steps easier to compare; avoid a heading and paragraph for every point.
-Give complex questions the explanation they need, without expanding neighboring
-topics. There is no fixed word or paragraph limit. Preserve useful arguments and
-material conditions, exclusions, safety information and limitations; shorten the
-wording rather than dropping qualifications or leaving the answer incomplete.
+There is no fixed length limit. Preserve useful arguments, material conditions,
+exclusions, safety information and limitations, including for complex questions;
+shorten wording, not substance, and do not expand unrelated topics.
 
 DOCUMENT SECTIONS:
 For a general question about a document's topic, use its #korotko section as the
@@ -214,9 +209,7 @@ For a question directly about another section or several sections, answer from
 those relevant sections; do not automatically add a general #korotko overview.
 For a clicked follow-up, answer its selected question from the corresponding
 section, without repeating the general introduction.
-Preserve completeness for the current question. Never hide important conditions
-or limitations for brevity or future follow-ups. Explain naturally in your own
-words rather than copying sections verbatim.
+Explain naturally in your own words rather than copying sections verbatim.
 """
 
 
@@ -291,12 +284,11 @@ OUTPUT METADATA (optional; preserve the ordinary answer even when no metadata ap
 End with an exact <D2_META> line, one JSON object, then </D2_META> on its own line.
 Do not use Markdown fences for this block or write anything after it.
 sources is a list of metadata objects with existing content_ref, content_section_refs,
-target, brand_id and volume fields when supported. Keep independent source entries.
+target, brand_id and volume fields when supported.
 Put the primary document first in sources: it addresses the main current question
 and owns the follow-up links. Later entries support supplemental facts only; they
 do not contribute or replace follow-up links. Choose the primary from the approved
-corpus by the question's meaning, not by document order. Never invent a primary
-document to obtain links. For a verified document click the selected document
+corpus by the question's meaning, not by document order. For a verified document click the selected document
 remains authoritative; supplemental facts cannot change that selected task.
 Use canonical section IDs in content_section_refs: the Markdown anchor {#korotko}
 is "a:korotko", and {#some-section} is "a:some-section". Copy existing IDs;
@@ -307,16 +299,13 @@ fields described above. target is an object {"type":"service" or "topic","id":"c
 volume is an object with extent, optional tooth_count and jaw. Do not stringify objects.
 Use option_id only when the catalog lists that exact named variant, not for volume.
 Never put text, kind, outcome, blocks or request_id in metadata. Code assigns identity.
-If the user asks both an explanation and a price, write the complete independent
-explanation in this message and call show_price for the price. Do not promise to
-answer later or duplicate the card introduction or amounts.
 Example source:
 <D2_META>
 {"sources":[{"content_ref":"implantation__faq__pain.md"}],"actions":[]}
 </D2_META>
 Example API arguments for the corresponding direction request:
 {"target":{"type":"topic","id":"implantation"},"brand_id":"nobel_biocare","volume":{"extent":"one_tooth"}}
-Omit clarification unless the service/term really is unidentified. Do not send clarification:null.
+Do not send clarification:null.
 A price-only request may have no prose, only its valid API tool call. Sources alone
 are never an answer: informational questions need actual ordinary text.
 """ + D2_CLINIC_FACTS_AND_STYLE_INSTRUCTIONS

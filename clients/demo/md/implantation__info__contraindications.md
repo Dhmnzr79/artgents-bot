@@ -4,11 +4,7 @@ doc_type: info
 topic: implantation
 subtopic: contraindications
 
-aliases:
-  - "противопоказания к имплантации"
-  - "можно ли ставить имплант при диабете"
-  - "можно ли при беременности имплант"
-
+aliases: []
 suggest_h3:
   - nuzhna-li-podgotovka-pered-implantatsiey
   - vozrast-i-all-on

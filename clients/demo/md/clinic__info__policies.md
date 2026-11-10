@@ -3,11 +3,7 @@ doc_id: clinic__info__policies
 doc_type: info
 topic: clinic
 subtopic: policies
-aliases:
-  - "принимаете детей"
-  - "лечение по ОМС"
-  - "лечение по ДМС"
-  - "отсутствующие услуги"
+aliases: []
 cta_key: callback
 cta_action: lead
 ---

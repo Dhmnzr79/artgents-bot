@@ -4,12 +4,7 @@ doc_type: service
 topic: implantation
 subtopic: pterygoid_implants
 
-aliases:
-  - "птеригоидная имплантация"
-  - "крыловидные импланты"
-  - "импланты без костной пластики"
-  - "импланты без синус-лифтинга"
-
+aliases: []
 suggest_h3:
   - kogda-rassmatrivayut-pterygoid
   - chem-otlichaetsya-ot-obychnyh

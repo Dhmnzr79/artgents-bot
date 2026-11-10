@@ -4,10 +4,7 @@ doc_type: service
 topic: implantation
 subtopic: all_on_4
 
-aliases:
-  - "протокол all-on-4"
-  - "несъёмный зубной ряд на 4 имплантах"
-
+aliases: []
 suggest_h3:
   - komu-podhodit-all-on-4
   - kak-rabotaet-metod-all-on-4

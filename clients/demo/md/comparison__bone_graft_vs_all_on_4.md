@@ -4,11 +4,7 @@ doc_type: comparison
 topic: implantation
 subtopic: bone_graft_vs_all_on_4
 
-aliases:
-  - "наращивание кости или all-on-4"
-  - "синус-лифтинг или all-on-4"
-  - "можно ли all-on-4 без наращивания кости"
-
+aliases: []
 suggest_h3:
   - kogda-nuzhna-kostnaya-plastika
   - kogda-mozhno-all-on-4

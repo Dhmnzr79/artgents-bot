@@ -4,10 +4,7 @@ doc_type: info
 topic: clinic
 subtopic: results
 
-aliases:
-  - "можно посмотреть ваши работы"
-  - "фото до и после"
-
+aliases: []
 suggest_h3:
   - posmotret-rezultaty
 ---

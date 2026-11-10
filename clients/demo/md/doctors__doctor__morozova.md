@@ -7,11 +7,7 @@ subtopic: morozova
 name_full: "Морозова Анна Сергеевна"
 name_short: "Морозова"
 
-aliases:
-  - "морозова анна"
-  - "ортодонт морозова"
-  - "врач морозова"
-
+aliases: []
 services:
   - aligners
 

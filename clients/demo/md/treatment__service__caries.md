@@ -4,15 +4,7 @@ doc_type: service
 topic: treatment
 subtopic: caries
 
-aliases:
-  - "дырка в зубе"
-  - "поставить пломбу"
-  - "вылечить зуб"
-  - "зуб с кариесом"
-  - "темное пятно на зубе"
-  - "зуб реагирует на холодное"
-  - "зуб реагирует на сладкое"
-
+aliases: []
 suggest_h3: []
 
 cta_key: plan

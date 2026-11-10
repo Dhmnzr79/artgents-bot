@@ -4,11 +4,7 @@ doc_type: service
 topic: diagnostics
 subtopic: tomography
 
-aliases:
-  - "своё кт"
-  - "свое кт"
-  - "повторное кт"
-
+aliases: []
 suggest_h3: []
 
 cta_key: plan

@@ -4,11 +4,7 @@ doc_type: info
 topic: clinic
 subtopic: promotions
 
-aliases:
-  - "скидка в день обращения"
-  - "скидка 15 процентов на имплантацию"
-  - "акция на имплантацию"
-
+aliases: []
 cta_key: booking
 cta_action: lead
 ---

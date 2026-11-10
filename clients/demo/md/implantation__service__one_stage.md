@@ -5,10 +5,7 @@ topic: implantation
 subtopic: one_stage
 
 
-aliases:
-  - "одномоментный протокол имплантации"
-  - "имплант в день удаления зуба"
-
+aliases: []
 suggest_h3:
   - kogda-ne-podhodit-odnomomentnaya
   - v-chem-osobennost-metoda

@@ -4,15 +4,7 @@ doc_type: info
 topic: clinic
 subtopic: technology
 
-aliases:
-  - "технологии клиники"
-  - "цифровая имплантация"
-  - "искусственный интеллект"
-  - "своя лаборатория"
-  - "зачем 3d-планирование"
-  - "зачем 3d планирование"
-  - "3d-планирование имплантации"
-
+aliases: []
 suggest_h3:
   - kak-planiruetsya-implantatsiya
   - kak-povyshaetsya-tochnost

@@ -4,11 +4,7 @@ doc_type: faq
 topic: implantation
 subtopic: tooth_loss
 
-aliases:
-  - "потерял зуб"
-  - "нет зуба что делать"
-  - "остался без зуба"
-
+aliases: []
 cta_key: consult
 cta_action: lead
 

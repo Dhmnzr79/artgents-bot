@@ -7,11 +7,7 @@ subtopic: orlov
 name_full: "Орлов Никита Владимирович"
 name_short: "Орлов"
 
-aliases:
-  - "никита орлов"
-  - "имплантолог орлов"
-  - "врач орлов"
-
+aliases: []
 services:
   - classic
   - one_stage

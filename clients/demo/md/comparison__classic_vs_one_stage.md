@@ -4,12 +4,7 @@ doc_type: comparison
 topic: implantation
 subtopic: classic_vs_one_stage
 
-aliases:
-  - "одномоментная или двухэтапная имплантация"
-  - "имплант сразу или в два этапа"
-  - "что надёжнее одномоментная или классическая"
-  - "сразу с коронкой или в два этапа"
-
+aliases: []
 suggest_h3:
   - klassicheskaya-dvuh-etapnaya
   - odnomomentnaya-srazu

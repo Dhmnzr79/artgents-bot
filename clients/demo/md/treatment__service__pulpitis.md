@@ -4,14 +4,7 @@ doc_type: service
 topic: treatment
 subtopic: pulpitis
 
-aliases:
-  - "пультип"
-  - "болит зуб"
-  - "сильно болит зуб"
-  - "острая зубная боль"
-  - "болит зуб ночью"
-  - "удалить нерв"
-
+aliases: []
 cta_key: plan
 cta_action: lead
 

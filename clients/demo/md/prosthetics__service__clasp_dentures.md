@@ -4,12 +4,7 @@ doc_type: service
 topic: prosthetics
 subtopic: clasp_dentures
 
-aliases:
-  - "протез с дугой"
-  - "частичный протез с дугой"
-  - "протез на кламмерах"
-  - "протез на замках"
-
+aliases: []
 suggest_h3:
   - podoydet-li-mne-byugelnyy-protez
   - budet-li-udobno-nosit

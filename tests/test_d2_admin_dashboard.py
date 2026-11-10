@@ -158,3 +158,42 @@ def test_old_ledger_is_read_only_and_old_amount_not_added_to_new_cost(admin_env)
     events=admin.get('/api/events?client_id=demo&limit=1').json
     assert len(events['items'])==1 and events['items'][0]['pricing_basis']is None
     assert db.read_bytes()==before
+
+
+def test_workspace_search_counts_order_and_privacy(admin_env):
+    bot, admin, db, use, _, _ = admin_env
+    use(D2HttpProvider(transport=Transport(message('Первый ответ'), message('Второй ответ'), message('Продолжение'))))
+    first, second = uuid4().hex, uuid4().hex
+    send(bot, sid=first, request_id='one', q='Консультация +79991234567 secret@example.org')
+    send(bot, sid=second, request_id='two', q='Гигиена')
+    send(bot, sid=first, request_id='three', q='Продолжим')
+    before = db.read_bytes()
+    data = admin.get('/api/dialogs?client_id=demo&limit=1').json
+    assert data['items'][0]['session_id'] == identity_hash(first)
+    assert data['items'][0]['questions'] == 2 and data['items'][0]['actions'] == 0
+    assert '79991234567' not in json.dumps(data) and 'secret@example.org' not in json.dumps(data)
+    other = admin.get('/api/dialogs', query_string=dict(client_id='demo',limit=1,cursor=data['next_cursor'])).json
+    assert other['items'][0]['session_id'] == identity_hash(second) and other['next_cursor'] is None
+    assert len(admin.get('/api/dialogs?client_id=demo&q=КОНСУЛЬТАЦИЯ').json['items']) == 1
+    assert admin.get('/api/dialogs?client_id=demo&q=secret@example.org').json['items'] == []
+    assert admin.get('/api/dialogs?client_id=nikadent').json['items'] == []
+    assert admin.get('/api/dialogs?client_id=demo&problems=1').json['items'] == []
+    assert db.read_bytes() == before
+
+
+def test_workspace_partial_failure_evidence_and_date_filter(admin_env):
+    from tests.d2_ci_http import FakeProvider
+    from tests.test_d2_af1b_contacts_http import _contact_raw
+    bot, admin, db, use, _, _ = admin_env
+    sid = uuid4().hex
+    use(FakeProvider(_contact_raw(['contact_address'], branch_id='pogranichnaya', prose=True)))
+    send(bot,sid=sid,request_id='partial')
+    listed = admin.get('/api/dialogs?client_id=demo&problems=1').json['items']
+    assert len(listed) == 1 and listed[0]['partial_failure'] is True
+    turn = admin.get(f'/api/dialogs/{identity_hash(sid)}/thread?client_id=demo').json['items'][0]
+    assert turn['failure_reasons'] == ['d2_operation_invalid']
+    assert turn['request_key'] == identity_hash('partial')
+    with sqlite3.connect(db) as conn:
+        conn.execute("UPDATE d2_dialogue SET payload=json_set(payload,'$.activity.last_user_turn_at','2020-01-01T00:00:00+00:00')")
+    assert admin.get('/api/dialogs?client_id=demo&dialog_period=month').json['items'] == []
+    assert len(admin.get('/api/dialogs?client_id=demo').json['items']) == 1

@@ -121,7 +121,11 @@ def api_overview():
 def api_dialogs():
     cid = _client()
     limit, cursor = _paging()
-    return jsonify(client_id=cid, **repository.dialogs(cid, limit, cursor))
+    return jsonify(client_id=cid, **repository.dialogs(cid, limit, cursor,
+        query=request.args.get('q', '')[:200],
+        start=_overview_period_bounds(request.args.get('dialog_period'))[0].isoformat() if request.args.get('dialog_period') in {'today','week','month'} else None,
+        end=_overview_period_bounds(request.args.get('dialog_period'))[1].isoformat() if request.args.get('dialog_period') in {'today','week','month'} else None,
+        problems=request.args.get('problems') == '1'))
 
 
 @app.get('/api/dialogs/<session_id>/thread')

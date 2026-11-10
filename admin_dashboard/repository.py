@@ -116,7 +116,7 @@ def overview(client_id, start, end):
     with reader(client_id) as conn:
         result = dict(sessions=0, saved_turns=0, forms=0, sent=0, demo_stub=0,
                       failed=0, unknown=0, pending=0, metrics_available=False,
-                      observed_requests=0, observed_failures=0)
+                      observed_requests=0, observed_failures=0, average_request_ms=None)
         if conn is None:
             return result
         result['sessions'] = conn.execute('SELECT count(*) FROM d2_dialogue WHERE client_id=?', (client_id,)).fetchone()[0]
@@ -127,19 +127,41 @@ def overview(client_id, start, end):
                 result['forms'] += row['n']
         result['metrics_available'] = _metrics_present(conn)
         if result['metrics_available']:
-            row = conn.execute("SELECT count(*) AS n,sum(outcome='failed') AS failures FROM d2_admin_observation WHERE client_id=? AND kind='request' AND observed_at>=? AND observed_at<?",
+            row = conn.execute("SELECT count(*) AS n,sum(outcome='failed') AS failures,avg(CASE WHEN outcome='completed' THEN duration_ms END) AS average_ms FROM d2_admin_observation WHERE client_id=? AND kind='request' AND observed_at>=? AND observed_at<?",
                                (client_id, start, end)).fetchone()
-            result.update(observed_requests=row['n'], observed_failures=row['failures'] or 0)
+            result.update(observed_requests=row['n'], observed_failures=row['failures'] or 0, average_request_ms=row['average_ms'])
         return result
 
 
-def dialogs(client_id, limit, cursor=None):
+def dialogs(client_id, limit, cursor=None, query='', start=None, end=None, problems=False):
+    """Bounded SQL filtering; summaries use validated public receipts only."""
     with reader(client_id) as conn:
         if conn is None:
             return {'items': [], 'next_cursor': None}
-        where = 'client_id=?' + (' AND rowid<?' if cursor is not None else '')
-        args = (client_id, cursor, limit + 1) if cursor is not None else (client_id, limit + 1)
-        rows = conn.execute('SELECT rowid AS cursor,sid,payload FROM d2_dialogue WHERE ' + where + ' ORDER BY rowid DESC LIMIT ?', args).fetchall()
+        conn.create_function('safe_search', 1, lambda text: observability_safe_user_text(text or '', max_len=8000).casefold())
+        where, args = ['d.client_id=?'], [client_id]
+        if start:
+            where.append("julianday(json_extract(d.payload,'$.activity.last_user_turn_at'))>=julianday(?)")
+            args.append(start)
+        if end:
+            where.append("julianday(json_extract(d.payload,'$.activity.last_user_turn_at'))<julianday(?)")
+            args.append(end)
+        if query:
+            where.append("""(instr(identity_hash(d.sid),?)>0 OR EXISTS (
+                SELECT 1 FROM d2_turn_request t WHERE t.client_id=d.client_id AND t.sid=d.sid
+                AND t.status='complete' AND instr(safe_search(json_extract(t.payload,'$.dialogue_ref.patient_text')),?)>0))""")
+            args.extend([query.casefold(), query.casefold()])
+        partial = """EXISTS (SELECT 1 FROM d2_turn_request t WHERE t.client_id=d.client_id AND t.sid=d.sid
+            AND t.status='complete' AND json_type(t.payload,'$.dialogue_ref')='object'
+            AND EXISTS (SELECT 1 FROM json_each(t.payload,'$.response.resolved.d2_part_failure_blocks') b WHERE json_extract(b.value,'$.reason')='d2_operation_invalid'))"""
+        failed = ("EXISTS (SELECT 1 FROM d2_admin_observation o WHERE o.client_id=d.client_id AND o.sid_hash=identity_hash(d.sid) AND o.outcome='failed')"
+                  if _metrics_present(conn) else '0')
+        if problems:
+            where.append(f'({partial} OR {failed})')
+        offset = cursor or 0
+        rows = conn.execute("SELECT d.sid,d.payload," + partial + " AS partial," + failed + " AS failed FROM d2_dialogue d WHERE "
+            + ' AND '.join(where) + " ORDER BY julianday(json_extract(d.payload,'$.activity.last_user_turn_at')) DESC,d.rowid DESC LIMIT ? OFFSET ?",
+            (*args, limit + 1, offset)).fetchall()
         items = []
         for row in rows[:limit]:
             try:
@@ -148,9 +170,19 @@ def dialogs(client_id, limit, cursor=None):
                     raise ValueError('owner')
             except ValueError as exc:
                 raise StorageUnavailable('d2_receipt_invalid') from exc
+            counts = conn.execute("""SELECT count(*) AS steps,
+                sum(json_extract(payload,'$.dialogue_ref.patient_text') IS NOT NULL) AS questions
+                FROM d2_turn_request WHERE client_id=? AND sid=? AND status='complete'
+                AND json_type(payload,'$.dialogue_ref')='object'""", (client_id,row['sid'])).fetchone()
+            first = conn.execute("""SELECT sid,request_id,payload FROM d2_turn_request
+                WHERE client_id=? AND sid=? AND status='complete'
+                AND json_extract(payload,'$.dialogue_ref.patient_text') IS NOT NULL ORDER BY rowid LIMIT 1""", (client_id,row['sid'])).fetchone()
+            preview = observability_safe_user_text(_turn(first,client_id).dialogue_ref.patient_text, max_len=180) if first else 'Действия в виджете'
             items.append(dict(session_id=identity_hash(row['sid']), revision=record.state.revision,
-                              last_activity=record.activity.last_user_turn_at.isoformat()))
-        return {'items': items, 'next_cursor': rows[limit-1]['cursor'] if len(rows) > limit else None}
+                last_activity=record.activity.last_user_turn_at.isoformat(), preview=preview,
+                questions=counts['questions'] or 0, actions=counts['steps']-(counts['questions'] or 0),
+                partial_failure=bool(row['partial']), failed=bool(row['failed'])))
+        return {'items': items, 'next_cursor': offset + limit if len(rows) > limit else None}
 
 
 def thread(client_id, session_id, limit, cursor=None):
@@ -173,7 +205,8 @@ def thread(client_id, session_id, limit, cursor=None):
             items.append(dict(revision=turn.committed_revision,
                 request_key=identity_hash(turn.request_id),
                 patient_text=observability_safe_user_text(patient, max_len=8000) if patient else None,
-                selected_action=patient is None, answer=publication['answer'][:24000]))
+                selected_action=patient is None, answer=publication['answer'][:24000],
+                failure_reasons=[b.reason for b in turn.response.resolved.d2_part_failure_blocks]))
         return {'items': items, 'session_id': session_id,
                 'next_cursor': rows[limit-1]['cursor'] if len(rows) > limit else None}
 

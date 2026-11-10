@@ -483,6 +483,12 @@ h1 {
 .cost-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-bottom:24px; }
 .cost-summary>.metric:first-child { background:linear-gradient(135deg,var(--metric-glow),var(--metric-bg)); border-color:color-mix(in srgb,var(--accent-blue) 32%,var(--line)); }
 .cost-summary .metric-number { font-size:30px; }
+#knowledge .cost-summary { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.knowledge-table { margin-top:16px; }
+.knowledge-table th:nth-child(2),.knowledge-table td:nth-child(2) { text-align:right; white-space:nowrap; }
+.knowledge-table tbody tr:nth-child(4) { font-weight:600; color:var(--accent-blue); background:var(--table-bg); }
+@media(max-width:1150px) { #knowledge .cost-summary { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:720px) { #knowledge .cost-summary { grid-template-columns:1fr; } }
 .cache-meter { width:100%; height:6px; margin-top:14px; border:0; border-radius:10px; overflow:hidden; background:var(--line); accent-color:var(--accent-teal); }
 .cache-meter::-webkit-progress-bar { background:var(--line); border-radius:10px; }
 .cache-meter::-webkit-progress-value { background:var(--accent-teal); border-radius:10px; }

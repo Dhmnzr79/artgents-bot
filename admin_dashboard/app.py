@@ -154,6 +154,13 @@ def api_costs():
     return jsonify(client_id=cid, **repository.costs(cid, start.isoformat(), end.isoformat()))
 
 
+@app.get('/api/knowledge')
+def api_knowledge():
+    cid = _client()
+    from admin_dashboard.knowledge_stats import knowledge_stats
+    return jsonify(client_id=cid, **knowledge_stats(cid))
+
+
 @app.get('/api/funnel')
 def api_funnel():
     cid = _client()

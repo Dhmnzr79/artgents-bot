@@ -98,12 +98,57 @@ def test_real_adapter_usage_replay_and_failed_request_observation(admin_env,monk
     assert send(bot,sid=sid,request_id='first',q='Расскажите о клинике')==first
     costs=admin.get('/api/costs?client_id=demo').json
     assert costs['items'][0]['calls']==1 and costs['estimated_usd']==.0012
+    assert costs['call_breakdown']['one']==1
+    assert costs['call_breakdown']['replayed']==1
+    thread=admin.get(f'/api/dialogs/{identity_hash(sid)}/thread?client_id=demo').json
+    assert thread['items'][0]['model_usage']['calls']==1
     response=bot.post('/ask',json=dict(client_id='demo',sid=sid,request_id='second',q='Следующий вопрос'))
     assert response.status_code>=400
     errors=admin.get('/api/problems?client_id=demo').json
     assert errors['available'] and errors['items']
     assert 'PRIVATE_PROVIDER_ERROR'not in json.dumps(errors)
     assert len(wire.calls)==2
+
+
+def test_call_breakdown_exact_attempt_period_tenant_and_missing_metrics(admin_env):
+    from datetime import datetime, timezone, timedelta
+    from core.d2_admin_metrics import _write
+    bot,admin,db,use,_,mod=admin_env
+    sid=uuid4().hex
+    use(D2HttpProvider(transport=Transport(message('Ответ.'))))
+    send(bot,sid=sid,request_id='shared')
+    with sqlite3.connect(db) as conn:
+        conn.execute('DELETE FROM d2_admin_observation')
+    now=datetime.now(timezone.utc)
+    stamp=now.isoformat()
+    old=(now-timedelta(days=2)).isoformat()
+    def event(attempt,kind='request',outcome='completed',when=stamp,tenant='demo',session=sid):
+        _write(tenant,dict(event_id=attempt,sid_hash=identity_hash(session),
+            request_hash=identity_hash('shared'),observed_at=when,kind=kind,
+            outcome=outcome,duration_ms=100,estimated_usd=None))
+    # Same logical request: a failure, success with two calls, and cached replay.
+    event('failed',outcome='failed');event('failed:1','provider','failed')
+    event('success');event('success:1','provider','returned',old)
+    event('success:2','provider','returned')
+    event('replay',outcome='replayed')
+    event('zero',session='action');event('three',session='other')
+    for i in range(1,4):event(f'three:{i}','provider','returned',session='other')
+    event('foreign',tenant='nikadent');event('foreign:1','provider','returned',tenant='nikadent')
+    event('orphan:1','provider','returned')
+    event('old',when=old)
+    before=db.read_bytes()
+    with mod.repository.reader('demo') as conn:
+        b=mod.repository._call_breakdown(mod.repository._call_attempts(conn,'demo',
+            (now-timedelta(hours=1)).isoformat(),(now+timedelta(hours=1)).isoformat()))
+    assert b==dict(completed=3,zero=1,one=0,two=1,more=1,two_percent=100/3,
+                   failed_attempts=1,replayed=1,failed_calls=1)
+    thread=admin.get(f'/api/dialogs/{identity_hash(sid)}/thread?client_id=demo').json
+    assert thread['items'][0]['model_usage']['calls']==2
+    assert thread['items'][0]['model_usage']['failed_attempts']==1
+    assert db.read_bytes()==before
+    with sqlite3.connect(db) as conn:conn.execute('DELETE FROM d2_admin_observation')
+    thread=admin.get(f'/api/dialogs/{identity_hash(sid)}/thread?client_id=demo').json
+    assert thread['items'][0]['model_usage'] is None
 
 
 def test_cached_usage_snapshot_totals_and_replay_without_charge(admin_env,monkeypatch):

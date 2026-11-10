@@ -207,6 +207,12 @@ def thread(client_id, session_id, limit, cursor=None):
                 patient_text=observability_safe_user_text(patient, max_len=8000) if patient else None,
                 selected_action=patient is None, answer=publication['answer'][:24000],
                 failure_reasons=[b.reason for b in turn.response.resolved.d2_part_failure_blocks]))
+            attempts = _call_attempts(conn, client_id, sid_hash=session_id,
+                                      request_hash=identity_hash(turn.request_id))
+            completed = [a for a in attempts if a['outcome'] == 'completed']
+            items[-1]['model_usage'] = (dict(completed[-1],
+                failed_attempts=sum(a['outcome'] == 'failed' for a in attempts))
+                if completed else None)
         return {'items': items, 'session_id': session_id,
                 'next_cursor': rows[limit-1]['cursor'] if len(rows) > limit else None}
 
@@ -244,6 +250,46 @@ def observations(client_id, start, end, limit, cursor=None, failures_only=False)
                 'next_cursor': rows[limit-1]['cursor'] if len(rows) > limit else None}
 
 
+def _call_attempts(conn, client_id, start=None, end=None, sid_hash=None, request_hash=None):
+    """Join provider events to their exact HTTP attempt, not all retries of a request.
+
+    event_id is emitted as <attempt UUID>:<call ordinal> by d2_admin_metrics.
+    Provider rows are deliberately not time-filtered: an answer may cross midnight.
+    No phase is recorded, so these are observed calls, not inferred tool stages.
+    """
+    if not _metrics_present(conn):
+        return []
+    where = ["r.client_id=?", "r.kind='request'"]
+    args = [client_id]
+    for column, op, value in [('observed_at', '>=', start), ('observed_at', '<', end),
+                               ('sid_hash', '=', sid_hash), ('request_hash', '=', request_hash)]:
+        if value is not None:
+            where.append(f'r.{column}{op}?')
+            args.append(value)
+    return [dict(row) for row in conn.execute("""SELECT r.outcome,r.observed_at,
+        count(p.event_id) AS calls,
+        sum(CASE WHEN p.outcome='failed' THEN 1 ELSE 0 END) AS failed_calls,
+        r.duration_ms,sum(p.estimated_usd) AS estimated_usd
+        FROM d2_admin_observation r LEFT JOIN d2_admin_observation p
+        ON p.client_id=r.client_id AND p.sid_hash=r.sid_hash
+        AND p.request_hash=r.request_hash AND p.kind='provider'
+        AND substr(p.event_id,1,instr(p.event_id,':')-1)=r.event_id
+        WHERE """ + ' AND '.join(where) + " GROUP BY r.event_id ORDER BY r.observed_at,r.event_id", args)]
+
+
+def _call_breakdown(attempts):
+    completed = [a for a in attempts if a['outcome'] == 'completed']
+    total = len(completed)
+    two = sum(a['calls'] == 2 for a in completed)
+    return dict(completed=total, zero=sum(a['calls'] == 0 for a in completed),
+        one=sum(a['calls'] == 1 for a in completed), two=two,
+        more=sum(a['calls'] > 2 for a in completed),
+        two_percent=100 * two / total if total else None,
+        failed_attempts=sum(a['outcome'] == 'failed' for a in attempts),
+        replayed=sum(a['outcome'] == 'replayed' for a in attempts),
+        failed_calls=sum(a['failed_calls'] for a in attempts))
+
+
 def costs(client_id, start, end):
     with reader(client_id) as conn:
         if not _metrics_present(conn):
@@ -261,7 +307,9 @@ def costs(client_id, start, end):
         items = [dict(row) for row in rows]
         sums = [row['estimated_usd'] for row in items if row['estimated_usd'] is not None]
         old_sums = [row['legacy_estimated_usd'] for row in items if row['legacy_estimated_usd'] is not None]
-        return {'available': True, 'items': items, 'estimated_usd': sum(sums) if sums else None,
+        return {'available': True, 'items': items,
+                'call_breakdown': _call_breakdown(_call_attempts(conn, client_id, start, end)),
+                'estimated_usd': sum(sums) if sums else None,
                 'unpriced_calls': sum(row['unpriced_calls'] for row in items),
                 'legacy_calls': sum(row['legacy_calls'] for row in items),
                 'legacy_estimated_usd': sum(old_sums) if old_sums else None,

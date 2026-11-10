@@ -10,7 +10,7 @@ async function get(path,params={},signal=state.controller?.signal){
   const generation=state.generation,client=state.client;
   const query=new URLSearchParams({client_id:client,period:$('period').value,...params});
   const response=await fetch(`${path}?${query}`,{cache:'no-store',signal});
-  if(!response.ok)throw new Error(response.status===503?'Хранилище диалогов недоступно или содержит несовместимые записи.':response.status===404?'Данные не найдены.':`Ошибка доступа (${response.status}).`);
+  if(!response.ok)throw new Error(response.status===503?(path==='/api/knowledge'?'Не удалось прочитать конфигурацию базы знаний.':'Хранилище диалогов недоступно или содержит несовместимые записи.'):response.status===404?'Данные не найдены.':`Ошибка доступа (${response.status}).`);
   const data=await response.json();
   if(generation!==state.generation||client!==state.client)throw new DOMException('Устаревший ответ','AbortError');
   return data;
@@ -46,10 +46,31 @@ function renderOverview(data){
   const fields=[['Диалоги',data.sessions,'blue','chat'],['Вопросы и действия',data.saved_turns,'blue','activity'],['Заявки',data.forms,'violet','send'],['Отправлено',data.sent,'teal','send'],['Демо-заявки',data.demo_stub,'muted','chat'],['Не отправлено',data.failed,data.failed?'red':'muted','error'],['Без подтверждения',data.unknown,data.unknown?'amber':'muted','clock'],['Ожидают',data.pending,data.pending?'amber':'muted','clock']];
   $('overview').replaceChildren(...fields.map(([label,value,tone,icon])=>metric(label,number(value),tone,'За всё время',icon)));
 }
+async function loadKnowledge(){
+  const d=await get('/api/knowledge');
+  const cards=node('div','','cost-summary');
+  cards.append(metric('Документы',number(d.documents),'blue',`${number(Math.round(d.md_bytes/1024*10)/10)} КиБ · MD-файлы`,'chat'),metric('Услуги',number(d.services),'violet',`${number(d.active_services)} активных`,'activity'),metric('Ценовые предложения',number(d.offers),'teal',`${number(d.active_offers)} активных`,'cost'),metric('Контекст ≈ токены',`${number(d.estimated_tokens_low)}–${number(d.estimated_tokens_high)}`,'amber','Грубая оценка, не расход API','activity'));
+  $('knowledge').replaceChildren(cards);
+  const detail=node('details'),summary=node('summary','Из чего складывается объём');
+  const wrap=node('div','','table-scroll'),breakdown=node('table','','simple-table knowledge-table');
+  const head=node('thead'),header=node('tr');
+  header.append(node('th','Состав'),node('th','Объём'),node('th','Единица'));head.append(header);
+  const body=node('tbody');
+  body.append(
+    row(['MD-корпус с шапками и границами',number(d.corpus_chars),'символов']),
+    row(['Инструкции, справочники и остальные части system',number(d.other_system_chars),'символов']),
+    row(['Схема ценового инструмента',number(d.tool_chars),'символов']),
+    row(['Итого контекст модели',number(d.total_chars),'символов']),
+    row(['Исходные MD-файлы (справочно)',number(d.md_chars),'символов']),
+    row(['Пакет знаний и настроек (справочно)',number(Math.round(d.pack_bytes/1024*10)/10),'КиБ'])
+  );
+  breakdown.append(head,body);wrap.append(breakdown);
+  detail.append(summary,wrap,node('p','Пакет знаний и настроек — без диалогов, изображений и видео. Справочные строки не прибавляются к итогу контекста.','muted'));
+  $('knowledge').append(detail,node('p','Объём для обычного первого запроса: system + схема инструмента. Без истории, вопроса, служебной обёртки API и результата ценового поиска. На других этапах состав контекста отличается. Оценка токенов: 2–4 символа на токен, не точный токенизатор; фактическое значение может выходить за этот диапазон. Кэш влияет на оплату, а не на размер контекста. Пересчёт при обновлении панели, без вызова модели.','muted'));
+}
 async function loadCosts(){
   const d=await get('/api/costs');
   if(!d.available){empty('costs','Метрик пока нет. Они появятся после новых обращений к боту.');return;}
-  if(!d.items.length){empty('costs','За выбранный период вызовов модели не записано.');return;}
   table('costs',['Модель','Вызовы','Вход, всего','Из кэша','Без кэша','Выход','Оценка, $'],d.items.map(x=>row([x.model||'Не указана',number(x.calls),number(x.prompt_tokens),number(x.cached_prompt_tokens),number(x.uncached_prompt_tokens),number(x.completion_tokens),number(x.estimated_usd)])));
   const split=d.items.filter(x=>x.cached_prompt_tokens!=null&&x.uncached_prompt_tokens!=null);
   const cached=split.reduce((n,x)=>n+x.cached_prompt_tokens,0),input=split.reduce((n,x)=>n+x.cached_prompt_tokens+x.uncached_prompt_tokens,0);
@@ -58,6 +79,11 @@ async function loadCosts(){
   const cacheCard=metric('Вход из кэша',input?`${Number(cached/input*100).toLocaleString('ru-RU',{maximumFractionDigits:1})} %`:null,'teal','Среди токенов с известной разбивкой','cache');
   if(input){const bar=node('progress','','cache-meter');bar.max=input;bar.value=cached;bar.setAttribute('aria-label','Доля входных токенов из кэша');cacheCard.appendChild(bar);}
   cards.appendChild(cacheCard);$('costs').prepend(cards);
+  if(d.call_breakdown){
+    const b=d.call_breakdown,counts=node('div','','cost-summary');
+    counts.append(metric('Один вызов',number(b.one),'blue','Завершённые ответы','chat'),metric('Два вызова',number(b.two),'violet',b.two_percent==null?'Нет завершённых ответов':`${Number(b.two_percent).toLocaleString('ru-RU',{maximumFractionDigits:1})} % завершённых ответов`,'activity'),metric('Более двух',number(b.more),'amber','Зарегистрированные вызовы','activity'),metric('Без зарегистрированных вызовов',number(b.zero),'teal','Включая действия интерфейса','chat'));
+    $('costs').append(counts,node('p',`Завершённых ответов и действий: ${number(b.completed)}. Неудачных попыток: ${number(b.failed_attempts)}. Повторных получений готового ответа: ${number(b.replayed)}. Ошибок вызова модели: ${number(b.failed_calls)}.`,'muted'),node('p','Разбивка по времени завершения ответа. Повторные обращения после ошибки и повторное получение готового ответа не включены в долю двойных. Назначение вызова и внутренние повторы провайдера не записаны. Это число зарегистрированных вызовов, а не доказанное число этапов. Ноль может означать действие без модели или неполные метрики; старые ответы без метрик не учитываются.','muted'));
+  }
   $('costs').appendChild(node('p',`Доля кэша среди входных токенов с известной разбивкой: ${input?Number(cached/input*100).toLocaleString('ru-RU',{maximumFractionDigits:1})+' %':'Нет данных'}.`,'muted'));
   $('costs').appendChild(node('p',`Оценка по сохранённым тарифам: ${number(d.estimated_usd)} $. Новых вызовов без расчёта: ${d.unpriced_calls}. Без разбивки кэша: ${d.unsplit_calls}.`,'muted'));
   $('costs').appendChild(node('p','Объёмы — суммы известных токенов из ответа провайдера. Для direct DeepSeek учтён UTC-график пик/непик; исключения китайских праздников не автоматизированы. Это оценка, не выписка со счёта.','muted'));
@@ -128,6 +154,8 @@ async function showThread(session,older=false,target=null){
     for(const turn of all){
       const box=node('section','','admin-turn');box.dataset.request=turn.request_key;
       box.append(node('div',turn.selected_action?'Действие в виджете':'Посетитель','turn-meta'),node('div',turn.patient_text||(turn.selected_action?'Выбор в виджете':'Сообщение скрыто'),'admin-turn__user'),node('div','ИИ-помощник','turn-meta'),formatted(turn.answer));
+      const usage=turn.model_usage;
+      box.appendChild(node('p',usage?`Вызовы модели: ${number(usage.calls)} · время ответа: ${number(usage.duration_ms/1000)} с · оценка: ${usage.estimated_usd==null?'нет данных':number(usage.estimated_usd)+' $'}${usage.failed_attempts?' · неудачных попыток по запросу: '+number(usage.failed_attempts):''}${usage.failed_calls?' · ошибок вызовов: '+number(usage.failed_calls):''}`:'Вызовы модели: нет данных','turn-meta'));
       if(turn.failure_reasons?.length){const technical=turn.failure_reasons.includes('d2_operation_invalid');box.append(node('p',`${technical?'Часть ответа не выполнена: операция отклонена.':'Для части ответа не хватило данных.'} Сохранённая причина: ${turn.failure_reasons.join(', ')}`,technical?'failure-note':'muted'));}
       const details=node('details'),summary=node('summary','Технические сведения шага');details.append(summary,node('p',`Шаг ${turn.revision} · запрос ${turn.request_key}`));box.append(details);
       if(turn.request_key===target)box.classList.add('is-target');fragment.appendChild(box);
@@ -160,8 +188,8 @@ async function refresh(preserve=true){
   const navigation=state.navigation;
   for(const id of ['moreDialogs','moreLeads','moreProblems','moreEvents'])$(id).hidden=true;
   const generation=++state.generation;
-  for(const target of ['overview','periodOverview','costs','funnel','dialogs','leads','problems','events'])empty(target,'Загрузка…');
-  const jobs=[['overview',()=>get('/api/overview').then(renderOverview)],['costs',loadCosts],['funnel',loadFunnel],['dialogs',loadDialogs],['leads',loadLeads],['problems',()=>loadObservations('problems')]];
+  for(const target of ['overview','periodOverview','knowledge','costs','funnel','dialogs','leads','problems','events'])empty(target,'Загрузка…');
+  const jobs=[['overview',()=>get('/api/overview').then(renderOverview)],['knowledge',loadKnowledge],['costs',loadCosts],['funnel',loadFunnel],['dialogs',loadDialogs],['leads',loadLeads],['problems',()=>loadObservations('problems')]];
   if($('eventExplorer').open)jobs.push(['events',()=>loadObservations('events')]);else empty('events','Откройте раздел для загрузки метрик.');
   await Promise.all(jobs.map(async([target,fn])=>{try{await fn();}catch(e){if(e.name!=='AbortError'&&generation===state.generation)empty(target,e.message);}}));
   if(generation===state.generation&&navigation===state.navigation&&selected){
@@ -212,6 +240,6 @@ async function init(){
     await refresh();
   }catch(e){$('statusBar').textContent=e.message;}
 }
-window.addEventListener('pagehide',()=>{state.controller?.abort();clearThread();for(const id of ['overview','periodOverview','costs','funnel','dialogs','leads','events','problems'])$(id).replaceChildren();});
+window.addEventListener('pagehide',()=>{state.controller?.abort();clearThread();for(const id of ['overview','periodOverview','knowledge','costs','funnel','dialogs','leads','events','problems'])$(id).replaceChildren();});
 window.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});
 void init();

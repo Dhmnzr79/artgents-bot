@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 const source = fs.readFileSync(new URL("../../static/widget/api.js", import.meta.url), "utf8");
-const { postAsk, streamAsk, friendlyErrorMessage, TECHNICAL_ERROR_MESSAGE } =
+const { postAsk, streamAsk, friendlyErrorMessage, TECHNICAL_ERROR_MESSAGE, visitorIdForClient } =
   await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
 assert.equal(friendlyErrorMessage(""), "");
 assert.equal(TECHNICAL_ERROR_MESSAGE, "Сейчас не получилось ответить. Понимаю, что это неудобно. Попробуйте задать другой вопрос.");
@@ -18,7 +18,7 @@ for (const mode of ["http", "sse", "network"]) {
   let errors = [], ui = 0, done = 0;
   globalThis.fetch = async (_, options) => {
     calls++;
-    assert.deepEqual(JSON.parse(options.body), body);
+    assert.deepEqual(JSON.parse(options.body), { ...body, visitor_id: visitorIdForClient(body.client_id) });
     if (mode === "network") throw new Error("private network detail");
     if (mode === "http") return Response.json({ error: "d2_turn_failed" }, { status: 503 });
     return response([["error", { error: "d2_invalid_turn" }]]);
@@ -48,8 +48,10 @@ await streamAsk("", body, { onUi: () => published++, onDone: () => completed++, 
 assert.deepEqual([published, completed, failed], [1, 1, 0]);
 console.log("PASS: friendly error copy, JSON/SSE/network, same-ID replay, committed UI preservation");
 
-for (const code of ["demo_session_limit", "demo_daily_limit"])
-  assert.match(friendlyErrorMessage(code), /Вы посмотрели возможности демо/);
+assert.match(friendlyErrorMessage("demo_visitor_limit"), /30 вопросов/);
+assert.match(friendlyErrorMessage("demo_daily_limit"), /Общий суточный лимит/);
+assert.equal(visitorIdForClient("demo"), visitorIdForClient("demo_medical"));
+assert.notEqual(visitorIdForClient("demo"), visitorIdForClient("nikadent"));
 assert.match(friendlyErrorMessage("demo_ip_limit"), /Подождите минуту/);
 calls = 0;
 let quotaErrors = [];
@@ -60,6 +62,13 @@ globalThis.fetch = async () => {
 await streamAsk("", body, { onError: (code, retryable) => quotaErrors.push([code, retryable]) });
 assert.deepEqual(quotaErrors, [["demo_daily_limit", false]]);
 assert.equal(calls, 1);
-globalThis.fetch = async () => Response.json({ error: "demo_session_limit" }, { status: 429 });
-await assert.rejects(postAsk("", body), { message: friendlyErrorMessage("demo_session_limit") });
+globalThis.fetch = async () => Response.json({ error: "demo_visitor_limit" }, { status: 429 });
+await assert.rejects(postAsk("", body), { message: friendlyErrorMessage("demo_visitor_limit") });
 console.log("PASS: demo limit messages and no automatic retry");
+
+const saved = new Map();
+globalThis.localStorage = {getItem:key=>saved.get(key),setItem:(key,value)=>saved.set(key,value)};
+const firstId=visitorIdForClient('demo');
+const reloaded=await import(`data:text/javascript;base64,${Buffer.from(source+'\n// fresh module').toString('base64')}`);
+assert.equal(reloaded.visitorIdForClient('demo_medical'), firstId);
+console.log('PASS: shared demo visitor survives a fresh module/browser reload');
